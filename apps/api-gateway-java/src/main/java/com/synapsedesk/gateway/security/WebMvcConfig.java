@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.security;
 
+import com.synapsedesk.gateway.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.throttle.ThrottlerInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
@@ -26,13 +27,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
   private final PermissionInterceptor permissionInterceptor;
   private final ThrottlerInterceptor throttlerInterceptor;
+  private final HttpMetricsInterceptor httpMetricsInterceptor;
 
   public WebMvcConfig(
     PermissionInterceptor permissionInterceptor,
-    ThrottlerInterceptor throttlerInterceptor
+    ThrottlerInterceptor throttlerInterceptor,
+    HttpMetricsInterceptor httpMetricsInterceptor
   ) {
     this.permissionInterceptor = permissionInterceptor;
     this.throttlerInterceptor = throttlerInterceptor;
+    this.httpMetricsInterceptor = httpMetricsInterceptor;
   }
 
   @Override
@@ -44,5 +48,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // time.
     registry.addInterceptor(throttlerInterceptor);
     registry.addInterceptor(permissionInterceptor);
+    // LAST: a request a guard refused above never reaches it, which is what makes
+    // the counter count only requests that reach a handler, as Node's does.
+    registry.addInterceptor(httpMetricsInterceptor);
   }
 }

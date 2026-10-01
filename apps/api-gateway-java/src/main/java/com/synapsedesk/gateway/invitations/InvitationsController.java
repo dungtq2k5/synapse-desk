@@ -19,6 +19,7 @@ import com.synapsedesk.gateway.generated.model.PreviewInvitationResponseDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
@@ -483,9 +484,11 @@ public class InvitationsController {
    */
   private static void requireEmailVerified(RequestContext context) {
     if (!context.isSuperAdmin() && !context.isEmailVerified()) {
-      throw new ResponseStatusException(
-        HttpStatus.FORBIDDEN,
-        "Verify your email address to use this feature."
+      throw GuardRefusal.refused(
+        new ResponseStatusException(
+          HttpStatus.FORBIDDEN,
+          "Verify your email address to use this feature."
+        )
       );
     }
   }

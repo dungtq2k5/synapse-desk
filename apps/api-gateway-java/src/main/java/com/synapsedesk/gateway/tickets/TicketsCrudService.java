@@ -6,6 +6,7 @@ import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.Permission
 import com.synapsedesk.gateway.generated.model.TicketResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateTicketDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
@@ -264,9 +265,11 @@ public class TicketsCrudService {
     if (context.permissionCodes().contains(code.getValue())) {
       return;
     }
-    throw new ResponseStatusException(
-      HttpStatus.FORBIDDEN,
-      "Requires: " + code.getValue()
+    throw GuardRefusal.refused(
+      new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        "Requires: " + code.getValue()
+      )
     );
   }
 

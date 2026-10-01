@@ -16,6 +16,7 @@ import com.synapsedesk.gateway.generated.model.GenerateTwoFactorResponseDto;
 import com.synapsedesk.gateway.generated.model.RegenerateBackupCodesDto;
 import com.synapsedesk.gateway.generated.model.TwoFactorAuthenticatedResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
@@ -357,9 +358,8 @@ public class TwoFactorAuthController {
       return new Enrollee(challenge.get().sub(), currentUser.origin(request));
     }
 
-    throw new ResponseStatusException(
-      HttpStatus.UNAUTHORIZED,
-      ENROLMENT_REFUSED
+    throw GuardRefusal.refused(
+      new ResponseStatusException(HttpStatus.UNAUTHORIZED, ENROLMENT_REFUSED)
     );
   }
 
@@ -380,7 +380,9 @@ public class TwoFactorAuthController {
   }
 
   private static ResponseStatusException unauthorized() {
-    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+    return GuardRefusal.refused(
+      new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized")
+    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

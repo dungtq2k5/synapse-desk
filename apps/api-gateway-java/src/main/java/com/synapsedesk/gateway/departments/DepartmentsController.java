@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.generated.model.DepartmentMemberResponseDto;
 import com.synapsedesk.gateway.generated.model.DepartmentResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateDepartmentDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
@@ -163,9 +164,11 @@ public class DepartmentsController {
       !context.isSuperAdmin() &&
       !context.permissionCodes().contains("department.delete")
     ) {
-      throw new ResponseStatusException(
-        HttpStatus.FORBIDDEN,
-        "Using 'includeDeleted' requires the department.delete permission"
+      throw GuardRefusal.refused(
+        new ResponseStatusException(
+          HttpStatus.FORBIDDEN,
+          "Using 'includeDeleted' requires the department.delete permission"
+        )
       );
     }
 

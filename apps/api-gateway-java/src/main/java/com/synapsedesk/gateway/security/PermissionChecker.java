@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.security;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.config.RuntimeProperties;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -40,14 +41,16 @@ public class PermissionChecker {
     }
 
     boolean production = "production".equals(runtime.nodeEnv());
-    throw new ResponseStatusException(
-      HttpStatus.FORBIDDEN,
-      production
-        ? "You do not have permission to access this resource"
-        : "Requires one of: " +
-            Arrays.stream(required.value())
-              .map(PermissionCodesEnum::getValue)
-              .collect(Collectors.joining(", "))
+    throw GuardRefusal.refused(
+      new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        production
+          ? "You do not have permission to access this resource"
+          : "Requires one of: " +
+              Arrays.stream(required.value())
+                .map(PermissionCodesEnum::getValue)
+                .collect(Collectors.joining(", "))
+      )
     );
   }
 }

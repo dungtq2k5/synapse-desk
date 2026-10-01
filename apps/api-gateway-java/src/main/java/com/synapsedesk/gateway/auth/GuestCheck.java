@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.auth;
 
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -36,9 +37,11 @@ public class GuestCheck {
       .orElse(false);
 
     if (hasValidToken) {
-      throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST,
-        "You are already logged in with an active session."
+      throw GuardRefusal.refused(
+        new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "You are already logged in with an active session."
+        )
       );
     }
   }

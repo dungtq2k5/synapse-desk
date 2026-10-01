@@ -38,12 +38,6 @@ export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
  * nothing is the failure this harness exists to prevent.
  */
 export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
-  '`/metrics` counts the requests it served':
-    'no Java code records `http_requests_total` or `http_request_duration_seconds`: ' +
-    '`GatewayMetrics.httpRequest()` has no caller, so the series never appears. ' +
-    '`grpc_client_duration_seconds` (`grpcCall`) and `ai_generation_duration_seconds` ' +
-    '(`aiGeneration`) are unrecorded for the same reason; dashboards and alerts on ' +
-    'traffic, peer latency and generation time would read empty after a cutover',
   'a DTO validation failure':
     'the exact Node phrasing (whitelist rejection, class-validator type ' +
     'messages) — the per-field text is already ruled loose; this ' +
