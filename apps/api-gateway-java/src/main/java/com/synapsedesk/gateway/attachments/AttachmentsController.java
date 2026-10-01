@@ -35,12 +35,8 @@ import synapsedesk.ticket.MessageServiceGrpc;
  * ticket-service's `MessageService` on the EXISTING `ticketServiceChannel`
  * (`messageServiceStub`, already wired for `Chat`). No new gRPC infrastructure.
  *
- * <p>Migrated off `AttachmentsApi`: both routes used to share the SAME
- * generated wrapper class (`AuthControllerForgotPasswordV1202Response`) —
- * the openapi-generator dedup this whole flip retires. `remove` answers 204
- * with an empty body — `@ResponseStatus` is what tells springdoc that;
- * without it the document would claim 200, exactly the class of gap
- * `AuthController`'s migration found first.
+ * <p>`remove` answers 204 with an empty body — `@ResponseStatus` is what tells
+ * springdoc that; without it the document would claim 200.
  */
 @Tag(name = "Attachments")
 @RestController

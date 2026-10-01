@@ -3,13 +3,10 @@ package com.synapsedesk.gateway.web;
 import org.springframework.lang.Nullable;
 
 /**
- * The success envelope every REST route answers with — one generic type,
- * not the ~150 structurally-identical per-endpoint classes OpenAPI
- * Generator produced from the old document (`AuthControllerForgotPasswordV1202Response`
- * and its siblings). Those were never a real contract: the SHAPE — this
- * record — is the contract, and a generated per-endpoint name was always an
- * artifact of how the document used to be produced, not a decision anyone
- * made.
+ * The success envelope every REST route answers with — one generic type for
+ * every route. The SHAPE — this record — is the contract; there is no
+ * per-endpoint envelope class, so a route's schema name is {@code
+ * ApiResponse<ItsData>} and nothing is named after the controller method.
  *
  * <p><b>Five fields, not four.</b> {@code warning} is easy to drop rebuilding
  * this by hand — it carries no example value worth noticing, unlike

@@ -81,13 +81,9 @@ import synapsedesk.ticket.MessageServiceGrpc;
  * at all, and none should ever gain one without the same reasoning Node's
  * controller docblock states.
  *
- * <p><b>Migrated off `MessagesApi`.</b> The two presign routes used to reuse
- * the generic empty-data envelope ({@code AuthControllerForgotPasswordV1202Response})
- * because no `PresignAttachmentResponseDto` model was generated for {@code
- * {uploadUrl, objectPath, expiresAt}} — a generator artifact, not a real
- * coupling to auth. {@link PresignAttachmentResponseDto} names that shape
- * honestly instead. `create`/`confirmAttachment` answer 201 — {@code
- * @ResponseStatus} is what tells springdoc that.
+ * <p>The two presign routes answer {@code {uploadUrl, objectPath, expiresAt}},
+ * which {@link PresignAttachmentResponseDto} names. `create`/`confirmAttachment`
+ * answer 201 — {@code @ResponseStatus} is what tells springdoc that.
  */
 @Tag(name = "Messages")
 @RestController
