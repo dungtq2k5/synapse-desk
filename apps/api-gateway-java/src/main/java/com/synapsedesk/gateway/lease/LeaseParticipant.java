@@ -21,7 +21,16 @@ package com.synapsedesk.gateway.lease;
  * honours. Every implementer must carry it there, on the class.
  */
 public interface LeaseParticipant {
-  /** Start. Called once, when the lease is claimed. */
+  /**
+   * Start. Called once, when the lease is claimed.
+   *
+   * <p><b>Returning means ACTIVE, not "started".</b> A participant that consumes
+   * from a broker must not return until the broker has registered what it asked
+   * for: a subscription that is only queued on the connection leaves a window in
+   * which this process believes it is consuming and events published to the bus
+   * are dropped, with no retry and no log. Core NATS drops what nobody is
+   * subscribed to yet, so flush before returning.
+   */
   void activate();
 
   /** Stop. Called once, when the lease is lost. */

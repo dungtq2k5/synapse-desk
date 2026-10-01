@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
@@ -90,6 +91,27 @@ class CacheInvalidationConsumerIT {
 
     await()
       .atMost(Duration.ofSeconds(5))
+      .untilAsserted(() -> assertThat(cache.raw(key)).isEmpty());
+  }
+
+  /**
+   * "{@code activate()} returned" must mean "subscribed". The subscriptions are
+   * queued on the connection, and an event published from ANOTHER connection the
+   * instant {@code activate()} returns can reach the broker first — and core NATS
+   * drops a message nobody is subscribed to yet. Once is a coin flip that
+   * depends on load; repeated, it is a measurement.
+   */
+  @RepeatedTest(40)
+  void anEventPublishedTheInstantActivateReturnsIsNeverLost() {
+    String tenant = "it-" + System.nanoTime();
+    String key = cache.buildKey(tenant, "tickets", Map.of());
+    cache.putRaw(key, "\"warm\"", 60);
+
+    consumer.activate();
+    publish("ticket.created", tenant);
+
+    await()
+      .atMost(Duration.ofSeconds(2))
       .untilAsserted(() -> assertThat(cache.raw(key)).isEmpty());
   }
 

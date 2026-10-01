@@ -12,8 +12,10 @@ import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import io.nats.client.Nats;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -67,6 +69,10 @@ public class NotificationEventsConsumer implements LeaseParticipant {
       for (String subject : SUBJECTS) {
         dispatcher.subscribe(subject);
       }
+      // "activate() returned" must mean "subscribed": the SUBs are queued on
+      // the connection, and core NATS drops an event published before the broker
+      // has them. Flushing waits for the broker to have read them all.
+      opened.flush(Duration.ofSeconds(5));
       connection = opened;
       LOG.info(
         "Notification events consumer subscribed to {} subjects",
@@ -78,7 +84,7 @@ public class NotificationEventsConsumer implements LeaseParticipant {
         "Could not start the notification events consumer",
         failure
       );
-    } catch (IOException failure) {
+    } catch (IOException | TimeoutException failure) {
       throw new IllegalStateException(
         "Could not start the notification events consumer",
         failure
