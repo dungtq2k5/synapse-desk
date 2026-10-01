@@ -25,7 +25,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
-import { apiNameFor, pendingApis } from './pending';
 
 type Operation = {
   operationId: string;
@@ -116,9 +115,9 @@ function codesIn(decoratorArgs: string): string[] {
  * `@ResponseMessage(...)` comes AFTER it on six of its twelve routes. There
  * the walk stopped at `@ResponseMessage` and never saw `@RequirePermission`,
  * returned `null`, and the per-operation assertion below took `null` to mean
- * "Node is open here" and passed without checking anything — the same shape
- * of failure as the `apiNameFor` bug: latent because every existing caller's
- * shape happened not to trigger it. Slicing to the nearest preceding `\n  }\n`
+ * "Node is open here" and passed without checking anything — a failure
+ * latent because every existing caller's shape happened not to trigger it.
+ * Slicing to the nearest preceding `\n  }\n`
  * is order- and decorator-count-independent: whatever sits between the last
  * method's end and this signature IS this method's own decorator block.
  */
@@ -220,7 +219,6 @@ function javaRequiredCodes(
 }
 
 describe('permission coverage — every gated Node operation stays gated in Java', () => {
-  const pending = pendingApis();
   const nodeSources = nodeControllerSources();
   const javaRoot = join(REPO_ROOT, 'apps/api-gateway-java/src/main/java');
   const javaFiles = (() => {
@@ -240,12 +238,8 @@ describe('permission coverage — every gated Node operation stays gated in Java
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n');
 
-  // `apiNameFor` now handles the published tag's spaces and casing
-  // (`'Audit Logs'` -> `AuditLogsApi`) itself — this used to hand-roll that
-  // normalization, which is exactly the kind of second copy that drifts.
-  const implemented = operations().filter(
-    (op) => !pending.has(apiNameFor(op.tag)),
-  );
+  // Every published operation: nothing is pending, so none is excused.
+  const implemented = operations();
 
   it('found at least one implemented, permission-gated operation to check', () => {
     // A guard with nothing to guard is vacuous — `Feedback`'s

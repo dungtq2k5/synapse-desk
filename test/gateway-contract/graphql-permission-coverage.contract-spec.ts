@@ -369,7 +369,7 @@ describe('GraphQL permission coverage — every gated Node field stays gated in 
     // end there — `Example` was read as a field name, and every real field
     // after it silently vanished from `declaredTags`'s universe. Root
     // fields going missing from THIS scan is the direction that matters
-    // (`skip-list.contract-spec.ts`'s own "a row DECLARES" vs "the field
+    // (`declared-tags.contract-spec.ts`'s own "a row DECLARES" vs "the field
     // EXISTS" distinction) — the exact failure mode this guard exists to
     // catch, now caused by the guard's own reader instead.
     const hostile = `type Query {

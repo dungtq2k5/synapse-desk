@@ -1,9 +1,7 @@
 /**
  * @file `UserSessionsApi` — the admin view of another user's sessions. Two
  * operations, two DISTINCT permission codes (`user.session.read` /
- * `user.session.revoke`), the first real exercise of `apiNameFor`'s
- * multi-word path (`'User Sessions'` -> `UserSessionsApi`) in production use
- * rather than a direct unit check.
+ * `user.session.revoke`).
  */
 
 import { sign } from 'jsonwebtoken';

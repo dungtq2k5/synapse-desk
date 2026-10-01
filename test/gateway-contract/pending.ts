@@ -1,20 +1,11 @@
 /**
- * @file Which rows run for which implementation, DERIVED from the Java
- * build's own pending list.
+ * @file Which rows run for which implementation.
  *
- * **One fact, one file.** "This route is not implemented in Java" is already
- * written in `apps/api-gateway-java/src/test/resources/pending-apis.txt`,
- * where `GeneratedApiCoverageTest` asserts it only ever shrinks. A second
- * list here would be the same fact maintained twice, and the two would part
- * company the first time someone implemented an API without remembering the
- * harness. So each row declares the API TAG it exercises and the skip is
- * computed.
- *
- * Reading that file is a FILE READ, not an import: `image-contract.spec.ts`
- * refuses a relative import that leaves a workspace, which is why
- * `canonicalizeEnums` moved into `@synapsedesk/common` — but it says nothing
- * about data, and §3a's binding test already reads `.env.example` the same
- * way.
+ * **Every route is implemented in both**, so no row is skipped for being
+ * unserved; the only rows skipped for Java are the ones NAMED in
+ * {@link SKIPPED_FOR_JAVA}, each with what it waits for. A row declares the API
+ * TAG it exercises — not to be gated by it, but so
+ * `declared-tags.contract-spec.ts` can prove every published API has a row.
  *
  * **Skipped means REPORTED skipped.** `rowFor(...)` returns jest's `it.skip`,
  * so the runner prints the row and its name. A conditional `return` inside a
@@ -28,61 +19,17 @@ import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 import { compareAlphabetically } from '@synapsedesk/common';
 
-/** The tracked list the Java build owns. */
-export const PENDING_APIS = join(
-  REPO_ROOT,
-  'apps/api-gateway-java/src/test/resources/pending-apis.txt',
-);
-
-/** Where the generator writes its interfaces, for the typo guard. */
-export const GENERATED_APIS = join(
-  REPO_ROOT,
-  'apps/api-gateway-java/target/generated-sources/openapi/src/main/java/com/synapsedesk/gateway/generated/api',
-);
-
 /** The implementation under test. */
 export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
 
 /**
- * `Tickets` -> `TicketsApi`, the generated interface's simple name.
+ * Rows the Java gateway cannot pass yet, by NAME, with what each waits for.
  *
- * **Word-capitalized, not merely space-stripped.** A published tag can carry
- * spaces (`'Audit Logs'`, `'User Sessions'`) and even an un-capitalized word
- * (`'Webhook endpoints'` — lowercase `e`), while the generated interface never
- * does (`AuditLogsApi`, `UserSessionsApi`, `WebhookEndpointsApi`). Stripping
- * spaces alone would produce `WebhookendpointsApi`, which matches nothing in
- * `pending-apis.txt` — silently treating every one of that tag's operations as
- * unimplemented forever. Found the hard way: every `rowFor(...)` tag written
- * so far happens to be one word, so this path had never run through THAT
- * caller — it surfaced when `permission-coverage.contract-spec.ts` read tags
- * straight off the published document instead, where
- * multi-word ones already exist for modules not yet implemented.
- */
-export const apiNameFor = (tag: string): string =>
-  `${tag
-    .split(/\s+/u)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('')}Api`;
-
-/** Every interface the Java gateway has NOT implemented, by simple name. */
-export function pendingApis(): Set<string> {
-  const lines = readFileSync(PENDING_APIS, 'utf8').split('\n');
-
-  return new Set(
-    lines
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !line.startsWith('#')),
-  );
-}
-
-/**
- * Rows the skeleton cannot pass yet, by NAME, with what each waits for.
- *
- * **The derived list covers ROUTES; this covers BEHAVIOURS.** A row can be
- * tagged for an API the Java gateway implements and still fail on something
- * the skeleton has not grown — CORS, the helmet header set, a metric that
- * only exists once its labels are first used. Those are not pending
- * interfaces, so `pending-apis.txt` cannot express them and should not try.
+ * **A BEHAVIOUR, never a route.** A row can exercise an API the Java gateway
+ * serves and still fail on something it has not grown — a metric that only
+ * exists once its labels are first used, an exact Node phrasing, a
+ * distinction a project-wide setting erases. Each is recorded here by the
+ * row's own title, with the reason beside it.
  *
  * **This list is the progress bar, and it must be EMPTY before the cutover
  * rehearsal.** Each entry names what it waits for, so that emptying it is a
@@ -109,11 +56,11 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     "the Swagger CLI plugin's own default for a bare `@Headers()` parameter, " +
     "not a deliberate spec decision) while Node's handler treats it as " +
     'optional (`idempotencyKey?: string`) and never enforces the header at ' +
-    "all. Java's generated `BillingApi` takes the published contract " +
-    'literally (`@NotNull @RequestHeader(required = true)`), so an absent ' +
-    'header 400s before the controller runs — a genuine, pre-existing spec/' +
+    "all. Java's `BillingController` keeps the published contract's " +
+    '`@NotNull @RequestHeader(required = true)`, so an absent header 400s ' +
+    'before the controller runs — a genuine, pre-existing spec/' +
     'implementation gap this port did not introduce and should not paper ' +
-    'over by deviating from the generated interface',
+    'over by deviating from the published contract',
 };
 
 /** True when this row's NAME is on the explicit list. */
@@ -124,21 +71,23 @@ function skippedByName(title: string): boolean {
 }
 
 /**
- * `it` or `it.skip`, by whether this implementation serves those tags yet.
+ * `it` or `it.skip`, by whether this row is named in {@link SKIPPED_FOR_JAVA}.
  *
- * For `node` it is always `it`: the Node gateway implements everything, and a
- * row skipped for it would be a row nothing runs.
+ * For `node` it is always `it`: the Node gateway does everything, and a row
+ * skipped for it would be a row nothing runs.
+ *
+ * **The tags are not consulted.** They name the API the row exercises, and
+ * are read by `declaredTags()` — never here, because nothing is gated by API
+ * any more.
  *
  * @example
  * rowFor('Tickets')('creates a ticket', async () => { … });
  */
 export function rowFor(...tags: string[]): jest.It {
+  // Declared for `declaredTags()`, deliberately not consulted here.
+  void tags;
+
   if (IMPL === 'node') return it;
-
-  const pending = pendingApis();
-  const blocked = tags.filter((tag) => pending.has(apiNameFor(tag)));
-
-  if (blocked.length > 0) return it.skip;
 
   // The name is not known until the row declares it, so the explicit list is
   // applied by wrapping `it` rather than by choosing it up front.
@@ -160,8 +109,8 @@ export function rowFor(...tags: string[]): jest.It {
  * guard stayed green while the row skipped for ever. The calls are the
  * declaration; this reads them.
  *
- * Direction, as ever: from the rows toward the interfaces. The reverse would
- * only confirm that the tags someone wrote down exist.
+ * Direction, as ever: from the rows toward the published document. The
+ * reverse would only confirm that the tags someone wrote down exist.
  */
 /**
  * Every tag a `rowFor(...)` call in `source` names as a string literal.
@@ -216,10 +165,11 @@ export function declaredTags(): string[] {
 }
 
 /**
- * The GraphQL analogue of {@link PENDING_APIS} — invented for this surface,
- * since `schema.gql` generates no interface a missing field could fail to
- * implement. `GraphqlFieldCoverageTest` reads the same file and asserts it
- * only ever shrinks.
+ * The root `Query`/`Mutation` fields the Java gateway does not resolve yet.
+ * `schema.gql` generates no interface a missing field could fail to
+ * implement, so the list is how an unresolved field is told from a forgotten
+ * one. `GraphqlFieldCoverageTest` reads the same file and asserts it only ever
+ * shrinks.
  */
 export const PENDING_GRAPHQL_FIELDS = join(
   REPO_ROOT,

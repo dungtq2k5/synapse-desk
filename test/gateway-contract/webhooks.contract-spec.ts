@@ -14,10 +14,10 @@
  * can actually pin: a bad signature does nothing, a good one either forwards
  * (Stripe) or is filtered by event type (Resend).
  *
- * `WebhooksApi` stays on `pending-apis.txt`: the Java port implements the
- * signature boundary and the `email.received` filter, but refuses with a
- * retryable 503 where Node would run its full ingestion pipeline. Every row
- * below is `it.skip` under `GATEWAY_IMPL=java` until that pipeline lands.
+ * The Java port implements the signature boundary and the `email.received`
+ * filter, but refuses with a retryable 503 where Node would run its full
+ * ingestion pipeline — so no row here asserts what happens once a verified
+ * `email.received` is accepted.
  */
 
 import { createHmac, randomUUID } from 'node:crypto';

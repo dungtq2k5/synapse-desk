@@ -855,12 +855,12 @@ form: empty value **and** (`Max-Age=0` **or** a past `Expires`) **and** the
 `Path`, `HttpOnly` and `SameSite` it was set with, since a browser only
 replaces a cookie whose path matches.
 
-**The skip list is where the Java gateway's progress is read.** Under
-`GATEWAY_IMPL=java` a row is skipped when the API tag it declares is still in
-`apps/api-gateway-java/src/test/resources/pending-apis.txt`; implementing an
-interface deletes a line there and un-skips its rows in the same commit. A
-short by-name list covers the other case — the route exists, the behaviour
-does not yet — and each entry names what it waits for.
+**Which rows run for Java is read from one place.** Under
+`GATEWAY_IMPL=java` a row is skipped only when its title is named in
+`SKIPPED_FOR_JAVA` in `test/gateway-contract/pending.ts` — the route exists,
+the behaviour does not yet — and each entry names what it waits for. A row
+declares the API tag it exercises, and `declared-tags.contract-spec.ts` proves
+every published API has one.
 
 **A row here is the one the Java gateway must also pass**, so a
 wire behaviour that only the in-process suite pins is a behaviour the second

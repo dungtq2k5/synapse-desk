@@ -21,15 +21,14 @@ import org.springframework.test.context.ContextConfiguration;
 
 /**
  * Every root `Query`/`Mutation` field in the tracked schema is resolved, or
- * listed as pending — the GraphQL analogue of {@code GeneratedApiCoverageTest}.
+ * listed as pending.
  *
  * <p>
  * <b>There is no generated interface here.</b> `schema.gql` generates
  * nothing on the Java side, so this reads the SCHEMA ITSELF — copied to the
  * classpath by `pom.xml`'s `graphql-schema` resources execution — rather than
- * a `target/generated-sources` directory. The direction is the same as the
- * REST coverage test: from the tracked contract toward the code, never from
- * a document about the code.
+ * any generated source. The direction is from the tracked contract toward the
+ * code, never from a document about the code.
  *
  * <p>
  * Implemented means <b>a bean exposes a `@QueryMapping`/`@MutationMapping`

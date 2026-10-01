@@ -53,14 +53,10 @@ import synapsedesk.auth.PlatformServiceGrpc;
  * door {@code PlatformJobsController} and {@code PlatformAuditLogsController}
  * already use — called first thing in every method.
  *
- * <p><b>A plain service, not yet a {@code @RestController}.</b> {@code
- * PlatformApi} is one generated interface with 20 abstract methods; a
- * concrete class declaring {@code implements PlatformApi} must implement all
- * twenty to compile (this port's own J3 rule — see {@code pending-apis.txt}'s
- * own comment on this). The routed {@code PlatformController} is assembled
- * once every group lands, delegating to this service and its two siblings;
- * until then this class carries real, sabotage-tested logic with no route
- * attached to it yet.
+ * <p><b>A plain service behind {@code PlatformController}, not itself a
+ * {@code @RestController}.</b> The controller declares the routes and
+ * delegates to this service and its two siblings, so each group's logic is
+ * unit-testable without a servlet.
  *
  * <p><b>Known gap 42, same as {@code OrganizationsController}</b>: Node
  * calls {@code organizationStatus.invalidate(id)} after {@code

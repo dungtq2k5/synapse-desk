@@ -378,13 +378,27 @@
         </executions>
       </plugin>
 
+      <!--
+        **Models only.** The controllers are the source of the REST surface:
+        each declares its own routes, and springdoc produces the document from
+        them. What is still generated is the DTO classes the controllers and
+        tests import, from the committed document, which Node still writes.
+        Generating the interfaces as well retired with the last controller to
+        leave them.
+
+        **This block is the thing left to retire.** While it reads the
+        committed document, that document cannot change writer: DTOs derived
+        from a document derived from controllers that use those DTOs is a
+        circle. The DTOs have to become source first; only then can the
+        document's writer flip, and then this execution goes.
+      -->
       <plugin>
         <groupId>org.openapitools</groupId>
         <artifactId>openapi-generator-maven-plugin</artifactId>
         <version>${openapi-generator.version}</version>
         <executions>
           <execution>
-            <id>rest-interfaces</id>
+            <id>rest-models</id>
             <phase>generate-sources</phase>
             <goals>
               <goal>generate</goal>
@@ -393,35 +407,26 @@
               <inputSpec
               >${project.basedir}/../../docs/reference/openapi.json</inputSpec>
               <generatorName>spring</generatorName>
-              <apiPackage>com.synapsedesk.gateway.generated.api</apiPackage>
               <modelPackage
               >com.synapsedesk.gateway.generated.model</modelPackage>
+              <generateApis>false</generateApis>
               <generateApiTests>false</generateApiTests>
               <generateModelTests>false</generateModelTests>
               <generateSupportingFiles>false</generateSupportingFiles>
 
               <configOptions>
-                <!--
-                  **`skipDefaultInterface` is the whole compile-time
-                  guarantee** (J3, measured). Left at its default the
-                  generator emits `default` methods returning 501: a
-                  controller missing a method COMPILES, and the route answers
-                  501 at runtime instead of failing the build.
-                -->
-                <skipDefaultInterface>true</skipDefaultInterface>
-                <interfaceOnly>true</interfaceOnly>
                 <useSpringBoot4>true</useSpringBoot4>
                 <useBeanValidation>true</useBeanValidation>
-                <useTags>true</useTags>
                 <openApiNullable>false</openApiNullable>
                 <!--
-                  **No swagger annotations, and no springdoc.** This gateway
-                  does not PUBLISH an OpenAPI document — it is generated FROM
-                  the one the Node gateway exports, and a second document
-                  derived from the first is a second thing to drift. Without
-                  this the generated code imports
-                  `io.swagger.v3.oas.annotations`, which is not a dependency
-                  here.
+                  **No swagger annotations on the generated DTOs.** springdoc
+                  derives each schema from the class itself — its bean
+                  validation and Jackson annotations — so a second set of
+                  `@Schema` annotations written by the generator would be a
+                  second description of the same type to keep in agreement.
+                  Without this the generated code also imports
+                  `io.swagger.v3.oas.annotations` from the generator's own
+                  templates.
                   Measured: both belong INSIDE `configOptions`. As direct
                   plugin parameters — siblings of `configOptions`, where the
                   plugin's own documentation suggests them — they are

@@ -220,7 +220,7 @@ describe('audit-logs', () => {
     });
   });
 
-  rowFor('Platform Audit Logs')(
+  rowFor('PlatformAuditLogs')(
     '**`list` refuses anyone who is not a super admin, before dialing the peer**',
     async () => {
       const response = await new Session(gateway.baseUrl).get(
@@ -233,7 +233,7 @@ describe('audit-logs', () => {
     },
   );
 
-  rowFor('Platform Audit Logs')(
+  rowFor('PlatformAuditLogs')(
     '**`list` succeeds for a super admin, with `platformScope` set**',
     async () => {
       peers.ticket.on('AuditService/ListAuditLogs').reply({
@@ -266,7 +266,7 @@ describe('audit-logs', () => {
     },
   );
 
-  rowFor('Platform Audit Logs')(
+  rowFor('PlatformAuditLogs')(
     '**`listActions` refuses anyone who is not a super admin**',
     async () => {
       const response = await new Session(gateway.baseUrl).get(
