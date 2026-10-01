@@ -50,7 +50,8 @@ class OrganizationsControllerTest {
       "support.example.com",
       "sender",
       "whsec",
-      "re_key"
+      "re_key",
+      "https://api.resend.test"
     );
   private OrganizationsController controller;
 

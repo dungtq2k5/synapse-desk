@@ -17,6 +17,9 @@ import org.springframework.validation.annotation.Validated;
  * @param sender the From address outbound mail is sent as
  * @param resendWebhookSecret the provider's signing secret
  * @param resendApiKey the receiving key, used to fetch a message body
+ * @param resendBaseUrl where the receiving API is; the provider's own address
+ *     unless {@code RESEND_BASE_URL} says otherwise (the variable the vendor's own
+ *     SDK reads, so a test points both gateways at one fake the same way)
  */
 @Validated
 @ConfigurationProperties(prefix = "inbound")
@@ -25,5 +28,6 @@ public record InboundEmailProperties(
   @NotBlank String domain,
   @NotBlank String sender,
   @NotBlank String resendWebhookSecret,
-  @NotBlank String resendApiKey
+  @NotBlank String resendApiKey,
+  @NotBlank String resendBaseUrl
 ) {}

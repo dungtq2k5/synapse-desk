@@ -2,8 +2,8 @@ package com.synapsedesk.gateway.webhooks;
 
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.config.InboundEmailProperties;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.inbound.ResendInboundService;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -12,13 +12,7 @@ import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 import java.util.concurrent.TimeUnit;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -30,8 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Billing.StripeWebhookRequest;
 import synapsedesk.auth.Billing.StripeWebhookResponse;
 import synapsedesk.auth.BillingServiceGrpc;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * `WebhooksApi` — the gateway's two INBOUND webhook intakes, unrelated to
@@ -48,16 +40,12 @@ import tools.jackson.databind.ObjectMapper;
  * than any bound DTO. Always 200 except a signature failure, because Stripe
  * retries any non-2xx — an unmappable event is still 200.
  *
- * <p><b>{@code resend}</b> verifies the Standard Webhooks (svix) signature
- * itself, over those same raw bytes, before doing anything else. Scope of
- * this pass: signature verification and the {@code email.received} event
- * filter are ported faithfully; the {@code accept()} pipeline this system
- * runs afterward (mail fetch, self-loop detection, tenant/sender/thread
- * routing, attachment ingestion) is its own, much larger, unit of work and is
- * refused here with 503 rather than answered 200 — Resend redelivers a 503
- * for roughly 17 hours, so the mail is only delayed, not lost, once that
- * pipeline lands. A 200 here would tell Resend the mail was handled and it
- * would never be redelivered.
+ * <p><b>{@code resend}</b> hands the raw bytes and the request's headers to
+ * {@link ResendInboundService}, which verifies the Standard Webhooks (svix)
+ * signature over those exact bytes before doing anything else, fetches the mail
+ * Resend names, validates it, and runs it through the {@code accept()} pipeline.
+ * It answers 200 for every outcome except a bad signature (401) and a fetch
+ * failure a retry can fix (503), and counts every exit once.
  *
  * <p><b>Migrated off `WebhooksApi`.</b> Neither route had a real generated
  * DTO for `data` — the published contract borrows an unrelated route's
@@ -74,28 +62,18 @@ public class WebhooksController {
 
   private static final long STRIPE_DEADLINE_SECONDS = 20;
 
-  private static final String SVIX_ID_HEADER = "svix-id";
-  private static final String SVIX_TIMESTAMP_HEADER = "svix-timestamp";
-  private static final String SVIX_SIGNATURE_HEADER = "svix-signature";
-  private static final String SVIX_SIGNATURE_SCHEME = "v1,";
-  private static final long SVIX_TOLERANCE_SECONDS = 300;
-  private static final String EMAIL_RECEIVED_EVENT_TYPE = "email.received";
-
   private final BillingServiceGrpc.BillingServiceBlockingStub stub;
   private final CurrentUser currentUser;
-  private final InboundEmailProperties inboundEmail;
-  private final ObjectMapper json;
+  private final ResendInboundService resendInbound;
 
   public WebhooksController(
     BillingServiceGrpc.BillingServiceBlockingStub stub,
     CurrentUser currentUser,
-    InboundEmailProperties inboundEmail,
-    ObjectMapper json
+    ResendInboundService resendInbound
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
-    this.inboundEmail = inboundEmail;
-    this.json = json;
+    this.resendInbound = resendInbound;
   }
 
   @PostMapping(value = "/webhooks/stripe", produces = { "application/json" })
@@ -151,119 +129,23 @@ public class WebhooksController {
     ApiResponse<ResendWebhookAcknowledgementDto>
   > inboundEmailControllerResendV1() {
     HttpServletRequest request = CurrentRequest.request();
-    if (!(request instanceof CachedBodyRequest cached)) {
-      throw rejectedSignature();
-    }
+    byte[] rawBody =
+      request instanceof CachedBodyRequest cached
+        ? cached.body()
+        : // `JsonBodyFilter` deliberately passes a bodyless request through
+          // unwrapped, so "no wrapper" is an EMPTY body (a bad signature, answered
+          // 401) unless a body was declared and never captured — the configuration
+          // failure that `no_raw_body` exists to name.
+          request.getContentLengthLong() > 0
+          ? null
+          : new byte[0];
 
-    String id = request.getHeader(SVIX_ID_HEADER);
-    String timestamp = request.getHeader(SVIX_TIMESTAMP_HEADER);
-    String signature = request.getHeader(SVIX_SIGNATURE_HEADER);
-    if (id == null || timestamp == null || signature == null) {
-      throw rejectedSignature();
-    }
-
-    if (!verifySignature(cached.body(), id, timestamp, signature)) {
-      throw rejectedSignature();
-    }
-
-    String eventType = eventType(cached.body());
-    if (!EMAIL_RECEIVED_EVENT_TYPE.equals(eventType)) {
-      return ResponseEntity.ok(
-        ApiResponse.of(
-          200,
-          "OK",
-          new ResendWebhookAcknowledgementDto(true, "ignored_event")
-        )
-      );
-    }
-
-    // The `accept()` pipeline (mail fetch, routing, attachment ingestion) is
-    // not yet ported — see the class docblock for why 503, not 200, is the
-    // correct placeholder.
-    throw new ResponseStatusException(
-      HttpStatus.SERVICE_UNAVAILABLE,
-      "Inbound mail fetch failed"
+    return ResponseEntity.ok(
+      ApiResponse.of(
+        200,
+        "OK",
+        resendInbound.handle(rawBody, request::getHeader)
+      )
     );
-  }
-
-  private ResponseStatusException rejectedSignature() {
-    return new ResponseStatusException(
-      HttpStatus.UNAUTHORIZED,
-      "Signature could not be verified"
-    );
-  }
-
-  /**
-   * The Standard Webhooks scheme Resend signs with: {@code v1,<base64 HMAC-SHA256>}
-   * over {@code "<id>.<timestamp>.<raw body>"}, keyed by the webhook secret's
-   * bytes after its {@code whsec_} prefix is stripped and base64-decoded.
-   * Reproduced from {@code test/utils/standard-webhooks.ts}'s signer, which is
-   * itself independent of the provider's own verifier.
-   */
-  private boolean verifySignature(
-    byte[] body,
-    String id,
-    String timestamp,
-    String signatureHeader
-  ) {
-    long timestampSeconds;
-    try {
-      timestampSeconds = Long.parseLong(timestamp);
-    } catch (NumberFormatException e) {
-      return false;
-    }
-    if (
-      Math.abs(java.time.Instant.now().getEpochSecond() - timestampSeconds) >
-      SVIX_TOLERANCE_SECONDS
-    ) {
-      return false;
-    }
-
-    byte[] expected = sign(body, id, timestamp);
-
-    for (String token : signatureHeader.split(" ")) {
-      if (!token.startsWith(SVIX_SIGNATURE_SCHEME)) {
-        continue;
-      }
-      byte[] candidate;
-      try {
-        candidate = Base64.getDecoder().decode(
-          token.substring(SVIX_SIGNATURE_SCHEME.length())
-        );
-      } catch (IllegalArgumentException e) {
-        continue;
-      }
-      if (MessageDigest.isEqual(expected, candidate)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private byte[] sign(byte[] body, String id, String timestamp) {
-    byte[] key = Base64.getDecoder().decode(
-      inboundEmail.resendWebhookSecret().replaceFirst("^whsec_", "")
-    );
-    byte[] signedContent = (id + "." + timestamp + ".").getBytes(
-      StandardCharsets.UTF_8
-    );
-    byte[] content = new byte[signedContent.length + body.length];
-    System.arraycopy(signedContent, 0, content, 0, signedContent.length);
-    System.arraycopy(body, 0, content, signedContent.length, body.length);
-
-    try {
-      Mac mac = Mac.getInstance("HmacSHA256");
-      mac.init(new SecretKeySpec(key, "HmacSHA256"));
-      return mac.doFinal(content);
-    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new IllegalStateException("HmacSHA256 is not available", e);
-    }
-  }
-
-  /** {@code type} from the verified body's JSON. */
-  private String eventType(byte[] body) {
-    JsonNode type = json.readTree(body).get("type");
-    return type == null ? null : type.asString();
   }
 }

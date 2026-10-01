@@ -129,3 +129,4 @@ inbound:
   sender: ${EMAIL_SENDER}
   resend-webhook-secret: ${RESEND_WEBHOOK_SECRET}
   resend-api-key: ${RESEND_GATEWAY_API_KEY}
+  resend-base-url: ${RESEND_BASE_URL:https://api.resend.com}

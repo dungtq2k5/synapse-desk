@@ -23,25 +23,6 @@ import { compareAlphabetically } from '@synapsedesk/common';
 export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
 
 /**
- * Why the inbound-email rows wait, in groups that lift one at a time as the Java
- * pipeline lands.
- */
-const INBOUND_COUNTER =
-  'Java answers the right status but never increments ' +
-  '`inbound_email_webhook_total`, which every exit of the webhook must ' +
-  'increment exactly once — the published series is not touched at all';
-const INBOUND_FETCH =
-  'Java refuses every verified `email.received` with a 503 and never fetches ' +
-  'the mail, so it cannot tell a retryable failure from a permanent one, and ' +
-  'cannot validate what it fetched';
-const INBOUND_ACCEPT =
-  '`accept()` is not ported: the Java gateway never reaches routing, so no ' +
-  'tenant, sender or ticket is resolved for a mail';
-const INBOUND_PUBLISH =
-  '`accept()` is not ported, so nothing refuses a mail and nothing publishes ' +
-  '`email.inbound_rejected` for notification-service to reply to';
-
-/**
  * Rows the Java gateway cannot pass yet, by NAME, with what each waits for.
  *
  * **A BEHAVIOUR, never a route.** A row can exercise an API the Java gateway
@@ -80,22 +61,6 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'before the controller runs — a genuine, pre-existing spec/' +
     'implementation gap this port did not introduce and should not paper ' +
     'over by deviating from the published contract',
-  '401 rejected_signature, and nothing is fetched': INBOUND_COUNTER,
-  'an empty body is 401 rejected_signature': INBOUND_COUNTER,
-  'is 200 ignored_event': INBOUND_COUNTER,
-  'a retryable %i is 503': INBOUND_FETCH,
-  'no answer at all is 503': INBOUND_FETCH,
-  'a permanent %i is 200': INBOUND_FETCH,
-  'is 200 invalid_payload': INBOUND_FETCH,
-  'is SELF_ADDRESSED': INBOUND_ACCEPT,
-  'is UNROUTABLE_ADDRESS': INBOUND_ACCEPT,
-  'is TENANT_INACTIVE': INBOUND_ACCEPT,
-  'is SENDER_NOT_PERMITTED': INBOUND_ACCEPT,
-  'as TICKET_CREATED': INBOUND_ACCEPT,
-  'a refused sender is told once': INBOUND_PUBLISH,
-  'a tenant that is not active publishes the refusal': INBOUND_PUBLISH,
-  'a token no tenant owns publishes NOTHING': INBOUND_PUBLISH,
-  'a machine-generated mail is refused without a reply': INBOUND_PUBLISH,
 };
 
 /** True when this row's NAME is on the explicit list. */

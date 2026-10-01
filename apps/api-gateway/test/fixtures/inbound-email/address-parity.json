@@ -1,0 +1,430 @@
+{
+  "address": [
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      "SUPPORT+A1B2C3D4E5F60718293A4B5C6D7E8F90@INBOUND.TEST",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      "  support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      " support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90.1a-aabbccddeeff@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": "1a-aabbccddeeff"
+      }
+    ],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90.@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f90.a.b@inbound.test", null],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f90..@inbound.test", null],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f90@a@inbound.test", null],
+    ["\"support+a1b2c3d4e5f60718293a4b5c6d7e8f90\"@inbound.test", null],
+    ["Support <support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test>", null],
+    ["support@inbound.test", null],
+    ["support+@inbound.test", null],
+    ["support+1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f900@inbound.test", null],
+    ["support+g1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90\n@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90 @inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ],
+    ["other+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["xsupport+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["support +a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["support++a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    ["+a1b2c3d4e5f60718293a4b5c6d7e8f90", null],
+    ["", null],
+    ["@", null],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90.x@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": "x"
+      }
+    ],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90.1@inbound.test",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": "1"
+      }
+    ],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f90.1.@inbound.test", null],
+    ["support+a1b2c3d4e5f60718293a4b5c6d7e8f90İ@inbound.test", null],
+    ["Kupport+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test", null],
+    [
+      "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test\n",
+      {
+        "tenantToken": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "ticketToken": null
+      }
+    ]
+  ],
+  "token": [
+    [
+      "1-7e1ad147aa07",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1
+    ],
+    [
+      "2-1c5a3bffc874",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      2
+    ],
+    [
+      "z-7976b8433f25",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      35
+    ],
+    [
+      "10-afd9fa7e6561",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      36
+    ],
+    [
+      "11-d08a34300d6e",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      37
+    ],
+    [
+      "zz-a937db225b7d",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1295
+    ],
+    [
+      "100-93d75b90f813",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1296
+    ],
+    [
+      "zzz-8de33df3a2b5",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      46655
+    ],
+    [
+      "zik0zk-adba36fa9893",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      2147483648
+    ],
+    [
+      "e13wu1og-f963d38282d4",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1099511627776
+    ],
+    [
+      "zzzzzzzz-86d516466655",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      2821109907455
+    ],
+    [
+      "100000000-95f9751678a9",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      2821109907456
+    ],
+    [
+      "18ce53un18g-ba31c99e28eb",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      4503599627370496
+    ],
+    [
+      "2gosa7pa2gv-8cc9f9342c09",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      9007199254740991
+    ],
+    [
+      "2gosa7pa2gw-8fde173c3e63",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "2gosa7pa2gy-d3e1de70dabb",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "0-b45ae7ffa00e",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "-1-69acfe10dbaf",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b37486",
+      "22222222-2222-4222-8222-222222222222",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "another-secret",
+      null
+    ],
+    [
+      "YA-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8A0C71B37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1234
+    ],
+    [
+      "ya-8a0c71b37486zz",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1234
+    ],
+    [
+      "ya-8a0c71b374860",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1234
+    ],
+    [
+      "ya-8a0c71b3748600",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b37486-x",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b374",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b3748",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b3748z",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0czzb37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-ffffffffffff",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "-",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "+ya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "-ya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "0xya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "0ya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      " ya-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya -8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71b37486 ",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1234
+    ],
+    [
+      "ya.5-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "yax-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "0-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "yb-8a0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "ya-8a0c71B37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      1234
+    ],
+    [
+      "ya-١٢0c71b37486",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "8-٩٠645aeaac32",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      null
+    ],
+    [
+      "8-90645aeaac32",
+      "11111111-1111-4111-8111-111111111111",
+      "parity-secret-owned-by-this-repo",
+      8
+    ]
+  ]
+}

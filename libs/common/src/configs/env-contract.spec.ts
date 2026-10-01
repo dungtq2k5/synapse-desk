@@ -46,6 +46,10 @@ describe('the environment contract', () => {
     // `PORT` and never reads this; only `RealtimeProperties` on the Java
     // side binds it.
     'WS_PORT',
+    // The stock Resend SDK reads this itself, so the Node gateway has no code
+    // to validate it; the Java gateway binds it, and the contract suite points
+    // both at a fake with it.
+    'RESEND_BASE_URL',
   ]);
 
   /**

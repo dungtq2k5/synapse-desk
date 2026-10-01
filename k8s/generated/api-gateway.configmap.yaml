@@ -39,6 +39,7 @@ data:
   NOTIFICATION_SERVICE_URL: 'notification-service:5005'
   PORT: '3000'
   RAG_SERVICE_URL: 'rag-service:50255'
+  RESEND_BASE_URL: 'https://api.resend.com'
   SWAGGER_ENABLED: 'false'
   TENANT_SELECTION_NAME: 'sd_tenant_selection'
   THROTTLER_AUTH_LIMIT: '30'

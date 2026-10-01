@@ -1,0 +1,475 @@
+[
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:513462b0619bb53e6d9b0fc99a0adf80bc8d934f8fc8dcf1cef33c1c8f6b96f3"
+  ],
+  [
+    {
+      "messageId": "<m1@acme.test>",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": "  <m1@acme.test>  ",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": " <m1@acme.test> ",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": "﻿<m1@acme.test>﻿",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": " <m1@acme.test> ",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": "<m1@acme.test>",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": "​<m1@acme.test>",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "​<m1@acme.test>"
+  ],
+  [
+    {
+      "messageId": "   ",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:513462b0619bb53e6d9b0fc99a0adf80bc8d934f8fc8dcf1cef33c1c8f6b96f3"
+  ],
+  [
+    {
+      "messageId": " ﻿",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:513462b0619bb53e6d9b0fc99a0adf80bc8d934f8fc8dcf1cef33c1c8f6b96f3"
+  ],
+  [
+    {
+      "messageId": "",
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:513462b0619bb53e6d9b0fc99a0adf80bc8d934f8fc8dcf1cef33c1c8f6b96f3"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": null,
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:086fb9ed2c5b6475551b62f9cea5530a78de9415b38398f27af8d2dcd6826ffa"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:086fb9ed2c5b6475551b62f9cea5530a78de9415b38398f27af8d2dcd6826ffa"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": null,
+      "html": "<p>html only</p>"
+    },
+    "synthesized:9e8f97198640ed2e78893605d4a0fc9bde52bfa8629785f1af3e3f17b9fe597a"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "",
+      "html": "<p>ignored: empty text wins over html</p>"
+    },
+    "synthesized:de2712e9e144eaecda7474dc9e1f8e61d2a2e371f3da84be5e221fb23a368f73"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": null,
+      "html": null
+    },
+    "synthesized:de2712e9e144eaecda7474dc9e1f8e61d2a2e371f3da84be5e221fb23a368f73"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "",
+      "html": null
+    },
+    "synthesized:de2712e9e144eaecda7474dc9e1f8e61d2a2e371f3da84be5e221fb23a368f73"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "café",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:93010726f7e854e7ae8a229d81ce70d857679228d7f32de819d35a99bc0dc27f"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "café",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:6b3a57fd8bb079b02038e03c0afa9fa61112627f66784c56b2c4fb36648c4f42"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "😀",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:88a0ad0cfe59a6445bf96876889bb868a68eeefa594248e8c4c80b66c6e838ab"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "lone high \ud800 surrogate",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:18bf6e6fdab0b36c042e8c138cc8dfe37f056645b7709e6a791679de045ff0c2"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "lone low \udc00 surrogate",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:6e641f1ee31bb7cd6c2f51c84800bf5893836ba52b76cd597ada06279ec4ca58"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "reversed \ude00\ud83d pair",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:21eb04f1d8b2f651c0888b5bb0ed32a4d635de09d52efd8c2a37a954528c7e1e"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "trailing high \ud83d",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:f618ba594ed765c6e0da807eeabdd3575754eb59a0555acf9557475732269d56"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "\udc00 leading low",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:a1eb87c3a4e2e15fc4e934883322a469d0c6001f7dcf1cb48a61bda50ad53d35"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "body with lone \ud800 surrogate",
+      "html": null
+    },
+    "synthesized:715fc0fd18b4502a599a5444302cebd745da2e064b8d31e51ec8a2e3715fcef7"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": null,
+      "html": "<p>html with lone \udfff</p>"
+    },
+    "synthesized:44a4b1c0eb3cb670c6ff40b948cf5040eb306daf638d058bb70dbf6b5215fb33"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "a\ud800@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:498ca7dfb00eae893556d8c917e1d897d98bbb289f42267f58c2e1e19445c98b"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue \ud800 date",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:9481da2845effaa8d50a8ada0d7092f886a7f8d09f84bf7328ba35cfa88877fa"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "two lone \ud800\ud800 highs",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:9eedb9a2ae8322831e861767db4ff333cc3c818a4506e01fff06a5ea1cf323b8"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "high then astral \ud800😀",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:e255e810f6ffffb4d223e63ce82324ecdf95684422492752a459a9d3d232da58"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "nul\u0000inside",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:4f1b85ce67998112b9c473605294419a26e56d8cc6faeeac239e1607ac06f3ee"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "a\u0000b",
+      "subject": "c",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:ecebd485acb738af1848b16b653622985e6a269446920616ae76482d36c06c40"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "a",
+      "subject": "b\u0000c",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:ecebd485acb738af1848b16b653622985e6a269446920616ae76482d36c06c40"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "line1\r\nline2",
+      "html": null
+    },
+    "synthesized:bdb52ec8c56566ea73132fbb08b9dc0c2a564a25518840058f58bd515321357c"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "line1\nline2",
+      "html": null
+    },
+    "synthesized:0a1408aec9ea304da26692051666387b3f6fd86db4bf7a2a0ad5c8aa9d678b4f"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "tab\tand nbsp em",
+      "html": null
+    },
+    "synthesized:710d3a8b55b1d19a90426165755543f2d796f345205c0a132c80996b563cfdb7"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:1ac65b020eff3a6e6ec07c786267a93998c67cb3b185455cd34936609177b611"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": " ",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:7ab3a8448831bd4d6ac1918355dc173406af3b92a920275edb2ee26b939e8612"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "Please help",
+      "html": null
+    },
+    "synthesized:a6e356c34b8c085da5bb6beb7aa95529363d24ff8d8f494a501770ab119ad31a"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "􏿿😀𠀀",
+      "html": null
+    },
+    "synthesized:4ed1a12c01aac83e812cc916455c079f4c792b195bd40a3adbd6cfa9b471ee37"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "日本語のメール本文",
+      "html": null
+    },
+    "synthesized:4131ede4c1d1ec94cb08c76fa7ec126183c5d46e6e3f0b315c33ace13f57fc96"
+  ],
+  [
+    {
+      "messageId": null,
+      "from": "customer@acme.test",
+      "subject": "Help",
+      "date": "Tue, 01 Oct 2026 09:00:00 +0000",
+      "text": "‮RTL override‬",
+      "html": null
+    },
+    "synthesized:5c32aefd464b9ae653b42114a07441b2699ac8b68be73373c2c215a2822ec795"
+  ]
+]

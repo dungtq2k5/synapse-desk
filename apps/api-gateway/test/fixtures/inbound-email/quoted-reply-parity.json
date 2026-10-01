@@ -1,0 +1,163 @@
+{
+  "reply": [
+    ["Thanks.\n\nOn Tue, A wrote:\n> q", "Thanks."],
+    ["Thanks.\r\n\r\nOn Tue, A wrote:\r\n> q\r\n", "Thanks."],
+    ["Thanks.\r\n> q1\r\n> q2\r\nafter", "Thanks.\r\n\r\n\r\nafter"],
+    ["Thanks.\r> q1\r> q2\rafter", "Thanks.\r\r\rafter"],
+    ["a\n> q1\n> q2\n\n\n\nb", "a\n\nb"],
+    ["a\n> q1\r\n> q2\nb", "a\n\r\nb"],
+    ["a\n>q\n>\n> \nb", "a\nb"],
+    ["> first\nreal\n> last", "real"],
+    ["> q1 > q2\nreal", "real"],
+    ["real > q1\nmore", "real more"],
+    ["real On Tue wrote: > q", "real"],
+    ["real\n\nOn Tue, A wrote:\n> q", "real"],
+    ["real\n\nOn Tue, A wrote:  \n> q", "real"],
+    [
+      "real\n\nOn Tue, A wrote:  trailing\n> q",
+      "real\n\nOn Tue, A wrote:  trailing"
+    ],
+    ["real\non Tue, A wrote:\n> q", "real\non Tue, A wrote:"],
+    [
+      "real\nOn x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x wrote:\nq",
+      "real"
+    ],
+    [
+      "real\nOn xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx wrote:\nq",
+      "real\nOn xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx wrote:\nq"
+    ],
+    ["real\nOn Tue, A\nwrote:\n> q", "real"],
+    ["real\nOn Tue, A\n\nwrote:\n> q", "real"],
+    ["real\n-----Original Message-----\nFrom: x", "real"],
+    ["real\n--- original message ---\nx", "real"],
+    ["real\n-- Original Message --\nx", "real"],
+    ["real\n- Original Message -\nx", "real\n- Original Message -\nx"],
+    ["real\n_____\nold", "real"],
+    ["real\n____\nold", "real\n____\nold"],
+    ["real\n_____   \nold", "real"],
+    ["real\nFrom: A <a@b.c>\nSent: x", "real"],
+    ["real\nFrom:\nnot a header", "real"],
+    ["real\nFrom: \nstill not", "real\nFrom: \nstill not"],
+    ["real\n  From: indented\nkeep", "real\n  From: indented\nkeep"],
+    ["real\n-----Forwarded message-----\nFrom: x", "real"],
+    ["real\n---------- Forwarded message ---------\nFrom: x", "real"],
+    ["real\n-- \nJane", "real"],
+    ["real\n--\nJane", "real"],
+    ["real\n---\nrule", "real\n---\nrule"],
+    ["real\n--  \nJane", "real"],
+    ["real\r\n-- \r\nJane", "real"],
+    [
+      "On Tuesday I wrote: the invoice is wrong. From: my reading of it.",
+      "On Tuesday I wrote: the invoice is wrong. From: my reading of it."
+    ],
+    ["> only\n> quoted", "> only\n> quoted"],
+    ["> only\r\n> quoted\r\n", "> only\r\n> quoted\r\n"],
+    ["On Tue, A wrote:\n> q", "On Tue, A wrote:\n> q"],
+    ["-- \nsig only", "-- \nsig only"],
+    ["   \n  ", "   \n  "],
+    ["", ""],
+    [" ﻿", " ﻿"],
+    [" real ", "real"],
+    ["﻿real﻿\n> q", "real"],
+    ["a\n\n\n\n\nb", "a\n\nb"],
+    ["a\r\n\r\n\r\n\r\nb", "a\r\n\r\n\r\n\r\nb"],
+    ["real\n>\n", "real"],
+    ["real\n>", "real"],
+    ["real >not at start\n> q", "real >not at start"],
+    [" > indented quote\nreal", "> indented quote\nreal"],
+    ["real\nfoo\n> a\n>b\nbar\n> c", "real\nfoo\nbar"],
+    [
+      "line\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\n> q\ntail",
+      "line\ntail"
+    ],
+    ["real\nOn Tue, A wrote:\n> q\nOn Mon, B wrote:\n> r", "real"],
+    ["real\n_____\nFrom: x\n-- \nz", "real"],
+    ["ab\nOn Tue wrote:\nq", "ab"],
+    ["realOn Tue wrote:\nq", "realOn Tue wrote:\nq"],
+    ["real\nON TUE, A WROTE:\n> q", "real\nON TUE, A WROTE:"],
+    ["real\nOn Tue, A wrote:\t\n> q", "real"],
+    ["real\nOn\tTue, A wrote:\n> q", "real"],
+    ["real\nOn\nTue wrote:\nq", "real"],
+    ["real\nFrom: ab\nx", "real"],
+    ["real\nFrom: a\nx", "real"],
+    ["real\nFrom: a b\nx", "real"],
+    ["real\n>ab\n>c\nx", "real\nx"]
+  ],
+  "html": [
+    [
+      "<div dir=\"ltr\">Thanks.</div><div class=\"gmail_quote\"><blockquote>old</blockquote></div>",
+      "<div dir=\"ltr\">Thanks.</div>"
+    ],
+    ["<p>Confirmed.</p><blockquote>previous</blockquote>", "<p>Confirmed.</p>"],
+    ["<p>Confirmed.</p><BLOCKQUOTE>previous</BLOCKQUOTE>", "<p>Confirmed.</p>"],
+    ["<p>Hi</p><div class=\"x gmail_quote y\">old</div>", "<p>Hi</p>"],
+    ["<p>Hi</p><div id=\"appendonsend\"></div><p>old</p>", "<p>Hi</p>"],
+    ["<p>Hi</p><hr id=\"stopSpelling\"><p>old</p>", "<p>Hi</p>"],
+    ["<p>Hi</p><hr style=\"x\" id=\"stopSpelling\"><p>old</p>", "<p>Hi</p>"],
+    ["<p>Hi</p><hr id=\"stopspelling\"><p>old</p>", "<p>Hi</p>"],
+    [
+      "<blockquote>only quote</blockquote>",
+      "<blockquote>only quote</blockquote>"
+    ],
+    [
+      "<div class=\"gmail_quote\">only</div>",
+      "<div class=\"gmail_quote\">only</div>"
+    ],
+    [
+      "<p>a</p><blockquote>q</blockquote><div class=\"gmail_quote\">r</div>",
+      "<p>a</p>"
+    ],
+    [
+      "<p>a</p><div class=\"gmail_quote\">r</div><blockquote>q</blockquote>",
+      "<p>a</p>"
+    ],
+    ["   ", "   "],
+    ["", ""],
+    [" <p>x</p> <blockquote>q", "<p>x</p>"],
+    [
+      "<div\nclass=\"gmail_quote\">multi-line tag</div>",
+      "<div\nclass=\"gmail_quote\">multi-line tag</div>"
+    ],
+    ["<div class=\"gmail_quote\">x", "<div class=\"gmail_quote\">x"]
+  ],
+  "stored": [
+    ["the plain part", "<p>the html</p>", "the plain part"],
+    [
+      null,
+      "<p>First line.</p><p>Second line.</p>",
+      "First line.\nSecond line."
+    ],
+    [null, "<p>use &lt;b&gt; for bold</p>", "use <b> for bold"],
+    [null, "<p>&amp;lt;b&amp;gt;</p>", "&lt;b&gt;"],
+    [
+      null,
+      "<p>&AMP; &LT; &Gt; &QUOT; &#39; &NBSP; &#x27;</p>",
+      "& < > \" '   &#x27;"
+    ],
+    [null, "<style>p{color:red}</style><p>Visible.</p>", "Visible."],
+    [null, "<SCRIPT>alert(1)</SCRIPT><p>Visible.</p>", "Visible."],
+    [null, "<script>a</style><p>b</p></script><p>Visible.</p>", "Visible."],
+    [null, "<script>never closed<p>Visible.</p>", "never closedVisible."],
+    [null, "<ul><li>one</li><li class=\"x\">two</li></ul>", "- one\n- two"],
+    [null, "a<br>b<br/>c<br />d<BR>e<br\n/>f", "a\nb\nc\nd\ne\nf"],
+    [null, "<h1>T</h1><h6>U</h6><tr><td>c</td></tr><div>d</div>", "T\nU\nc\nd"],
+    [null, "<p>a</p><p></p><p></p><p></p><p>b</p>", "a\n\nb"],
+    [null, "<p>x</p><blockquote>quoted</blockquote>", "x"],
+    [null, "<p>Hi</p><p>On Tue, A wrote:</p><p>&gt; old</p>", "Hi"],
+    [null, "<p>unterminated <b", "unterminated <b"],
+    [null, "<p>a < b and c > d</p>", "a  d"],
+    [null, "plain text in html slot", "plain text in html slot"],
+    [null, "&nbsp;", ""],
+    [null, "<p>   </p>", ""],
+    [null, null, ""],
+    ["   ", null, ""],
+    ["   ", "<p>fallback</p>", "fallback"],
+    ["", "<p>fallback</p>", "fallback"],
+    [" ", "<p>fallback</p>", "fallback"],
+    ["> only quoted", "<p>ignored</p>", "> only quoted"],
+    ["text\n> q", null, "text"],
+    [null, "", ""],
+    [null, "   ", ""],
+    [null, "<div>a</div>\r\n<div>b</div>", "a\n\r\nb"]
+  ]
+}
