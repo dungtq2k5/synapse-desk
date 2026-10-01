@@ -50,6 +50,8 @@ export type ServiceHeartbeats = {
  */
 @Injectable()
 export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
+  // The default peer only: each job-health leg names the process it reaches, so a
+  // failing auth poll is counted against `auth-service`, not this one.
   protected readonly serviceName = 'ticket-service';
 
   private readonly logger = new Logger(PlatformJobsClient.name);
@@ -90,6 +92,8 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     const response = await this.call(
       (metadata) => this.platformService.getAuthJobHealth({}, metadata),
       context,
+      undefined,
+      'auth-service',
     );
 
     return {
@@ -118,6 +122,8 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       (metadata) =>
         this.notificationService.getNotificationJobHealth({}, metadata),
       context,
+      undefined,
+      'notification-service',
     );
 
     return {
@@ -140,6 +146,8 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     const response = await this.call(
       (metadata) => this.analyticsService.getJobHealth({}, metadata),
       context,
+      undefined,
+      'ticket-service',
     );
 
     return {
@@ -164,6 +172,8 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     const response = await this.call(
       (metadata) => this.ledgerService.getAiJobHealth({}, metadata),
       context,
+      undefined,
+      'ingestion-service',
     );
 
     return {
@@ -206,6 +216,8 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     const response = await this.call(
       (metadata) => this.ledgerService.runAiRollup(range ?? {}, metadata),
       context,
+      undefined,
+      'ingestion-service',
     );
 
     return { tenants: response.tenants, rows: response.rows };

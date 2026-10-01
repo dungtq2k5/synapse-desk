@@ -1,15 +1,14 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import type Redis from 'ioredis';
+import { BaseGrpcClient } from '../grpc/base-grpc.client';
 import { RedisService } from '../redis/redis.service';
 import {
   AUTH_GRPC_CLIENT,
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
-  packRequestContext,
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
-import { firstValueFrom } from 'rxjs';
 import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/common';
 
 /** What the gate needs to decide, and nothing else. */
@@ -44,7 +43,12 @@ const CACHE_PREFIX = 'org-status:';
  * happened to serve the status change.
  */
 @Injectable()
-export class OrganizationStatusService implements OnModuleInit {
+export class OrganizationStatusService
+  extends BaseGrpcClient
+  implements OnModuleInit
+{
+  protected readonly serviceName = 'auth-service';
+
   private readonly logger = new Logger(OrganizationStatusService.name);
   private readonly redis: Redis;
   private organizationGrpcService!: OrganizationServiceClient;
@@ -53,6 +57,7 @@ export class OrganizationStatusService implements OnModuleInit {
     @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
     redis: RedisService,
   ) {
+    super();
     // The SHARED connection. This service opened its own, with its
     // own shutdown hook, to run two commands; that is a connection and a
     // lifecycle written a fourth time for no property the shared one lacks.
@@ -70,13 +75,17 @@ export class OrganizationStatusService implements OnModuleInit {
     const cached = await this.readCache(organizationId);
     if (cached) return cached;
 
-    const response = await firstValueFrom(
-      this.organizationGrpcService.getOrganizationStatus(
-        { organizationId },
-        // No caller identity: the RPC is by id and unscoped, and the id came
-        // from a JWT this gateway just verified.
-        packRequestContext(UNKNOWN_ORIGIN),
-      ),
+    // Through `call()`, so the most frequent RPC the gateway makes is timed
+    // under `auth-service` and has a deadline like every other. No caller
+    // identity: the RPC is by id and unscoped, and the id came from a JWT this
+    // gateway just verified.
+    const response = await this.call(
+      (metadata) =>
+        this.organizationGrpcService.getOrganizationStatus(
+          { organizationId },
+          metadata,
+        ),
+      UNKNOWN_ORIGIN,
     );
 
     const state: OrganizationState = {

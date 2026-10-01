@@ -63,11 +63,16 @@ export abstract class BaseGrpcClient {
    * unauthenticated one (login, register, invitation preview) passes a bare
    * origin, and the service sees a caller with no identity — which is exactly
    * what it is.
+   *
+   * `peer` names the process the call reaches. It defaults to this client's
+   * `serviceName`; only a client that talks to several processes (the job-health
+   * fan-out) passes it, so a failing peer is counted against itself.
    */
   protected async call<T>(
     invoke: (metadata: Metadata) => Observable<T>,
     origin: RequestOrigin | RequestContext,
     deadlineMs: number = GRPC_DEADLINE_MS,
+    peer: GrpcPeer = this.serviceName,
   ): Promise<T> {
     const started = process.hrtime.bigint();
     let code = 'OK';
@@ -79,9 +84,7 @@ export abstract class BaseGrpcClient {
           catchError((error: unknown) =>
             throwError(() =>
               error instanceof TimeoutError
-                ? new GatewayTimeoutException(
-                    `${this.serviceName} did not respond in time`,
-                  )
+                ? new GatewayTimeoutException(`${peer} did not respond in time`)
                 : error,
             ),
           ),
@@ -92,7 +95,7 @@ export abstract class BaseGrpcClient {
       throw error;
     } finally {
       BaseGrpcClient.durations?.observe(
-        { peer: this.serviceName, code },
+        { peer, code },
         Number(process.hrtime.bigint() - started) / 1e9,
       );
     }
