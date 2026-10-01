@@ -23,6 +23,25 @@ import { compareAlphabetically } from '@synapsedesk/common';
 export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
 
 /**
+ * Why the inbound-email rows wait, in groups that lift one at a time as the Java
+ * pipeline lands.
+ */
+const INBOUND_COUNTER =
+  'Java answers the right status but never increments ' +
+  '`inbound_email_webhook_total`, which every exit of the webhook must ' +
+  'increment exactly once — the published series is not touched at all';
+const INBOUND_FETCH =
+  'Java refuses every verified `email.received` with a 503 and never fetches ' +
+  'the mail, so it cannot tell a retryable failure from a permanent one, and ' +
+  'cannot validate what it fetched';
+const INBOUND_ACCEPT =
+  '`accept()` is not ported: the Java gateway never reaches routing, so no ' +
+  'tenant, sender or ticket is resolved for a mail';
+const INBOUND_PUBLISH =
+  '`accept()` is not ported, so nothing refuses a mail and nothing publishes ' +
+  '`email.inbound_rejected` for notification-service to reply to';
+
+/**
  * Rows the Java gateway cannot pass yet, by NAME, with what each waits for.
  *
  * **A BEHAVIOUR, never a route.** A row can exercise an API the Java gateway
@@ -61,6 +80,22 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'before the controller runs — a genuine, pre-existing spec/' +
     'implementation gap this port did not introduce and should not paper ' +
     'over by deviating from the published contract',
+  '401 rejected_signature, and nothing is fetched': INBOUND_COUNTER,
+  'an empty body is 401 rejected_signature': INBOUND_COUNTER,
+  'is 200 ignored_event': INBOUND_COUNTER,
+  'a retryable %i is 503': INBOUND_FETCH,
+  'no answer at all is 503': INBOUND_FETCH,
+  'a permanent %i is 200': INBOUND_FETCH,
+  'is 200 invalid_payload': INBOUND_FETCH,
+  'is SELF_ADDRESSED': INBOUND_ACCEPT,
+  'is UNROUTABLE_ADDRESS': INBOUND_ACCEPT,
+  'is TENANT_INACTIVE': INBOUND_ACCEPT,
+  'is SENDER_NOT_PERMITTED': INBOUND_ACCEPT,
+  'as TICKET_CREATED': INBOUND_ACCEPT,
+  'a refused sender is told once': INBOUND_PUBLISH,
+  'a tenant that is not active publishes the refusal': INBOUND_PUBLISH,
+  'a token no tenant owns publishes NOTHING': INBOUND_PUBLISH,
+  'a machine-generated mail is refused without a reply': INBOUND_PUBLISH,
 };
 
 /** True when this row's NAME is on the explicit list. */
@@ -89,15 +124,44 @@ export function rowFor(...tags: string[]): jest.It {
 
   if (IMPL === 'node') return it;
 
+  return gate(skippedByName, it);
+}
+
+/**
+ * Wraps `base` so a row is `skip`ped when `skipped` says its title is.
+ *
+ * **`each` is gated too, by its TEMPLATE.** The title an `each` row is declared
+ * with — `'a retryable %i is 503'` — is what the explicit list is matched
+ * against, since the formatted names do not exist until jest expands the table.
+ * Copying `base` over the wrapper would put the ungated `each` back, and a row
+ * declared with `each` could then never be skipped by name.
+ *
+ * Pure, so the gating is testable against a recording stand-in for `it`.
+ */
+export function gate(
+  skipped: (title: string) => boolean,
+  base: jest.It,
+): jest.It {
+  const choose = (title: string): jest.It =>
+    skipped(title) ? base.skip : base;
+
   // The name is not known until the row declares it, so the explicit list is
   // applied by wrapping `it` rather than by choosing it up front.
   const gated = ((title: string, ...rest: unknown[]) =>
-    (skippedByName(title) ? it.skip : it)(
+    (choose(title) as unknown as (...args: unknown[]) => void)(
       title,
-      ...(rest as Parameters<jest.It>[1][]),
+      ...rest,
     )) as unknown as jest.It;
 
-  return Object.assign(gated, it);
+  const each = ((table: unknown) =>
+    (title: string, ...rest: unknown[]) =>
+      (
+        choose(title).each as unknown as (
+          rows: unknown,
+        ) => (...args: unknown[]) => void
+      )(table)(title, ...rest)) as unknown as jest.Each;
+
+  return Object.assign(gated, base, { each });
 }
 
 /**

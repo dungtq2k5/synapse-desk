@@ -20,32 +20,13 @@
  * `email.received` is accepted.
  */
 
-import { createHmac, randomUUID } from 'node:crypto';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { API } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers } from './peers';
 import { readRunState } from './run-state';
 import { rowFor } from './pending';
-
-/** Signs a body the way Resend does — independent of the gateway's own verifier. */
-function signStandardWebhook(
-  body: string,
-  secret: string,
-  timestampSeconds: number = Math.floor(Date.now() / 1000),
-  id = `msg_${randomUUID()}`,
-) {
-  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
-  const digest = createHmac('sha256', key)
-    .update(`${id}.${timestampSeconds}.${body}`)
-    .digest('base64');
-
-  return {
-    'svix-id': id,
-    'svix-timestamp': String(timestampSeconds),
-    'svix-signature': `v1,${digest}`,
-  };
-}
+import { signStandardWebhook } from './standard-webhooks';
 
 describe('webhooks', () => {
   let gateway: Gateway;
