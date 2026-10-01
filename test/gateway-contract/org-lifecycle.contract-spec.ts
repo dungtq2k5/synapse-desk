@@ -37,7 +37,9 @@ describe('the tenant lifecycle gate', () => {
   let peers: Peers;
   let redis: Redis;
 
-  const ORGANIZATION = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
+  // Unique to this suite: it writes FROZEN and DELETED into the status cache in the
+  // shared Redis, and another suite using the same id would be refused by it.
+  const ORGANIZATION = 'a0470000-0000-4000-8000-000000000047';
   const USER = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
   const DEPARTMENT = 'cccccccc-1111-4111-8111-cccccccccccc';
   const CACHE_KEY = `org-status:${ORGANIZATION}`;
@@ -524,6 +526,25 @@ describe('the tenant lifecycle gate', () => {
       expect(statusCalls()).toHaveLength(0);
       expect(response.body).not.toHaveProperty('errors');
       expect(response.body).toHaveProperty('data.version.version');
+    },
+  );
+
+  rowFor('Platform')(
+    '**a tenant admin on a super-admin-only route is refused by THAT door, and the gate never asks about the tenant**',
+    async () => {
+      // A tenant the cache has not seen, whose status the peer could not even
+      // answer: were the gate asked first, the answer would be its refusal or a
+      // peer failure, not the super-admin door's.
+      const stranger = 'a0470000-0000-4000-8000-000000000048';
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/platform/organizations`,
+        headers([], { organizationId: stranger }),
+      );
+
+      expect(response.status).toBe(403);
+      expect(peers.auth.calls(STATUS_RPC)).toHaveLength(0);
     },
   );
 

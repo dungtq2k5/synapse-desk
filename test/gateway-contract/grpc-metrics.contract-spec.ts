@@ -74,6 +74,12 @@ describe('the gRPC client metric on /metrics', () => {
 
   beforeEach(() => {
     peers.reset();
+    // The lifecycle gate asks for the tenant's status on a cache miss; without a
+    // standing answer the row would depend on what an earlier suite left cached.
+    peers.auth.on('OrganizationService/GetOrganizationStatus').always({
+      status: toProtoOrgStatus(OrgStatus.ACTIVE),
+      deleted: false,
+    });
     peers.auth.on('OrganizationService/GetOrganizationStatus').always({
       status: toProtoOrgStatus(OrgStatus.ACTIVE),
       deleted: false,
@@ -148,7 +154,7 @@ describe('the gRPC client metric on /metrics', () => {
   rowFor('Ops')(
     "**the lifecycle gate's status call is timed: a tenant the cache has not seen costs one `OrganizationService/GetOrganizationStatus`, and one `auth-service|OK` sample**",
     async () => {
-      const stranger = 'dddddddd-1111-4111-8111-dddddddddddd';
+      const stranger = 'a0460000-0000-4000-8000-000000000046';
       peers.auth
         .on('DepartmentService/GetDepartment')
         .reply(wireDepartment(DEPARTMENT));

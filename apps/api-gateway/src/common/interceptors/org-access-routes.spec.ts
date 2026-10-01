@@ -52,13 +52,25 @@ describe('the tenant-lifecycle category of every route', () => {
       .filter(Boolean)
       .join('/');
 
-  const isJwtGuarded = (target: object): boolean =>
+  const hasGuard = (target: object, name: string): boolean =>
     (
       (Reflect.getMetadata('__guards__', target) as { name?: string }[]) ?? []
-    ).some((guard) => guard.name === 'JwtAuthGuard');
+    ).some((guard) => guard.name === name);
 
-  const compute = (): [string, string, string, boolean][] => {
-    const rows: [string, string, string, boolean][] = [];
+  const isJwtGuarded = (target: object): boolean =>
+    hasGuard(target, 'JwtAuthGuard');
+
+  /**
+   * Refused by `SuperAdminGuard` before the gate runs, unless the caller is a super
+   * admin, whom the gate exempts. Either way the gate never decides on this route,
+   * which is what lets Java (whose super-admin check is inline, in the handler,
+   * AFTER its gate) exempt the route outright and still answer as Node does.
+   */
+  const isSuperAdminOnly = (target: object): boolean =>
+    hasGuard(target, 'SuperAdminGuard');
+
+  const compute = (): [string, string, string, boolean, boolean][] => {
+    const rows: [string, string, string, boolean, boolean][] = [];
     const ops = new Set<string>(
       (OPS_ROUTES as readonly unknown[]).map((route) =>
         join2(
@@ -109,6 +121,7 @@ describe('the tenant-lifecycle category of every route', () => {
             path,
             String(kind),
             isJwtGuarded(handler) || isJwtGuarded(controller),
+            isSuperAdminOnly(handler) || isSuperAdminOnly(controller),
           ]);
         }
       }

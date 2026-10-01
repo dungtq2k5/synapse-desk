@@ -22,6 +22,8 @@ import com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.generated.model.SubscriptionPlanResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlanDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -68,6 +70,8 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Platform")
 @RestController
+// Refused to anyone but a super admin, whom the gate exempts, so the gate never decides here. Node's guard refuses first; this check runs in the handler, after the gate, so the route is exempt outright.
+@OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)
 @Validated
 public class PlatformController {

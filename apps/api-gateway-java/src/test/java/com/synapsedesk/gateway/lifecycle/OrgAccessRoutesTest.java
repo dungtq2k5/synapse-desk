@@ -34,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>What is compared is the EFFECTIVE category. Node gates only where
  * {@code JwtAuthGuard} ran and never gates {@code AUTH}; Java has no guard layer and
  * declares the routes Node leaves public as {@code AUTH} to be exempt, so both are the
- * same "exempt" here.
+ * same "exempt" here. A route behind {@code SuperAdminGuard} is exempt too: Node refuses
+ * a non-super-admin before the gate, and exempts a super admin in it.
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -90,8 +91,12 @@ class OrgAccessRoutesTest {
   }
 
   /** {@code "EXEMPT"}, or the category the gate would ask about. */
-  private static String effective(String kind, boolean guarded) {
-    return !guarded || kind.equals("AUTH") ? "EXEMPT" : kind;
+  private static String effective(
+    String kind,
+    boolean guarded,
+    boolean superAdminOnly
+  ) {
+    return !guarded || superAdminOnly || kind.equals("AUTH") ? "EXEMPT" : kind;
   }
 
   @Test
@@ -109,9 +114,13 @@ class OrgAccessRoutesTest {
         continue;
       }
 
-      String node = effective(row.get(2).asString(), row.get(3).asBoolean());
+      String node = effective(
+        row.get(2).asString(),
+        row.get(3).asBoolean(),
+        row.get(4).asBoolean()
+      );
       OrgAccess kind = OrganizationLifecycleInterceptor.kindOf(handler, method);
-      String java = effective(kind.name(), true);
+      String java = effective(kind.name(), true, false);
       checked++;
 
       if (!java.equals(node)) {

@@ -7,6 +7,8 @@ import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.generated.model.AuditActionsResponseDto;
 import com.synapsedesk.gateway.generated.model.AuditLogResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -59,6 +61,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Tag(name = "PlatformAuditLogs")
 @RestController
+// Refused to anyone but a super admin, whom the gate exempts, so the gate never decides here. Node's guard refuses first; this check runs in the handler, after the gate, so the route is exempt outright.
+@OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)
 @Validated
 public class PlatformAuditLogsController {

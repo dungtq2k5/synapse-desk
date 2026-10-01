@@ -855,6 +855,20 @@ form: empty value **and** (`Max-Age=0` **or** a past `Expires`) **and** the
 `Path`, `HttpOnly` and `SameSite` it was set with, since a browser only
 replaces a cookie whose path matches.
 
+**A cached lookup hides its own absence from any row that does not use a cold
+key.** The lifecycle gate's status read is cached in Redis for 30 seconds, so a
+row reusing an organization id another suite has already touched cannot tell
+whether the gateway asked at all — which is how an entire implementation
+shipped without the gate and passed thirty-five rows that programmed its
+answer. A row that means to prove a lookup happens needs an id nothing else has
+warmed, and an assertion that the peer was called.
+
+**State a row writes is shared by every suite that reads it.** Not just cache
+keys — the values in them. A row that writes `FROZEN` into the shared status
+cache changes what later suites see, in the same way two rows sharing a
+fixture id share its cached entity. Dedicated ids are the fix in both
+directions.
+
 **Which rows run for Java is read from one place.** Under
 `GATEWAY_IMPL=java` a row is skipped only when its title is named in
 `SKIPPED_FOR_JAVA` in `test/gateway-contract/pending.ts` — the route exists,
