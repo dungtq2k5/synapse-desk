@@ -43484,8 +43484,7 @@
             "required": false,
             "schema": {
               "type": ["string", "null"],
-              "maxLength": 500,
-              "minLength": 0
+              "maxLength": 500
             }
           }
         ],
@@ -53459,8 +53458,7 @@
               "type": "string",
               "format": "uuid"
             },
-            "maxItems": 50,
-            "minItems": 0
+            "maxItems": 50
           }
         },
         "required": ["roleIds"]
@@ -53615,8 +53613,7 @@
             "items": {
               "$ref": "#/components/schemas/DepartmentAssignmentDto"
             },
-            "maxItems": 50,
-            "minItems": 0
+            "maxItems": 50
           }
         },
         "required": ["departments"]
@@ -53973,13 +53970,11 @@
           "url": {
             "type": "string",
             "format": "uri",
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "description": {
             "type": ["string", "null"],
-            "maxLength": 500,
-            "minLength": 0
+            "maxLength": 500
           },
           "eventTypes": {
             "type": "array",
@@ -53998,7 +53993,6 @@
                 "webhook.endpoint_disabled"
               ]
             },
-            "maxItems": 2147483647,
             "minItems": 1
           }
         },
@@ -54350,7 +54344,6 @@
             "items": {
               "$ref": "#/components/schemas/InviteUserDto"
             },
-            "maxItems": 2147483647,
             "minItems": 1
           }
         },
@@ -54526,7 +54519,6 @@
             "items": {
               "$ref": "#/components/schemas/PreviewInviteUserDto"
             },
-            "maxItems": 2147483647,
             "minItems": 1
           }
         },
@@ -54539,27 +54531,23 @@
             "type": "array",
             "items": {
               "type": "string",
-              "maxLength": 64,
-              "minLength": 0
+              "maxLength": 64
             }
           },
           "departmentIds": {
             "type": "array",
             "items": {
               "type": "string",
-              "maxLength": 64,
-              "minLength": 0
+              "maxLength": 64
             }
           },
           "email": {
             "type": "string",
-            "maxLength": 320,
-            "minLength": 0
+            "maxLength": 320
           },
           "primaryDepartmentId": {
             "type": ["string", "null"],
-            "maxLength": 64,
-            "minLength": 0
+            "maxLength": 64
           }
         },
         "required": ["email"]
@@ -54641,18 +54629,15 @@
           },
           "fullName": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "password": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 12
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         },
         "required": ["fullName", "password", "token"]
@@ -55419,8 +55404,7 @@
           },
           "reason": {
             "type": ["string", "null"],
-            "maxLength": 500,
-            "minLength": 0
+            "maxLength": 500
           }
         },
         "required": ["status"]
@@ -55430,8 +55414,7 @@
         "properties": {
           "reason": {
             "type": ["string", "null"],
-            "maxLength": 500,
-            "minLength": 0
+            "maxLength": 500
           }
         }
       },
@@ -55677,7 +55660,6 @@
               "type": "string",
               "format": "uuid"
             },
-            "maxItems": 2147483647,
             "minItems": 1
           },
           "status": {
@@ -55693,8 +55675,7 @@
           },
           "reason": {
             "type": ["string", "null"],
-            "maxLength": 500,
-            "minLength": 0
+            "maxLength": 500
           }
         },
         "required": ["status", "ticketIds"]
@@ -55759,7 +55740,6 @@
               "type": "string",
               "format": "uuid"
             },
-            "maxItems": 2147483647,
             "minItems": 1
           },
           "priority": {
@@ -55813,8 +55793,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "name": {
             "type": "string",
@@ -55896,8 +55875,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "name": {
             "type": "string",
@@ -55978,8 +55956,7 @@
           },
           "stripeProductId": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           },
           "maxAgentSeats": {
             "type": "number",
@@ -56283,8 +56260,7 @@
           },
           "domain": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           },
           "adminEmail": {
             "type": "string",
@@ -56684,8 +56660,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         },
         "required": ["platform", "token"]
@@ -57116,8 +57091,7 @@
         "properties": {
           "comment": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           }
         }
       },
@@ -57241,8 +57215,7 @@
           },
           "fileName": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           }
         },
         "required": ["objectPath", "title"]
@@ -57252,8 +57225,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "name": {
             "type": "string",
@@ -57329,7 +57301,6 @@
               "type": "string",
               "format": "uuid"
             },
-            "maxItems": 2147483647,
             "minItems": 1
           }
         },
@@ -57810,7 +57781,6 @@
         "properties": {
           "password": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "email": {
@@ -57819,8 +57789,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         },
         "required": ["email", "password"]
@@ -57876,8 +57845,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         },
         "required": ["organizationId"]
@@ -57887,13 +57855,11 @@
         "properties": {
           "idToken": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         },
         "required": ["idToken"]
@@ -57980,7 +57946,6 @@
         "properties": {
           "password": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           }
         },
@@ -57991,7 +57956,6 @@
         "properties": {
           "backupCode": {
             "type": ["string", "null"],
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "rememberDevice": {
@@ -58004,8 +57968,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
-            "maxLength": 100,
-            "minLength": 0
+            "maxLength": 100
           }
         }
       },
@@ -58088,13 +58051,11 @@
           "url": {
             "type": ["string", "null"],
             "format": "uri",
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "description": {
             "type": ["string", "null"],
-            "maxLength": 500,
-            "minLength": 0
+            "maxLength": 500
           },
           "eventTypes": {
             "type": "array",
@@ -58113,7 +58074,6 @@
                 "webhook.endpoint_disabled"
               ]
             },
-            "maxItems": 2147483647,
             "minItems": 1
           },
           "isActive": {
@@ -58235,8 +58195,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "name": {
             "type": ["string", "null"],
@@ -58255,8 +58214,7 @@
           },
           "stripeProductId": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           },
           "clearStripeProductId": {
             "type": ["boolean", "null"]
@@ -58317,8 +58275,7 @@
           },
           "domain": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           },
           "maxAgentSeats": {
             "type": ["number", "null"],
@@ -58349,8 +58306,7 @@
           },
           "domain": {
             "type": ["string", "null"],
-            "maxLength": 255,
-            "minLength": 0
+            "maxLength": 255
           }
         }
       },
@@ -58547,8 +58503,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
-            "maxLength": 2000,
-            "minLength": 0
+            "maxLength": 2000
           },
           "name": {
             "type": ["string", "null"],
@@ -58562,7 +58517,6 @@
         "properties": {
           "currentPassword": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "newPassword": {
@@ -62432,7 +62386,6 @@
         "properties": {
           "password": {
             "type": "string",
-            "maxLength": 2147483647,
             "minLength": 1
           },
           "code": {
