@@ -211,6 +211,10 @@ describe('enum-valued query parameters', () => {
     );
 
     expect(response.status).toBe(400);
+    // Which refusal: the one about THIS parameter. A 400 for any other cause (a
+    // missing required parameter, a bad id) would otherwise pass. The field name
+    // is promised by the parity rule; the wording after it is not asserted.
+    expect(JSON.stringify(response.body)).toContain(parameter);
     expect(reached()).toEqual([]);
   };
 
@@ -232,6 +236,10 @@ describe('enum-valued query parameters', () => {
     );
 
     expect(response.status).toBe(400);
+    // Which refusal: the one about THIS parameter. A 400 for any other cause (a
+    // missing required parameter, a bad id) would otherwise pass. The field name
+    // is promised by the parity rule; the wording after it is not asserted.
+    expect(JSON.stringify(response.body)).toContain(parameter);
     expect(reached()).toEqual([]);
   };
 
