@@ -14,6 +14,7 @@ import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.SortDirection;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -110,7 +111,7 @@ public class PlatformAuditLogsController {
       value = "sortOrder",
       required = false,
       defaultValue = "ASC"
-    ) String sortOrder,
+    ) SortDirection sortOrder,
     @Valid @RequestParam(
       value = "action",
       required = false
@@ -142,7 +143,7 @@ public class PlatformAuditLogsController {
         page,
         limit,
         sortBy,
-        sortOrder,
+        sortOrder.name(),
         action,
         userId,
         resourceType,

@@ -15,6 +15,7 @@ import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.model.AcceptInvitationDto;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.SortDirection;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -226,7 +227,7 @@ class InvitationsControllerTest {
       controller.invitationsControllerListV1(
         java.math.BigDecimal.ONE,
         java.math.BigDecimal.TEN,
-        "ASC",
+        SortDirection.ASC,
         null,
         "createdAt",
         "BOGUS"

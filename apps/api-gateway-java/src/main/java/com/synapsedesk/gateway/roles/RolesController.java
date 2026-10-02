@@ -17,6 +17,7 @@ import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.SortDirection;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -133,7 +134,7 @@ public class RolesController {
       value = "sortOrder",
       required = false,
       defaultValue = "ASC"
-    ) String sortOrder,
+    ) SortDirection sortOrder,
     @Valid @RequestParam(
       value = "searchTerm",
       required = false
@@ -178,7 +179,7 @@ public class RolesController {
           .setLimit(limit.intValue())
           .setSortBy(sortBy)
           .setSortOrder(
-            "DESC".equalsIgnoreCase(sortOrder)
+            sortOrder == SortDirection.DESC
               ? SortOrder.SORT_ORDER_DESC
               : SortOrder.SORT_ORDER_ASC
           );

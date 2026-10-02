@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.web.SortDirection;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,7 +100,7 @@ class PlatformAuditLogsControllerTest {
         java.math.BigDecimal.ONE,
         java.math.BigDecimal.TEN,
         "createdAt",
-        "ASC",
+        SortDirection.ASC,
         null,
         null,
         null,

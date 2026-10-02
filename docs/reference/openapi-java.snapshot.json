@@ -2761,7 +2761,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -4777,7 +4778,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -5988,7 +5990,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -6500,7 +6503,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -13204,7 +13208,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -13990,7 +13995,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -14405,7 +14411,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -15047,7 +15054,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -21859,7 +21867,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -22605,7 +22614,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -23202,7 +23212,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -23676,7 +23687,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -41738,7 +41750,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -42530,7 +42543,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -43710,7 +43724,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -44168,7 +44183,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -44868,7 +44884,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -45113,7 +45130,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -45810,7 +45828,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -46535,7 +46554,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {
@@ -48478,7 +48498,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "ASC"
+              "default": "ASC",
+              "enum": ["ASC", "DESC"]
             }
           },
           {

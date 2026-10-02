@@ -27,6 +27,7 @@ import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.SortDirection;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -129,7 +130,7 @@ public class TicketsController {
       value = "sortOrder",
       required = false,
       defaultValue = "ASC"
-    ) String sortOrder,
+    ) SortDirection sortOrder,
     @Valid @RequestParam(
       value = "searchTerm",
       required = false
@@ -173,7 +174,7 @@ public class TicketsController {
       context(),
       page,
       limit,
-      sortOrder,
+      sortOrder.name(),
       searchTerm,
       sortBy,
       includeDeleted,

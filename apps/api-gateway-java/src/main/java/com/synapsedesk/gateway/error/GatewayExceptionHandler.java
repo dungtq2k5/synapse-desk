@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -103,6 +105,38 @@ public class GatewayExceptionHandler {
       HttpStatus.BAD_REQUEST,
       request,
       ErrorMessages.format(messages)
+    );
+  }
+
+  /**
+   * A request parameter that does not convert to the type the handler declares:
+   * an enum value outside its set ({@code sortOrder=sideways}), a non-numeric
+   * number, a malformed UUID. Uncaught, it fell through to the catch-all below
+   * as a 500, which a client reads as the gateway failing rather than as its own
+   * mistake. The enum message is class-validator's, as Node's is, so the field
+   * name and the allowed values are what the client reads.
+   */
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ErrorEnvelope> onParameterTypeMismatch(
+    MethodArgumentTypeMismatchException exception,
+    HttpServletRequest request
+  ) {
+    Class<?> type = exception.getRequiredType();
+    String message =
+      type != null && type.isEnum()
+        ? exception.getName() +
+          " must be one of the following values: " +
+          Arrays.stream(type.getEnumConstants())
+            .map(Object::toString)
+            .collect(Collectors.joining(", "))
+        : exception.getName() +
+          " must be a valid " +
+          (type == null ? "value" : type.getSimpleName());
+
+    return envelope(
+      HttpStatus.BAD_REQUEST,
+      request,
+      ErrorMessages.format(message)
     );
   }
 

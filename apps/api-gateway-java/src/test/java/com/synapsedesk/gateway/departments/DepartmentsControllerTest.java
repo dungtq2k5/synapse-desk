@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.web.SortDirection;
 import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
@@ -92,7 +93,7 @@ class DepartmentsControllerTest {
       controller.departmentsControllerListV1(
         BigDecimalOf(1),
         BigDecimalOf(10),
-        "ASC",
+        SortDirection.ASC,
         null,
         "createdAt",
         true
@@ -120,7 +121,7 @@ class DepartmentsControllerTest {
     controller.departmentsControllerListV1(
       BigDecimalOf(1),
       BigDecimalOf(10),
-      "ASC",
+      SortDirection.ASC,
       null,
       "createdAt",
       true
@@ -149,7 +150,7 @@ class DepartmentsControllerTest {
     controller.departmentsControllerListV1(
       BigDecimalOf(1),
       BigDecimalOf(10),
-      "ASC",
+      SortDirection.ASC,
       null,
       "createdAt",
       false
@@ -180,7 +181,7 @@ class DepartmentsControllerTest {
     controller.departmentsControllerListV1(
       BigDecimalOf(1),
       BigDecimalOf(10),
-      "ASC",
+      SortDirection.ASC,
       null,
       "createdAt",
       false

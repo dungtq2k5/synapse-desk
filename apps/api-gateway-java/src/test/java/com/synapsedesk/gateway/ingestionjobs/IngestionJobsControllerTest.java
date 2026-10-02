@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.web.SortDirection;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -81,7 +82,7 @@ class IngestionJobsControllerTest {
         java.math.BigDecimal.ONE,
         java.math.BigDecimal.TEN,
         "createdAt",
-        "ASC",
+        SortDirection.ASC,
         "NOT_A_REAL_STATUS",
         null
       )
@@ -100,7 +101,7 @@ class IngestionJobsControllerTest {
       java.math.BigDecimal.ONE,
       java.math.BigDecimal.TEN,
       "createdAt",
-      "ASC",
+      SortDirection.ASC,
       "FAILED",
       null
     );
@@ -125,7 +126,7 @@ class IngestionJobsControllerTest {
       java.math.BigDecimal.ONE,
       java.math.BigDecimal.TEN,
       "createdAt",
-      "ASC",
+      SortDirection.ASC,
       null,
       documentId
     );
