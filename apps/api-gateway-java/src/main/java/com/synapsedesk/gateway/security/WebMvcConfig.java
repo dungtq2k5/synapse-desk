@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.security;
 import com.synapsedesk.gateway.lifecycle.OrganizationLifecycleInterceptor;
 import com.synapsedesk.gateway.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.throttle.ThrottlerInterceptor;
+import com.synapsedesk.gateway.web.PathIdInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
 import org.springframework.context.annotation.Configuration;
@@ -30,17 +31,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
   private final ThrottlerInterceptor throttlerInterceptor;
   private final HttpMetricsInterceptor httpMetricsInterceptor;
   private final OrganizationLifecycleInterceptor organizationLifecycleInterceptor;
+  private final PathIdInterceptor pathIdInterceptor;
 
   public WebMvcConfig(
     PermissionInterceptor permissionInterceptor,
     ThrottlerInterceptor throttlerInterceptor,
     HttpMetricsInterceptor httpMetricsInterceptor,
-    OrganizationLifecycleInterceptor organizationLifecycleInterceptor
+    OrganizationLifecycleInterceptor organizationLifecycleInterceptor,
+    PathIdInterceptor pathIdInterceptor
   ) {
     this.permissionInterceptor = permissionInterceptor;
     this.throttlerInterceptor = throttlerInterceptor;
     this.httpMetricsInterceptor = httpMetricsInterceptor;
     this.organizationLifecycleInterceptor = organizationLifecycleInterceptor;
+    this.pathIdInterceptor = pathIdInterceptor;
   }
 
   @Override
@@ -59,5 +63,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // is marked ({@code GuardRefusal}) and the recorder skips marked requests,
     // whichever interceptor ran first.
     registry.addInterceptor(httpMetricsInterceptor);
+    // After the metrics, as Node's pipes run inside its interceptors: a malformed
+    // id is refused for THAT, after the guards, and still counted.
+    registry.addInterceptor(pathIdInterceptor);
   }
 }

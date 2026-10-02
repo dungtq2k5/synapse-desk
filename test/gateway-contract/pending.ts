@@ -44,18 +44,12 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
   'Java does not refuse this yet':
-    'two measured sets where Java does what Node refuses. ENUMS ' +
-    '(query-enums.contract-spec.ts): Java takes some enum-valued query ' +
-    'parameters as plain strings, so a value outside the set is accepted ' +
-    '(forwarded to the peer, or a 500 on the invitations list sortBy, ' +
-    'status and the documents list status and fileType, document flags ' +
-    'severity) and 40 also accept it in a different case, where Node ' +
-    'answers 400. IDS (path-ids.contract-spec.ts): 95 of the 120 path ' +
-    'parameters named id or <x>Id are taken as plain strings, so a value ' +
-    'that is not a UUID is forwarded to the peer (92) or answers 500 at ' +
-    'the gateway (3, the invitations routes), where Node answers 400 ' +
-    'before anything runs. The exact pairs are the sets in those specs; ' +
-    'every other pair runs on Java today',
+    'the enum-valued query parameters Java takes as plain strings: a value ' +
+    'outside the set is accepted (forwarded to the peer, or a 500 on the ' +
+    'invitations list sortBy and status, the documents list status and ' +
+    'fileType, document flags severity) and 40 also accept it in a different ' +
+    'case, where Node answers 400. The exact pairs are the sets in ' +
+    'query-enums.contract-spec.ts; every other pair runs on Java today',
   '**an explicit `dob: null` clears it**':
     '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
