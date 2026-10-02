@@ -1,5 +1,7 @@
 package com.synapsedesk.gateway.webhooks;
 
+import jakarta.validation.constraints.NotNull;
+
 /**
  * `{ received: true, outcome: string }` — `resend-inbound.service.ts`'s
  * {@code ResendWebhookAck} type, named rather than left as {@code
@@ -9,6 +11,6 @@ package com.synapsedesk.gateway.webhooks;
  * InboundOutcome}. A string, because the published contract types it as one.
  */
 public record ResendWebhookAcknowledgementDto(
-  boolean received,
-  String outcome
+  @NotNull boolean received,
+  @NotNull String outcome
 ) {}

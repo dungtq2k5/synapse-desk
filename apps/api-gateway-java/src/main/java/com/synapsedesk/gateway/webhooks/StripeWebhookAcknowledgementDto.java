@@ -1,5 +1,7 @@
 package com.synapsedesk.gateway.webhooks;
 
+import jakarta.validation.constraints.NotNull;
+
 /**
  * `{ received: true, status: string }` — `webhooks.controller.ts`'s
  * `Promise<{ received: true; status: string }>`, named rather than left as
@@ -9,6 +11,6 @@ package com.synapsedesk.gateway.webhooks;
  * rather than an enum.
  */
 public record StripeWebhookAcknowledgementDto(
-  boolean received,
-  String status
+  @NotNull boolean received,
+  @NotNull String status
 ) {}

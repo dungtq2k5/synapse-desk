@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import {
   checkKnownDivergences,
   diffOpenApiDocuments,
+  diffResponseSchemaShapes,
 } from './lib/java-openapi-diff.cjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -130,9 +131,42 @@ try {
     for (const { kind, route } of stale) console.error(`  [${kind}] ${route}`);
   }
 
+  // Which response properties are required and which accept null: an EQUALITY over
+  // every schema only responses reach and both documents have, no exception list.
+  // The one envelope difference (`warning`) is named and held from both sides.
+  const shapes = diffResponseSchemaShapes(nodeDocument, javaDocument);
+
+  if (shapes.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${shapes.mismatches.length} response schema property(ies) differ in required or nullable:`,
+    );
+    for (const row of shapes.mismatches.slice(0, 40)) {
+      console.error(`  ${row.schema}.${row.property}: ${JSON.stringify(row)}`);
+    }
+  }
+  if (shapes.envelope.wrappersNotRequiredAndNullable.length) {
+    failed = true;
+    console.error(
+      `\n${shapes.envelope.wrappersNotRequiredAndNullable.length} envelope wrapper(s) do not publish warning as required and nullable:`,
+    );
+    for (const name of shapes.envelope.wrappersNotRequiredAndNullable) {
+      console.error(`  ${name}`);
+    }
+  }
+  if (!shapes.envelope.nodePublishesWarningOptional) {
+    failed = true;
+    console.error(
+      '\nNode no longer publishes the envelope warning as optional, so the named divergence is stale: remove it from diffResponseSchemaShapes.',
+    );
+  }
+
   if (!failed) {
     console.log(
       `${known.length} known divergence(s) all accounted for, none unexplained.`,
+    );
+    console.log(
+      `${shapes.properties} response properties in ${shapes.schemas} schemas agree with the committed document on required and nullable; ${shapes.envelope.wrappers} envelope wrappers publish warning as required and nullable (Node: optional), the one named divergence.`,
     );
   }
 

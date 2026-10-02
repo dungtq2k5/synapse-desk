@@ -168,7 +168,182 @@ function checkKnownDivergences(diff, known) {
   };
 }
 
+/** Every schema name a node of a document points at, anywhere inside it. */
+function refsIn(node, into) {
+  if (Array.isArray(node)) {
+    for (const item of node) refsIn(item, into);
+  } else if (node && typeof node === 'object') {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '$ref' && typeof value === 'string') {
+        into.add(value.split('/').pop());
+      } else {
+        refsIn(value, into);
+      }
+    }
+  }
+}
+
+/** The schemas reachable from `seeds`, through each schema's own references. */
+function schemaClosure(schemas, seeds) {
+  const seen = new Set();
+  const pending = [...seeds];
+  while (pending.length) {
+    const name = pending.pop();
+    if (seen.has(name) || !schemas[name]) continue;
+    seen.add(name);
+    const next = new Set();
+    refsIn(schemas[name], next);
+    pending.push(...next);
+  }
+
+  return seen;
+}
+
+/** Schemas reachable from a request body, and from a success response. */
+function reachableSchemas(document) {
+  const schemas = (document.components && document.components.schemas) || {};
+  const fromRequests = new Set();
+  const fromResponses = new Set();
+  for (const methods of Object.values(document.paths || {})) {
+    for (const operation of Object.values(methods)) {
+      refsIn(operation.requestBody || {}, fromRequests);
+      for (const [status, response] of Object.entries(
+        operation.responses || {},
+      )) {
+        if (status.startsWith('2')) refsIn(response, fromResponses);
+      }
+    }
+  }
+
+  return {
+    request: schemaClosure(schemas, fromRequests),
+    response: schemaClosure(schemas, fromResponses),
+  };
+}
+
+/** Whether a property schema accepts null, in either spelling (3.0 `nullable`, 3.1 type list or `oneOf` with null). */
+function acceptsNull(property) {
+  if (property.nullable === true) return true;
+  if (Array.isArray(property.type) && property.type.includes('null')) {
+    return true;
+  }
+
+  return [...(property.oneOf || []), ...(property.anyOf || [])].some(
+    (branch) => branch && branch.type === 'null',
+  );
+}
+
+/**
+ * Compares, for every schema that ONLY responses reach and that both documents
+ * have, which properties are required and which accept null: the two claims a
+ * generated client acts on (may the key be absent, may the value be null).
+ *
+ * <p>The comparison is an EQUALITY with no exception list, and one named
+ * divergence is held on its own: the envelope wrappers are Java-only schemas
+ * (Node inlines its envelope in each response), so they are outside the
+ * comparison, and `warning` is the one envelope property where the two documents
+ * differ on purpose. Node publishes it optional and nullable; both gateways send
+ * the key on every response (`null` when there is nothing to say), so Java
+ * publishes it required and nullable. Held from BOTH sides: a Java wrapper that
+ * stops publishing it that way fails, and so does a Node document that starts
+ * calling it required, because then the divergence record is stale.
+ */
+function diffResponseSchemaShapes(nodeDocument, javaDocument) {
+  const nodeSchemas = nodeDocument.components.schemas;
+  const javaSchemas = javaDocument.components.schemas;
+  const node = reachableSchemas(nodeDocument);
+  const java = reachableSchemas(javaDocument);
+
+  const shared = [...node.response]
+    .filter((name) => javaSchemas[name] && !java.request.has(name))
+    .sort();
+  const mismatches = [];
+  let properties = 0;
+
+  for (const name of shared) {
+    const nodeRequired = new Set(nodeSchemas[name].required || []);
+    const javaRequired = new Set(javaSchemas[name].required || []);
+    const nodeProperties = nodeSchemas[name].properties || {};
+    const javaProperties = javaSchemas[name].properties || {};
+
+    for (const key of new Set([
+      ...Object.keys(nodeProperties),
+      ...Object.keys(javaProperties),
+    ])) {
+      if (!(key in nodeProperties) || !(key in javaProperties)) {
+        mismatches.push({ schema: name, property: key, kind: 'property set' });
+        continue;
+      }
+      properties += 1;
+      if (nodeRequired.has(key) !== javaRequired.has(key)) {
+        mismatches.push({
+          schema: name,
+          property: key,
+          kind: 'required',
+          node: nodeRequired.has(key),
+          java: javaRequired.has(key),
+        });
+      }
+      if (
+        acceptsNull(nodeProperties[key]) !== acceptsNull(javaProperties[key])
+      ) {
+        mismatches.push({
+          schema: name,
+          property: key,
+          kind: 'nullable',
+          node: acceptsNull(nodeProperties[key]),
+          java: acceptsNull(javaProperties[key]),
+        });
+      }
+    }
+  }
+
+  const wrappers = Object.keys(javaSchemas).filter(
+    (name) =>
+      name.startsWith('ApiResponse') &&
+      Object.hasOwn(javaSchemas[name].properties || {}, 'warning'),
+  );
+  const wrappersNotRequiredAndNullable = wrappers.filter((name) => {
+    const schema = javaSchemas[name];
+
+    return !(
+      (schema.required || []).includes('warning') &&
+      acceptsNull(schema.properties.warning)
+    );
+  });
+
+  let nodePublishesWarningOptional = false;
+  for (const methods of Object.values(nodeDocument.paths || {})) {
+    for (const operation of Object.values(methods)) {
+      const ok = (operation.responses || {})['200'];
+      const schema =
+        ok && ok.content && ok.content['application/json']
+          ? ok.content['application/json'].schema
+          : undefined;
+      if (schema && schema.properties && schema.properties.warning) {
+        nodePublishesWarningOptional =
+          !(schema.required || []).includes('warning') &&
+          acceptsNull(schema.properties.warning);
+        break;
+      }
+    }
+    if (nodePublishesWarningOptional) break;
+  }
+
+  return {
+    schemas: shared.length,
+    properties,
+    mismatches,
+    envelope: {
+      wrappers: wrappers.length,
+      wrappersNotRequiredAndNullable,
+      nodePublishesWarningOptional,
+    },
+  };
+}
+
 module.exports = {
+  diffResponseSchemaShapes,
   extractOperations,
   routeKey,
   diffOpenApiDocuments,

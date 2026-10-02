@@ -1,5 +1,7 @@
 package com.synapsedesk.gateway.sessions;
 
+import jakarta.validation.constraints.NotNull;
+
 /**
  * `{ revokedCount: number }` — `sessions.controller.ts`'s
  * `Promise<{ revokedCount: number }>` and `user-sessions.controller.ts`'s
@@ -9,4 +11,4 @@ package com.synapsedesk.gateway.sessions;
  * declares none — so this is the shape the handler actually returns, given
  * a name instead of reusing an unrelated route's wrapper class.
  */
-public record RevokedCountDto(int revokedCount) {}
+public record RevokedCountDto(@NotNull int revokedCount) {}

@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.messages;
 
+import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 
 /**
@@ -8,7 +9,7 @@ import java.time.OffsetDateTime;
  * DTO field-for-field.
  */
 public record PresignAttachmentResponseDto(
-  String uploadUrl,
-  String objectPath,
-  OffsetDateTime expiresAt
+  @NotNull String uploadUrl,
+  @NotNull String objectPath,
+  @NotNull OffsetDateTime expiresAt
 ) {}

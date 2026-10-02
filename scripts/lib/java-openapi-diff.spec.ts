@@ -1,6 +1,7 @@
 import {
   checkKnownDivergences,
   diffOpenApiDocuments,
+  diffResponseSchemaShapes,
   extractOperations,
 } from './java-openapi-diff.cjs';
 
@@ -263,5 +264,206 @@ describe('checkKnownDivergences', () => {
 
     expect(result.unexpected).toHaveLength(1);
     expect(result.stale).toHaveLength(1);
+  });
+});
+
+describe('diffResponseSchemaShapes', () => {
+  const operation = (request: string | null, response: string) => ({
+    ...(request
+      ? {
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: { $ref: `#/components/schemas/${request}` },
+              },
+            },
+          },
+        }
+      : {}),
+    responses: {
+      '200': {
+        content: {
+          'application/json': {
+            schema: { $ref: `#/components/schemas/${response}` },
+          },
+        },
+      },
+    },
+  });
+
+  /** A document whose one route answers with `Out`. */
+  const document = (
+    out: Record<string, unknown>,
+    extra: Record<string, unknown> = {},
+    request: string | null = null,
+  ) => ({
+    paths: { '/x': { post: operation(request, 'Out') } },
+    components: { schemas: { Out: out, ...extra } },
+  });
+
+  const shape = (required: string[], properties: Record<string, unknown>) => ({
+    type: 'object',
+    required,
+    properties,
+  });
+
+  const NULLABLE_STRING = { type: ['string', 'null'] };
+
+  it('matches when required and nullable agree, whichever way null is spelled', () => {
+    const node = document(
+      shape(['a', 'b'], {
+        a: { type: 'string' },
+        b: { type: 'string', nullable: true },
+      }),
+    );
+    const java = document(
+      shape(['a', 'b'], { a: { type: 'string' }, b: NULLABLE_STRING }),
+    );
+
+    const result = diffResponseSchemaShapes(node, java);
+
+    expect(result.mismatches).toEqual([]);
+    expect(result.schemas).toBe(1);
+    expect(result.properties).toBe(2);
+  });
+
+  it('reads a oneOf with null as nullable, the 3.1 spelling of a nullable reference', () => {
+    const node = document(shape(['a'], { a: { $ref: '#/x', nullable: true } }));
+    const java = document(
+      shape(['a'], { a: { oneOf: [{ $ref: '#/x' }, { type: 'null' }] } }),
+    );
+
+    expect(diffResponseSchemaShapes(node, java).mismatches).toEqual([]);
+  });
+
+  it('FAILS when Java leaves a property optional that Node requires', () => {
+    const node = document(shape(['a'], { a: { type: 'string' } }));
+    const java = document(shape([], { a: { type: 'string' } }));
+
+    expect(diffResponseSchemaShapes(node, java).mismatches).toEqual([
+      {
+        schema: 'Out',
+        property: 'a',
+        kind: 'required',
+        node: true,
+        java: false,
+      },
+    ]);
+  });
+
+  it('FAILS when the two disagree on whether null is allowed', () => {
+    const node = document(shape(['a'], { a: NULLABLE_STRING }));
+    const java = document(shape(['a'], { a: { type: 'string' } }));
+
+    expect(diffResponseSchemaShapes(node, java).mismatches).toEqual([
+      {
+        schema: 'Out',
+        property: 'a',
+        kind: 'nullable',
+        node: true,
+        java: false,
+      },
+    ]);
+  });
+
+  it('FAILS on a property one document has and the other lacks', () => {
+    const node = document(shape(['a'], { a: { type: 'string' } }));
+    const java = document(
+      shape(['a', 'b'], { a: { type: 'string' }, b: { type: 'string' } }),
+    );
+
+    expect(diffResponseSchemaShapes(node, java).mismatches).toEqual([
+      { schema: 'Out', property: 'b', kind: 'property set' },
+    ]);
+  });
+
+  it('leaves a schema a request also reaches out of the comparison', () => {
+    const node = document(shape([], { a: { type: 'string' } }), {}, 'Out');
+    const java = document(shape(['a'], { a: NULLABLE_STRING }), {}, 'Out');
+
+    const result = diffResponseSchemaShapes(node, java);
+
+    expect(result.schemas).toBe(0);
+    expect(result.mismatches).toEqual([]);
+  });
+
+  describe('the named envelope divergence', () => {
+    const javaWith = (wrapper: Record<string, unknown>) => ({
+      ...document(shape(['a'], { a: { type: 'string' } })),
+      components: {
+        schemas: {
+          Out: shape(['a'], { a: { type: 'string' } }),
+          ApiResponseOut: wrapper,
+        },
+      },
+    });
+    const nodeWith = (required: string[]) => ({
+      paths: {
+        '/x': {
+          get: {
+            responses: {
+              '200': {
+                content: {
+                  'application/json': {
+                    schema: {
+                      required,
+                      properties: {
+                        warning: { type: 'string', nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      components: { schemas: { Out: shape(['a'], { a: { type: 'string' } }) } },
+    });
+    const conforming = shape(['warning'], { warning: NULLABLE_STRING });
+
+    it('holds when Java wrappers publish warning required and nullable and Node calls it optional', () => {
+      const result = diffResponseSchemaShapes(
+        nodeWith([]),
+        javaWith(conforming),
+      );
+
+      expect(result.envelope).toEqual({
+        wrappers: 1,
+        wrappersNotRequiredAndNullable: [],
+        nodePublishesWarningOptional: true,
+      });
+    });
+
+    it('FAILS when a Java wrapper stops publishing warning as required', () => {
+      const result = diffResponseSchemaShapes(
+        nodeWith([]),
+        javaWith(shape([], { warning: NULLABLE_STRING })),
+      );
+
+      expect(result.envelope.wrappersNotRequiredAndNullable).toEqual([
+        'ApiResponseOut',
+      ]);
+    });
+
+    it('FAILS when a Java wrapper stops publishing warning as nullable', () => {
+      const result = diffResponseSchemaShapes(
+        nodeWith([]),
+        javaWith(shape(['warning'], { warning: { type: 'string' } })),
+      );
+
+      expect(result.envelope.wrappersNotRequiredAndNullable).toEqual([
+        'ApiResponseOut',
+      ]);
+    });
+
+    it('goes stale when Node starts calling warning required, so the divergence no longer exists', () => {
+      const result = diffResponseSchemaShapes(
+        nodeWith(['warning']),
+        javaWith(conforming),
+      );
+
+      expect(result.envelope.nodePublishesWarningOptional).toBe(false);
+    });
   });
 });

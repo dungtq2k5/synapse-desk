@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.web;
 
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 /**
@@ -9,11 +10,11 @@ import java.math.BigDecimal;
  * carry for a {@code type: number} property.
  */
 public record PageMeta(
-  BigDecimal totalItems,
-  BigDecimal itemCount,
-  BigDecimal itemsPerPage,
-  BigDecimal totalPages,
-  BigDecimal currentPage
+  @NotNull BigDecimal totalItems,
+  @NotNull BigDecimal itemCount,
+  @NotNull BigDecimal itemsPerPage,
+  @NotNull BigDecimal totalPages,
+  @NotNull BigDecimal currentPage
 ) {
   /** Every controller built this by hand off `synapsedesk.auth.Common.PageMeta` — one place now. */
   public static PageMeta from(synapsedesk.auth.Common.PageMeta meta) {

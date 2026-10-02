@@ -53482,7 +53482,8 @@
           "data": {
             "$ref": "#/components/schemas/UserSummaryResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UserResponseDto": {
         "type": "object",
@@ -53492,14 +53493,14 @@
             "format": "uuid"
           },
           "organizationId": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "uuid"
           },
           "fullName": {
             "type": "string"
           },
           "avatarUrl": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "uri"
           },
           "email": {
@@ -53510,27 +53511,27 @@
             "type": "boolean"
           },
           "phoneNumber": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "isPhoneVerified": {
             "type": "boolean"
           },
           "dob": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "gender": {
             "type": "string",
             "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
           },
           "lastLoginAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "isLocked": {
             "type": "boolean"
           },
           "lockedUntil": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "isTwoFactorEnabled": {
@@ -53546,7 +53547,9 @@
           }
         },
         "required": [
+          "avatarUrl",
           "createdAt",
+          "dob",
           "email",
           "fullName",
           "gender",
@@ -53555,6 +53558,10 @@
           "isLocked",
           "isPhoneVerified",
           "isTwoFactorEnabled",
+          "lastLoginAt",
+          "lockedUntil",
+          "organizationId",
+          "phoneNumber",
           "updatedAt"
         ]
       },
@@ -53583,14 +53590,21 @@
             }
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "deletedByName": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["departmentIds", "roleIds", "roleNames", "user"]
+        "required": [
+          "deletedAt",
+          "deletedByName",
+          "departmentIds",
+          "roleIds",
+          "roleNames",
+          "user"
+        ]
       },
       "DepartmentAssignmentDto": {
         "type": "object",
@@ -53695,7 +53709,8 @@
           "data": {
             "$ref": "#/components/schemas/RoleResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RoleResponseDto": {
         "type": "object",
@@ -53707,7 +53722,7 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "isSystemRole": {
             "type": "boolean"
@@ -53778,6 +53793,7 @@
         },
         "required": [
           "createdAt",
+          "description",
           "id",
           "isSystemRole",
           "name",
@@ -53818,7 +53834,8 @@
           "data": {
             "$ref": "#/components/schemas/DocumentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DocumentResponseDto": {
         "type": "object",
@@ -53856,7 +53873,7 @@
             "type": "boolean"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
           },
           "departmentIds": {
@@ -53877,17 +53894,19 @@
             "format": "date-time"
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "deletedById": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": [
           "chunkCount",
           "createdAt",
           "createdById",
+          "deletedAt",
+          "deletedById",
           "departmentIds",
           "fileSizeBytes",
           "fileType",
@@ -53896,6 +53915,7 @@
           "isOrganizationWide",
           "ocrLanguages",
           "organizationId",
+          "status",
           "title",
           "updatedAt"
         ]
@@ -53919,7 +53939,8 @@
           "data": {
             "$ref": "#/components/schemas/StripeWebhookAcknowledgementDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "StripeWebhookAcknowledgementDto": {
         "type": "object",
@@ -53930,7 +53951,8 @@
           "status": {
             "type": "string"
           }
-        }
+        },
+        "required": ["received", "status"]
       },
       "ApiResponseResendWebhookAcknowledgementDto": {
         "type": "object",
@@ -53951,7 +53973,8 @@
           "data": {
             "$ref": "#/components/schemas/ResendWebhookAcknowledgementDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ResendWebhookAcknowledgementDto": {
         "type": "object",
@@ -53962,7 +53985,8 @@
           "outcome": {
             "type": "string"
           }
-        }
+        },
+        "required": ["outcome", "received"]
       },
       "CreateWebhookEndpointDto": {
         "type": "object",
@@ -54017,7 +54041,8 @@
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointWithSecretResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "WebhookEndpointResponseDto": {
         "type": "object",
@@ -54029,7 +54054,7 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "eventTypes": {
             "type": "array",
@@ -54053,7 +54078,7 @@
             "type": "boolean"
           },
           "disabledReason": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -54066,6 +54091,8 @@
         },
         "required": [
           "createdAt",
+          "description",
+          "disabledReason",
           "eventTypes",
           "id",
           "isActive",
@@ -54104,7 +54131,8 @@
           "data": {
             "$ref": "#/components/schemas/TestWebhookResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "TestWebhookResponseDto": {
         "type": "object",
@@ -54113,13 +54141,13 @@
             "type": "boolean"
           },
           "responseStatus": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "error": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["delivered"]
+        "required": ["delivered", "error", "responseStatus"]
       },
       "CreateUserDto": {
         "type": "object",
@@ -54171,7 +54199,8 @@
             "type": ["string", "null"]
           },
           "data": {}
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "LockUserDto": {
         "type": "object",
@@ -54206,7 +54235,8 @@
           "data": {
             "$ref": "#/components/schemas/RevokedSessionCountResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RevokedSessionCountResponseDto": {
         "type": "object",
@@ -54236,7 +54266,8 @@
           "data": {
             "$ref": "#/components/schemas/UntrustedDeviceCountResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UntrustedDeviceCountResponseDto": {
         "type": "object",
@@ -54286,7 +54317,8 @@
           "data": {
             "$ref": "#/components/schemas/PresignAvatarResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PresignAvatarResponseDto": {
         "type": "object",
@@ -54334,7 +54366,8 @@
           "data": {
             "$ref": "#/components/schemas/UserResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "CreateInvitationsDto": {
         "type": "object",
@@ -54396,7 +54429,8 @@
           "data": {
             "$ref": "#/components/schemas/CreateInvitationsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "CreateInvitationsResponseDto": {
         "type": "object",
@@ -54414,10 +54448,10 @@
             }
           },
           "batchId": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["created", "failed"]
+        "required": ["batchId", "created", "failed"]
       },
       "FailedInvitationResponseDto": {
         "type": "object",
@@ -54457,10 +54491,10 @@
             }
           },
           "primaryDepartmentId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "invitedByName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "resentCount": {
             "type": "number"
@@ -54484,7 +54518,9 @@
           "email",
           "expiresAt",
           "id",
+          "invitedByName",
           "lastSentAt",
+          "primaryDepartmentId",
           "resentCount",
           "roleIds",
           "status"
@@ -54509,7 +54545,8 @@
           "data": {
             "$ref": "#/components/schemas/InvitationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PreviewInvitationsDto": {
         "type": "object",
@@ -54571,7 +54608,8 @@
           "data": {
             "$ref": "#/components/schemas/PreviewInvitationsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "InvitationPreviewRowResponseDto": {
         "type": "object",
@@ -54583,7 +54621,7 @@
             "type": "boolean"
           },
           "reason": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "unknownRoleIds": {
             "type": "array",
@@ -54598,7 +54636,13 @@
             }
           }
         },
-        "required": ["email", "ok", "unknownDepartmentIds", "unknownRoleIds"]
+        "required": [
+          "email",
+          "ok",
+          "reason",
+          "unknownDepartmentIds",
+          "unknownRoleIds"
+        ]
       },
       "PreviewInvitationsResponseDto": {
         "type": "object",
@@ -54661,7 +54705,8 @@
           "data": {
             "$ref": "#/components/schemas/LoginResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "LoginResponseDto": {
         "type": "object",
@@ -54722,7 +54767,8 @@
           "data": {
             "$ref": "#/components/schemas/TicketResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "TicketResponseDto": {
         "type": "object",
@@ -54740,11 +54786,11 @@
             "type": "string"
           },
           "source": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["API", "CHAT", "EMAIL", "WEB"]
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "CLOSED",
               "ESCALATED",
@@ -54755,7 +54801,7 @@
             ]
           },
           "priority": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "title": {
@@ -54765,17 +54811,17 @@
             "type": "string"
           },
           "currentAssigneeId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "currentDepartmentId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "escalatedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "resolvedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "unreadCount": {
@@ -54790,19 +54836,28 @@
             "format": "date-time"
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "deletedById": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": [
           "authorId",
           "createdAt",
+          "currentAssigneeId",
+          "currentDepartmentId",
+          "deletedAt",
+          "deletedById",
           "description",
+          "escalatedAt",
           "id",
           "organizationId",
+          "priority",
+          "resolvedAt",
+          "source",
+          "status",
           "ticketNumber",
           "title",
           "unreadCount",
@@ -54871,7 +54926,8 @@
           "data": {
             "$ref": "#/components/schemas/CreateMessageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AttachmentResponseDto": {
         "type": "object",
@@ -54922,13 +54978,19 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "vectorPointId": {
             "type": "string"
           }
         },
-        "required": ["chunkId", "documentId", "documentTitle", "vectorPointId"]
+        "required": [
+          "chunkId",
+          "documentId",
+          "documentTitle",
+          "pageNumber",
+          "vectorPointId"
+        ]
       },
       "CreateMessageResponseDto": {
         "type": "object",
@@ -54955,7 +55017,7 @@
             "type": "string"
           },
           "senderId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "content": {
             "type": "string"
@@ -54967,20 +55029,20 @@
             "type": "boolean"
           },
           "modelName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "promptTokens": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "completionTokens": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "editedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "redactedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "createdAt": {
@@ -54997,7 +55059,7 @@
             "type": "boolean"
           },
           "answerStatus": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
@@ -55007,20 +55069,28 @@
             ]
           },
           "citations": {
-            "type": "array",
+            "type": ["array", "null"],
             "items": {
               "$ref": "#/components/schemas/CitationResponseDto"
             }
           }
         },
         "required": [
+          "answerStatus",
           "attachments",
+          "citations",
+          "completionTokens",
           "content",
           "createdAt",
+          "editedAt",
           "excludedFromAiContext",
           "id",
           "isAiGenerated",
           "isInternalNote",
+          "modelName",
+          "promptTokens",
+          "redactedAt",
+          "senderId",
           "ticketId"
         ]
       },
@@ -55076,7 +55146,8 @@
           "data": {
             "$ref": "#/components/schemas/PresignAttachmentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PresignAttachmentResponseDto": {
         "type": "object",
@@ -55091,7 +55162,8 @@
             "type": "string",
             "format": "date-time"
           }
-        }
+        },
+        "required": ["expiresAt", "objectPath", "uploadUrl"]
       },
       "ConfirmAttachmentDto": {
         "type": "object",
@@ -55128,7 +55200,8 @@
           "data": {
             "$ref": "#/components/schemas/AttachmentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AiSummaryResponseDto": {
         "type": "object",
@@ -55190,7 +55263,8 @@
           "data": {
             "$ref": "#/components/schemas/AiSummaryResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AiSuggestionResponseDto": {
         "type": "object",
@@ -55223,11 +55297,11 @@
             }
           },
           "degraded": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["LEXICAL_ONLY"]
           }
         },
-        "required": ["articles", "nextSteps"]
+        "required": ["articles", "degraded", "nextSteps"]
       },
       "ApiResponseAiSuggestionsResponseDto": {
         "type": "object",
@@ -55248,7 +55322,8 @@
           "data": {
             "$ref": "#/components/schemas/AiSuggestionsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "SuggestedArticleResponseDto": {
         "type": "object",
@@ -55260,13 +55335,13 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "score": {
             "type": "number"
           }
         },
-        "required": ["documentId", "documentTitle", "score"]
+        "required": ["documentId", "documentTitle", "pageNumber", "score"]
       },
       "GenerateDraftDto": {
         "type": "object",
@@ -55331,7 +55406,8 @@
           "data": {
             "$ref": "#/components/schemas/AiDraftResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DraftCitationResponseDto": {
         "type": "object",
@@ -55346,10 +55422,10 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           }
         },
-        "required": ["chunkId", "documentId", "documentTitle"]
+        "required": ["chunkId", "documentId", "documentTitle", "pageNumber"]
       },
       "AiClassificationResponseDto": {
         "type": "object",
@@ -55358,14 +55434,18 @@
             "type": "string"
           },
           "suggestedPriority": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "confidenceScore": {
             "type": "number"
           }
         },
-        "required": ["confidenceScore", "suggestedDepartmentId"]
+        "required": [
+          "confidenceScore",
+          "suggestedDepartmentId",
+          "suggestedPriority"
+        ]
       },
       "ApiResponseAiClassificationResponseDto": {
         "type": "object",
@@ -55386,7 +55466,8 @@
           "data": {
             "$ref": "#/components/schemas/AiClassificationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ChangeTicketStatusDto": {
         "type": "object",
@@ -55463,7 +55544,8 @@
           "data": {
             "$ref": "#/components/schemas/AssignmentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AssignmentResponseDto": {
         "type": "object",
@@ -55488,11 +55570,11 @@
             "format": "date-time"
           },
           "unassignedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "reason": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "DEPARTMENT_CHANGE",
               "ESCALATION",
@@ -55519,7 +55601,9 @@
           "departmentId",
           "id",
           "isCurrent",
-          "ticketId"
+          "reason",
+          "ticketId",
+          "unassignedAt"
         ]
       },
       "MarkTicketReadDto": {
@@ -55550,7 +55634,8 @@
           "data": {
             "$ref": "#/components/schemas/MarkTicketReadResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "MarkTicketReadResponseDto": {
         "type": "object",
@@ -55611,7 +55696,8 @@
           "data": {
             "$ref": "#/components/schemas/ExportResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ExportResponseDto": {
         "type": "object",
@@ -55620,36 +55706,46 @@
             "type": "string"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAILED", "PENDING", "READY"]
           },
           "kind": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY"]
           },
           "rowCount": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "rollupComputedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "downloadUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "error": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           },
           "completedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["createdAt", "id"]
+        "required": [
+          "completedAt",
+          "createdAt",
+          "downloadUrl",
+          "error",
+          "id",
+          "kind",
+          "rollupComputedAt",
+          "rowCount",
+          "status"
+        ]
       },
       "BulkTicketStatusDto": {
         "type": "object",
@@ -55699,7 +55795,8 @@
           "data": {
             "$ref": "#/components/schemas/BulkTicketStatusResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "BulkTicketFailureResponseDto": {
         "type": "object",
@@ -55768,7 +55865,8 @@
           "data": {
             "$ref": "#/components/schemas/BulkTicketPriorityResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "BulkTicketPriorityResponseDto": {
         "type": "object",
@@ -56041,7 +56139,8 @@
           "data": {
             "$ref": "#/components/schemas/SubscriptionPlanResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "SubscriptionPlanPriceResponseDto": {
         "type": "object",
@@ -56068,7 +56167,7 @@
             "type": "string"
           },
           "stripeProductId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "maxAgentSeats": {
             "type": "number"
@@ -56115,13 +56214,14 @@
             "format": "date-time"
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
         "required": [
           "aiModelTier",
           "createdAt",
+          "deletedAt",
           "id",
           "isActive",
           "maxAgentSeats",
@@ -56133,6 +56233,7 @@
           "monthlyAiTokenBudget",
           "name",
           "prices",
+          "stripeProductId",
           "subscriberCount",
           "updatedAt"
         ]
@@ -56156,7 +56257,8 @@
           "data": {
             "$ref": "#/components/schemas/ApplyPlanResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApplyPlanResponseDto": {
         "type": "object",
@@ -56305,7 +56407,8 @@
           "data": {
             "$ref": "#/components/schemas/CreatePlatformOrganizationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "CreatePlatformOrganizationResponseDto": {
         "type": "object",
@@ -56332,10 +56435,10 @@
             "type": "string"
           },
           "domain": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -56378,6 +56481,7 @@
           "allowedEmailDomains",
           "billingCycleStart",
           "createdAt",
+          "domain",
           "enforceTwoFactor",
           "id",
           "maxAgentSeats",
@@ -56385,6 +56489,7 @@
           "monthlyAiTokenBudget",
           "name",
           "slug",
+          "status",
           "updatedAt"
         ]
       },
@@ -56404,11 +56509,12 @@
             "type": "number"
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
         "required": [
+          "deletedAt",
           "departmentCount",
           "organization",
           "pendingInvitationCount",
@@ -56454,7 +56560,8 @@
           "data": {
             "$ref": "#/components/schemas/PlatformOrganizationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ResetBillingCycleDto": {
         "type": "object",
@@ -56486,7 +56593,8 @@
           "data": {
             "$ref": "#/components/schemas/JobRunResultResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "JobRunResultResponseDto": {
         "type": "object",
@@ -56561,7 +56669,8 @@
           "data": {
             "$ref": "#/components/schemas/OrganizationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseInboundAddressResponseDto": {
         "type": "object",
@@ -56582,7 +56691,8 @@
           "data": {
             "$ref": "#/components/schemas/InboundAddressResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "InboundAddressResponseDto": {
         "type": "object",
@@ -56612,7 +56722,8 @@
           "data": {
             "$ref": "#/components/schemas/MarkReadResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "MarkReadResponseDto": {
         "type": "object",
@@ -56684,7 +56795,8 @@
           "data": {
             "$ref": "#/components/schemas/DeviceTokenResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DeviceTokenResponseDto": {
         "type": "object",
@@ -56693,22 +56805,22 @@
             "type": "string"
           },
           "platform": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["ANDROID", "IOS", "WEB"]
           },
           "deviceName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "lastUsedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "createdAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["id"]
+        "required": ["createdAt", "deviceName", "id", "lastUsedAt", "platform"]
       },
       "SubmitFeedbackDto": {
         "type": "object",
@@ -56747,7 +56859,8 @@
           "data": {
             "$ref": "#/components/schemas/FeedbackResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "FeedbackResponseDto": {
         "type": "object",
@@ -56769,10 +56882,10 @@
             "type": "string"
           },
           "feedbackText": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "citationAccurate": {
-            "type": "boolean"
+            "type": ["boolean", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -56784,7 +56897,9 @@
           }
         },
         "required": [
+          "citationAccurate",
           "createdAt",
+          "feedbackText",
           "id",
           "organizationId",
           "rating",
@@ -56831,7 +56946,8 @@
           "data": {
             "$ref": "#/components/schemas/KnowledgeSearchResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "KnowledgeSearchResponseDto": {
         "type": "object",
@@ -56843,11 +56959,11 @@
             }
           },
           "degraded": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["LEXICAL_ONLY"]
           }
         },
-        "required": ["chunks"]
+        "required": ["chunks", "degraded"]
       },
       "RetrievedChunkResponseDto": {
         "type": "object",
@@ -56862,7 +56978,7 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "chunkIndex": {
             "type": "number"
@@ -56883,6 +56999,7 @@
           "contentText",
           "documentId",
           "documentTitle",
+          "pageNumber",
           "score",
           "vectorPointId"
         ]
@@ -56917,7 +57034,8 @@
           "data": {
             "$ref": "#/components/schemas/KnowledgeAskResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "KnowledgeAskResponseDto": {
         "type": "object",
@@ -56926,7 +57044,7 @@
             "type": "string"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
@@ -56945,7 +57063,7 @@
             "type": "string"
           }
         },
-        "required": ["citations", "content", "generationId"]
+        "required": ["citations", "content", "generationId", "status"]
       },
       "ApiResponseIngestionJobResponseDto": {
         "type": "object",
@@ -56966,7 +57084,8 @@
           "data": {
             "$ref": "#/components/schemas/IngestionJobResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "IngestionJobResponseDto": {
         "type": "object",
@@ -56981,7 +57100,7 @@
             "type": "string"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "CANCELLED",
               "CHUNKING",
@@ -56993,10 +57112,10 @@
             ]
           },
           "errorLog": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "processedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "createdAt": {
@@ -57004,7 +57123,15 @@
             "format": "date-time"
           }
         },
-        "required": ["bullmqJobId", "createdAt", "documentId", "id"]
+        "required": [
+          "bullmqJobId",
+          "createdAt",
+          "documentId",
+          "errorLog",
+          "id",
+          "processedAt",
+          "status"
+        ]
       },
       "ReplaceDocumentDto": {
         "type": "object",
@@ -57068,7 +57195,8 @@
           "data": {
             "$ref": "#/components/schemas/PresignDocumentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PresignDocumentResponseDto": {
         "type": "object",
@@ -57114,7 +57242,8 @@
           "data": {
             "$ref": "#/components/schemas/DocumentFlagResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DocumentFlagResponseDto": {
         "type": "object",
@@ -57129,7 +57258,7 @@
             "type": "string"
           },
           "flagType": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "CONFLICTING",
               "LOW_CONFIDENCE",
@@ -57141,46 +57270,55 @@
             ]
           },
           "severity": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["CRITICAL", "INFO", "WARNING"]
           },
           "detail": {
             "type": "string"
           },
           "confidenceScore": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "detectedAt": {
             "type": "string",
             "format": "date-time"
           },
           "resolvedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "resolvedById": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "resolution": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["DISMISSED", "DOCUMENT_REPLACED", "FIXED"]
           },
           "resolutionComment": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "relatedDocumentId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "relatedChunkId": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": [
+          "confidenceScore",
           "detail",
           "detectedAt",
           "documentId",
           "documentTitle",
-          "id"
+          "flagType",
+          "id",
+          "relatedChunkId",
+          "relatedDocumentId",
+          "resolution",
+          "resolutionComment",
+          "resolvedAt",
+          "resolvedById",
+          "severity"
         ]
       },
       "ConfirmDocumentDto": {
@@ -57254,7 +57392,8 @@
           "data": {
             "$ref": "#/components/schemas/DepartmentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DepartmentResponseDto": {
         "type": "object",
@@ -57266,17 +57405,17 @@
             "type": "string"
           },
           "description": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "memberCount": {
             "type": "number"
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "deletedByName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -57287,7 +57426,16 @@
             "format": "date-time"
           }
         },
-        "required": ["createdAt", "id", "memberCount", "name", "updatedAt"]
+        "required": [
+          "createdAt",
+          "deletedAt",
+          "deletedByName",
+          "description",
+          "id",
+          "memberCount",
+          "name",
+          "updatedAt"
+        ]
       },
       "AddDepartmentMembersDto": {
         "type": "object",
@@ -57337,7 +57485,8 @@
           "data": {
             "$ref": "#/components/schemas/AddDepartmentMembersResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "StartConversationDto": {
         "type": "object",
@@ -57388,7 +57537,8 @@
           "data": {
             "$ref": "#/components/schemas/PortalSessionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PortalSessionResponseDto": {
         "type": "object",
@@ -57433,7 +57583,8 @@
           "data": {
             "$ref": "#/components/schemas/PlanChangeResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PlanChangeResponseDto": {
         "type": "object",
@@ -57445,14 +57596,14 @@
             "type": "string"
           },
           "effectiveAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "creditIssued": {
-            "type": "boolean"
+            "type": ["boolean", "null"]
           }
         },
-        "required": ["planId", "planName"]
+        "required": ["creditIssued", "effectiveAt", "planId", "planName"]
       },
       "CreateCheckoutSessionDto": {
         "type": "object",
@@ -57492,7 +57643,8 @@
           "data": {
             "$ref": "#/components/schemas/CheckoutSessionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "CheckoutSessionResponseDto": {
         "type": "object",
@@ -57540,7 +57692,8 @@
           "data": {
             "$ref": "#/components/schemas/RegisterResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RegisterResponseDto": {
         "type": "object",
@@ -57595,7 +57748,8 @@
           "data": {
             "$ref": "#/components/schemas/VerifyOtpResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "VerifyOtpResponseDto": {
         "type": "object",
@@ -57640,7 +57794,8 @@
           "data": {
             "$ref": "#/components/schemas/RequestOtpResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RequestOtpResponseDto": {
         "type": "object",
@@ -57687,7 +57842,8 @@
           "data": {
             "$ref": "#/components/schemas/ResetPasswordResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ResetPasswordResponseDto": {
         "type": "object",
@@ -57735,7 +57891,8 @@
           "data": {
             "$ref": "#/components/schemas/LogoutResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "LogoutResponseDto": {
         "type": "object",
@@ -57765,7 +57922,8 @@
           "data": {
             "$ref": "#/components/schemas/LogoutAllResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "LogoutAllResponseDto": {
         "type": "object",
@@ -57883,7 +58041,8 @@
           "data": {
             "$ref": "#/components/schemas/GenerateTwoFactorResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "GenerateTwoFactorResponseDto": {
         "type": "object",
@@ -57927,7 +58086,8 @@
           "data": {
             "$ref": "#/components/schemas/BackupCodesResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "BackupCodesResponseDto": {
         "type": "object",
@@ -57991,7 +58151,8 @@
           "data": {
             "$ref": "#/components/schemas/TwoFactorAuthenticatedResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "TwoFactorAuthenticatedResponseDto": {
         "type": "object",
@@ -58000,10 +58161,10 @@
             "$ref": "#/components/schemas/UserResponseDto"
           },
           "warning": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["user"]
+        "required": ["user", "warning"]
       },
       "CreateAuditLogExportDto": {
         "type": "object",
@@ -58100,7 +58261,8 @@
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UpdateUserDto": {
         "type": "object",
@@ -58169,7 +58331,8 @@
           "data": {
             "$ref": "#/components/schemas/MessageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UpdateTicketDto": {
         "type": "object",
@@ -58358,7 +58521,8 @@
           "data": {
             "$ref": "#/components/schemas/OrganizationSettingsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OrganizationSettingsResponseDto": {
         "type": "object",
@@ -58379,18 +58543,21 @@
             }
           },
           "maxDocumentBytesOverride": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "maxAttachmentBytesOverride": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "maxAttachmentsPerMessageOverride": {
-            "type": "number"
+            "type": ["number", "null"]
           }
         },
         "required": [
           "allowedEmailDomains",
           "enforceTwoFactor",
+          "maxAttachmentBytesOverride",
+          "maxAttachmentsPerMessageOverride",
+          "maxDocumentBytesOverride",
           "publicDomainWarnings"
         ]
       },
@@ -58446,13 +58613,14 @@
           "data": {
             "$ref": "#/components/schemas/PreferenceResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PreferenceResponseDto": {
         "type": "object",
         "properties": {
           "type": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "*",
               "billing.payment_failed",
@@ -58468,22 +58636,22 @@
             ]
           },
           "channel": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK"]
           },
           "isEnabled": {
             "type": "boolean"
           },
           "digest": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
           },
           "source": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["DEFAULT", "EXPLICIT", "WILDCARD"]
           }
         },
-        "required": ["isEnabled"]
+        "required": ["channel", "digest", "isEnabled", "source", "type"]
       },
       "UpdateDocumentDto": {
         "type": "object",
@@ -58544,7 +58712,8 @@
           "data": {
             "$ref": "#/components/schemas/ChangePasswordResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ChangePasswordResponseDto": {
         "type": "object",
@@ -58574,7 +58743,8 @@
           "data": {
             "$ref": "#/components/schemas/VersionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "VersionResponseDto": {
         "type": "object",
@@ -58610,7 +58780,8 @@
           "data": {
             "$ref": "#/components/schemas/LivenessResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "LivenessResponseDto": {
         "type": "object",
@@ -58644,7 +58815,8 @@
           "data": {
             "$ref": "#/components/schemas/ReadinessResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ReadinessDependenciesResponseDto": {
         "type": "object",
@@ -58698,7 +58870,8 @@
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "WebhookEndpointsResponseDto": {
         "type": "object",
@@ -58731,7 +58904,8 @@
           "data": {
             "$ref": "#/components/schemas/WebhookDeliveriesResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "WebhookDeliveriesResponseDto": {
         "type": "object",
@@ -58758,28 +58932,38 @@
             "type": "string"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["DELIVERED", "FAILED", "PENDING"]
           },
           "attempts": {
             "type": "number"
           },
           "responseStatus": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "lastError": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "occurredAt": {
             "type": "string",
             "format": "date-time"
           },
           "deliveredAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["attempts", "eventId", "eventType", "id", "occurredAt"]
+        "required": [
+          "attempts",
+          "deliveredAt",
+          "eventId",
+          "eventType",
+          "id",
+          "lastError",
+          "occurredAt",
+          "responseStatus",
+          "status"
+        ]
       },
       "ApiResponseWebhookEventTypesResponseDto": {
         "type": "object",
@@ -58800,7 +58984,8 @@
           "data": {
             "$ref": "#/components/schemas/WebhookEventTypesResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "WebhookEventTypesResponseDto": {
         "type": "object",
@@ -58845,7 +59030,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataUserSummaryResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PageMeta": {
         "type": "object",
@@ -58865,7 +59051,14 @@
           "currentPage": {
             "type": "number"
           }
-        }
+        },
+        "required": [
+          "currentPage",
+          "itemCount",
+          "itemsPerPage",
+          "totalItems",
+          "totalPages"
+        ]
       },
       "PagedDataUserSummaryResponseDto": {
         "type": "object",
@@ -58879,7 +59072,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseListSessionResponseDto": {
         "type": "object",
@@ -58903,7 +59097,8 @@
               "$ref": "#/components/schemas/SessionResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "SessionResponseDto": {
         "type": "object",
@@ -58912,7 +59107,7 @@
             "type": "string"
           },
           "deviceName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "ipAddress": {
             "type": "string"
@@ -58927,7 +59122,7 @@
             "type": "boolean"
           },
           "trustedUntil": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "expiresAt": {
@@ -58942,10 +59137,12 @@
         "required": [
           "createdAt",
           "current",
+          "deviceName",
           "expiresAt",
           "id",
           "ipAddress",
           "isTrusted",
+          "trustedUntil",
           "userAgent"
         ]
       },
@@ -58968,7 +59165,8 @@
           "data": {
             "$ref": "#/components/schemas/UserPermissionsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UserPermissionsResponseDto": {
         "type": "object",
@@ -59001,7 +59199,8 @@
           "data": {
             "$ref": "#/components/schemas/CurrentUserResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "CurrentUserResponseDto": {
         "type": "object",
@@ -59090,7 +59289,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataInvitationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataInvitationResponseDto": {
         "type": "object",
@@ -59104,7 +59304,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePreviewInvitationResponseDto": {
         "type": "object",
@@ -59125,7 +59326,8 @@
           "data": {
             "$ref": "#/components/schemas/PreviewInvitationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PreviewInvitationResponseDto": {
         "type": "object",
@@ -59134,13 +59336,13 @@
             "type": "boolean"
           },
           "organizationName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "inviterName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "email": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "roleNames": {
             "type": "array",
@@ -59149,11 +59351,18 @@
             }
           },
           "expiresAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["roleNames", "valid"]
+        "required": [
+          "email",
+          "expiresAt",
+          "inviterName",
+          "organizationName",
+          "roleNames",
+          "valid"
+        ]
       },
       "ApiResponsePagedDataTicketResponseDto": {
         "type": "object",
@@ -59174,7 +59383,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataTicketResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataTicketResponseDto": {
         "type": "object",
@@ -59188,7 +59398,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataMessageResponseDto": {
         "type": "object",
@@ -59209,7 +59420,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataMessageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataMessageResponseDto": {
         "type": "object",
@@ -59223,7 +59435,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseListAttachmentResponseDto": {
         "type": "object",
@@ -59247,7 +59460,8 @@
               "$ref": "#/components/schemas/AttachmentResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseListSimilarTicketResponseDto": {
         "type": "object",
@@ -59271,7 +59485,8 @@
               "$ref": "#/components/schemas/SimilarTicketResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "SimilarTicketResponseDto": {
         "type": "object",
@@ -59313,7 +59528,8 @@
               "$ref": "#/components/schemas/TicketStatusChangeResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "TicketStatusChangeResponseDto": {
         "type": "object",
@@ -59325,7 +59541,7 @@
             "type": "string"
           },
           "fromStatus": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "CLOSED",
               "ESCALATED",
@@ -59350,14 +59566,22 @@
             "type": "string"
           },
           "reason": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "changedAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["changedAt", "changedById", "id", "ticketId", "toStatus"]
+        "required": [
+          "changedAt",
+          "changedById",
+          "fromStatus",
+          "id",
+          "reason",
+          "ticketId",
+          "toStatus"
+        ]
       },
       "ApiResponseListAssignmentResponseDto": {
         "type": "object",
@@ -59381,7 +59605,8 @@
               "$ref": "#/components/schemas/AssignmentResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponsePagedDataRoleResponseDto": {
         "type": "object",
@@ -59402,7 +59627,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataRoleResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataRoleResponseDto": {
         "type": "object",
@@ -59416,7 +59642,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataPlatformUserResponseDto": {
         "type": "object",
@@ -59437,7 +59664,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataPlatformUserResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataPlatformUserResponseDto": {
         "type": "object",
@@ -59451,7 +59679,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "PlatformUserResponseDto": {
         "type": "object",
@@ -59460,10 +59689,10 @@
             "$ref": "#/components/schemas/UserResponseDto"
           },
           "organizationId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "organizationName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "roleNames": {
             "type": "array",
@@ -59472,11 +59701,17 @@
             }
           },
           "deletedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["roleNames", "user"]
+        "required": [
+          "deletedAt",
+          "organizationId",
+          "organizationName",
+          "roleNames",
+          "user"
+        ]
       },
       "ApiResponsePagedDataSubscriptionPlanResponseDto": {
         "type": "object",
@@ -59497,7 +59732,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataSubscriptionPlanResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataSubscriptionPlanResponseDto": {
         "type": "object",
@@ -59511,7 +59747,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataPlatformOrganizationResponseDto": {
         "type": "object",
@@ -59532,7 +59769,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataPlatformOrganizationResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataPlatformOrganizationResponseDto": {
         "type": "object",
@@ -59546,7 +59784,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePlatformMetricsResponseDto": {
         "type": "object",
@@ -59567,7 +59806,8 @@
           "data": {
             "$ref": "#/components/schemas/PlatformMetricsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PlatformMetricsResponseDto": {
         "type": "object",
@@ -59635,7 +59875,8 @@
           "data": {
             "$ref": "#/components/schemas/JobHealthResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "JobHealthResponseDto": {
         "type": "object",
@@ -59676,16 +59917,16 @@
             "type": "string"
           },
           "lastStartedAt": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "lastSucceededAt": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "lastDurationMs": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "lastError": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "consecutiveFailures": {
             "type": "number"
@@ -59695,7 +59936,16 @@
             "enum": ["failing", "healthy", "never-ran", "stale", "step"]
           }
         },
-        "required": ["consecutiveFailures", "health", "jobName", "service"]
+        "required": [
+          "consecutiveFailures",
+          "health",
+          "jobName",
+          "lastDurationMs",
+          "lastError",
+          "lastStartedAt",
+          "lastSucceededAt",
+          "service"
+        ]
       },
       "ApiResponseFinanceSnapshotResponseDto": {
         "type": "object",
@@ -59716,7 +59966,8 @@
           "data": {
             "$ref": "#/components/schemas/FinanceSnapshotResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DunningTenantResponseDto": {
         "type": "object",
@@ -59774,19 +60025,19 @@
             "type": "boolean"
           },
           "unavailableReason": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "estimatedMrr": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "currency": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "activeSubscriptions": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "computedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "excludes": {
@@ -59796,7 +60047,15 @@
             }
           }
         },
-        "required": ["available", "excludes"]
+        "required": [
+          "activeSubscriptions",
+          "available",
+          "computedAt",
+          "currency",
+          "estimatedMrr",
+          "excludes",
+          "unavailableReason"
+        ]
       },
       "FinanceSnapshotResponseDto": {
         "type": "object",
@@ -59857,7 +60116,8 @@
           "data": {
             "$ref": "#/components/schemas/BillingEventsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "BillingEventPointResponseDto": {
         "type": "object",
@@ -59917,7 +60177,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataAuditLogResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AuditLogResponseDto": {
         "type": "object",
@@ -59926,13 +60187,13 @@
             "type": "string"
           },
           "organizationId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "userId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "action": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
@@ -59979,7 +60240,7 @@
             ]
           },
           "resourceType": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "DEPARTMENT",
               "DOCUMENT_FLAG",
@@ -59991,13 +60252,13 @@
             ]
           },
           "resourceId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "ipAddress": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "userAgent": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "metadata": {
             "type": "object",
@@ -60008,7 +60269,18 @@
             "format": "date-time"
           }
         },
-        "required": ["createdAt", "id", "metadata"]
+        "required": [
+          "action",
+          "createdAt",
+          "id",
+          "ipAddress",
+          "metadata",
+          "organizationId",
+          "resourceId",
+          "resourceType",
+          "userAgent",
+          "userId"
+        ]
       },
       "PagedDataAuditLogResponseDto": {
         "type": "object",
@@ -60022,7 +60294,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseAuditActionsResponseDto": {
         "type": "object",
@@ -60043,7 +60316,8 @@
           "data": {
             "$ref": "#/components/schemas/AuditActionsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AuditActionsResponseDto": {
         "type": "object",
@@ -60123,7 +60397,8 @@
               "$ref": "#/components/schemas/PermissionResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PermissionResponseDto": {
         "type": "object",
@@ -60211,7 +60486,8 @@
           "data": {
             "$ref": "#/components/schemas/OrganizationUsageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OrganizationUsageResponseDto": {
         "type": "object",
@@ -60230,20 +60506,22 @@
             "format": "date-time"
           },
           "aiModelTier": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAST", "QUALITY"]
           },
           "planName": {
             "type": "string"
           },
           "currentPeriodEnd": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
         "required": [
+          "aiModelTier",
           "aiTokens",
           "billingCycleStart",
+          "currentPeriodEnd",
           "planName",
           "seats",
           "storage"
@@ -60256,16 +60534,16 @@
             "type": "boolean"
           },
           "used": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "limit": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "unavailableReason": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["available"]
+        "required": ["available", "limit", "unavailableReason", "used"]
       },
       "ApiResponseOnboardingResponseDto": {
         "type": "object",
@@ -60286,7 +60564,8 @@
           "data": {
             "$ref": "#/components/schemas/OnboardingResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OnboardingResponseDto": {
         "type": "object",
@@ -60301,7 +60580,7 @@
             "type": "boolean"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -60310,7 +60589,7 @@
             ]
           }
         },
-        "required": ["canComplete", "steps"]
+        "required": ["canComplete", "status", "steps"]
       },
       "OnboardingStepResponseDto": {
         "type": "object",
@@ -60346,7 +60625,8 @@
           "data": {
             "$ref": "#/components/schemas/NotificationFeedResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "NotificationFeedResponseDto": {
         "type": "object",
@@ -60358,13 +60638,13 @@
             }
           },
           "nextCursor": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "hasMore": {
             "type": "boolean"
           }
         },
-        "required": ["hasMore", "items"]
+        "required": ["hasMore", "items", "nextCursor"]
       },
       "NotificationResponseDto": {
         "type": "object",
@@ -60376,7 +60656,7 @@
             "type": "string"
           },
           "type": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "billing.payment_failed",
               "billing.plan_changed",
@@ -60391,44 +60671,44 @@
             ]
           },
           "priority": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
           },
           "title": {
             "type": "string"
           },
           "body": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "data": {
             "type": "object",
             "additionalProperties": {}
           },
           "actionUrl": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "actorId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "resourceType": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
           },
           "resourceId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "groupKey": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "groupCount": {
             "type": "number"
           },
           "readAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "archivedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "createdAt": {
@@ -60437,12 +60717,22 @@
           }
         },
         "required": [
+          "actionUrl",
+          "actorId",
+          "archivedAt",
+          "body",
           "createdAt",
           "data",
           "groupCount",
+          "groupKey",
           "id",
           "organizationId",
-          "title"
+          "priority",
+          "readAt",
+          "resourceId",
+          "resourceType",
+          "title",
+          "type"
         ]
       },
       "ApiResponseUnreadCountResponseDto": {
@@ -60464,7 +60754,8 @@
           "data": {
             "$ref": "#/components/schemas/UnreadCountResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "UnreadCountResponseDto": {
         "type": "object",
@@ -60497,7 +60788,8 @@
               "$ref": "#/components/schemas/PreferenceResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseListDeviceTokenResponseDto": {
         "type": "object",
@@ -60521,7 +60813,8 @@
               "$ref": "#/components/schemas/DeviceTokenResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponsePagedDataKnowledgeArticleResponseDto": {
         "type": "object",
@@ -60542,7 +60835,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataKnowledgeArticleResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "KnowledgeArticleResponseDto": {
         "type": "object",
@@ -60575,7 +60869,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseKnowledgeArticleDetailResponseDto": {
         "type": "object",
@@ -60596,7 +60891,8 @@
           "data": {
             "$ref": "#/components/schemas/KnowledgeArticleDetailResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "KnowledgeArticleBlockResponseDto": {
         "type": "object",
@@ -60605,13 +60901,13 @@
             "type": "number"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "contentText": {
             "type": "string"
           }
         },
-        "required": ["chunkIndex", "contentText"]
+        "required": ["chunkIndex", "contentText", "pageNumber"]
       },
       "KnowledgeArticleDetailResponseDto": {
         "type": "object",
@@ -60680,7 +60976,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataIngestionJobResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataIngestionJobResponseDto": {
         "type": "object",
@@ -60694,7 +60991,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataFeedbackResponseDto": {
         "type": "object",
@@ -60715,7 +61013,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataFeedbackResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataFeedbackResponseDto": {
         "type": "object",
@@ -60729,7 +61028,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataDocumentResponseDto": {
         "type": "object",
@@ -60750,7 +61050,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataDocumentResponseDto": {
         "type": "object",
@@ -60764,7 +61065,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseListIngestionJobResponseDto": {
         "type": "object",
@@ -60788,7 +61090,8 @@
               "$ref": "#/components/schemas/IngestionJobResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseDownloadDocumentResponseDto": {
         "type": "object",
@@ -60809,7 +61112,8 @@
           "data": {
             "$ref": "#/components/schemas/DownloadDocumentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DownloadDocumentResponseDto": {
         "type": "object",
@@ -60843,7 +61147,8 @@
           "data": {
             "$ref": "#/components/schemas/DocumentDepartmentsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DocumentDepartmentsResponseDto": {
         "type": "object",
@@ -60876,7 +61181,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentChunkResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DocumentChunkResponseDto": {
         "type": "object",
@@ -60894,13 +61200,13 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "tokenCount": {
             "type": "number"
           },
           "vectorPointId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "createdAt": {
             "type": "string",
@@ -60913,7 +61219,9 @@
           "createdAt",
           "documentId",
           "id",
-          "tokenCount"
+          "pageNumber",
+          "tokenCount",
+          "vectorPointId"
         ]
       },
       "PagedDataDocumentChunkResponseDto": {
@@ -60928,7 +61236,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseDocumentChunkResponseDto": {
         "type": "object",
@@ -60949,7 +61258,8 @@
           "data": {
             "$ref": "#/components/schemas/DocumentChunkResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseStorageUsageResponseDto": {
         "type": "object",
@@ -60970,7 +61280,8 @@
           "data": {
             "$ref": "#/components/schemas/StorageUsageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "StorageUsageResponseDto": {
         "type": "object",
@@ -61006,7 +61317,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentFlagResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataDocumentFlagResponseDto": {
         "type": "object",
@@ -61020,7 +61332,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataDepartmentResponseDto": {
         "type": "object",
@@ -61041,7 +61354,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataDepartmentResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "PagedDataDepartmentResponseDto": {
         "type": "object",
@@ -61055,7 +61369,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponsePagedDataDepartmentMemberResponseDto": {
         "type": "object",
@@ -61076,7 +61391,8 @@
           "data": {
             "$ref": "#/components/schemas/PagedDataDepartmentMemberResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DepartmentMemberResponseDto": {
         "type": "object",
@@ -61086,14 +61402,14 @@
             "type": "boolean"
           },
           "assignedByName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "assignedAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["assignedAt", "isPrimary", "user"]
+        "required": ["assignedAt", "assignedByName", "isPrimary", "user"]
       },
       "PagedDataDepartmentMemberResponseDto": {
         "type": "object",
@@ -61107,7 +61423,8 @@
           "meta": {
             "$ref": "#/components/schemas/PageMeta"
           }
-        }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseSubscriptionResponseDto": {
         "type": "object",
@@ -61128,16 +61445,17 @@
           "data": {
             "$ref": "#/components/schemas/SubscriptionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "SubscriptionResponseDto": {
         "type": "object",
         "properties": {
           "stripeCustomerId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "stripeSubscriptionId": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "planName": {
             "type": "string"
@@ -61152,15 +61470,15 @@
             "type": "number"
           },
           "aiModelTier": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAST", "QUALITY"]
           },
           "billingCycleStart": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "status": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -61170,10 +61488,15 @@
           }
         },
         "required": [
+          "aiModelTier",
+          "billingCycleStart",
           "maxAgentSeats",
           "maxStorageBytes",
           "monthlyAiTokenBudget",
-          "planName"
+          "planName",
+          "status",
+          "stripeCustomerId",
+          "stripeSubscriptionId"
         ]
       },
       "ApiResponseListTenantPlanResponseDto": {
@@ -61198,7 +61521,8 @@
               "$ref": "#/components/schemas/TenantPlanResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "TenantPlanPriceResponseDto": {
         "type": "object",
@@ -61231,7 +61555,7 @@
             "type": "number"
           },
           "aiModelTier": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAST", "QUALITY"]
           },
           "maxDocumentBytes": {
@@ -61254,6 +61578,7 @@
           }
         },
         "required": [
+          "aiModelTier",
           "id",
           "maxAgentSeats",
           "maxAnalyticsRangeDays",
@@ -61288,7 +61613,8 @@
               "$ref": "#/components/schemas/InvoiceResponseDto"
             }
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "InvoiceResponseDto": {
         "type": "object",
@@ -61309,7 +61635,7 @@
             "type": "string"
           },
           "created": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "hostedInvoiceUrl": {
@@ -61318,6 +61644,7 @@
         },
         "required": [
           "amountDue",
+          "created",
           "currency",
           "hostedInvoiceUrl",
           "id",
@@ -61344,7 +61671,8 @@
           "data": {
             "$ref": "#/components/schemas/ValidatePasswordResetTokenResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ValidatePasswordResetTokenResponseDto": {
         "type": "object",
@@ -61353,10 +61681,10 @@
             "type": "boolean"
           },
           "email": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["valid"]
+        "required": ["email", "valid"]
       },
       "ApiResponseOtpStatusResponseDto": {
         "type": "object",
@@ -61377,7 +61705,8 @@
           "data": {
             "$ref": "#/components/schemas/OtpStatusResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OtpStatusResponseDto": {
         "type": "object",
@@ -61386,17 +61715,17 @@
             "type": "boolean"
           },
           "target": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "expiresAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "attemptsRemaining": {
             "type": "number"
           }
         },
-        "required": ["attemptsRemaining", "pending"]
+        "required": ["attemptsRemaining", "expiresAt", "pending", "target"]
       },
       "ApiResponseBackupCodesStatusResponseDto": {
         "type": "object",
@@ -61417,7 +61746,8 @@
           "data": {
             "$ref": "#/components/schemas/BackupCodesStatusResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "BackupCodesStatusResponseDto": {
         "type": "object",
@@ -61429,11 +61759,11 @@
             "type": "number"
           },
           "expiresAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           }
         },
-        "required": ["remaining", "used"]
+        "required": ["expiresAt", "remaining", "used"]
       },
       "ApiResponseVolumeResponseDto": {
         "type": "object",
@@ -61454,7 +61784,8 @@
           "data": {
             "$ref": "#/components/schemas/VolumeResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "VolumeBreakdownResponseDto": {
         "type": "object",
@@ -61514,10 +61845,16 @@
             }
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["byPriority", "bySource", "byStatus", "points"]
+        "required": [
+          "byPriority",
+          "bySource",
+          "byStatus",
+          "dataThrough",
+          "points"
+        ]
       },
       "ApiResponseSatisfactionResponseDto": {
         "type": "object",
@@ -61538,13 +61875,14 @@
           "data": {
             "$ref": "#/components/schemas/SatisfactionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RateResponseDto": {
         "type": "object",
         "properties": {
           "rate": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "numerator": {
             "type": "number"
@@ -61553,7 +61891,7 @@
             "type": "number"
           }
         },
-        "required": ["denominator", "numerator"]
+        "required": ["denominator", "numerator", "rate"]
       },
       "SatisfactionPointResponseDto": {
         "type": "object",
@@ -61586,10 +61924,15 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["citationAccuracyTotal", "csatTotal", "points"]
+        "required": [
+          "citationAccuracyTotal",
+          "csatTotal",
+          "dataThrough",
+          "points"
+        ]
       },
       "ApiResponseResponseTimesResponseDto": {
         "type": "object",
@@ -61610,19 +61953,20 @@
           "data": {
             "$ref": "#/components/schemas/ResponseTimesResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "MeanResponseDto": {
         "type": "object",
         "properties": {
           "mean": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "count": {
             "type": "number"
           }
         },
-        "required": ["count"]
+        "required": ["count", "mean"]
       },
       "ResponseTimePointResponseDto": {
         "type": "object",
@@ -61666,10 +62010,16 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["aiTotal", "humanTotal", "points", "resolutionTotal"]
+        "required": [
+          "aiTotal",
+          "dataThrough",
+          "humanTotal",
+          "points",
+          "resolutionTotal"
+        ]
       },
       "ApiResponseOverviewResponseDto": {
         "type": "object",
@@ -61690,7 +62040,8 @@
           "data": {
             "$ref": "#/components/schemas/OverviewResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OverviewResponseDto": {
         "type": "object",
@@ -61723,21 +62074,24 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "openTicketMedianAgeSeconds": {
-            "type": "number"
+            "type": ["number", "null"]
           },
           "computedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": [
           "aiFirstResponseSeconds",
+          "computedAt",
           "csat",
+          "dataThrough",
           "deflection",
           "humanFirstResponseSeconds",
+          "openTicketMedianAgeSeconds",
           "openTickets",
           "resolutionSeconds",
           "ticketsCreated",
@@ -61764,7 +62118,8 @@
           "data": {
             "$ref": "#/components/schemas/KnowledgeGapsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "KnowledgeGapFlagResponseDto": {
         "type": "object",
@@ -61776,7 +62131,7 @@
             "type": "string"
           },
           "flagType": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": [
               "CONFLICTING",
               "LOW_CONFIDENCE",
@@ -61791,7 +62146,7 @@
             "type": "string"
           }
         },
-        "required": ["detail", "documentId", "documentTitle"]
+        "required": ["detail", "documentId", "documentTitle", "flagType"]
       },
       "KnowledgeGapsResponseDto": {
         "type": "object",
@@ -61818,7 +62173,7 @@
             }
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "unavailable": {
             "type": "array",
@@ -61831,6 +62186,7 @@
           "answeringGenerations",
           "attachmentEmptyRetrievals",
           "attachmentGroundedRate",
+          "dataThrough",
           "emptyRetrievalRate",
           "emptyRetrievals",
           "flags",
@@ -61868,7 +62224,8 @@
           "data": {
             "$ref": "#/components/schemas/DocumentAnalyticsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DocumentAnalyticsResponseDto": {
         "type": "object",
@@ -61892,10 +62249,17 @@
             }
           },
           "citationAccuracy": {
-            "$ref": "#/components/schemas/RateResponseDto"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RateResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "unavailable": {
             "type": "array",
@@ -61905,6 +62269,8 @@
           }
         },
         "required": [
+          "citationAccuracy",
+          "dataThrough",
           "mostCited",
           "neverRetrieved",
           "retrievedNeverCited",
@@ -61957,7 +62323,8 @@
           "data": {
             "$ref": "#/components/schemas/DeflectionResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DeflectionPointResponseDto": {
         "type": "object",
@@ -61995,10 +62362,10 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
-        "required": ["points", "total"]
+        "required": ["dataThrough", "points", "total"]
       },
       "AiUsagePointResponseDto": {
         "type": "object",
@@ -62046,7 +62413,7 @@
             "type": "number"
           },
           "aiModelTier": {
-            "type": "string",
+            "type": ["string", "null"],
             "enum": ["FAST", "QUALITY"]
           },
           "draftAcceptance": {
@@ -62056,16 +62423,19 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "computedAt": {
-            "type": "string",
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           }
         },
         "required": [
+          "aiModelTier",
           "byModel",
           "byPurpose",
+          "computedAt",
+          "dataThrough",
           "draftAcceptance",
           "emptyRetrievalRate",
           "monthlyBudgetMicros",
@@ -62132,7 +62502,8 @@
           "data": {
             "$ref": "#/components/schemas/AiUsageResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "AgentAnalyticsResponseDto": {
         "type": "object",
@@ -62144,7 +62515,7 @@
             }
           },
           "dataThrough": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "unavailable": {
             "type": "array",
@@ -62153,7 +62524,7 @@
             }
           }
         },
-        "required": ["items", "unavailable"]
+        "required": ["dataThrough", "items", "unavailable"]
       },
       "AgentStatResponseDto": {
         "type": "object",
@@ -62162,7 +62533,7 @@
             "type": "string"
           },
           "fullName": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "assigned": {
             "type": "number"
@@ -62177,12 +62548,21 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "draftAcceptance": {
-            "$ref": "#/components/schemas/RateResponseDto"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RateResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "agentId",
           "assigned",
+          "draftAcceptance",
+          "fullName",
           "messagesSent",
           "resolutionSeconds",
           "resolved"
@@ -62207,7 +62587,8 @@
           "data": {
             "$ref": "#/components/schemas/AgentAnalyticsResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseDeleteWebhookEndpointResponseDto": {
         "type": "object",
@@ -62228,7 +62609,8 @@
           "data": {
             "$ref": "#/components/schemas/DeleteWebhookEndpointResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DeleteWebhookEndpointResponseDto": {
         "type": "object",
@@ -62258,7 +62640,8 @@
           "data": {
             "$ref": "#/components/schemas/RevokedCountDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RevokedCountDto": {
         "type": "object",
@@ -62267,7 +62650,8 @@
             "type": "integer",
             "format": "int32"
           }
-        }
+        },
+        "required": ["revokedCount"]
       },
       "ApiResponseDeletePlanResponseDto": {
         "type": "object",
@@ -62288,7 +62672,8 @@
           "data": {
             "$ref": "#/components/schemas/DeletePlanResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "DeletePlanResponseDto": {
         "type": "object",
@@ -62329,7 +62714,8 @@
           "data": {
             "$ref": "#/components/schemas/OffboardResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "OffboardResponseDto": {
         "type": "object",
@@ -62370,7 +62756,8 @@
           "data": {
             "$ref": "#/components/schemas/RevokeTrustResponseDto"
           }
-        }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "RevokeTrustResponseDto": {
         "type": "object",

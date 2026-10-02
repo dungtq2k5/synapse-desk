@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.web;
 
+import jakarta.validation.constraints.NotNull;
 import org.springframework.lang.Nullable;
 
 /**
@@ -21,11 +22,11 @@ import org.springframework.lang.Nullable;
  *     override of its own.
  */
 public record ApiResponse<T>(
-  boolean success,
-  int statusCode,
-  String message,
+  @NotNull boolean success,
+  @NotNull int statusCode,
+  @NotNull String message,
   @Nullable String warning,
-  T data
+  @NotNull T data
 ) {
   public static <T> ApiResponse<T> of(int statusCode, String message, T data) {
     return new ApiResponse<>(true, statusCode, message, null, data);
