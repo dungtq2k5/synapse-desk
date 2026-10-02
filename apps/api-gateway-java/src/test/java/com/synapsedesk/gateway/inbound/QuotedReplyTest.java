@@ -203,12 +203,18 @@ class QuotedReplyTest {
   }
 
   /**
-   * The property {@link HtmlScan} exists for. Each shape is a body of openers that
-   * are never closed, which the regular expressions rescanned from every one of:
-   * 800 000 characters took them about ten minutes in Java. This uses 3 000 000,
-   * because the JDK's vectorised {@code indexOf} hides a rescan at smaller sizes.
-   * The bound is generous (five seconds) and the input is NOT capped — linearity is the scanners' own,
-   * not the cap's.
+   * The property {@link HtmlScan} exists for, measured in WORK and not in time. Each
+   * shape is a body of openers that are never closed, which the regular
+   * expressions rescanned from every one of, so their cost grew with the SQUARE of
+   * the length. {@link HtmlScan#work} counts every step the scanners take, so the
+   * count for double the input must be about double, not four times, and a scanner
+   * that rescans fails here at sizes that finish in milliseconds, on any machine.
+   *
+   * <p>A stopwatch cannot say this: it measures the machine as much as the code (a
+   * 90 ms run took 498 s when the box was swapping), and it passes a quadratic
+   * scanner that happens to run fast. The input is NOT capped: linearity is the
+   * scanners' own, not the body cap's. Measured on the current scanners: exactly
+   * twice the work for twice the input, between 20 and 37 steps per character.
    */
   @org.junit.jupiter.params.ParameterizedTest(
     name = "{0} repeated, never closed"
@@ -222,28 +228,58 @@ class QuotedReplyTest {
       "<li ",
       "<hr ",
       "<div class=\"",
+      "<div class=\"gmail",
+      "<blockquote",
       "<p><",
+      "<",
     }
   )
   void everyUnclosedOpenerShapeIsLinearAndUncapped(String opener) {
-    String hostile = "<p>" + opener.repeat(3_000_000 / opener.length());
+    long small = workFor(opener, 20_000);
+    long medium = workFor(opener, 40_000);
+    long large = workFor(opener, 80_000);
 
-    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-      Duration.ofSeconds(5),
-      () -> {
-        QuotedReply.toStoredBody(null, hostile);
-        QuotedReply.stripQuotedHtml(hostile);
-      }
-    );
+    // Linear is x2.00 per doubling; quadratic is x4. 2.2 leaves room for the
+    // input's own edges and none for a rescan.
+    org.assertj.core.api.Assertions.assertThat((double) medium / small)
+      .as("work for 40 000 characters over work for 20 000")
+      .isLessThan(2.2);
+    org.assertj.core.api.Assertions.assertThat((double) large / medium)
+      .as("work for 80 000 characters over work for 40 000")
+      .isLessThan(2.2);
+    // And a constant that does not explode: the measured worst is 37 per character.
+    org.assertj.core.api.Assertions.assertThat(large / 80_000.0)
+      .as("steps per character")
+      .isLessThan(100.0);
   }
 
   @Test
   void aLongRunOfClosedTagsIsLinearToo() {
-    String tags = "<p>a</p><div class=\"x\">b</div><li>c</li>".repeat(20_000);
+    long small = workFor("<p>a</p><div class=\"x\">b</div><li>c</li>", 20_000);
+    long large = workFor("<p>a</p><div class=\"x\">b</div><li>c</li>", 80_000);
 
+    // Four times the input, so linear is x4 and quadratic is x16.
+    org.assertj.core.api.Assertions.assertThat((double) large / small)
+      .as("work for 80 000 characters over work for 20 000")
+      .isLessThan(4.4);
+  }
+
+  /** Steps the scanners take on `size` characters of `unit` repeated, through both entry points. */
+  private static long workFor(String unit, int size) {
+    String body = "<p>" + unit.repeat(Math.max(1, size / unit.length()));
+
+    // A hang guard only: a quadratic regression fails on the counts above long
+    // before this, and the bound is wide enough that a swapping machine never
+    // reaches it. Nothing here asserts a speed.
     org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
-      Duration.ofSeconds(5),
-      () -> QuotedReply.toStoredBody(null, tags)
+      Duration.ofMinutes(10),
+      () -> {
+        HtmlScan.work = 0;
+        QuotedReply.toStoredBody(null, body);
+        QuotedReply.stripQuotedHtml(body);
+      }
     );
+
+    return HtmlScan.work;
   }
 }

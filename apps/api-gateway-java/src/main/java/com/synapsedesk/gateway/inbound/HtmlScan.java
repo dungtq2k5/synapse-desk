@@ -30,6 +30,19 @@ final class HtmlScan {
 
   private HtmlScan() {}
 
+  /**
+   * How much the scanners have done, in steps: characters walked, comparisons made,
+   * and the span every {@code indexOf} jump skipped. Every step is constant work, so
+   * this IS the cost, and unlike a stopwatch it does not depend on the machine: a
+   * test asserts it grows in proportion to the input, which catches a scanner that
+   * went quadratic even on a box fast enough to hide it.
+   *
+   * <p>A plain static, not thread-safe: the count is exact only while one thread
+   * scans, which is how the test reads it. In production it is incremented and never
+   * read, on a path that runs once per inbound mail, so a lost update costs nothing.
+   */
+  static long work;
+
   /** {@code <(script|style)[\s\S]*?</\1>} removed, case-insensitively. */
   static String removeScriptAndStyle(String text) {
     int length = text.length();
@@ -39,6 +52,7 @@ final class HtmlScan {
     int i = 0;
 
     while (i < length) {
+      work++;
       char c = text.charAt(i);
       if (c == '<') {
         boolean script = at(text, i + 1, "script");
@@ -73,6 +87,7 @@ final class HtmlScan {
     int i = 0;
 
     while (i < length) {
+      work++;
       char c = text.charAt(i);
       if (c == '<' && at(text, i + 1, "li")) {
         if (lastGt < i + 3) {
@@ -81,6 +96,7 @@ final class HtmlScan {
           break;
         }
         int close = text.indexOf('>', i + 3);
+        work += (close < 0 ? length : close) - i;
         kept.append("- ");
         i = close + 1;
         continue;
@@ -100,6 +116,7 @@ final class HtmlScan {
     int i = 0;
 
     while (i < length) {
+      work++;
       char c = text.charAt(i);
       if (c == '<') {
         if (i >= lastGt) {
@@ -108,6 +125,7 @@ final class HtmlScan {
           break;
         }
         int close = text.indexOf('>', i + 1);
+        work += (close < 0 ? length : close) - i;
         if (close > i + 1) {
           i = close + 1;
           continue;
@@ -150,6 +168,7 @@ final class HtmlScan {
       i >= 0 && i < cut;
       i = html.indexOf('<', i + 1)
     ) {
+      work++;
       if (at(html, i + 1, "div")) {
         int from = i + 4;
         int close = nextGt[from];
@@ -187,6 +206,7 @@ final class HtmlScan {
 
   /** Whether {@code lower} (already lower-case ASCII) is at {@code index}, ignoring ASCII case. */
   private static boolean at(String text, int index, String lower) {
+    work++;
     if (index < 0 || index + lower.length() > text.length()) return false;
     for (int k = 0; k < lower.length(); k++) {
       char c = text.charAt(index + k);
@@ -199,21 +219,29 @@ final class HtmlScan {
 
   /** The index just past the first {@code closing} at or after {@code from}, or -1. */
   private static int endOfClosing(String text, int from, String closing) {
+    int previous = from;
     for (
       int j = text.indexOf('<', from);
       j >= 0;
       j = text.indexOf('<', j + 1)
     ) {
+      work += 1 + j - previous;
+      previous = j;
       if (at(text, j, closing)) return j + closing.length();
     }
+    work += text.length() - previous;
 
     return -1;
   }
 
   private static int indexOfBlockquote(String html) {
+    int previous = 0;
     for (int j = html.indexOf('<'); j >= 0; j = html.indexOf('<', j + 1)) {
+      work += 1 + j - previous;
+      previous = j;
       if (at(html, j, "<blockquote")) return j;
     }
+    work += html.length() - previous;
 
     return html.length();
   }
@@ -223,6 +251,7 @@ final class HtmlScan {
     int length = text.length();
     int[] next = new int[length + 1];
     next[length] = length;
+    work += length;
     for (int x = length - 1; x >= 0; x--) {
       next[x] = text.charAt(x) == ch ? x : next[x + 1];
     }
@@ -235,6 +264,7 @@ final class HtmlScan {
     int length = text.length();
     int[] next = new int[length + 1];
     next[length] = length;
+    work += length;
     for (int x = length - 1; x >= 0; x--) {
       next[x] = at(text, x, lower) ? x : next[x + 1];
     }
@@ -255,6 +285,7 @@ final class HtmlScan {
   ) {
     int length = text.length();
     int[] counts = new int[length + 2];
+    work += length;
     for (int p = 0; p <= length; p++) {
       boolean hit = p < length && at(text, p, lower) && qualifies.at(p);
       counts[p + 1] = counts[p] + (hit ? 1 : 0);
