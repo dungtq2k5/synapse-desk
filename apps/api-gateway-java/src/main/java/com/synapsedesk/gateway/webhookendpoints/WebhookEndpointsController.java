@@ -19,7 +19,6 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
-import com.synapsedesk.gateway.web.CachedBodyRequest;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -78,15 +77,11 @@ import tools.jackson.databind.ObjectMapper;
  * a {@code secret} field, and {@code get}/{@code list}/{@code update} never
  * construct one.
  *
- * <p>
- * <b>{@code update}'s {@code eventTypes} needs the raw request body</b>, the
- * same shape as {@code OrganizationsController.updateSettings}: proto3
- * cannot tell an absent repeated field from an empty one, so "leave the
- * subscriptions alone" and "replace them" travel as a wrapper message
- * ({@link EventTypeList}) that is only ever set when the client's JSON
- * actually named the key — read via {@link CachedBodyRequest}, since the
- * bound DTO's {@code eventTypes} defaults to an empty list whether the key
- * was sent or not.
+ * <p><b>{@code update}'s {@code eventTypes} is null when the client did not send
+ * it.</b> proto3 cannot tell an absent repeated field from an empty one, so
+ * "leave the subscriptions alone" and "replace them" travel as a wrapper message
+ * ({@link EventTypeList}) that is only set for a non-null list; an empty list is
+ * refused by the DTO's {@code @Size(min = 1)} before the handler runs.
  *
  * <p><b>Migrated off `WebhookEndpointsApi`.</b> `create`, `rotateSecret` and
  * `test` all answer 201, not the generated interface's documented default of
@@ -157,16 +152,13 @@ public class WebhookEndpointsController {
 
   private final NotificationServiceGrpc.NotificationServiceBlockingStub stub;
   private final CurrentUser currentUser;
-  private final ObjectMapper json;
 
   public WebhookEndpointsController(
     NotificationServiceGrpc.NotificationServiceBlockingStub stub,
-    CurrentUser currentUser,
-    ObjectMapper json
+    CurrentUser currentUser
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
-    this.json = json;
   }
 
   @GetMapping(value = "/webhook-endpoints", produces = { "application/json" })
@@ -302,17 +294,9 @@ public class WebhookEndpointsController {
     if (updateWebhookEndpointDto.getIsActive() != null) {
       wire.setIsActive(updateWebhookEndpointDto.getIsActive());
     }
-    if (rawBody().has("eventTypes")) {
-      if (updateWebhookEndpointDto.getEventTypes().isEmpty()) {
-        // The generator's own `@Size(min = 1)` on this getter can't tell an
-        // absent key from an explicit `[]` (both bind to the same default
-        // empty list), so it is dropped for this property (ValidationConfig)
-        // and the refusal is reproduced here, where presence is known.
-        throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST,
-          "eventTypes must contain at least 1 elements"
-        );
-      }
+    // Absent means "leave them". An empty array was refused at the door by the
+    // DTO's `@Size(min = 1)`, which only sees a value when one was sent.
+    if (updateWebhookEndpointDto.getEventTypes() != null) {
       wire.setEventTypes(
         EventTypeList.newBuilder().addAllValues(
           updateWebhookEndpointDto
@@ -447,13 +431,6 @@ public class WebhookEndpointsController {
     );
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
-  }
-
-  private tools.jackson.databind.JsonNode rawBody() {
-    if (CurrentRequest.request() instanceof CachedBodyRequest cached) {
-      return json.readTree(cached.body());
-    }
-    return json.readTree("{}");
   }
 
   private static WebhookEndpointResponseDto toDto(

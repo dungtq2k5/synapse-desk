@@ -6,17 +6,16 @@ import com.synapsedesk.gateway.model.UpdateWebhookEndpointDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.net.URI;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 /**
- * The generated {@code UpdateWebhookEndpointDto.eventTypes} getter carries an
- * unconditional {@code @Size(min = 1)} that can't tell an absent JSON key
- * from an explicit {@code []} (both bind to the same default empty list) —
- * see {@link ValidationConfig}. This confirms the override actually drops
- * that one constraint, leaving every other generated {@code @Size} (e.g.
- * {@code url}) enforced as normal.
+ * {@code UpdateWebhookEndpointDto.eventTypes} carries {@code @Size(min = 1)} and
+ * no default, so the constraint only ever sees a value the client sent: absent
+ * is valid, an explicit {@code []} is not. {@code url}'s {@code @Size} on a
+ * {@code URI} is enforced by {@link UriSizeValidator}.
  */
 class ValidationConfigTest {
 
@@ -28,13 +27,35 @@ class ValidationConfigTest {
   }
 
   @Test
-  void eventTypesDefaultingToEmptyDoesNotViolateSizeMinOne() {
+  void anAbsentEventTypesIsValid() {
     UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
+
+    assertThat(dto.getEventTypes()).isNull();
+    assertThat(validator().validate(dto)).isEmpty();
+  }
+
+  @Test
+  void anExplicitEmptyEventTypesIsRefused() {
+    UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
+    dto.setEventTypes(List.of());
 
     Set<ConstraintViolation<UpdateWebhookEndpointDto>> violations =
       validator().validate(dto);
 
-    assertThat(violations).isEmpty();
+    assertThat(violations).hasSize(1);
+    assertThat(violations.iterator().next().getPropertyPath()).hasToString(
+      "eventTypes"
+    );
+  }
+
+  @Test
+  void aNonEmptyEventTypesIsValid() {
+    UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
+    dto.setEventTypes(
+      List.of(UpdateWebhookEndpointDto.EventTypesEnum.TICKET_ASSIGNED)
+    );
+
+    assertThat(validator().validate(dto)).isEmpty();
   }
 
   @Test

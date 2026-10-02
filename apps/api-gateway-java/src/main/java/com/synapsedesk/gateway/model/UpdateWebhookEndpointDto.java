@@ -76,7 +76,7 @@ public class UpdateWebhookEndpointDto {
     }
   }
 
-  private List<EventTypesEnum> eventTypes = new ArrayList<>();
+  private List<EventTypesEnum> eventTypes;
 
   private @Nullable Boolean isActive;
 
