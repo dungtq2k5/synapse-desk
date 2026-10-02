@@ -43,23 +43,14 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'messages) — the per-field text is already ruled loose; this ' +
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
-  'outside its enum':
-    'Java takes 42 of the 60 enum-valued query parameters as plain strings ' +
-    'and does not refuse a value outside the set: 36 reach the peer (sortOrder ' +
-    '20, sortBy 10, status 2, and one each of fileType, priority, source, ' +
-    'type) and 6 answer 500 (the invitations list sortBy, sortOrder and ' +
-    'status, the documents list status and fileType, document flags ' +
-    "severity), where Node answers 400. Node's behaviour, the document's " +
-    'enum, and a contract row per parameter exist; what is missing is an ' +
-    'enum-typed or validated parameter on the Java side. The 18 that already ' +
-    'refuse are skipped with the rest, because the skip matches the row ' +
-    'template, not the row',
-  'differs from its enum only in case':
-    'the same 42 parameters, from the other side: Java compares ' +
-    '`sortOrder` and its siblings case-insensitively (e.g. ' +
-    '`"DESC".equalsIgnoreCase(sortOrder)`), so `desc` is accepted where Node ' +
-    'answers 400. `fileType` is the one parameter Node deliberately reads in ' +
-    'any case and has its own row, which Java passes',
+  'Java does not refuse this yet':
+    'the enum-valued query parameters Java takes as plain strings: 42 of the 60 ' +
+    'accept a value outside the enum (36 reach the peer, 6 answer 500: the ' +
+    'invitations list sortBy, sortOrder and status, the documents list status ' +
+    'and fileType, document flags severity) and 40 of them accept it in a ' +
+    'different case (`"DESC".equalsIgnoreCase(sortOrder)`), where Node answers ' +
+    '400. The exact pairs are the two sets in query-enums.contract-spec.ts; ' +
+    'the other 18 pairs run on Java today',
   '**an explicit `dob: null` clears it**':
     '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
