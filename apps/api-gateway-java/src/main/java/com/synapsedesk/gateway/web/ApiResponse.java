@@ -17,6 +17,13 @@ import org.springframework.lang.Nullable;
  * is the other four; {@code warning} is nullable and absent means nothing to
  * say.
  *
+ * <p><b>{@code @NotNull} documents here; it does not validate.</b> Nothing checks an
+ * outgoing body, so on this type the annotation only tells the published document
+ * that the property is required and never null (see {@code
+ * ResponseSchemasOpenApiCustomizer}, which publishes a response property without it
+ * as possibly null). It is not redundant: removing it changes the published
+ * contract.
+ *
  * @param data required as a KEY even when its value is {@code null} — never
  *     omitted, which is why this type carries no {@code @JsonInclude}
  *     override of its own.
