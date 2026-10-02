@@ -23,6 +23,7 @@ import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
+import com.synapsedesk.gateway.web.UserSortField;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -141,7 +142,7 @@ public class UserAdminController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) UserSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -177,7 +178,7 @@ public class UserAdminController {
     PageRequest.Builder pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
-      .setSortBy(sortBy)
+      .setSortBy(sortBy.name())
       .setSortOrder(
         sortOrder == SortDirection.DESC
           ? SortOrder.SORT_ORDER_DESC

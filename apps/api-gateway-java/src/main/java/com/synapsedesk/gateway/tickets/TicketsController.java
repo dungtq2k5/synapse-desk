@@ -28,6 +28,7 @@ import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
+import com.synapsedesk.gateway.web.TicketSortField;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -139,7 +140,7 @@ public class TicketsController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) TicketSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -176,7 +177,7 @@ public class TicketsController {
       limit,
       sortOrder.name(),
       searchTerm,
-      sortBy,
+      sortBy.name(),
       includeDeleted,
       status,
       priority,

@@ -15,6 +15,7 @@ import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.model.AcceptInvitationDto;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.InvitationSortField;
 import com.synapsedesk.gateway.web.SortDirection;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
@@ -229,7 +230,7 @@ class InvitationsControllerTest {
         java.math.BigDecimal.TEN,
         SortDirection.ASC,
         null,
-        "createdAt",
+        InvitationSortField.createdAt,
         "BOGUS"
       )
     ).isInstanceOf(ResponseStatusException.class);

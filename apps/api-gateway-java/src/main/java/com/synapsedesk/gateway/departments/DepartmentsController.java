@@ -18,6 +18,8 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.DepartmentMemberSortField;
+import com.synapsedesk.gateway.web.DepartmentSortField;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -146,7 +148,7 @@ public class DepartmentsController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) DepartmentSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -198,7 +200,7 @@ public class DepartmentsController {
         PageRequest.Builder pageRequest = PageRequest.newBuilder()
           .setPage(page.intValue())
           .setLimit(limit.intValue())
-          .setSortBy(sortBy)
+          .setSortBy(sortBy.name())
           .setSortOrder(
             sortOrder == SortDirection.DESC
               ? SortOrder.SORT_ORDER_DESC
@@ -375,14 +377,14 @@ public class DepartmentsController {
       value = "sortBy",
       required = false,
       defaultValue = "assignedAt"
-    ) String sortBy
+    ) DepartmentMemberSortField sortBy
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     PageRequest.Builder pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
-      .setSortBy(sortBy)
+      .setSortBy(sortBy.name())
       .setSortOrder(
         sortOrder == SortDirection.DESC
           ? SortOrder.SORT_ORDER_DESC

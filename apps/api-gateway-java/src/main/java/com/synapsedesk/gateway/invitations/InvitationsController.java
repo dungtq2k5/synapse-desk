@@ -30,6 +30,7 @@ import com.synapsedesk.gateway.throttle.ThrottleOverride;
 import com.synapsedesk.gateway.throttle.ThrottlerTiers;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.InvitationSortField;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -214,7 +215,7 @@ public class InvitationsController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) InvitationSortField sortBy,
     @Valid @RequestParam(
       value = "status",
       required = false
@@ -225,7 +226,7 @@ public class InvitationsController {
     PageRequest.Builder pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
-      .setSortBy(sortBy)
+      .setSortBy(sortBy.name())
       .setSortOrder(
         sortOrder == SortDirection.DESC
           ? SortOrder.SORT_ORDER_DESC

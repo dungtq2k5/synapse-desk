@@ -27,8 +27,11 @@ import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.OrganizationSortField;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.PlanSortField;
 import com.synapsedesk.gateway.web.SortDirection;
+import com.synapsedesk.gateway.web.UserSortField;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -129,7 +132,7 @@ public class PlatformController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) OrganizationSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -146,7 +149,7 @@ public class PlatformController {
       limit,
       sortOrder.name(),
       searchTerm,
-      sortBy,
+      sortBy.name(),
       includeDeleted,
       status
     );
@@ -284,7 +287,7 @@ public class PlatformController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) UserSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -301,7 +304,7 @@ public class PlatformController {
       limit,
       sortOrder.name(),
       searchTerm,
-      sortBy,
+      sortBy.name(),
       includeDeleted,
       organizationId
     );
@@ -335,7 +338,7 @@ public class PlatformController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) UserSortField sortBy,
     @Valid @RequestParam(
       value = "includeDeleted",
       required = false,
@@ -352,7 +355,7 @@ public class PlatformController {
       limit,
       sortOrder.name(),
       searchTerm,
-      sortBy,
+      sortBy.name(),
       includeDeleted,
       organizationId
     );
@@ -431,7 +434,7 @@ public class PlatformController {
       value = "sortBy",
       required = false,
       defaultValue = "createdAt"
-    ) String sortBy,
+    ) PlanSortField sortBy,
     @Valid @RequestParam(
       value = "includeInactive",
       required = false,
@@ -449,7 +452,7 @@ public class PlatformController {
       limit,
       sortOrder.name(),
       searchTerm,
-      sortBy,
+      sortBy.name(),
       includeInactive,
       includeDeleted
     );

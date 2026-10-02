@@ -2779,7 +2779,14 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "email",
+                "fullName",
+                "lastLoginAt",
+                "updatedAt"
+              ]
             }
           },
           {
@@ -4796,7 +4803,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": ["createdAt", "email", "expiresAt", "status"]
             }
           },
           {
@@ -6008,7 +6016,15 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "priority",
+                "resolvedAt",
+                "status",
+                "ticketNumber",
+                "updatedAt"
+              ]
             }
           },
           {
@@ -13226,7 +13242,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": ["createdAt", "name", "updatedAt", "userAssigned"]
             }
           },
           {
@@ -14013,7 +14030,14 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "email",
+                "fullName",
+                "lastLoginAt",
+                "updatedAt"
+              ]
             }
           },
           {
@@ -14429,7 +14453,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": ["createdAt", "maxAgentSeats", "name"]
             }
           },
           {
@@ -15072,7 +15097,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": ["createdAt", "name", "slug", "status", "updatedAt"]
             }
           },
           {
@@ -21885,7 +21911,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": ["createdAt", "name", "updatedAt"]
             }
           },
           {
@@ -22632,7 +22659,8 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "assignedAt"
+              "default": "assignedAt",
+              "enum": ["assignedAt", "isPrimary"]
             }
           }
         ],
@@ -23230,7 +23258,15 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "priority",
+                "resolvedAt",
+                "status",
+                "ticketNumber",
+                "updatedAt"
+              ]
             }
           },
           {
@@ -41768,7 +41804,14 @@
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "createdAt",
+              "enum": [
+                "createdAt",
+                "email",
+                "fullName",
+                "lastLoginAt",
+                "updatedAt"
+              ]
             }
           },
           {

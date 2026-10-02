@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.web.DepartmentSortField;
 import com.synapsedesk.gateway.web.SortDirection;
 import java.util.List;
 import java.util.function.Supplier;
@@ -95,7 +96,7 @@ class DepartmentsControllerTest {
         BigDecimalOf(10),
         SortDirection.ASC,
         null,
-        "createdAt",
+        DepartmentSortField.createdAt,
         true
       )
     ).isInstanceOf(ResponseStatusException.class);
@@ -123,7 +124,7 @@ class DepartmentsControllerTest {
       BigDecimalOf(10),
       SortDirection.ASC,
       null,
-      "createdAt",
+      DepartmentSortField.createdAt,
       true
     );
 
@@ -152,7 +153,7 @@ class DepartmentsControllerTest {
       BigDecimalOf(10),
       SortDirection.ASC,
       null,
-      "createdAt",
+      DepartmentSortField.createdAt,
       false
     );
 
@@ -183,7 +184,7 @@ class DepartmentsControllerTest {
       BigDecimalOf(10),
       SortDirection.ASC,
       null,
-      "createdAt",
+      DepartmentSortField.createdAt,
       false
     );
 
