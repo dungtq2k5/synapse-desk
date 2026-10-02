@@ -9,8 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 /**
- * Two corrections to what the generated {@code *Api} DTOs carry, neither
- * fixable at the source since generated code regenerates on every build:
+ * Two corrections to what the DTO classes carry:
  *
  * <ul>
  *   <li>{@code @Size} extended to cover {@link java.net.URI} — see {@link

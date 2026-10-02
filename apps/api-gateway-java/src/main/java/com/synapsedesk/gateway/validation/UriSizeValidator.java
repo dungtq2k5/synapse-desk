@@ -11,10 +11,11 @@ import java.net.URI;
  *
  * <p><b>Hibernate Validator ships no {@code @Size} validator for {@link
  * URI}</b> (only {@code CharSequence}, {@code Collection}, {@code Map} and
- * arrays), so a generated field typed as {@code URI} carrying {@code @Size}
- * — which the OpenAPI generator produces for a {@code format: uri} property
- * that also declares {@code maxLength} — throws {@code
- * UnexpectedTypeException} on every request that reaches validation,
+ * arrays), so a field typed as {@code URI} carrying {@code @Size} — the DTO
+ * shape for a {@code format: uri} property that declares {@code maxLength},
+ * where {@code @Size} is also what puts {@code maxLength} in the published
+ * document — throws {@code UnexpectedTypeException} on every request that
+ * reaches validation,
  * regardless of whether that field is even populated: a 500 on the whole
  * route, not a refusal of one bad value.
  *

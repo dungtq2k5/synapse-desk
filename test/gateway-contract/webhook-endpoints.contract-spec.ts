@@ -162,6 +162,35 @@ describe('webhook-endpoints', () => {
   );
 
   rowFor('Webhook endpoints')(
+    '**a `url` over 2000 characters is refused at the door, on create and on update — `maxLength` is the published contract**',
+    async () => {
+      const tooLong = `https://example.com/${'a'.repeat(2000)}`;
+      const id = 'dddddddd-1111-4111-8111-dddddddddddd';
+
+      const created = await new Session(gateway.baseUrl).post(
+        `${API}/webhook-endpoints`,
+        { url: tooLong, eventTypes: ['ticket.assigned'] },
+        headers(['organization.update']),
+      );
+      const updated = await new Session(gateway.baseUrl).request(
+        'PATCH',
+        `${API}/webhook-endpoints/${id}`,
+        { body: { url: tooLong }, headers: headers(['organization.update']) },
+      );
+
+      expect(created.status).toBe(400);
+      expect(updated.status).toBe(400);
+      // Refused before the peer: a length the contract forbids is never forwarded.
+      expect(
+        peers.notification.calls('NotificationService/CreateWebhookEndpoint'),
+      ).toHaveLength(0);
+      expect(
+        peers.notification.calls('NotificationService/UpdateWebhookEndpoint'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Webhook endpoints')(
     '**`update` leaves subscriptions untouched when `eventTypes` is absent from the body**',
     async () => {
       const id = 'dddddddd-1111-4111-8111-dddddddddddd';
