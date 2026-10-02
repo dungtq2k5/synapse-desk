@@ -19,6 +19,19 @@ public record RequestContext(
   String ip,
   String userAgent
 ) {
+  /**
+   * The organization, or the empty string for a caller with none (a super admin
+   * carries {@code isSuperAdmin} with a null organization).
+   *
+   * <p>What a protobuf string field takes: its setter refuses {@code null}, which
+   * answered 500 before any peer was called, where Node sends the empty default and
+   * lets the peer decide. Every request to a peer that names the caller's
+   * organization goes through this, so there is one definition of "none".
+   */
+  public String organizationIdOrEmpty() {
+    return organizationId == null ? "" : organizationId;
+  }
+
   public RequestOrigin origin() {
     return new RequestOrigin(ip, userAgent);
   }

@@ -551,9 +551,7 @@ public class AnalyticsController {
       ListUsersByIdsResponse names = tryLeg("auth-service", unavailable, () ->
         usersWith(context).listUsersByIds(
           ListUsersByIdsRequest.newBuilder()
-            .setOrganizationId(
-              context.organizationId() == null ? "" : context.organizationId()
-            )
+            .setOrganizationId(context.organizationIdOrEmpty())
             .addAllUserIds(agentIds)
             .setIncludeInactive(true)
             .setProjection(UserProjection.USER_PROJECTION_SUMMARY)

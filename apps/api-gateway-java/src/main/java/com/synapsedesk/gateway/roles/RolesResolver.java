@@ -109,10 +109,7 @@ public class RolesResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     return loader
-      .load(
-        context.organizationId() == null ? "" : context.organizationId(),
-        context
-      )
+      .load(context.organizationIdOrEmpty(), context)
       .thenApply(PermissionCatalogueGqlDto::items);
   }
 
@@ -133,10 +130,7 @@ public class RolesResolver {
     // catalogue, and passing the role id would reinstate the N calls this
     // loader exists to collapse.
     return loader
-      .load(
-        context.organizationId() == null ? "" : context.organizationId(),
-        context
-      )
+      .load(context.organizationIdOrEmpty(), context)
       .thenApply(catalogue ->
         catalogue
           .items()

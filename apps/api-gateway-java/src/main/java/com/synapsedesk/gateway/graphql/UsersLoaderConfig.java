@@ -69,9 +69,7 @@ public class UsersLoaderConfig {
 
     ListUsersByIdsResponse response = withMetadata(context).listUsersByIds(
       ListUsersByIdsRequest.newBuilder()
-        .setOrganizationId(
-          context.organizationId() == null ? "" : context.organizationId()
-        )
+        .setOrganizationId(context.organizationIdOrEmpty())
         .addAllUserIds(ids)
         // `true`: a loader asks "who IS this?", never "who can act on
         // this?" — see the proto's own comment on the flag.

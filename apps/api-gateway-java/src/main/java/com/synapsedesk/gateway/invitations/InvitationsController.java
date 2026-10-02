@@ -139,7 +139,7 @@ public class InvitationsController {
     requireEmailVerified(context);
 
     CreateInvitationsRequest wire = CreateInvitationsRequest.newBuilder()
-      .setOrganizationId(context.organizationId())
+      .setOrganizationId(context.organizationIdOrEmpty())
       .setInvitedById(context.sub())
       .addAllInvitations(
         createInvitationsDto
@@ -236,7 +236,7 @@ public class InvitationsController {
     }
 
     ListInvitationsRequest.Builder wire = ListInvitationsRequest.newBuilder()
-      .setOrganizationId(context.organizationId())
+      .setOrganizationId(context.organizationIdOrEmpty())
       .setPage(pageRequest);
     if (status != null) {
       wire.setStatus(toInvitationStatus(status));
@@ -278,7 +278,7 @@ public class InvitationsController {
 
     InvitationResponse response = withMetadata(context).resendInvitation(
       InvitationIdRequest.newBuilder()
-        .setOrganizationId(context.organizationId())
+        .setOrganizationId(context.organizationIdOrEmpty())
         .setInvitationId(id)
         .setActorId(context.sub())
         .build()
@@ -306,7 +306,7 @@ public class InvitationsController {
 
     withMetadata(context).revokeInvitation(
       InvitationIdRequest.newBuilder()
-        .setOrganizationId(context.organizationId())
+        .setOrganizationId(context.organizationIdOrEmpty())
         .setInvitationId(id)
         .setActorId(context.sub())
         .build()
@@ -429,7 +429,7 @@ public class InvitationsController {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     PreviewInvitationsRequest wire = PreviewInvitationsRequest.newBuilder()
-      .setOrganizationId(context.organizationId())
+      .setOrganizationId(context.organizationIdOrEmpty())
       .addAllInvitations(
         previewInvitationsDto
           .getInvitations()
@@ -470,7 +470,7 @@ public class InvitationsController {
 
     InvitationResponse response = withMetadata(context).getInvitation(
       GetInvitationRequest.newBuilder()
-        .setOrganizationId(context.organizationId())
+        .setOrganizationId(context.organizationIdOrEmpty())
         .setInvitationId(id)
         .build()
     );

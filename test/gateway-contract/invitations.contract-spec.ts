@@ -403,4 +403,81 @@ describe('invitations', () => {
       expect(response.body).toMatchObject({ data: { id, status: 'REVOKED' } });
     },
   );
+
+  rowFor('Invitations')(
+    '**a caller with no organization (a super admin) reaches the peer with an EMPTY organization on every invitation route — the peer decides, the gateway never answers 500 first**',
+    async () => {
+      const superAdmin = {
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
+          {
+            sub: USER,
+            organizationId: null,
+            isSuperAdmin: true,
+            departmentIds: [],
+            permissionCodes: [],
+            isEmailVerified: true,
+          },
+          TEST_KEYS.access(),
+          { algorithm: 'RS256', expiresIn: '15m' },
+        )}`,
+      };
+      const id = 'ffffffff-3333-4333-8333-ffffffffffff';
+      const invitations = {
+        invitations: [
+          { email: 'a@example.com', roleIds: [], departmentIds: [] },
+        ],
+      };
+      const requests: [string, string, unknown, string][] = [
+        [
+          'GET',
+          `${API}/users/invitations/${id}`,
+          undefined,
+          'InvitationService/GetInvitation',
+        ],
+        [
+          'DELETE',
+          `${API}/users/invitations/${id}`,
+          {},
+          'InvitationService/RevokeInvitation',
+        ],
+        [
+          'POST',
+          `${API}/users/invitations/${id}/resend`,
+          {},
+          'InvitationService/ResendInvitation',
+        ],
+        [
+          'POST',
+          `${API}/users/invitations`,
+          invitations,
+          'InvitationService/CreateInvitations',
+        ],
+        [
+          'POST',
+          `${API}/users/invitations/preview`,
+          invitations,
+          'InvitationService/PreviewInvitations',
+        ],
+      ];
+
+      for (const [method, path, body, rpc] of requests) {
+        peers.auth.reset();
+        const response = await new Session(gateway.baseUrl).request(
+          method,
+          path,
+          {
+            body,
+            headers: superAdmin,
+          },
+        );
+        const [call] = peers.auth.calls(rpc);
+
+        // The peer was called, with no organization: a 500 here would mean the
+        // gateway failed before asking.
+        expect(call).toBeDefined();
+        expect(call.request.organizationId ?? '').toBe('');
+        expect(response.status).not.toBe(500);
+      }
+    },
+  );
 });
