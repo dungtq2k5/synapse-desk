@@ -16,6 +16,7 @@ import com.synapsedesk.gateway.model.UpdatePreferenceDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.NotificationTypeFilter;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -189,7 +190,7 @@ public class NotificationsController {
     @Valid @RequestParam(
       value = "type",
       required = false
-    ) @Nullable String type,
+    ) @Nullable NotificationTypeFilter type,
     @Size(max = 500) @Valid @RequestParam(
       value = "cursor",
       required = false
@@ -203,7 +204,7 @@ public class NotificationsController {
         .setIncludeArchived(Boolean.TRUE.equals(includeArchived))
         .setLimit(limit.intValue());
     if (type != null) {
-      wire.setType(toProtoType(type));
+      wire.setType(toProtoType(type.wire()));
     }
     if (cursor != null) {
       wire.setCursor(cursor);

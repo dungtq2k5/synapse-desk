@@ -148,6 +148,37 @@ describe('chat', () => {
     },
   );
 
+  rowFor('Chat')(
+    '**list forwards the `status` and `priority` filters, and `source` is still forced to CHAT whatever the query says**',
+    async () => {
+      peers.ticket.on('TicketService/ListTickets').reply({
+        items: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 10,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/chat/conversations?status=OPEN&priority=HIGH&source=EMAIL`,
+        cookie(),
+      );
+
+      expect(response.status).toBe(200);
+
+      const [call] = peers.ticket.calls('TicketService/ListTickets');
+      expect(call.request).toMatchObject({
+        status: 2, // TICKET_STATUS_OPEN
+        priority: 3, // TICKET_PRIORITY_HIGH
+        source: 2, // TICKET_SOURCE_CHAT, not the EMAIL the query asked for
+        authorId: USER,
+      });
+    },
+  );
+
   rowFor('Chat')('get returns one own conversation', async () => {
     peers.ticket.on('TicketService/GetTicket').reply(wireTicket());
 

@@ -104,6 +104,12 @@ describe('path parameters that name an id', () => {
       peer.calls().filter((call) => !call.method.endsWith('JobHealth')),
     );
 
+  // These rows do NOT assert which 400 they got, unlike the enum rows (which require
+  // the refusal to name its parameter): `ParseUUIDPipe`'s message ("Validation
+  // failed (uuid is expected)") names no parameter, so there is nothing to assert.
+  // The cause is pinned by construction instead: every OTHER path variable is a real
+  // UUID, a body is sent where the route takes one, and the caller is a super admin
+  // with no permission or tenant to refuse first.
   rowFor('Ops').each(rows().filter((row) => !NOT_A_UUID.has(row.join(' '))))(
     '**`%s %s` refuses a `%s` that is not a UUID, before any peer is called**',
     async (method: string, path: string, parameter: string) => {

@@ -17,7 +17,10 @@ import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
+import com.synapsedesk.gateway.web.TicketPriorityFilter;
 import com.synapsedesk.gateway.web.TicketSortField;
+import com.synapsedesk.gateway.web.TicketSourceFilter;
+import com.synapsedesk.gateway.web.TicketStatusFilter;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -189,15 +192,15 @@ public class ChatController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status,
+    ) @Nullable TicketStatusFilter status,
     @Valid @RequestParam(
       value = "priority",
       required = false
-    ) @Nullable String priority,
+    ) @Nullable TicketPriorityFilter priority,
     @Valid @RequestParam(
       value = "source",
       required = false
-    ) @Nullable String source,
+    ) @Nullable TicketSourceFilter source,
     @Valid @RequestParam(
       value = "assigneeId",
       required = false
@@ -226,17 +229,31 @@ public class ChatController {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListTicketsRequest wire = ListTicketsRequest.newBuilder()
+    ListTicketsRequest.Builder wire = ListTicketsRequest.newBuilder()
       .setPage(pageRequest)
       // `source=CHAT` forced and `authorId` pinned to the caller — the
       // caller's OWN conversations, never the tenant queue
       // `ticket.read.all` would otherwise expose.
       .setSource(TicketSource.TICKET_SOURCE_CHAT)
       .setAuthorId(context.sub())
-      .setIncludeDeleted(false)
-      .build();
+      .setIncludeDeleted(false);
 
-    ListTicketsResponse response = ticketsWith(context).listTickets(wire);
+    // Node spreads the query over its forced values, so `status` and `priority`
+    // filter the caller's conversations as they filter the ticket queue; only
+    // `source` and `authorId` are pinned. (`source` is accepted and checked as an
+    // enum, then overridden: a chat is always source CHAT.)
+    if (status != null) {
+      wire.setStatus(TicketStatus.valueOf("TICKET_STATUS_" + status.name()));
+    }
+    if (priority != null) {
+      wire.setPriority(
+        TicketPriority.valueOf("TICKET_PRIORITY_" + priority.name())
+      );
+    }
+
+    ListTicketsResponse response = ticketsWith(context).listTickets(
+      wire.build()
+    );
 
     PagedData<TicketResponseDto> data = new PagedData<>(
       response

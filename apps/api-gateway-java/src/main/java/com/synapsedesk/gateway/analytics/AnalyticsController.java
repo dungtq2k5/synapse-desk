@@ -34,6 +34,7 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.Granularity;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -202,7 +203,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     OverviewResponseDto data = cachedGetDto(
@@ -240,7 +241,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     DeflectionResponseDto data = cachedGetDto(
@@ -278,7 +279,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     ResponseTimesResponseDto data = cachedGetDto(
@@ -313,7 +314,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     VolumeResponseDto data = cachedGetDto(
@@ -351,7 +352,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     SatisfactionResponseDto data = cachedGetDto(
@@ -386,14 +387,14 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     AiUsageRequest.Builder wire = AiUsageRequest.newBuilder()
       .setFrom(from)
       .setTo(to);
     if (granularity != null) {
-      wire.setGranularity(granularity);
+      wire.setGranularity(granularity.name());
     }
 
     AiUsageResponseDto data = cachedGetDto(
@@ -485,7 +486,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -505,7 +506,7 @@ public class AnalyticsController {
     String from,
     String to,
     UUID departmentId,
-    String granularity,
+    Granularity granularity,
     RequestContext context
   ) {
     List<UnavailableBlockResponseDto> unavailable = new ArrayList<>();
@@ -610,7 +611,7 @@ public class AnalyticsController {
     @Valid @RequestParam(
       value = "granularity",
       required = false
-    ) @Nullable String granularity
+    ) @Nullable Granularity granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -822,7 +823,7 @@ public class AnalyticsController {
     String from,
     String to,
     UUID departmentId,
-    String granularity
+    Granularity granularity
   ) {
     Map<String, String> params = new LinkedHashMap<>();
     params.put("from", from);
@@ -831,7 +832,7 @@ public class AnalyticsController {
       params.put("departmentId", departmentId.toString());
     }
     if (granularity != null) {
-      params.put("granularity", granularity);
+      params.put("granularity", granularity.name());
     }
 
     return params;
@@ -841,7 +842,7 @@ public class AnalyticsController {
     String from,
     String to,
     UUID departmentId,
-    String granularity
+    Granularity granularity
   ) {
     AnalyticsRangeRequest.Builder wire = AnalyticsRangeRequest.newBuilder()
       .setFrom(from)
@@ -850,7 +851,7 @@ public class AnalyticsController {
       wire.setDepartmentId(departmentId.toString());
     }
     if (granularity != null) {
-      wire.setGranularity(granularity);
+      wire.setGranularity(granularity.name());
     }
 
     return wire.build();

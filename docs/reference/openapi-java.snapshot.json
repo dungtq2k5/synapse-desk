@@ -4812,7 +4812,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["ACCEPTED", "EXPIRED", "PENDING", "REVOKED"]
             }
           }
         ],
@@ -23283,7 +23284,15 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": [
+                "CLOSED",
+                "ESCALATED",
+                "NEW",
+                "OPEN",
+                "PENDING_AGENT",
+                "RESOLVED"
+              ]
             }
           },
           {
@@ -23291,7 +23300,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
             }
           },
           {
@@ -23299,7 +23309,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["API", "CHAT", "EMAIL", "WEB"]
             }
           },
           {
@@ -43452,7 +43463,19 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": [
+                "billing.payment_failed",
+                "billing.plan_changed",
+                "limit.threshold",
+                "quota.threshold",
+                "ticket.assigned",
+                "ticket.escalated",
+                "ticket.message_created",
+                "ticket.reassigned",
+                "ticket.status_changed",
+                "webhook.endpoint_disabled"
+              ]
             }
           },
           {
@@ -45199,7 +45222,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
             }
           },
           {
@@ -45216,7 +45240,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["bin", "docx", "md", "pdf", "txt"]
             }
           }
         ],
@@ -45897,7 +45922,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
             }
           },
           {
@@ -45914,7 +45940,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["bin", "docx", "md", "pdf", "txt"]
             }
           }
         ],
@@ -46626,7 +46653,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["CRITICAL", "INFO", "WARNING"]
             }
           },
           {
@@ -49443,7 +49471,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -49648,7 +49677,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -49853,7 +49883,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -50058,7 +50089,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -50274,7 +50306,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -50918,7 +50951,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -51123,7 +51157,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],
@@ -51328,7 +51363,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": ["string", "null"],
+              "enum": ["DAY", "MONTH", "WEEK"]
             }
           }
         ],

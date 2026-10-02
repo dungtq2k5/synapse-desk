@@ -92,54 +92,6 @@ function rows(): Row[] {
   return found;
 }
 
-/**
- * The (route, parameter) pairs the Java gateway does not yet refuse, MEASURED
- * from a full run of these rows on Java (accept a value outside the enum, and most
- * of them also in another case), not guessed. They are the progress bar for the
- * enum work and shrink to empty: a pair leaves its set in the commit that makes
- * Java refuse it, and the rows for every other pair run on Java today. Rows in a
- * set are reported skipped for Java through `SKIPPED_FOR_JAVA`, never silently.
- */
-const NOT_YET_REFUSED_OUTSIDE = new Set([
-  'GET /api/v1/analytics/agents granularity',
-  'GET /api/v1/analytics/ai-usage granularity',
-  'GET /api/v1/analytics/deflection granularity',
-  'GET /api/v1/analytics/knowledge-gaps granularity',
-  'GET /api/v1/analytics/overview granularity',
-  'GET /api/v1/analytics/response-times granularity',
-  'GET /api/v1/analytics/satisfaction granularity',
-  'GET /api/v1/analytics/volume granularity',
-  'GET /api/v1/chat/conversations priority',
-  'GET /api/v1/chat/conversations source',
-  'GET /api/v1/chat/conversations status',
-  'GET /api/v1/documents fileType',
-  'GET /api/v1/documents status',
-  'GET /api/v1/documents/flags severity',
-  'GET /api/v1/documents/{id}/chunks fileType',
-  'GET /api/v1/documents/{id}/chunks status',
-  'GET /api/v1/notifications type',
-  'GET /api/v1/users/invitations status',
-]);
-
-const NOT_YET_REFUSED_IN_CASE = new Set([
-  'GET /api/v1/analytics/agents granularity',
-  'GET /api/v1/analytics/ai-usage granularity',
-  'GET /api/v1/analytics/deflection granularity',
-  'GET /api/v1/analytics/knowledge-gaps granularity',
-  'GET /api/v1/analytics/overview granularity',
-  'GET /api/v1/analytics/response-times granularity',
-  'GET /api/v1/analytics/satisfaction granularity',
-  'GET /api/v1/analytics/volume granularity',
-  'GET /api/v1/chat/conversations priority',
-  'GET /api/v1/chat/conversations source',
-  'GET /api/v1/chat/conversations status',
-  'GET /api/v1/documents status',
-  'GET /api/v1/documents/flags severity',
-  'GET /api/v1/documents/{id}/chunks status',
-  'GET /api/v1/notifications type',
-  'GET /api/v1/users/invitations status',
-]);
-
 describe('enum-valued query parameters', () => {
   let gateway: Gateway;
   let peers: Peers;
@@ -243,19 +195,8 @@ describe('enum-valued query parameters', () => {
     expect(reached()).toEqual([]);
   };
 
-  const key = (row: Row) => `${row[0]} ${row[1]} ${row[2]}`;
-
-  rowFor('Ops').each(
-    rows().filter((row) => !NOT_YET_REFUSED_OUTSIDE.has(key(row))),
-  )(
+  rowFor('Ops').each(rows())(
     '**`%s %s` refuses a `%s` outside its enum, before any peer is called**',
-    refusesOutsideTheEnum,
-  );
-
-  rowFor('Ops').each(
-    rows().filter((row) => NOT_YET_REFUSED_OUTSIDE.has(key(row))),
-  )(
-    '**`%s %s` refuses a `%s` outside its enum, before any peer is called** (Java does not refuse this yet)',
     refusesOutsideTheEnum,
   );
 
@@ -265,17 +206,8 @@ describe('enum-valued query parameters', () => {
   const CASE_INSENSITIVE = new Set(['fileType']);
   const caseRows = rows().filter(([, , name]) => !CASE_INSENSITIVE.has(name));
 
-  rowFor('Ops').each(
-    caseRows.filter((row) => !NOT_YET_REFUSED_IN_CASE.has(key(row))),
-  )(
+  rowFor('Ops').each(caseRows)(
     '**`%s %s` refuses a `%s` that differs from its enum only in case**',
-    refusesTheOtherCase,
-  );
-
-  rowFor('Ops').each(
-    caseRows.filter((row) => NOT_YET_REFUSED_IN_CASE.has(key(row))),
-  )(
-    '**`%s %s` refuses a `%s` that differs from its enum only in case** (Java does not refuse this yet)',
     refusesTheOtherCase,
   );
 

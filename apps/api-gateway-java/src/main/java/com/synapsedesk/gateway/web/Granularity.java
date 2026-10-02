@@ -1,0 +1,16 @@
+package com.synapsedesk.gateway.web;
+
+/**
+ * The {@code granularity} query parameter of the analytics routes: {@code DAY},
+ * {@code MONTH} or {@code WEEK}, exactly, in the order the published contract
+ * lists them. A value outside it is refused with a 400 before any handler or peer
+ * runs, and the document publishes the enum from the type.
+ *
+ * <p>The constants are the wire values, so Spring converts the parameter by
+ * constant name and there is no converter to keep in step with the contract.
+ */
+public enum Granularity {
+  DAY,
+  MONTH,
+  WEEK,
+}

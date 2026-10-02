@@ -208,33 +208,4 @@ class InvitationsControllerTest {
 
     verify(stub).createInvitations(any());
   }
-
-  @Test
-  void listRefusesAnUnrecognizedStatusValue() {
-    when(currentUser.require(any())).thenReturn(
-      new RequestContext(
-        "agent-1",
-        "org-1",
-        false,
-        List.of(),
-        List.of("user.read"),
-        true,
-        "127.0.0.1",
-        "test"
-      )
-    );
-
-    assertThatThrownBy(() ->
-      controller.invitationsControllerListV1(
-        java.math.BigDecimal.ONE,
-        java.math.BigDecimal.TEN,
-        SortDirection.ASC,
-        null,
-        InvitationSortField.createdAt,
-        "BOGUS"
-      )
-    ).isInstanceOf(ResponseStatusException.class);
-
-    verifyNoInteractions(stub);
-  }
 }

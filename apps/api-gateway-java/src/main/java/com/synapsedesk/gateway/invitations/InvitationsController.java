@@ -31,6 +31,7 @@ import com.synapsedesk.gateway.throttle.ThrottlerTiers;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.InvitationSortField;
+import com.synapsedesk.gateway.web.InvitationStatusFilter;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -219,7 +220,7 @@ public class InvitationsController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status
+    ) @Nullable InvitationStatusFilter status
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -501,16 +502,14 @@ public class InvitationsController {
     }
   }
 
-  private static InvitationStatus toInvitationStatus(String status) {
+  private static InvitationStatus toInvitationStatus(
+    InvitationStatusFilter status
+  ) {
     return switch (status) {
-      case "PENDING" -> InvitationStatus.INVITATION_STATUS_PENDING;
-      case "ACCEPTED" -> InvitationStatus.INVITATION_STATUS_ACCEPTED;
-      case "REVOKED" -> InvitationStatus.INVITATION_STATUS_REVOKED;
-      case "EXPIRED" -> InvitationStatus.INVITATION_STATUS_EXPIRED;
-      default -> throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST,
-        "status must be one of PENDING, ACCEPTED, REVOKED, EXPIRED"
-      );
+      case PENDING -> InvitationStatus.INVITATION_STATUS_PENDING;
+      case ACCEPTED -> InvitationStatus.INVITATION_STATUS_ACCEPTED;
+      case REVOKED -> InvitationStatus.INVITATION_STATUS_REVOKED;
+      case EXPIRED -> InvitationStatus.INVITATION_STATUS_EXPIRED;
     };
   }
 

@@ -25,6 +25,9 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.DocumentFileTypeFilter;
+import com.synapsedesk.gateway.web.DocumentStatusFilter;
+import com.synapsedesk.gateway.web.FlagSeverityFilter;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -191,7 +194,7 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status,
+    ) @Nullable DocumentStatusFilter status,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -199,7 +202,7 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "fileType",
       required = false
-    ) @Nullable String fileType
+    ) @Nullable DocumentFileTypeFilter fileType
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -245,10 +248,10 @@ public class DocumentsController {
           wire.setDepartmentId(departmentId.toString());
         }
         if (status != null) {
-          wire.setStatus(documentStatusOf(status));
+          wire.setStatus(documentStatusOf(status.name()));
         }
         if (fileType != null) {
-          wire.setFileType(documentFileTypeOf(fileType));
+          wire.setFileType(documentFileTypeOf(fileType.name()));
         }
         if (includeDeleted != null) {
           wire.setIncludeDeleted(includeDeleted);
@@ -338,7 +341,7 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "severity",
       required = false
-    ) @Nullable String severity,
+    ) @Nullable FlagSeverityFilter severity,
     @Valid @RequestParam(
       value = "documentId",
       required = false
@@ -363,7 +366,7 @@ public class DocumentsController {
       type.forEach(t -> wire.addFlagTypes(documentFlagTypeOf(t)));
     }
     if (severity != null) {
-      wire.setSeverity(documentFlagSeverityOf(severity));
+      wire.setSeverity(documentFlagSeverityOf(severity.name()));
     }
     if (documentId != null) {
       wire.setDocumentId(documentId.toString());
@@ -891,7 +894,7 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status,
+    ) @Nullable DocumentStatusFilter status,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -899,7 +902,7 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "fileType",
       required = false
-    ) @Nullable String fileType
+    ) @Nullable DocumentFileTypeFilter fileType
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
