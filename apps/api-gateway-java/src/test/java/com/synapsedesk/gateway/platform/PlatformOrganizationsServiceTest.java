@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationDto;
-import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
+import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -237,7 +237,7 @@ class PlatformOrganizationsServiceTest {
     service.updateOrganization(
       context(),
       "org-9",
-      new com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto()
+      new com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto()
     );
 
     verify(statuses).invalidate("org-9");
@@ -246,10 +246,9 @@ class PlatformOrganizationsServiceTest {
   @Test
   void settingAStatusDropsItsCachedStatus() {
     when(stub.setOrganizationStatus(any())).thenReturn(reply());
-    var dto =
-      new com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto();
+    var dto = new com.synapsedesk.gateway.model.SetOrganizationStatusDto();
     dto.setStatus(
-      com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+      com.synapsedesk.gateway.model.SetOrganizationStatusDto.StatusEnum.FROZEN
     );
     dto.setReason("suspected fraud");
 
@@ -264,8 +263,7 @@ class PlatformOrganizationsServiceTest {
       synapsedesk.auth.Platform.OffboardOrganizationResponse.getDefaultInstance()
     );
 
-    var dto =
-      new com.synapsedesk.gateway.generated.model.OffboardOrganizationDto();
+    var dto = new com.synapsedesk.gateway.model.OffboardOrganizationDto();
     dto.setReason("contract ended");
 
     service.offboard(context(), "org-9", dto);
@@ -287,10 +285,9 @@ class PlatformOrganizationsServiceTest {
     when(stub.setOrganizationStatus(any())).thenThrow(
       io.grpc.Status.FAILED_PRECONDITION.asRuntimeException()
     );
-    var dto =
-      new com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto();
+    var dto = new com.synapsedesk.gateway.model.SetOrganizationStatusDto();
     dto.setStatus(
-      com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+      com.synapsedesk.gateway.model.SetOrganizationStatusDto.StatusEnum.FROZEN
     );
     dto.setReason("suspected fraud");
 

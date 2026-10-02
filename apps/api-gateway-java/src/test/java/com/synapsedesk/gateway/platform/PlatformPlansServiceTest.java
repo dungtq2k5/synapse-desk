@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.generated.model.ApplyPlanResponseDto;
-import com.synapsedesk.gateway.generated.model.CreatePlanDto;
-import com.synapsedesk.gateway.generated.model.CreatePlanPriceDto;
+import com.synapsedesk.gateway.model.ApplyPlanResponseDto;
+import com.synapsedesk.gateway.model.CreatePlanDto;
+import com.synapsedesk.gateway.model.CreatePlanPriceDto;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

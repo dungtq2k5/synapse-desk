@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.ops;
 
-import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
 
 /**
  * One reason this instance may not be ready, and how it appears under

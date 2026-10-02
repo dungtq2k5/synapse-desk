@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.security;
 
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.model.PermissionResponseDto;
+import com.synapsedesk.gateway.model.PermissionResponseDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;

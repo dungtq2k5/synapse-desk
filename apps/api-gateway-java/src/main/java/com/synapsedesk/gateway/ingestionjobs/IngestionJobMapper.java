@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.ingestionjobs;
 
-import com.synapsedesk.gateway.generated.model.IngestionJobResponseDto;
+import com.synapsedesk.gateway.model.IngestionJobResponseDto;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

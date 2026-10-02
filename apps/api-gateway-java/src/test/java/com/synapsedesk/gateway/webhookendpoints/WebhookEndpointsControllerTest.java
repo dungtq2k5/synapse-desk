@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.UpdateWebhookEndpointDto;
+import com.synapsedesk.gateway.model.UpdateWebhookEndpointDto;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

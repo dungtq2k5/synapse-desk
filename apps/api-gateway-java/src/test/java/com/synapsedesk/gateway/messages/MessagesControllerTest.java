@@ -60,7 +60,7 @@ class MessagesControllerTest {
     );
     assertThat(annotation).isNotNull();
     assertThat(annotation.value()).containsExactly(
-      com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum.TICKET_MESSAGE_MODERATE
+      com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum.TICKET_MESSAGE_MODERATE
     );
   }
 

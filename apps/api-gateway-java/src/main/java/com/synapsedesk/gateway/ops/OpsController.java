@@ -1,12 +1,12 @@
 package com.synapsedesk.gateway.ops;
 
 import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.generated.model.LivenessResponseDto;
-import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
-import com.synapsedesk.gateway.generated.model.ReadinessResponseDto;
-import com.synapsedesk.gateway.generated.model.VersionResponseDto;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
+import com.synapsedesk.gateway.model.LivenessResponseDto;
+import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.model.ReadinessResponseDto;
+import com.synapsedesk.gateway.model.VersionResponseDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.OffsetDateTime;

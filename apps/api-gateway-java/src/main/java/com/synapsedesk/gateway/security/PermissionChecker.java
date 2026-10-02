@@ -2,8 +2,8 @@ package com.synapsedesk.gateway.security;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.metrics.GuardRefusal;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;

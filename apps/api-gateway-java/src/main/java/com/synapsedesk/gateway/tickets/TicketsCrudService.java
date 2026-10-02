@@ -1,12 +1,12 @@
 package com.synapsedesk.gateway.tickets;
 
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.CreateTicketDto;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.TicketResponseDto;
-import com.synapsedesk.gateway.generated.model.UpdateTicketDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.metrics.GuardRefusal;
+import com.synapsedesk.gateway.model.CreateTicketDto;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.TicketResponseDto;
+import com.synapsedesk.gateway.model.UpdateTicketDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;

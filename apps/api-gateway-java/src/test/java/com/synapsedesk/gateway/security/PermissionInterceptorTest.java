@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;

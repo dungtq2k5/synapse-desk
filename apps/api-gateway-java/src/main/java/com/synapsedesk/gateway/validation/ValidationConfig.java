@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.validation;
 
-import com.synapsedesk.gateway.generated.model.UpdateWebhookEndpointDto;
+import com.synapsedesk.gateway.model.UpdateWebhookEndpointDto;
 import jakarta.validation.Configuration;
 import jakarta.validation.constraints.Size;
 import org.hibernate.validator.HibernateValidatorConfiguration;

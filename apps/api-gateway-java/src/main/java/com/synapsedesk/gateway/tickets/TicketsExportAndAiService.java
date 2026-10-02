@@ -2,11 +2,11 @@ package com.synapsedesk.gateway.tickets;
 
 import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.CreateTicketExportDto;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.ExportResponseDto;
-import com.synapsedesk.gateway.generated.model.SimilarTicketResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.model.CreateTicketExportDto;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.ExportResponseDto;
+import com.synapsedesk.gateway.model.SimilarTicketResponseDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;

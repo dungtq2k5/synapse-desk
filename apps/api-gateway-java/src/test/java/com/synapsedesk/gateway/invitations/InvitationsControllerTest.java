@@ -13,7 +13,7 @@ import com.synapsedesk.gateway.auth.CookieWriter;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.AcceptInvitationDto;
+import com.synapsedesk.gateway.model.AcceptInvitationDto;
 import com.synapsedesk.gateway.security.RequirePermission;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
@@ -145,7 +145,7 @@ class InvitationsControllerTest {
     );
     Method accept = InvitationsController.class.getMethod(
       "invitationsControllerAcceptV1",
-      com.synapsedesk.gateway.generated.model.AcceptInvitationDto.class
+      com.synapsedesk.gateway.model.AcceptInvitationDto.class
     );
 
     assertThat(
@@ -169,8 +169,8 @@ class InvitationsControllerTest {
       )
     );
 
-    com.synapsedesk.gateway.generated.model.CreateInvitationsDto dto =
-      new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
+    com.synapsedesk.gateway.model.CreateInvitationsDto dto =
+      new com.synapsedesk.gateway.model.CreateInvitationsDto();
     dto.setInvitations(List.of());
 
     assertThatThrownBy(() ->
@@ -198,8 +198,8 @@ class InvitationsControllerTest {
       synapsedesk.auth.Invitation.CreateInvitationsResponse.getDefaultInstance()
     );
 
-    com.synapsedesk.gateway.generated.model.CreateInvitationsDto dto =
-      new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
+    com.synapsedesk.gateway.model.CreateInvitationsDto dto =
+      new com.synapsedesk.gateway.model.CreateInvitationsDto();
     dto.setInvitations(List.of());
 
     controller.invitationsControllerCreateV1(dto);

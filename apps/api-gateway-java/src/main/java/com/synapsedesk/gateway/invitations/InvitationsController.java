@@ -7,21 +7,21 @@ import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.generated.model.AcceptInvitationDto;
-import com.synapsedesk.gateway.generated.model.CreateInvitationsDto;
-import com.synapsedesk.gateway.generated.model.CreateInvitationsResponseDto;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.FailedInvitationResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationPreviewRowResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationResponseDto;
-import com.synapsedesk.gateway.generated.model.LoginResponseDto;
-import com.synapsedesk.gateway.generated.model.PreviewInvitationResponseDto;
-import com.synapsedesk.gateway.generated.model.PreviewInvitationsDto;
-import com.synapsedesk.gateway.generated.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.metrics.GuardRefusal;
+import com.synapsedesk.gateway.model.AcceptInvitationDto;
+import com.synapsedesk.gateway.model.CreateInvitationsDto;
+import com.synapsedesk.gateway.model.CreateInvitationsResponseDto;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.FailedInvitationResponseDto;
+import com.synapsedesk.gateway.model.InvitationPreviewRowResponseDto;
+import com.synapsedesk.gateway.model.InvitationResponseDto;
+import com.synapsedesk.gateway.model.LoginResponseDto;
+import com.synapsedesk.gateway.model.PreviewInvitationResponseDto;
+import com.synapsedesk.gateway.model.PreviewInvitationsDto;
+import com.synapsedesk.gateway.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
@@ -513,7 +513,7 @@ public class InvitationsController {
   }
 
   private static InviteUserInput toInviteUserInput(
-    com.synapsedesk.gateway.generated.model.InviteUserDto draft
+    com.synapsedesk.gateway.model.InviteUserDto draft
   ) {
     InviteUserInput.Builder wire = InviteUserInput.newBuilder()
       .setEmail(draft.getEmail())
@@ -529,7 +529,7 @@ public class InvitationsController {
   }
 
   private static InviteUserInput toPreviewInviteUserInput(
-    com.synapsedesk.gateway.generated.model.PreviewInviteUserDto draft
+    com.synapsedesk.gateway.model.PreviewInviteUserDto draft
   ) {
     InviteUserInput.Builder wire = InviteUserInput.newBuilder()
       .setEmail(draft.getEmail())

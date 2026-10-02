@@ -10,7 +10,7 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.config.InboundEmailProperties;
-import com.synapsedesk.gateway.generated.model.UpdateOrganizationSettingsDto;
+import com.synapsedesk.gateway.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
 import java.lang.reflect.Method;

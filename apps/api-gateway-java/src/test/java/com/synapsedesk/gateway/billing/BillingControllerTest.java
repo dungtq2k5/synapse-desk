@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.ChangePlanDto;
+import com.synapsedesk.gateway.model.ChangePlanDto;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;

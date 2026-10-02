@@ -2,7 +2,7 @@ package com.synapsedesk.gateway.webhookendpoints;
 
 import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
-import com.synapsedesk.gateway.generated.model.CreateWebhookEndpointDto;
+import com.synapsedesk.gateway.model.CreateWebhookEndpointDto;
 import jakarta.validation.Valid;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;

@@ -2,7 +2,7 @@ package com.synapsedesk.gateway.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.synapsedesk.gateway.generated.model.UpdateWebhookEndpointDto;
+import com.synapsedesk.gateway.model.UpdateWebhookEndpointDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.net.URI;

@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.lease;
 
-import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
 import com.synapsedesk.gateway.ops.ReadinessGate;
 import java.net.InetAddress;
 import java.net.UnknownHostException;

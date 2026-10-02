@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.UpdateTicketDto;
+import com.synapsedesk.gateway.model.UpdateTicketDto;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

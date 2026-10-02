@@ -1,16 +1,16 @@
 package com.synapsedesk.gateway.tickets;
 
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.BulkTicketFailureResponseDto;
-import com.synapsedesk.gateway.generated.model.BulkTicketPriorityDto;
-import com.synapsedesk.gateway.generated.model.BulkTicketPriorityResponseDto;
-import com.synapsedesk.gateway.generated.model.BulkTicketStatusDto;
-import com.synapsedesk.gateway.generated.model.BulkTicketStatusResponseDto;
-import com.synapsedesk.gateway.generated.model.ChangeTicketStatusDto;
-import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.TicketResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketStatusActionDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.model.BulkTicketFailureResponseDto;
+import com.synapsedesk.gateway.model.BulkTicketPriorityDto;
+import com.synapsedesk.gateway.model.BulkTicketPriorityResponseDto;
+import com.synapsedesk.gateway.model.BulkTicketStatusDto;
+import com.synapsedesk.gateway.model.BulkTicketStatusResponseDto;
+import com.synapsedesk.gateway.model.ChangeTicketStatusDto;
+import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.model.TicketResponseDto;
+import com.synapsedesk.gateway.model.TicketStatusActionDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
