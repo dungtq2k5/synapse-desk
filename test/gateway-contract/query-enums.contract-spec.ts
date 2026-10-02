@@ -29,14 +29,33 @@ import { rowFor } from './pending';
 type Parameter = {
   name: string;
   in: string;
+  required?: boolean;
   schema?: { enum?: string[] };
 };
 
-type Row = [method: string, path: string, parameter: string, valid: string];
+type Row = [
+  method: string,
+  path: string,
+  parameter: string,
+  valid: string,
+  allValid: string[],
+  required: string,
+];
 
 const SOME_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 
-/** `[METHOD, document path, parameter, one valid value]` for every enum query parameter. */
+/**
+ * A value that satisfies a REQUIRED, non-enum query parameter, so that what a row
+ * refuses is the enum and not a missing date. Without it the analytics
+ * `granularity` rows passed on both gateways for the wrong reason: `from` and `to`
+ * are required, and their absence is a 400 whatever `granularity` says.
+ */
+const REQUIRED_VALUE: Record<string, string> = {
+  from: '2026-01-01',
+  to: '2026-01-31',
+};
+
+/** `[METHOD, document path, parameter, one valid value, every valid value, required query]` for every enum query parameter. */
 function rows(): Row[] {
   const document = JSON.parse(
     readFileSync(join(REPO_ROOT, 'docs/reference/openapi.json'), 'utf8'),
@@ -51,11 +70,20 @@ function rows(): Row[] {
         if (parameter.in !== 'query' || !parameter.schema?.enum?.length) {
           continue;
         }
+        const required = (operation.parameters ?? [])
+          .filter(
+            (other) =>
+              other.in === 'query' && other.required && !other.schema?.enum,
+          )
+          .map((other) => `${other.name}=${REQUIRED_VALUE[other.name] ?? 'x'}`)
+          .join('&');
         found.push([
           method.toUpperCase(),
           path,
           parameter.name,
           parameter.schema.enum[0],
+          parameter.schema.enum,
+          required,
         ]);
       }
     }
@@ -66,13 +94,21 @@ function rows(): Row[] {
 
 /**
  * The (route, parameter) pairs the Java gateway does not yet refuse, MEASURED
- * from a full run of these rows on Java (42 accept a value outside the enum, 40
+ * from a full run of these rows on Java (accept a value outside the enum, and most
  * of them also in another case), not guessed. They are the progress bar for the
  * enum work and shrink to empty: a pair leaves its set in the commit that makes
  * Java refuse it, and the rows for every other pair run on Java today. Rows in a
  * set are reported skipped for Java through `SKIPPED_FOR_JAVA`, never silently.
  */
 const NOT_YET_REFUSED_OUTSIDE = new Set([
+  'GET /api/v1/analytics/agents granularity',
+  'GET /api/v1/analytics/ai-usage granularity',
+  'GET /api/v1/analytics/deflection granularity',
+  'GET /api/v1/analytics/knowledge-gaps granularity',
+  'GET /api/v1/analytics/overview granularity',
+  'GET /api/v1/analytics/response-times granularity',
+  'GET /api/v1/analytics/satisfaction granularity',
+  'GET /api/v1/analytics/volume granularity',
   'GET /api/v1/chat/conversations priority',
   'GET /api/v1/chat/conversations source',
   'GET /api/v1/chat/conversations status',
@@ -86,6 +122,14 @@ const NOT_YET_REFUSED_OUTSIDE = new Set([
 ]);
 
 const NOT_YET_REFUSED_IN_CASE = new Set([
+  'GET /api/v1/analytics/agents granularity',
+  'GET /api/v1/analytics/ai-usage granularity',
+  'GET /api/v1/analytics/deflection granularity',
+  'GET /api/v1/analytics/knowledge-gaps granularity',
+  'GET /api/v1/analytics/overview granularity',
+  'GET /api/v1/analytics/response-times granularity',
+  'GET /api/v1/analytics/satisfaction granularity',
+  'GET /api/v1/analytics/volume granularity',
   'GET /api/v1/chat/conversations priority',
   'GET /api/v1/chat/conversations source',
   'GET /api/v1/chat/conversations status',
@@ -144,10 +188,10 @@ describe('enum-valued query parameters', () => {
       peer.calls().filter((call) => !call.method.endsWith('JobHealth')),
     );
 
-  const send = (method: string, path: string, query: string) =>
+  const send = (method: string, path: string, query: string, required = '') =>
     new Session(gateway.baseUrl).request(
       method,
-      `${path.replace(/\{\w+\}/gu, SOME_ID)}?${query}`,
+      `${path.replace(/\{\w+\}/gu, SOME_ID)}?${[query, required].filter(Boolean).join('&')}`,
       { headers: headers() },
     );
 
@@ -155,8 +199,16 @@ describe('enum-valued query parameters', () => {
     method: string,
     path: string,
     parameter: string,
+    _valid: string,
+    _all: string[],
+    required: string,
   ) => {
-    const response = await send(method, path, `${parameter}=__not_a_value__`);
+    const response = await send(
+      method,
+      path,
+      `${parameter}=__not_a_value__`,
+      required,
+    );
 
     expect(response.status).toBe(400);
     expect(reached()).toEqual([]);
@@ -167,10 +219,17 @@ describe('enum-valued query parameters', () => {
     path: string,
     parameter: string,
     valid: string,
+    _all: string[],
+    required: string,
   ) => {
     const flipped =
       valid.toLowerCase() === valid ? valid.toUpperCase() : valid.toLowerCase();
-    const response = await send(method, path, `${parameter}=${flipped}`);
+    const response = await send(
+      method,
+      path,
+      `${parameter}=${flipped}`,
+      required,
+    );
 
     expect(response.status).toBe(400);
     expect(reached()).toEqual([]);
@@ -214,16 +273,42 @@ describe('enum-valued query parameters', () => {
 
   rowFor('Ops').each(rows().filter(([, , name]) => CASE_INSENSITIVE.has(name)))(
     '**`%s %s` accepts a `%s` in any case: the stored values are lowercase and `?fileType=PDF` must work**',
-    async (method, path, parameter, valid) => {
+    async (method, path, parameter, valid, _all, required) => {
       const response = await send(
         method,
         path,
         `${parameter}=${valid.toUpperCase()}`,
+        required,
       );
 
       // Past validation: whatever the unprogrammed peer then answers, it is not a 400.
       expect(response.status).not.toBe(400);
       expect(reached().length).toBeGreaterThan(0);
+    },
+  );
+
+  // The refusal rows above send only values OUTSIDE the enum, so a gateway that
+  // dropped a VALID value from its type would pass all of them and refuse a real
+  // client. Every value the document lists is sent here, and none may be refused.
+  rowFor('Ops').each(rows())(
+    '**`%s %s` accepts every value of `%s` the contract lists, and the request reaches the peer**',
+    async (method, path, parameter, _valid, allValid, required) => {
+      for (const value of allValid) {
+        peers.reset();
+        const response = await send(
+          method,
+          path,
+          `${parameter}=${value}`,
+          required,
+        );
+
+        // Past validation: whatever the unprogrammed peer then answers, it is not a 400.
+        expect({ value, status: response.status }).not.toEqual({
+          value,
+          status: 400,
+        });
+        expect(reached().length).toBeGreaterThan(0);
+      }
     },
   );
 });

@@ -44,14 +44,15 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
   'Java does not refuse this yet':
-    'the enum-valued query parameters Java still takes as plain strings: 10 ' +
-    'pairs accept a value outside the set (the chat-conversations, documents ' +
-    'and chunks `status`, `fileType`, `priority`, `source`, the document-flags ' +
-    '`severity`, the notifications `type` and the invitations list `status`; ' +
-    'the invitations, documents and flags ones answer 500, the rest reach the ' +
-    'peer) and 8 of them accept it in a different case, where Node answers ' +
-    '400. The exact pairs are the two sets in query-enums.contract-spec.ts; ' +
-    'every other pair, `sortOrder` and `sortBy` included, runs on Java today',
+    'the enum-valued query parameters Java still takes as plain strings: 18 ' +
+    'pairs accept a value outside the set (the eight analytics `granularity`, ' +
+    'the chat-conversations, documents and chunks `status`, `fileType`, ' +
+    '`priority`, `source`, the document-flags `severity`, the notifications ' +
+    '`type` and the invitations list `status`; the invitations, documents and ' +
+    'flags ones answer 500, the rest reach the peer) and 16 of them accept it ' +
+    'in a different case, where Node answers 400. The exact pairs are the two ' +
+    'sets in query-enums.contract-spec.ts; every other pair, `sortOrder` and ' +
+    '`sortBy` included, runs on Java today',
   '**an explicit `dob: null` clears it**':
     '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
