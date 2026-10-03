@@ -323,22 +323,6 @@ class PlatformJobsControllerTest {
       .hasMessageContaining("from must not be after to");
   }
 
-  @Test
-  void backfillRefusesAMalformedDateWith400() {
-    BackfillJobDto dto = new BackfillJobDto();
-    dto.setFrom("not-a-date");
-    dto.setTo("2026-01-01");
-    dto.setReason("test");
-
-    assertThatThrownBy(() ->
-      controller.platformJobsControllerBackfillV1("analytics-daily", dto)
-    )
-      .isInstanceOf(
-        org.springframework.web.server.ResponseStatusException.class
-      )
-      .hasMessageContaining("from must be a valid ISO 8601 date string");
-  }
-
   private static JobRunStatus rowAt(
     String jobName,
     Instant lastSucceededAt,

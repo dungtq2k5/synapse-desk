@@ -61,7 +61,7 @@ class AuditLogsControllerTest {
     ).isInstanceOf(ResponseStatusException.class);
   }
 
-  // `createExport`'s ISO-8601 check on `from`/`to` is `IsoDateCheck`'s own
-  // shared implementation now (see `IsoDateCheckTest`) — nothing left to
-  // test at this file's level beyond the filter parsers above.
+  // `createExport`'s ISO-8601 check on `from`/`to` is `@StrictIso8601` on the DTO,
+  // held by the body-date contract rows and the shared parity table — nothing left
+  // to test at this file's level beyond the filter parsers above.
 }

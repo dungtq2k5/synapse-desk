@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.audit;
 
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.AuditActionsResponseDto;
@@ -218,8 +217,6 @@ public class AuditLogsController {
     @Valid @RequestBody CreateAuditLogExportDto createAuditLogExportDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-    IsoDateCheck.requireIsoDate(createAuditLogExportDto.getFrom(), "from");
-    IsoDateCheck.requireIsoDate(createAuditLogExportDto.getTo(), "to");
 
     CreateExportRequest.Builder wire = CreateExportRequest.newBuilder()
       .setKind(synapsedesk.ticket.Analytics.ExportKind.EXPORT_KIND_AUDIT_LOG)

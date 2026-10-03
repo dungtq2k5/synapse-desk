@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.platformjobs;
 
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.config.JsIsoFormat;
@@ -63,11 +62,9 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  * page somebody about a wiring bug that does not exist. See {@code
  * platform-jobs.service.ts}'s own comment on this exact point.
  *
- * <p><b>{@code BackfillJobDto.from}/{@code to} carry no format validation</b>
- * — the generator drops {@code @IsISO8601} (there is no Bean Validation
- * equivalent to carry it forward as), so this controller checks via {@link
- * com.synapsedesk.gateway.auth.IsoDateCheck}, shared with every other DTO
- * the generator dropped it from.
+ * <p><b>{@code BackfillJobDto.from}/{@code to}</b> are held to Node's
+ * {@code @IsISO8601({ strict: true })} by {@code @StrictIso8601} on the DTO, the
+ * validator.js port every other date field uses.
  *
  * <p><b>Migrated off `PlatformJobsApi`.</b> No {@code @RequirePermission}
  * here — {@link SuperAdminCheck} is the door, same as {@code
@@ -177,8 +174,6 @@ public class PlatformJobsController {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    IsoDateCheck.requireIsoDate(backfillJobDto.getFrom(), "from");
-    IsoDateCheck.requireIsoDate(backfillJobDto.getTo(), "to");
     if (backfillJobDto.getFrom().compareTo(backfillJobDto.getTo()) > 0) {
       throw new ResponseStatusException(
         HttpStatus.BAD_REQUEST,

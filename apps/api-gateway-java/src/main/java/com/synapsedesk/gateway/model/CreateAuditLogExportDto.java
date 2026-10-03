@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.StrictIso8601;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -77,6 +78,7 @@ public class CreateAuditLogExportDto {
    * @return from
    */
   @NotNull
+  @StrictIso8601
   @JsonProperty("from")
   public String getFrom() {
     return from;
@@ -97,6 +99,7 @@ public class CreateAuditLogExportDto {
    * @return to
    */
   @NotNull
+  @StrictIso8601
   @JsonProperty("to")
   public String getTo() {
     return to;

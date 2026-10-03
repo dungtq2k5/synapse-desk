@@ -73,18 +73,6 @@ class TicketsExportAndAiServiceTest {
   }
 
   @Test
-  void createExportRefusesAMalformedFromDate() {
-    CreateTicketExportDto dto = new CreateTicketExportDto();
-    dto.setFrom("not-a-date");
-    dto.setTo("2026-09-01");
-
-    assertThatThrownBy(() ->
-      service.createExport(contextWithCodes(List.of("ticket.export")), dto)
-    ).isInstanceOf(ResponseStatusException.class);
-    verify(analyticsStub, never()).createExport(any());
-  }
-
-  @Test
   void createExportAcceptsABareCalendarDate() {
     when(analyticsStub.createExport(any())).thenReturn(wireExport());
     CreateTicketExportDto dto = new CreateTicketExportDto();

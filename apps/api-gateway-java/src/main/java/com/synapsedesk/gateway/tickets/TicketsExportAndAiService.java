@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.tickets;
 
-import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.CreateTicketExportDto;
@@ -47,10 +46,8 @@ import tools.jackson.databind.ObjectMapper;
  * the mapper here reproduces that file's exact pattern (an empty map
  * serializes to {@code ""}, "no filters", never {@code "{}"}).
  *
- * <p><b>{@code from}/{@code to} are checked via {@link IsoDateCheck}</b> —
- * Node's {@code @IsISO8601({strict: true})}, reproduced once and shared by
- * every DTO the generator dropped it from (generator-validation defect #3,
- * absent).
+ * <p><b>{@code from}/{@code to}</b> are held to Node's
+ * {@code @IsISO8601({ strict: true })} by {@code @StrictIso8601} on the DTO.
  */
 @Component
 public class TicketsExportAndAiService {
@@ -79,8 +76,6 @@ public class TicketsExportAndAiService {
       context,
       PermissionCodesEnum.TICKET_EXPORT
     );
-    IsoDateCheck.requireIsoDate(dto.getFrom(), "from");
-    IsoDateCheck.requireIsoDate(dto.getTo(), "to");
 
     CreateExportRequest.Builder wire = CreateExportRequest.newBuilder()
       .setKind(ExportKind.EXPORT_KIND_TICKET)

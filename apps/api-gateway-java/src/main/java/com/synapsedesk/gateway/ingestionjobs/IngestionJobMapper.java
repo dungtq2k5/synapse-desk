@@ -22,8 +22,8 @@ import synapsedesk.ingestion.Document.IngestionJobResponse;
  * No Bean Validation annotation can express this (it is a transform, not a
  * constraint), so the generated {@code IngestionJobResponseDto.errorLog}
  * carries no hint of it at all — hand-replicated here, the same
- * generator-validation defect shape as {@code IsoDateCheck}, one field
- * position over.
+ * generator-validation defect shape as a validator the generator drops, one
+ * field position over.
  */
 public final class IngestionJobMapper {
 

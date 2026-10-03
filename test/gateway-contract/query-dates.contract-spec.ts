@@ -31,32 +31,12 @@
  * rule).
  */
 
+import { ISO, PATTERN, type Rule } from './date-rules';
 import { type Gateway, startGateway } from './gateway';
 import { type Peers, startPeers } from './peers';
 import { rowFor } from './pending';
 import { allOperations, bodySender, freshSubject } from './request-bodies';
 import { readRunState } from './run-state';
-
-type Rule = { accepted: string[]; refused: string[] };
-
-/** What `validator.js` `isISO8601(strict)` does with each value, measured on Node. */
-const ISO: Rule = {
-  accepted: ['2026-01-01', '2026-01-01T00:00:00Z', '20260101'],
-  refused: ['not-a-date', '2026-02-30', '2026-1-1', ' 2026-01-01', ''],
-};
-
-/** `@Matches(ISO_DATE_PATTERN)`: the shape only, so a date that does not exist passes. */
-const PATTERN: Rule = {
-  accepted: ['2026-01-01', '2026-02-30'],
-  refused: [
-    'not-a-date',
-    '2026-01-01T00:00:00Z',
-    '20260101',
-    '2026-1-1',
-    ' 2026-01-01',
-    '',
-  ],
-};
 
 const RULE_BY_ROUTE: Record<string, Rule> = {
   ...Object.fromEntries(
