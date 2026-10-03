@@ -17,6 +17,7 @@ import com.synapsedesk.gateway.model.UserResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -62,13 +63,16 @@ public class UsersController {
 
   private final UserServiceGrpc.UserServiceBlockingStub stub;
   private final CurrentUser currentUser;
+  private final RawJsonBody rawBody;
 
   public UsersController(
     UserServiceGrpc.UserServiceBlockingStub stub,
-    CurrentUser currentUser
+    CurrentUser currentUser,
+    RawJsonBody rawBody
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
+    this.rawBody = rawBody;
   }
 
   private UserServiceGrpc.UserServiceBlockingStub withMetadata(
@@ -132,12 +136,18 @@ public class UsersController {
     if (updateOwnProfileDto.getFullName() != null) {
       wire.setFullName(updateOwnProfileDto.getFullName());
     }
+    // A literal `null` clears the field (an empty dob, an UNSPECIFIED gender) and
+    // leaving it out leaves it alone; the DTO reads both as null, the raw body tells.
     if (updateOwnProfileDto.getDob() != null) {
       wire.setDob(updateOwnProfileDto.getDob());
+    } else if (rawBody.isNull("dob")) {
+      wire.setDob("");
     }
     UpdateOwnProfileDto.GenderEnum gender = updateOwnProfileDto.getGender();
     if (gender != null) {
       wire.setGender(Gender.valueOf("GENDER_" + gender.getValue()));
+    } else if (rawBody.isNull("gender")) {
+      wire.setGender(Gender.GENDER_UNSPECIFIED);
     }
 
     synapsedesk.auth.Common.UserResponse response = withMetadata(

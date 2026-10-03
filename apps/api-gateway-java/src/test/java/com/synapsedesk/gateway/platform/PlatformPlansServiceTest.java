@@ -14,6 +14,7 @@ import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.model.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.model.CreatePlanDto;
 import com.synapsedesk.gateway.model.CreatePlanPriceDto;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +68,12 @@ class PlatformPlansServiceTest {
     when(stub.withInterceptors(any())).thenReturn(stub);
     when(usageStub.withDeadlineAfter(anyLong(), any())).thenReturn(usageStub);
     when(usageStub.withInterceptors(any())).thenReturn(usageStub);
-    service = new PlatformPlansService(stub, usageStub, superAdminCheck);
+    service = new PlatformPlansService(
+      stub,
+      usageStub,
+      superAdminCheck,
+      new RawJsonBody(tools.jackson.databind.json.JsonMapper.builder().build())
+    );
   }
 
   @Test

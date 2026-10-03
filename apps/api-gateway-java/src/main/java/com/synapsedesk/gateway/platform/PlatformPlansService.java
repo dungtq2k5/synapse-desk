@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.model.UpdatePlanDto;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -95,15 +96,18 @@ public class PlatformPlansService {
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
   private final IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub;
   private final SuperAdminCheck superAdminCheck;
+  private final RawJsonBody rawBody;
 
   public PlatformPlansService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
     IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub,
-    SuperAdminCheck superAdminCheck
+    SuperAdminCheck superAdminCheck,
+    RawJsonBody rawBody
   ) {
     this.stub = stub;
     this.usageStub = usageStub;
     this.superAdminCheck = superAdminCheck;
+    this.rawBody = rawBody;
   }
 
   public ResponseEntity<
@@ -244,6 +248,9 @@ public class PlatformPlansService {
     var aiModelTier = dto.getAiModelTier();
     if (aiModelTier != null) {
       wire.setAiModelTier(toProtoAiModelTier(aiModelTier.getValue()));
+    } else if (rawBody.isNull("aiModelTier")) {
+      // A literal `null` clears the tier; leaving it out leaves it alone.
+      wire.setAiModelTier(AiModelTier.AI_MODEL_TIER_UNSPECIFIED);
     }
     BigDecimal maxDocumentBytes = dto.getMaxDocumentBytes();
     if (maxDocumentBytes != null) {

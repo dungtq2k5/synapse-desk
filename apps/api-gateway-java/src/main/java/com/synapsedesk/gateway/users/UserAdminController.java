@@ -22,6 +22,7 @@ import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import com.synapsedesk.gateway.web.SortDirection;
 import com.synapsedesk.gateway.web.UserSortField;
 import io.grpc.stub.MetadataUtils;
@@ -94,13 +95,16 @@ public class UserAdminController {
 
   private final UserServiceGrpc.UserServiceBlockingStub stub;
   private final CurrentUser currentUser;
+  private final RawJsonBody rawBody;
 
   public UserAdminController(
     UserServiceGrpc.UserServiceBlockingStub stub,
-    CurrentUser currentUser
+    CurrentUser currentUser,
+    RawJsonBody rawBody
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
+    this.rawBody = rawBody;
   }
 
   private UserServiceGrpc.UserServiceBlockingStub withMetadata(
@@ -302,13 +306,18 @@ public class UserAdminController {
     }
     // `dob === null` clears it (empty string on the wire); `dob === undefined`
     // (here: field simply absent from the JSON body) leaves it unchanged —
-    // `toProfileFields`, reproduced.
+    // `toProfileFields`, reproduced. The DTO reads both as null, so the raw body
+    // says which the client sent.
     if (updateUserDto.getDob() != null) {
       wire.setDob(updateUserDto.getDob());
+    } else if (rawBody.isNull("dob")) {
+      wire.setDob("");
     }
     var gender = updateUserDto.getGender();
     if (gender != null) {
       wire.setGender(Gender.valueOf("GENDER_" + gender.getValue()));
+    } else if (rawBody.isNull("gender")) {
+      wire.setGender(Gender.GENDER_UNSPECIFIED);
     }
     // Node's own `update()` does `dto.phoneNumber ?? undefined`, which collapses
     // an explicit `null` to "leave unchanged" same as an absent field — so

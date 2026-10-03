@@ -25,6 +25,7 @@ import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -71,7 +72,6 @@ import synapsedesk.ingestion.Document.DocumentIdRequest;
 import synapsedesk.ingestion.Document.StorageUsageResponse;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * `OrganizationsApi` — the caller's OWN tenant, against auth-service's
@@ -127,7 +127,7 @@ public class OrganizationsController {
   private final CurrentUser currentUser;
   private final CacheService cache;
   private final InboundEmailProperties inboundEmail;
-  private final ObjectMapper json;
+  private final RawJsonBody rawBody;
 
   public OrganizationsController(
     OrganizationServiceGrpc.OrganizationServiceBlockingStub stub,
@@ -135,14 +135,14 @@ public class OrganizationsController {
     CurrentUser currentUser,
     CacheService cache,
     InboundEmailProperties inboundEmail,
-    ObjectMapper json
+    RawJsonBody rawBody
   ) {
     this.stub = stub;
     this.documentStub = documentStub;
     this.currentUser = currentUser;
     this.cache = cache;
     this.inboundEmail = inboundEmail;
-    this.json = json;
+    this.rawBody = rawBody;
   }
 
   // The workspace's own record, which the billing screens read.
@@ -296,7 +296,7 @@ public class OrganizationsController {
     @Valid @RequestBody UpdateOrganizationSettingsDto updateOrganizationSettingsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-    JsonNode body = rawBody();
+    JsonNode body = rawBody.current();
 
     UpdateOrganizationSettingsRequest.Builder wire =
       UpdateOrganizationSettingsRequest.newBuilder();
@@ -510,19 +510,6 @@ public class OrganizationsController {
     } else {
       setValue.accept(value.longValue());
     }
-  }
-
-  /**
-   * The raw request body, read from {@link CachedBodyRequest} — populated
-   * globally by {@code JsonBodyFilter} ahead of every route that carries one
-   * — rather than the bound DTO, which cannot tell an absent key apart from
-   * an explicit {@code null}.
-   */
-  private JsonNode rawBody() {
-    if (CurrentRequest.request() instanceof CachedBodyRequest cached) {
-      return json.readTree(cached.body());
-    }
-    return json.readTree("{}");
   }
 
   private static ApiResponse<OrganizationResponseDto> toGetEnvelope(

@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.config.InboundEmailProperties;
 import com.synapsedesk.gateway.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
+import com.synapsedesk.gateway.web.RawJsonBody;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -89,7 +90,7 @@ class OrganizationsControllerTest {
       currentUser,
       cache,
       inboundEmail,
-      new ObjectMapper()
+      new RawJsonBody(new ObjectMapper())
     );
   }
 

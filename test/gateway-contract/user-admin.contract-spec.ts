@@ -205,11 +205,6 @@ describe('user admin', () => {
   );
 
   rowFor('User Admin')(
-    // Skipped for Java: `openApiNullable` is off project-wide (pom.xml,
-    // deliberate), so the generated `UpdateUserDto.dob` is a plain
-    // `@Nullable String` — JSON `null` and an absent key both deserialize to
-    // the same Java `null`, and the controller cannot tell "clear it" from
-    // "leave it alone" apart the way Node's `dto.dob === null` check can.
     '**an explicit `dob: null` clears it** — `toProfileFields`, reproduced',
     async () => {
       peers.auth.on('UserService/UpdateUser').reply(wireSummary());
