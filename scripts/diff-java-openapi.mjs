@@ -37,6 +37,7 @@ import {
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
   diffSecurity,
+  diffOperationIds,
 } from './lib/java-openapi-diff.cjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -174,7 +175,20 @@ try {
     }
   }
 
+  const ids = diffOperationIds(nodeDocument, javaDocument);
+
+  if (ids.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${ids.mismatches.length} operation(s) publish a different operationId:`,
+    );
+    for (const row of ids.mismatches.slice(0, 40)) {
+      console.error(`  ${row.route}: ${JSON.stringify(row)}`);
+    }
+  }
+
   if (!failed) {
+    console.log(`${ids.matched} operations publish the same operationId.`);
     console.log(
       `${security.matched} operations publish the same security as the committed document; ${security.named} named divergences (Node omits it on routes it guards).`,
     );

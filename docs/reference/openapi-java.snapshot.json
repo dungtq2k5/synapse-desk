@@ -14,7 +14,7 @@
     "/api/v1/users/{id}/roles": {
       "put": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerSetRolesV1",
+        "operationId": "UserAdminController_setRoles_v1",
         "parameters": [
           {
             "name": "id",
@@ -323,7 +323,7 @@
     "/api/v1/users/{id}/departments": {
       "put": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerSetDepartmentsV1",
+        "operationId": "UserAdminController_setDepartments_v1",
         "parameters": [
           {
             "name": "id",
@@ -632,7 +632,7 @@
     "/api/v1/roles/{id}/permissions": {
       "put": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerSetPermissionsV1",
+        "operationId": "RolesController_setPermissions_v1",
         "parameters": [
           {
             "name": "id",
@@ -941,7 +941,7 @@
     "/api/v1/documents/{id}/departments": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerListDepartmentsV1",
+        "operationId": "DocumentsController_listDepartments_v1",
         "parameters": [
           {
             "name": "id",
@@ -1200,7 +1200,7 @@
       },
       "put": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerSetDepartmentsV1",
+        "operationId": "DocumentsController_setDepartments_v1",
         "parameters": [
           {
             "name": "id",
@@ -1509,7 +1509,7 @@
     "/api/v1/webhooks/stripe": {
       "post": {
         "tags": ["Webhooks"],
-        "operationId": "webhooksControllerStripeV1",
+        "operationId": "WebhooksController_stripe_v1",
         "parameters": [
           {
             "name": "stripe-signature",
@@ -1652,7 +1652,7 @@
     "/api/v1/webhooks/email/resend": {
       "post": {
         "tags": ["Webhooks"],
-        "operationId": "inboundEmailControllerResendV1",
+        "operationId": "InboundEmailController_resend_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -1823,7 +1823,7 @@
     "/api/v1/webhook-endpoints": {
       "get": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerListV1",
+        "operationId": "WebhookEndpointsController_list_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -1996,7 +1996,7 @@
       },
       "post": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerCreateV1",
+        "operationId": "WebhookEndpointsController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2257,7 +2257,7 @@
     "/api/v1/webhook-endpoints/{id}/test": {
       "post": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerTestV1",
+        "operationId": "WebhookEndpointsController_test_v1",
         "parameters": [
           {
             "name": "id",
@@ -2518,7 +2518,7 @@
     "/api/v1/webhook-endpoints/{id}/rotate-secret": {
       "post": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerRotateSecretV1",
+        "operationId": "WebhookEndpointsController_rotateSecret_v1",
         "parameters": [
           {
             "name": "id",
@@ -2779,7 +2779,7 @@
     "/api/v1/users": {
       "get": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerListV1",
+        "operationId": "UserAdminController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -3044,7 +3044,7 @@
       },
       "post": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerCreateV1",
+        "operationId": "UserAdminController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3305,7 +3305,7 @@
     "/api/v1/users/{id}/unlock": {
       "post": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerUnlockV1",
+        "operationId": "UserAdminController_unlock_v1",
         "parameters": [
           {
             "name": "id",
@@ -3566,7 +3566,7 @@
     "/api/v1/users/{id}/restore": {
       "post": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerRestoreV1",
+        "operationId": "UserAdminController_restore_v1",
         "parameters": [
           {
             "name": "id",
@@ -3827,7 +3827,7 @@
     "/api/v1/users/{id}/lock": {
       "post": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerLockV1",
+        "operationId": "UserAdminController_lock_v1",
         "parameters": [
           {
             "name": "id",
@@ -4136,7 +4136,7 @@
     "/api/v1/users/{id}/2fa/reset": {
       "post": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerResetTwoFactorV1",
+        "operationId": "UserAdminController_resetTwoFactor_v1",
         "parameters": [
           {
             "name": "id",
@@ -4397,7 +4397,7 @@
     "/api/v1/users/me/avatar/upload-url": {
       "post": {
         "tags": ["Users"],
-        "operationId": "usersControllerPresignAvatarV1",
+        "operationId": "UsersController_presignAvatar_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4620,7 +4620,7 @@
     "/api/v1/users/me/avatar/confirm": {
       "post": {
         "tags": ["Users"],
-        "operationId": "usersControllerConfirmAvatarV1",
+        "operationId": "UsersController_confirmAvatar_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4843,7 +4843,7 @@
     "/api/v1/users/invitations": {
       "get": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerListV1",
+        "operationId": "InvitationsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -5076,7 +5076,7 @@
       },
       "post": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerCreateV1",
+        "operationId": "InvitationsController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5337,7 +5337,7 @@
     "/api/v1/users/invitations/{id}/resend": {
       "post": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerResendV1",
+        "operationId": "InvitationsController_resend_v1",
         "parameters": [
           {
             "name": "id",
@@ -5598,7 +5598,7 @@
     "/api/v1/users/invitations/preview": {
       "post": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerPreviewBatchV1",
+        "operationId": "InvitationsController_previewBatch_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5859,7 +5859,7 @@
     "/api/v1/users/invitations/accept": {
       "post": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerAcceptV1",
+        "operationId": "InvitationsController_accept_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6078,7 +6078,7 @@
     "/api/v1/tickets": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerListV1",
+        "operationId": "TicketsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -6331,7 +6331,7 @@
       },
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerCreateV1",
+        "operationId": "TicketsController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -6592,7 +6592,7 @@
     "/api/v1/tickets/{ticketId}/messages": {
       "get": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerListV1",
+        "operationId": "MessagesController_list_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -6861,7 +6861,7 @@
       },
       "post": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerCreateV1",
+        "operationId": "MessagesController_create_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -7132,7 +7132,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/upload-url": {
       "post": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerPresignAttachmentV1",
+        "operationId": "MessagesController_presignAttachment_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -7411,7 +7411,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/confirm": {
       "post": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerConfirmAttachmentV1",
+        "operationId": "MessagesController_confirmAttachment_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -7690,7 +7690,7 @@
     "/api/v1/tickets/{ticketId}/messages/attachments/upload-url": {
       "post": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerPresignNewAttachmentV1",
+        "operationId": "MessagesController_presignNewAttachment_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -7961,7 +7961,7 @@
     "/api/v1/tickets/{ticketId}/ai/summary": {
       "get": {
         "tags": ["Ai"],
-        "operationId": "aiControllerGetSummaryV1",
+        "operationId": "AiController_getSummary_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -8220,7 +8220,7 @@
       },
       "post": {
         "tags": ["Ai"],
-        "operationId": "aiControllerGenerateSummaryV1",
+        "operationId": "AiController_generateSummary_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -8519,7 +8519,7 @@
     "/api/v1/tickets/{ticketId}/ai/suggestions": {
       "post": {
         "tags": ["Ai"],
-        "operationId": "aiControllerGetSuggestionsV1",
+        "operationId": "AiController_getSuggestions_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -8780,7 +8780,7 @@
     "/api/v1/tickets/{ticketId}/ai/draft": {
       "post": {
         "tags": ["Ai"],
-        "operationId": "aiControllerGenerateDraftV1",
+        "operationId": "AiController_generateDraft_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -9127,7 +9127,7 @@
     "/api/v1/tickets/{ticketId}/ai/classify": {
       "post": {
         "tags": ["Ai"],
-        "operationId": "aiControllerClassifyV1",
+        "operationId": "AiController_classify_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -9426,7 +9426,7 @@
     "/api/v1/tickets/{id}/status": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerChangeStatusV1",
+        "operationId": "TicketsController_changeStatus_v1",
         "parameters": [
           {
             "name": "id",
@@ -9735,7 +9735,7 @@
     "/api/v1/tickets/{id}/restore": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerRestoreV1",
+        "operationId": "TicketsController_restore_v1",
         "parameters": [
           {
             "name": "id",
@@ -9996,7 +9996,7 @@
     "/api/v1/tickets/{id}/resolve": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerResolveV1",
+        "operationId": "TicketsController_resolve_v1",
         "parameters": [
           {
             "name": "id",
@@ -10305,7 +10305,7 @@
     "/api/v1/tickets/{id}/reopen": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerReopenV1",
+        "operationId": "TicketsController_reopen_v1",
         "parameters": [
           {
             "name": "id",
@@ -10614,7 +10614,7 @@
     "/api/v1/tickets/{id}/reassign": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerReassignV1",
+        "operationId": "TicketsController_reassign_v1",
         "parameters": [
           {
             "name": "id",
@@ -10923,7 +10923,7 @@
     "/api/v1/tickets/{id}/read": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerMarkReadV1",
+        "operationId": "TicketsController_markRead_v1",
         "parameters": [
           {
             "name": "id",
@@ -11194,7 +11194,7 @@
     "/api/v1/tickets/{id}/escalate": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerEscalateV1",
+        "operationId": "TicketsController_escalate_v1",
         "parameters": [
           {
             "name": "id",
@@ -11465,7 +11465,7 @@
     "/api/v1/tickets/{id}/close": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerCloseV1",
+        "operationId": "TicketsController_close_v1",
         "parameters": [
           {
             "name": "id",
@@ -11774,7 +11774,7 @@
     "/api/v1/tickets/{id}/assign": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerAssignV1",
+        "operationId": "TicketsController_assign_v1",
         "parameters": [
           {
             "name": "id",
@@ -12081,7 +12081,7 @@
       },
       "delete": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerUnassignV1",
+        "operationId": "TicketsController_unassign_v1",
         "parameters": [
           {
             "name": "id",
@@ -12342,7 +12342,7 @@
     "/api/v1/tickets/{id}/assign/self": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerAssignToSelfV1",
+        "operationId": "TicketsController_assignToSelf_v1",
         "parameters": [
           {
             "name": "id",
@@ -12651,7 +12651,7 @@
     "/api/v1/tickets/export": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerCreateExportV1",
+        "operationId": "TicketsController_createExport_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -12912,7 +12912,7 @@
     "/api/v1/tickets/bulk/status": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerBulkChangeStatusV1",
+        "operationId": "TicketsController_bulkChangeStatus_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13173,7 +13173,7 @@
     "/api/v1/tickets/bulk/priority": {
       "post": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerBulkChangePriorityV1",
+        "operationId": "TicketsController_bulkChangePriority_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13434,7 +13434,7 @@
     "/api/v1/roles": {
       "get": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerListV1",
+        "operationId": "RolesController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -13667,7 +13667,7 @@
       },
       "post": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerCreateV1",
+        "operationId": "RolesController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -13928,7 +13928,7 @@
     "/api/v1/roles/{id}/users": {
       "post": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerAssignUsersV1",
+        "operationId": "RolesController_assignUsers_v1",
         "parameters": [
           {
             "name": "id",
@@ -14237,7 +14237,7 @@
     "/api/v1/platform/roles": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerListGlobalRolesV1",
+        "operationId": "PlatformController_listGlobalRoles_v1",
         "parameters": [
           {
             "name": "page",
@@ -14447,7 +14447,7 @@
       },
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerCreateGlobalRoleV1",
+        "operationId": "PlatformController_createGlobalRole_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -14670,7 +14670,7 @@
     "/api/v1/platform/plans": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerListPlansV1",
+        "operationId": "PlatformController_listPlans_v1",
         "parameters": [
           {
             "name": "page",
@@ -14874,7 +14874,7 @@
       },
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerCreatePlanV1",
+        "operationId": "PlatformController_createPlan_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -15097,7 +15097,7 @@
     "/api/v1/platform/plans/{id}/apply": {
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerApplyPlanV1",
+        "operationId": "PlatformController_applyPlan_v1",
         "parameters": [
           {
             "name": "id",
@@ -15329,7 +15329,7 @@
     "/api/v1/platform/organizations": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerListOrganizationsV1",
+        "operationId": "PlatformController_listOrganizations_v1",
         "parameters": [
           {
             "name": "page",
@@ -15532,7 +15532,7 @@
       },
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerCreateOrganizationV1",
+        "operationId": "PlatformController_createOrganization_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -15755,7 +15755,7 @@
     "/api/v1/platform/organizations/{id}/status": {
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerSetStatusV1",
+        "operationId": "PlatformController_setStatus_v1",
         "parameters": [
           {
             "name": "id",
@@ -16026,7 +16026,7 @@
     "/api/v1/platform/organizations/{id}/restore": {
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerRestoreV1",
+        "operationId": "PlatformController_restore_v1",
         "parameters": [
           {
             "name": "id",
@@ -16249,7 +16249,7 @@
     "/api/v1/platform/organizations/{id}/billing-cycle/reset": {
       "post": {
         "tags": ["Platform"],
-        "operationId": "platformControllerResetBillingCycleV1",
+        "operationId": "PlatformController_resetBillingCycle_v1",
         "parameters": [
           {
             "name": "id",
@@ -16520,7 +16520,7 @@
     "/api/v1/platform/jobs/{name}/run": {
       "post": {
         "tags": ["Platform Jobs"],
-        "operationId": "platformJobsControllerRunV1",
+        "operationId": "PlatformJobsController_run_v1",
         "parameters": [
           {
             "name": "name",
@@ -16705,7 +16705,7 @@
     "/api/v1/platform/jobs/{name}/backfill": {
       "post": {
         "tags": ["Platform Jobs"],
-        "operationId": "platformJobsControllerBackfillV1",
+        "operationId": "PlatformJobsController_backfill_v1",
         "parameters": [
           {
             "name": "name",
@@ -16976,7 +16976,7 @@
     "/api/v1/organizations/current/onboarding/complete": {
       "post": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerCompleteOnboardingV1",
+        "operationId": "OrganizationsController_completeOnboarding_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -17151,7 +17151,7 @@
     "/api/v1/organizations/current/inbound-token": {
       "post": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerIssueInboundTokenV1",
+        "operationId": "OrganizationsController_issueInboundToken_v1",
         "responses": {
           "201": {
             "description": "Created",
@@ -17324,7 +17324,7 @@
       },
       "delete": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerRevokeInboundTokenV1",
+        "operationId": "OrganizationsController_revokeInboundToken_v1",
         "responses": {
           "204": {
             "description": "No Content"
@@ -17492,7 +17492,7 @@
     "/api/v1/notifications/{id}/read": {
       "post": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerMarkReadV1",
+        "operationId": "NotificationsController_markRead_v1",
         "parameters": [
           {
             "name": "id",
@@ -17715,7 +17715,7 @@
     "/api/v1/notifications/{id}/archive": {
       "post": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerArchiveV1",
+        "operationId": "NotificationsController_archive_v1",
         "parameters": [
           {
             "name": "id",
@@ -17938,7 +17938,7 @@
     "/api/v1/notifications/read": {
       "post": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerMarkManyReadV1",
+        "operationId": "NotificationsController_markManyRead_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -18161,7 +18161,7 @@
     "/api/v1/notifications/devices": {
       "get": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerListDevicesV1",
+        "operationId": "NotificationsController_listDevices_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -18296,7 +18296,7 @@
       },
       "post": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerRegisterDeviceV1",
+        "operationId": "NotificationsController_registerDevice_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -18519,7 +18519,7 @@
     "/api/v1/messages/{messageId}/feedback": {
       "get": {
         "tags": ["Feedback"],
-        "operationId": "messageFeedbackControllerOwnV1",
+        "operationId": "MessageFeedbackController_own_v1",
         "parameters": [
           {
             "name": "messageId",
@@ -18740,7 +18740,7 @@
       },
       "post": {
         "tags": ["Feedback"],
-        "operationId": "messageFeedbackControllerSubmitV1",
+        "operationId": "MessageFeedbackController_submit_v1",
         "parameters": [
           {
             "name": "messageId",
@@ -19009,7 +19009,7 @@
       },
       "delete": {
         "tags": ["Feedback"],
-        "operationId": "messageFeedbackControllerWithdrawV1",
+        "operationId": "MessageFeedbackController_withdraw_v1",
         "parameters": [
           {
             "name": "messageId",
@@ -19225,7 +19225,7 @@
     "/api/v1/knowledge/search": {
       "post": {
         "tags": ["Knowledge"],
-        "operationId": "knowledgeControllerSearchV1",
+        "operationId": "KnowledgeController_search_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -19448,7 +19448,7 @@
     "/api/v1/knowledge/ask": {
       "post": {
         "tags": ["Knowledge"],
-        "operationId": "knowledgeControllerAskV1",
+        "operationId": "KnowledgeController_ask_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -19709,7 +19709,7 @@
     "/api/v1/ingestion-jobs/{id}/retry": {
       "post": {
         "tags": ["Ingestion Jobs"],
-        "operationId": "ingestionJobsControllerRetryV1",
+        "operationId": "IngestionJobsController_retry_v1",
         "parameters": [
           {
             "name": "id",
@@ -19970,7 +19970,7 @@
     "/api/v1/documents/{id}/restore": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerRestoreV1",
+        "operationId": "DocumentsController_restore_v1",
         "parameters": [
           {
             "name": "id",
@@ -20231,7 +20231,7 @@
     "/api/v1/documents/{id}/replace": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerReplaceV1",
+        "operationId": "DocumentsController_replace_v1",
         "parameters": [
           {
             "name": "id",
@@ -20578,7 +20578,7 @@
     "/api/v1/documents/{id}/reindex": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerReindexV1",
+        "operationId": "DocumentsController_reindex_v1",
         "parameters": [
           {
             "name": "id",
@@ -20839,7 +20839,7 @@
     "/api/v1/documents/presign": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerPresignV1",
+        "operationId": "DocumentsController_presign_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -21100,7 +21100,7 @@
     "/api/v1/documents/flags/{flagId}/replaced": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerReplaceFlagV1",
+        "operationId": "DocumentsController_replaceFlag_v1",
         "parameters": [
           {
             "name": "flagId",
@@ -21409,7 +21409,7 @@
     "/api/v1/documents/flags/{flagId}/fixed": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerFixFlagV1",
+        "operationId": "DocumentsController_fixFlag_v1",
         "parameters": [
           {
             "name": "flagId",
@@ -21718,7 +21718,7 @@
     "/api/v1/documents/flags/{flagId}/dismiss": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerDismissFlagV1",
+        "operationId": "DocumentsController_dismissFlag_v1",
         "parameters": [
           {
             "name": "flagId",
@@ -22027,7 +22027,7 @@
     "/api/v1/documents/confirm": {
       "post": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerConfirmV1",
+        "operationId": "DocumentsController_confirm_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -22288,7 +22288,7 @@
     "/api/v1/departments": {
       "get": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerListV1",
+        "operationId": "DepartmentsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -22521,7 +22521,7 @@
       },
       "post": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerCreateV1",
+        "operationId": "DepartmentsController_create_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -22782,7 +22782,7 @@
     "/api/v1/departments/{id}/restore": {
       "post": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerRestoreV1",
+        "operationId": "DepartmentsController_restore_v1",
         "parameters": [
           {
             "name": "id",
@@ -23043,7 +23043,7 @@
     "/api/v1/departments/{id}/members": {
       "get": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerListMembersV1",
+        "operationId": "DepartmentsController_listMembers_v1",
         "parameters": [
           {
             "name": "id",
@@ -23351,7 +23351,7 @@
       },
       "post": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerAddMembersV1",
+        "operationId": "DepartmentsController_addMembers_v1",
         "parameters": [
           {
             "name": "id",
@@ -23660,7 +23660,7 @@
     "/api/v1/chat/conversations": {
       "get": {
         "tags": ["Chat"],
-        "operationId": "chatControllerListV1",
+        "operationId": "ChatController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -23923,7 +23923,7 @@
       },
       "post": {
         "tags": ["Chat"],
-        "operationId": "chatControllerStartV1",
+        "operationId": "ChatController_start_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -24146,7 +24146,7 @@
     "/api/v1/chat/conversations/{id}/messages": {
       "get": {
         "tags": ["Chat"],
-        "operationId": "chatControllerListMessagesV1",
+        "operationId": "ChatController_listMessages_v1",
         "parameters": [
           {
             "name": "id",
@@ -24415,7 +24415,7 @@
       },
       "post": {
         "tags": ["Chat"],
-        "operationId": "chatControllerSendMessageV1",
+        "operationId": "ChatController_sendMessage_v1",
         "parameters": [
           {
             "name": "id",
@@ -24686,7 +24686,7 @@
     "/api/v1/chat/conversations/{id}/escalate": {
       "post": {
         "tags": ["Chat"],
-        "operationId": "chatControllerEscalateV1",
+        "operationId": "ChatController_escalate_v1",
         "parameters": [
           {
             "name": "id",
@@ -24909,7 +24909,7 @@
     "/api/v1/billing/portal-session": {
       "post": {
         "tags": ["Billing"],
-        "operationId": "billingControllerCreatePortalSessionV1",
+        "operationId": "BillingController_createPortalSession_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -25170,7 +25170,7 @@
     "/api/v1/billing/plan": {
       "post": {
         "tags": ["Billing"],
-        "operationId": "billingControllerChangePlanV1",
+        "operationId": "BillingController_changePlan_v1",
         "parameters": [
           {
             "name": "idempotency-key",
@@ -25555,7 +25555,7 @@
     "/api/v1/billing/checkout-session": {
       "post": {
         "tags": ["Billing"],
-        "operationId": "billingControllerCreateCheckoutSessionV1",
+        "operationId": "BillingController_createCheckoutSession_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -25816,7 +25816,7 @@
     "/api/v1/auth/register": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerRegisterV1",
+        "operationId": "AuthController_register_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -26035,7 +26035,7 @@
     "/api/v1/auth/refresh": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerRefreshV1",
+        "operationId": "AuthController_refresh_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -26172,7 +26172,7 @@
     "/api/v1/auth/phone/verify": {
       "post": {
         "tags": ["Otp"],
-        "operationId": "otpControllerVerifyPhoneV1",
+        "operationId": "OtpController_verifyPhone_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -26395,7 +26395,7 @@
     "/api/v1/auth/phone/verify/request": {
       "post": {
         "tags": ["Otp"],
-        "operationId": "otpControllerRequestPhoneVerificationV1",
+        "operationId": "OtpController_requestPhoneVerification_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -26618,7 +26618,7 @@
     "/api/v1/auth/password/reset": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerResetPasswordV1",
+        "operationId": "AuthController_resetPassword_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -26837,7 +26837,7 @@
     "/api/v1/auth/password/forgot": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerForgotPasswordV1",
+        "operationId": "AuthController_forgotPassword_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -27056,7 +27056,7 @@
     "/api/v1/auth/logout": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerLogoutV1",
+        "operationId": "AuthController_logout_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -27279,7 +27279,7 @@
     "/api/v1/auth/logout/all": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerLogoutAllV1",
+        "operationId": "AuthController_logoutAll_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -27416,7 +27416,7 @@
     "/api/v1/auth/login": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerLoginV1",
+        "operationId": "AuthController_login_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -27663,7 +27663,7 @@
     "/api/v1/auth/login/tenant": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerLoginWithTenantV1",
+        "operationId": "AuthController_loginWithTenant_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -27910,7 +27910,7 @@
     "/api/v1/auth/google": {
       "post": {
         "tags": ["Auth"],
-        "operationId": "authControllerGoogleSignInV1",
+        "operationId": "AuthController_googleSignIn_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -28157,7 +28157,7 @@
     "/api/v1/auth/email/verify": {
       "post": {
         "tags": ["Otp"],
-        "operationId": "otpControllerVerifyEmailV1",
+        "operationId": "OtpController_verifyEmail_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -28380,7 +28380,7 @@
     "/api/v1/auth/email/verify/request": {
       "post": {
         "tags": ["Otp"],
-        "operationId": "otpControllerRequestEmailVerificationV1",
+        "operationId": "OtpController_requestEmailVerification_v1",
         "responses": {
           "202": {
             "description": "Accepted",
@@ -28517,7 +28517,7 @@
     "/api/v1/auth/2fa/setup": {
       "post": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerGenerateV1",
+        "operationId": "TwoFactorAuthController_generate_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -28654,7 +28654,7 @@
     "/api/v1/auth/2fa/enable": {
       "post": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerActivateV1",
+        "operationId": "TwoFactorAuthController_activate_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -28877,7 +28877,7 @@
     "/api/v1/auth/2fa/backup-codes": {
       "get": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerGetBackupCodesStatusV1",
+        "operationId": "TwoFactorAuthController_getBackupCodesStatus_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -29012,7 +29012,7 @@
       },
       "post": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerRegenerateBackupCodesV1",
+        "operationId": "TwoFactorAuthController_regenerateBackupCodes_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -29235,7 +29235,7 @@
     "/api/v1/auth/2fa/authenticate": {
       "post": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerAuthenticateV1",
+        "operationId": "TwoFactorAuthController_authenticate_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -29458,7 +29458,7 @@
     "/api/v1/audit-logs/export": {
       "post": {
         "tags": ["Audit Logs"],
-        "operationId": "auditLogsControllerCreateExportV1",
+        "operationId": "AuditLogsController_createExport_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -29719,7 +29719,7 @@
     "/api/v1/analytics/export": {
       "post": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerCreateExportV1",
+        "operationId": "AnalyticsController_createExport_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -29980,7 +29980,7 @@
     "/api/v1/webhook-endpoints/{id}": {
       "get": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerGetV1",
+        "operationId": "WebhookEndpointsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -30239,7 +30239,7 @@
       },
       "delete": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerDeleteV1",
+        "operationId": "WebhookEndpointsController_delete_v1",
         "parameters": [
           {
             "name": "id",
@@ -30498,7 +30498,7 @@
       },
       "patch": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerUpdateV1",
+        "operationId": "WebhookEndpointsController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -30807,7 +30807,7 @@
     "/api/v1/users/{id}": {
       "get": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerGetV1",
+        "operationId": "UserAdminController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -31066,7 +31066,7 @@
       },
       "delete": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerRemoveV1",
+        "operationId": "UserAdminController_remove_v1",
         "parameters": [
           {
             "name": "id",
@@ -31325,7 +31325,7 @@
       },
       "patch": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerUpdateV1",
+        "operationId": "UserAdminController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -31634,7 +31634,7 @@
     "/api/v1/users/me": {
       "get": {
         "tags": ["Users"],
-        "operationId": "usersControllerGetCurrentUserV1",
+        "operationId": "UsersController_getCurrentUser_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -31769,7 +31769,7 @@
       },
       "patch": {
         "tags": ["Users"],
-        "operationId": "usersControllerUpdateOwnProfileV1",
+        "operationId": "UsersController_updateOwnProfile_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -31992,7 +31992,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}": {
       "delete": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerRedactV1",
+        "operationId": "MessagesController_redact_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -32259,7 +32259,7 @@
       },
       "patch": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerUpdateV1",
+        "operationId": "MessagesController_update_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -32538,7 +32538,7 @@
     "/api/v1/tickets/{id}": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerGetV1",
+        "operationId": "TicketsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -32759,7 +32759,7 @@
       },
       "delete": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerRemoveV1",
+        "operationId": "TicketsController_remove_v1",
         "parameters": [
           {
             "name": "id",
@@ -33018,7 +33018,7 @@
       },
       "patch": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerUpdateV1",
+        "operationId": "TicketsController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -33327,7 +33327,7 @@
     "/api/v1/roles/{id}": {
       "get": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerGetV1",
+        "operationId": "RolesController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -33586,7 +33586,7 @@
       },
       "delete": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerRemoveV1",
+        "operationId": "RolesController_remove_v1",
         "parameters": [
           {
             "name": "id",
@@ -33845,7 +33845,7 @@
       },
       "patch": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerUpdateV1",
+        "operationId": "RolesController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -34154,7 +34154,7 @@
     "/api/v1/platform/plans/{id}": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerGetPlanV1",
+        "operationId": "PlatformController_getPlan_v1",
         "parameters": [
           {
             "name": "id",
@@ -34375,7 +34375,7 @@
       },
       "delete": {
         "tags": ["Platform"],
-        "operationId": "platformControllerDeletePlanV1",
+        "operationId": "PlatformController_deletePlan_v1",
         "parameters": [
           {
             "name": "id",
@@ -34634,7 +34634,7 @@
       },
       "patch": {
         "tags": ["Platform"],
-        "operationId": "platformControllerUpdatePlanV1",
+        "operationId": "PlatformController_updatePlan_v1",
         "parameters": [
           {
             "name": "id",
@@ -34905,7 +34905,7 @@
     "/api/v1/platform/organizations/{id}": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerGetOrganizationV1",
+        "operationId": "PlatformController_getOrganization_v1",
         "parameters": [
           {
             "name": "id",
@@ -35126,7 +35126,7 @@
       },
       "delete": {
         "tags": ["Platform"],
-        "operationId": "platformControllerOffboardV1",
+        "operationId": "PlatformController_offboard_v1",
         "parameters": [
           {
             "name": "id",
@@ -35395,7 +35395,7 @@
       },
       "patch": {
         "tags": ["Platform"],
-        "operationId": "platformControllerUpdateOrganizationV1",
+        "operationId": "PlatformController_updateOrganization_v1",
         "parameters": [
           {
             "name": "id",
@@ -35666,7 +35666,7 @@
     "/api/v1/organizations/current": {
       "get": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerGetV1",
+        "operationId": "OrganizationsController_get_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -35801,7 +35801,7 @@
       },
       "delete": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerRequestOffboardV1",
+        "operationId": "OrganizationsController_requestOffboard_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -36060,7 +36060,7 @@
       },
       "patch": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerUpdateV1",
+        "operationId": "OrganizationsController_update_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -36321,7 +36321,7 @@
     "/api/v1/organizations/current/settings": {
       "get": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerGetSettingsV1",
+        "operationId": "OrganizationsController_getSettings_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -36494,7 +36494,7 @@
       },
       "patch": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerUpdateSettingsV1",
+        "operationId": "OrganizationsController_updateSettings_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -36755,7 +36755,7 @@
     "/api/v1/notifications/preferences": {
       "get": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerListPreferencesV1",
+        "operationId": "NotificationsController_listPreferences_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -36890,7 +36890,7 @@
       },
       "patch": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerUpdatePreferenceV1",
+        "operationId": "NotificationsController_updatePreference_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -37113,7 +37113,7 @@
     "/api/v1/documents/{id}": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerGetV1",
+        "operationId": "DocumentsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -37334,7 +37334,7 @@
       },
       "delete": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerRemoveV1",
+        "operationId": "DocumentsController_remove_v1",
         "parameters": [
           {
             "name": "id",
@@ -37586,7 +37586,7 @@
       },
       "patch": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerUpdateV1",
+        "operationId": "DocumentsController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -37895,7 +37895,7 @@
     "/api/v1/departments/{id}": {
       "get": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerGetV1",
+        "operationId": "DepartmentsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -38154,7 +38154,7 @@
       },
       "delete": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerRemoveV1",
+        "operationId": "DepartmentsController_remove_v1",
         "parameters": [
           {
             "name": "id",
@@ -38413,7 +38413,7 @@
       },
       "patch": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerUpdateV1",
+        "operationId": "DepartmentsController_update_v1",
         "parameters": [
           {
             "name": "id",
@@ -38722,7 +38722,7 @@
     "/api/v1/auth/password": {
       "patch": {
         "tags": ["Auth"],
-        "operationId": "authControllerChangePasswordV1",
+        "operationId": "AuthController_changePassword_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -38945,7 +38945,7 @@
     "/version": {
       "get": {
         "tags": ["Ops"],
-        "operationId": "versionControllerVersion",
+        "operationId": "VersionController_version",
         "responses": {
           "200": {
             "description": "OK",
@@ -39040,7 +39040,7 @@
     "/health": {
       "get": {
         "tags": ["Ops"],
-        "operationId": "healthControllerLiveness",
+        "operationId": "HealthController_liveness",
         "responses": {
           "200": {
             "description": "OK",
@@ -39135,7 +39135,7 @@
     "/health/ready": {
       "get": {
         "tags": ["Ops"],
-        "operationId": "healthControllerReadiness",
+        "operationId": "HealthController_readiness",
         "responses": {
           "200": {
             "description": "OK",
@@ -39230,7 +39230,7 @@
     "/api/v1/webhook-endpoints/{id}/deliveries": {
       "get": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerListDeliveriesV1",
+        "operationId": "WebhookEndpointsController_listDeliveries_v1",
         "parameters": [
           {
             "name": "id",
@@ -39502,7 +39502,7 @@
     "/api/v1/webhook-endpoints/event-types": {
       "get": {
         "tags": ["Webhook endpoints"],
-        "operationId": "webhookEndpointsControllerListEventTypesV1",
+        "operationId": "WebhookEndpointsController_listEventTypes_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -39677,7 +39677,7 @@
     "/api/v1/users/{userId}/sessions": {
       "get": {
         "tags": ["User Sessions"],
-        "operationId": "userSessionsControllerListV1",
+        "operationId": "UserSessionsController_list_v1",
         "parameters": [
           {
             "name": "userId",
@@ -39936,7 +39936,7 @@
       },
       "delete": {
         "tags": ["User Sessions"],
-        "operationId": "userSessionsControllerRevokeV1",
+        "operationId": "UserSessionsController_revoke_v1",
         "parameters": [
           {
             "name": "userId",
@@ -40197,7 +40197,7 @@
     "/api/v1/users/{id}/permissions": {
       "get": {
         "tags": ["User Admin"],
-        "operationId": "userAdminControllerGetPermissionsV1",
+        "operationId": "UserAdminController_getPermissions_v1",
         "parameters": [
           {
             "name": "id",
@@ -40458,7 +40458,7 @@
     "/api/v1/users/invitations/{id}": {
       "get": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerGetV1",
+        "operationId": "InvitationsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -40717,7 +40717,7 @@
       },
       "delete": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerRevokeV1",
+        "operationId": "InvitationsController_revoke_v1",
         "parameters": [
           {
             "name": "id",
@@ -40978,7 +40978,7 @@
     "/api/v1/users/invitations/token/{token}": {
       "get": {
         "tags": ["Invitations"],
-        "operationId": "invitationsControllerPreviewByTokenV1",
+        "operationId": "InvitationsController_previewByToken_v1",
         "parameters": [
           {
             "name": "token",
@@ -41159,7 +41159,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments": {
       "get": {
         "tags": ["Messages"],
-        "operationId": "messagesControllerListAttachmentsV1",
+        "operationId": "MessagesController_listAttachments_v1",
         "parameters": [
           {
             "name": "ticketId",
@@ -41390,7 +41390,7 @@
     "/api/v1/tickets/{id}/similar": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerListSimilarV1",
+        "operationId": "TicketsController_listSimilar_v1",
         "parameters": [
           {
             "name": "id",
@@ -41651,7 +41651,7 @@
     "/api/v1/tickets/{id}/history": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerListStatusChangesV1",
+        "operationId": "TicketsController_listStatusChanges_v1",
         "parameters": [
           {
             "name": "id",
@@ -41874,7 +41874,7 @@
     "/api/v1/tickets/{id}/assignments": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerListAssignmentsV1",
+        "operationId": "TicketsController_listAssignments_v1",
         "parameters": [
           {
             "name": "id",
@@ -42097,7 +42097,7 @@
     "/api/v1/tickets/export/{id}": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerGetExportV1",
+        "operationId": "TicketsController_getExport_v1",
         "parameters": [
           {
             "name": "id",
@@ -42358,7 +42358,7 @@
     "/api/v1/tickets/by-number/{ticketNumber}": {
       "get": {
         "tags": ["Tickets"],
-        "operationId": "ticketsControllerGetByNumberV1",
+        "operationId": "TicketsController_getByNumber_v1",
         "parameters": [
           {
             "name": "ticketNumber",
@@ -42581,7 +42581,7 @@
     "/api/v1/platform/users": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerListUsersV1",
+        "operationId": "PlatformController_listUsers_v1",
         "parameters": [
           {
             "name": "page",
@@ -42793,7 +42793,7 @@
     "/api/v1/platform/metrics": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerGetMetricsV1",
+        "operationId": "PlatformController_getMetrics_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -42930,7 +42930,7 @@
     "/api/v1/platform/jobs": {
       "get": {
         "tags": ["Platform Jobs"],
-        "operationId": "platformJobsControllerGetHealthV1",
+        "operationId": "PlatformJobsController_getHealth_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -43067,7 +43067,7 @@
     "/api/v1/platform/finance": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerGetFinanceSnapshotV1",
+        "operationId": "PlatformController_getFinanceSnapshot_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -43204,7 +43204,7 @@
     "/api/v1/platform/finance/events": {
       "get": {
         "tags": ["Platform"],
-        "operationId": "platformControllerListBillingEventsV1",
+        "operationId": "PlatformController_listBillingEvents_v1",
         "parameters": [
           {
             "name": "from",
@@ -43397,7 +43397,7 @@
     "/api/v1/platform/audit-logs": {
       "get": {
         "tags": ["PlatformAuditLogs"],
-        "operationId": "platformAuditLogsControllerListV1",
+        "operationId": "PlatformAuditLogsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -43628,7 +43628,7 @@
     "/api/v1/platform/audit-logs/actions": {
       "get": {
         "tags": ["PlatformAuditLogs"],
-        "operationId": "platformAuditLogsControllerListActionsV1",
+        "operationId": "PlatformAuditLogsController_listActions_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -43765,7 +43765,7 @@
     "/api/v1/permissions": {
       "get": {
         "tags": ["Permissions"],
-        "operationId": "permissionsControllerListV1",
+        "operationId": "PermissionsController_list_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -43940,7 +43940,7 @@
     "/api/v1/organizations/current/usage": {
       "get": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerGetUsageV1",
+        "operationId": "OrganizationsController_getUsage_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -44115,7 +44115,7 @@
     "/api/v1/organizations/current/onboarding": {
       "get": {
         "tags": ["Organizations"],
-        "operationId": "organizationsControllerGetOnboardingV1",
+        "operationId": "OrganizationsController_getOnboarding_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -44290,7 +44290,7 @@
     "/api/v1/notifications": {
       "get": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerListV1",
+        "operationId": "NotificationsController_list_v1",
         "parameters": [
           {
             "name": "unreadOnly",
@@ -44487,7 +44487,7 @@
     "/api/v1/notifications/unread-count": {
       "get": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerUnreadCountV1",
+        "operationId": "NotificationsController_unreadCount_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -44624,7 +44624,7 @@
     "/api/v1/knowledge/articles": {
       "get": {
         "tags": ["Knowledge"],
-        "operationId": "knowledgeControllerListArticlesV1",
+        "operationId": "KnowledgeController_listArticles_v1",
         "parameters": [
           {
             "name": "page",
@@ -44849,7 +44849,7 @@
     "/api/v1/knowledge/articles/{id}": {
       "get": {
         "tags": ["Knowledge"],
-        "operationId": "knowledgeControllerGetArticleV1",
+        "operationId": "KnowledgeController_getArticle_v1",
         "parameters": [
           {
             "name": "id",
@@ -45093,7 +45093,7 @@
     "/api/v1/ingestion-jobs": {
       "get": {
         "tags": ["Ingestion Jobs"],
-        "operationId": "ingestionJobsControllerListV1",
+        "operationId": "IngestionJobsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -45327,7 +45327,7 @@
     "/api/v1/ingestion-jobs/{id}": {
       "get": {
         "tags": ["Ingestion Jobs"],
-        "operationId": "ingestionJobsControllerGetV1",
+        "operationId": "IngestionJobsController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -45548,7 +45548,7 @@
       },
       "delete": {
         "tags": ["Ingestion Jobs"],
-        "operationId": "ingestionJobsControllerCancelV1",
+        "operationId": "IngestionJobsController_cancel_v1",
         "parameters": [
           {
             "name": "id",
@@ -45809,7 +45809,7 @@
     "/api/v1/feedback": {
       "get": {
         "tags": ["Feedback"],
-        "operationId": "feedbackControllerListV1",
+        "operationId": "FeedbackController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -46060,7 +46060,7 @@
     "/api/v1/documents": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerListV1",
+        "operationId": "DocumentsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -46283,7 +46283,7 @@
     "/api/v1/documents/{id}/ingestion-jobs": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerListIngestionJobsV1",
+        "operationId": "DocumentsController_listIngestionJobs_v1",
         "parameters": [
           {
             "name": "id",
@@ -46544,7 +46544,7 @@
     "/api/v1/documents/{id}/download": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerDownloadV1",
+        "operationId": "DocumentsController_download_v1",
         "parameters": [
           {
             "name": "id",
@@ -46767,7 +46767,7 @@
     "/api/v1/documents/{id}/chunks": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerListChunksV1",
+        "operationId": "DocumentsController_listChunks_v1",
         "parameters": [
           {
             "name": "id",
@@ -47112,7 +47112,7 @@
     "/api/v1/documents/{id}/chunks/{chunkId}": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerGetChunkV1",
+        "operationId": "DocumentsController_getChunk_v1",
         "parameters": [
           {
             "name": "id",
@@ -47343,7 +47343,7 @@
     "/api/v1/documents/storage": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerStorageUsageV1",
+        "operationId": "DocumentsController_storageUsage_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -47518,7 +47518,7 @@
     "/api/v1/documents/flags": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerListFlagsV1",
+        "operationId": "DocumentsController_listFlags_v1",
         "parameters": [
           {
             "name": "page",
@@ -47773,7 +47773,7 @@
     "/api/v1/documents/flags/{flagId}": {
       "get": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerGetFlagV1",
+        "operationId": "DocumentsController_getFlag_v1",
         "parameters": [
           {
             "name": "flagId",
@@ -48032,7 +48032,7 @@
       },
       "delete": {
         "tags": ["Documents"],
-        "operationId": "documentsControllerDeleteFlagV1",
+        "operationId": "DocumentsController_deleteFlag_v1",
         "parameters": [
           {
             "name": "flagId",
@@ -48286,7 +48286,7 @@
     "/api/v1/chat/conversations/{id}": {
       "get": {
         "tags": ["Chat"],
-        "operationId": "chatControllerGetV1",
+        "operationId": "ChatController_get_v1",
         "parameters": [
           {
             "name": "id",
@@ -48509,7 +48509,7 @@
     "/api/v1/billing/subscription": {
       "get": {
         "tags": ["Billing"],
-        "operationId": "billingControllerGetSubscriptionV1",
+        "operationId": "BillingController_getSubscription_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -48684,7 +48684,7 @@
     "/api/v1/billing/plans": {
       "get": {
         "tags": ["Billing"],
-        "operationId": "billingControllerListPlansV1",
+        "operationId": "BillingController_listPlans_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -48859,7 +48859,7 @@
     "/api/v1/billing/invoices": {
       "get": {
         "tags": ["Billing"],
-        "operationId": "billingControllerListInvoicesV1",
+        "operationId": "BillingController_listInvoices_v1",
         "parameters": [
           {
             "name": "limit",
@@ -49044,7 +49044,7 @@
     "/api/v1/auth/sessions": {
       "get": {
         "tags": ["Sessions"],
-        "operationId": "sessionsControllerListV1",
+        "operationId": "SessionsController_list_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -49181,7 +49181,7 @@
     "/api/v1/auth/password/reset/{token}": {
       "get": {
         "tags": ["Auth"],
-        "operationId": "authControllerValidatePasswordResetTokenV1",
+        "operationId": "AuthController_validatePasswordResetToken_v1",
         "parameters": [
           {
             "name": "token",
@@ -49362,7 +49362,7 @@
     "/api/v1/auth/otp/status": {
       "get": {
         "tags": ["Otp"],
-        "operationId": "otpControllerGetOtpStatusV1",
+        "operationId": "OtpController_getOtpStatus_v1",
         "parameters": [
           {
             "name": "purpose",
@@ -49509,7 +49509,7 @@
     "/api/v1/audit-logs": {
       "get": {
         "tags": ["Audit Logs"],
-        "operationId": "auditLogsControllerListV1",
+        "operationId": "AuditLogsController_list_v1",
         "parameters": [
           {
             "name": "page",
@@ -49778,7 +49778,7 @@
     "/api/v1/audit-logs/export/{id}": {
       "get": {
         "tags": ["Audit Logs"],
-        "operationId": "auditLogsControllerGetExportV1",
+        "operationId": "AuditLogsController_getExport_v1",
         "parameters": [
           {
             "name": "id",
@@ -50039,7 +50039,7 @@
     "/api/v1/audit-logs/actions": {
       "get": {
         "tags": ["Audit Logs"],
-        "operationId": "auditLogsControllerListActionsV1",
+        "operationId": "AuditLogsController_listActions_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -50214,7 +50214,7 @@
     "/api/v1/attachments/{id}/download": {
       "get": {
         "tags": ["Attachments"],
-        "operationId": "attachmentsControllerDownloadV1",
+        "operationId": "AttachmentsController_download_v1",
         "parameters": [
           {
             "name": "id",
@@ -50437,7 +50437,7 @@
     "/api/v1/analytics/volume": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerVolumeV1",
+        "operationId": "AnalyticsController_volume_v1",
         "parameters": [
           {
             "name": "from",
@@ -50648,7 +50648,7 @@
     "/api/v1/analytics/satisfaction": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerSatisfactionV1",
+        "operationId": "AnalyticsController_satisfaction_v1",
         "parameters": [
           {
             "name": "from",
@@ -50859,7 +50859,7 @@
     "/api/v1/analytics/response-times": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerResponseTimesV1",
+        "operationId": "AnalyticsController_responseTimes_v1",
         "parameters": [
           {
             "name": "from",
@@ -51070,7 +51070,7 @@
     "/api/v1/analytics/overview": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerOverviewV1",
+        "operationId": "AnalyticsController_overview_v1",
         "parameters": [
           {
             "name": "from",
@@ -51281,7 +51281,7 @@
     "/api/v1/analytics/knowledge-gaps": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerKnowledgeGapsV1",
+        "operationId": "AnalyticsController_knowledgeGaps_v1",
         "parameters": [
           {
             "name": "from",
@@ -51503,7 +51503,7 @@
     "/api/v1/analytics/export/{id}": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerGetExportV1",
+        "operationId": "AnalyticsController_getExport_v1",
         "parameters": [
           {
             "name": "id",
@@ -51764,7 +51764,7 @@
     "/api/v1/analytics/documents": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerDocumentsV1",
+        "operationId": "AnalyticsController_documents_v1",
         "parameters": [
           {
             "name": "limit",
@@ -51952,7 +51952,7 @@
     "/api/v1/analytics/deflection": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerDeflectionV1",
+        "operationId": "AnalyticsController_deflection_v1",
         "parameters": [
           {
             "name": "from",
@@ -52163,7 +52163,7 @@
     "/api/v1/analytics/ai-usage": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerAiUsageV1",
+        "operationId": "AnalyticsController_aiUsage_v1",
         "parameters": [
           {
             "name": "from",
@@ -52374,7 +52374,7 @@
     "/api/v1/analytics/agents": {
       "get": {
         "tags": ["Analytics"],
-        "operationId": "analyticsControllerAgentsV1",
+        "operationId": "AnalyticsController_agents_v1",
         "parameters": [
           {
             "name": "from",
@@ -52585,7 +52585,7 @@
     "/api/v1/users/me/avatar": {
       "delete": {
         "tags": ["Users"],
-        "operationId": "usersControllerDeleteAvatarV1",
+        "operationId": "UsersController_deleteAvatar_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -52722,7 +52722,7 @@
     "/api/v1/roles/{id}/users/{userId}": {
       "delete": {
         "tags": ["Roles"],
-        "operationId": "rolesControllerRevokeUserV1",
+        "operationId": "RolesController_revokeUser_v1",
         "parameters": [
           {
             "name": "id",
@@ -53029,7 +53029,7 @@
     "/api/v1/notifications/devices/{id}": {
       "delete": {
         "tags": ["Notifications"],
-        "operationId": "notificationsControllerForgetDeviceV1",
+        "operationId": "NotificationsController_forgetDevice_v1",
         "parameters": [
           {
             "name": "id",
@@ -53207,7 +53207,7 @@
     "/api/v1/departments/{id}/members/{userId}": {
       "delete": {
         "tags": ["Departments"],
-        "operationId": "departmentsControllerRemoveMemberV1",
+        "operationId": "DepartmentsController_removeMember_v1",
         "parameters": [
           {
             "name": "id",
@@ -53476,7 +53476,7 @@
     "/api/v1/auth/sessions/{id}": {
       "delete": {
         "tags": ["Sessions"],
-        "operationId": "sessionsControllerRevokeV1",
+        "operationId": "SessionsController_revoke_v1",
         "parameters": [
           {
             "name": "id",
@@ -53699,7 +53699,7 @@
     "/api/v1/auth/sessions/{id}/trust": {
       "delete": {
         "tags": ["Sessions"],
-        "operationId": "sessionsControllerRevokeTrustV1",
+        "operationId": "SessionsController_revokeTrust_v1",
         "parameters": [
           {
             "name": "id",
@@ -53922,7 +53922,7 @@
     "/api/v1/auth/sessions/trusted": {
       "delete": {
         "tags": ["Sessions"],
-        "operationId": "sessionsControllerRevokeAllTrustV1",
+        "operationId": "SessionsController_revokeAllTrust_v1",
         "responses": {
           "200": {
             "description": "OK",
@@ -54059,7 +54059,7 @@
     "/api/v1/auth/2fa": {
       "delete": {
         "tags": ["Two Factor Auth"],
-        "operationId": "twoFactorAuthControllerDisableV1",
+        "operationId": "TwoFactorAuthController_disable_v1",
         "requestBody": {
           "content": {
             "application/json": {
@@ -54282,7 +54282,7 @@
     "/api/v1/attachments/{id}": {
       "delete": {
         "tags": ["Attachments"],
-        "operationId": "attachmentsControllerRemoveV1",
+        "operationId": "AttachmentsController_remove_v1",
         "parameters": [
           {
             "name": "id",

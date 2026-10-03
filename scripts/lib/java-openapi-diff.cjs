@@ -412,9 +412,38 @@ function diffSecurity(nodeDocument, javaDocument) {
   return { matched, named: NODE_OMITS_SECURITY.length, mismatches };
 }
 
+/**
+ * Compares each shared operation's `operationId`: an EQUALITY, no exceptions. A
+ * generated client names its methods from this id, so a different spelling is a
+ * different published contract.
+ */
+function diffOperationIds(nodeDocument, javaDocument) {
+  const mismatches = [];
+  let matched = 0;
+
+  for (const [path, methods] of Object.entries(nodeDocument.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const java = ((javaDocument.paths || {})[path] || {})[method];
+      if (!java) continue;
+      if (operation.operationId === java.operationId) {
+        matched += 1;
+      } else {
+        mismatches.push({
+          route: `${method} ${path}`,
+          node: operation.operationId,
+          java: java.operationId,
+        });
+      }
+    }
+  }
+
+  return { matched, mismatches };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
   diffSecurity,
+  diffOperationIds,
   extractOperations,
   routeKey,
   diffOpenApiDocuments,

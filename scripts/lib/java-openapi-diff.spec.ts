@@ -2,6 +2,7 @@ import {
   checkKnownDivergences,
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
+  diffOperationIds,
   diffSecurity,
   extractOperations,
 } from './java-openapi-diff.cjs';
@@ -538,6 +539,27 @@ describe('diffSecurity', () => {
     expect(
       diffSecurity(withFeedback({}, undefined), withFeedback({}, []))
         .mismatches,
+    ).toHaveLength(1);
+  });
+});
+
+describe('diffOperationIds', () => {
+  const document = (id: string | undefined) => ({
+    paths: { '/x': { get: { operationId: id } } },
+  });
+
+  it('matches equal ids', () => {
+    const result = diffOperationIds(document('A_b_v1'), document('A_b_v1'));
+
+    expect(result).toEqual({ matched: 1, mismatches: [] });
+  });
+
+  it('names the route when the spelling differs, or the id is missing', () => {
+    expect(
+      diffOperationIds(document('A_b_v1'), document('aBV1')).mismatches,
+    ).toEqual([{ route: 'get /x', node: 'A_b_v1', java: 'aBV1' }]);
+    expect(
+      diffOperationIds(document('A_b_v1'), document(undefined)).mismatches,
     ).toHaveLength(1);
   });
 });
