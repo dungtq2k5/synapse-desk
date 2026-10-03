@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.Ordered;
@@ -50,6 +51,10 @@ import tools.jackson.databind.ObjectMapper;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class JsonBodyFilter extends OncePerRequestFilter {
 
+  private static final byte[] EMPTY_OBJECT = "{}".getBytes(
+    StandardCharsets.UTF_8
+  );
+
   private final ObjectMapper json;
   private final HandlerExceptionResolver resolver;
 
@@ -73,7 +78,19 @@ public class JsonBodyFilter extends OncePerRequestFilter {
       // No body is not a refusal: `POST /auth/logout` sends none, and a
       // gateway that demanded a Content-Type would break every caller that
       // correctly sends nothing.
-      chain.doFilter(request, response);
+      //
+      // And Node does not merely tolerate it: its body parser leaves `req.body`
+      // as `{}`, so a route whose body is all-optional is SERVED a bare POST and
+      // a route with a required field answers 400 for the field. Spring would
+      // refuse the same request with 415 at routing (a `consumes` condition
+      // needs a Content-Type), so the empty body is handed on as the empty JSON
+      // object it is there, whatever Content-Type came with it.
+      chain.doFilter(
+        carriesABody(request.getMethod())
+          ? new CachedBodyRequest(request, EMPTY_OBJECT, true)
+          : request,
+        response
+      );
 
       return;
     }
@@ -124,6 +141,14 @@ public class JsonBodyFilter extends OncePerRequestFilter {
       null,
       new ResponseStatusException(status, reason)
     );
+  }
+
+  /** The methods whose route may read a body; a GET has none to supply. */
+  private static boolean carriesABody(String method) {
+    return switch (method) {
+      case "POST", "PUT", "PATCH", "DELETE" -> true;
+      default -> false;
+    };
   }
 
   /** As the Node middleware does: a parameter or a `+json` suffix is fine. */
