@@ -2,6 +2,8 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.FutureDate;
+import com.synapsedesk.gateway.validation.StrictIso8601;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -62,6 +64,8 @@ public class LockUserDto {
    * @return lockedUntil
    */
 
+  @StrictIso8601
+  @FutureDate
   @JsonProperty("lockedUntil")
   public @Nullable String getLockedUntil() {
     return lockedUntil;

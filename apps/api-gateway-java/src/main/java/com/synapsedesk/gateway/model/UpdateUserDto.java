@@ -3,6 +3,8 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.validation.StrictIso8601;
+import com.synapsedesk.gateway.validation.ValidPhoneNumber;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -94,6 +96,7 @@ public class UpdateUserDto {
    * @return phoneNumber
    */
 
+  @ValidPhoneNumber
   @JsonProperty("phoneNumber")
   public @Nullable String getPhoneNumber() {
     return phoneNumber;
@@ -134,6 +137,7 @@ public class UpdateUserDto {
    * @return dob
    */
 
+  @StrictIso8601
   @JsonProperty("dob")
   public @Nullable String getDob() {
     return dob;

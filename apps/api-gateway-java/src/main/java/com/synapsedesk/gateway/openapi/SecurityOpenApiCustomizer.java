@@ -41,6 +41,9 @@ public class SecurityOpenApiCustomizer
       case NONE -> operation.security(List.of());
       case REFRESH_COOKIE -> operation.security(List.of(requirement(REFRESH)));
       case MFA_COOKIE -> operation.security(List.of(requirement(MFA)));
+      case SESSION_OR_CHALLENGE -> operation.security(
+        List.of(requirement(ACCESS))
+      );
     };
   }
 

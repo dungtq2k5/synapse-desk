@@ -59,7 +59,7 @@ export const PERMISSION_CODES = (document.components.schemas
   .CurrentUserResponseDto.properties?.permissionCodes?.items?.enum ??
   []) as string[];
 
-const resolve = (schema: Schema): Schema =>
+export const resolve = (schema: Schema): Schema =>
   schema.$ref
     ? resolve(
         document.components.schemas[schema.$ref.split('/').pop() as string],

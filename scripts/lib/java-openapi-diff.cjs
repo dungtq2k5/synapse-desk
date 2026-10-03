@@ -360,6 +360,14 @@ const NODE_OMITS_SECURITY = [
   'get /api/v1/platform/audit-logs/actions',
 ];
 
+/**
+ * The one route Node publishes as secured and Java publishes as public, on purpose:
+ * `POST /auth/logout` answers 200 to a caller with no session (there is nothing to
+ * revoke, and it clears the cookies regardless), so Node's `access-cookie` is the
+ * stale side. Held from BOTH sides, like the omissions above.
+ */
+const JAVA_PUBLISHES_OPEN = ['post /api/v1/auth/logout'];
+
 function sortedJson(value) {
   if (Array.isArray(value)) return `[${value.map(sortedJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -396,6 +404,15 @@ function diffSecurity(nodeDocument, javaDocument) {
         }
         continue;
       }
+      if (JAVA_PUBLISHES_OPEN.includes(route)) {
+        const nodeSecured =
+          sortedJson(operation.security) ===
+          sortedJson([{ 'access-cookie': [] }]);
+        if (!nodeSecured || sortedJson(java.security) !== sortedJson([])) {
+          mismatches.push({ route, kind: 'named divergence stale or broken' });
+        }
+        continue;
+      }
       if (sortedJson(operation.security) === sortedJson(java.security)) {
         matched += 1;
       } else {
@@ -409,7 +426,11 @@ function diffSecurity(nodeDocument, javaDocument) {
     }
   }
 
-  return { matched, named: NODE_OMITS_SECURITY.length, mismatches };
+  return {
+    matched,
+    named: NODE_OMITS_SECURITY.length + JAVA_PUBLISHES_OPEN.length,
+    mismatches,
+  };
 }
 
 /**

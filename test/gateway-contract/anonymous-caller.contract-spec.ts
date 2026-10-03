@@ -16,6 +16,12 @@
  *
  * Each request is otherwise VALID (a minimal body, every required query parameter), so
  * a 400 for a malformed body cannot stand in for the 401 a guard would have given first.
+ *
+ * **And the order, held separately.** A caller with no session who also sends an INVALID
+ * body is told to sign in, not what is wrong with the body: Node's guard runs before its
+ * validation pipe. A second row per secured route whose body requires something sends `{}`
+ * and expects the same 401, so a gateway that validates first (Java did, on 28 of 80 such
+ * routes, until a session interceptor ran ahead of the binding) fails here.
  */
 
 import { readFileSync } from 'node:fs';
@@ -28,6 +34,7 @@ import {
   bodySender,
   freshSubject,
   minimalValue,
+  resolve,
 } from './request-bodies';
 import { readRunState } from './run-state';
 
@@ -134,6 +141,19 @@ describe('an anonymous caller', () => {
           expect(outcome.asked).toEqual([]);
         },
       );
+      // An empty body is INVALID only where the schema requires something; on an
+      // all-optional body it is a valid request and the row would prove nothing.
+      if ((resolve(operation.body ?? {}).required?.length ?? 0) > 0) {
+        rowFor('Ops')(
+          `**\`${operation.key}\` refuses a caller with no session before it reads the body: 401 even when the body is invalid**`,
+          async () => {
+            const outcome = await send(request, {}, freshSubject());
+
+            expect(outcome.status).toBe(401);
+            expect(outcome.asked).toEqual([]);
+          },
+        );
+      }
     } else if (!REFUSES_FOR_ANOTHER_REASON.has(operation.key)) {
       rowFor('Ops')(
         `**\`${operation.key}\` is public: an anonymous caller is not refused for lack of a session**`,

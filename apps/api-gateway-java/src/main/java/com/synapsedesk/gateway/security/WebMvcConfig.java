@@ -13,7 +13,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Registers {@link PermissionInterceptor} and {@link ThrottlerInterceptor} on
+ * Registers {@link SessionInterceptor}, {@link PermissionInterceptor} and {@link ThrottlerInterceptor} on
  * every route — `PermissionGuard`'s and `SmartThrottlerGuard`'s global scope.
  *
  * <p><b>{@code ThrottlerInterceptor} used to compile, inject and never
@@ -29,6 +29,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @ConditionalOnWebApplication(type = Type.SERVLET)
 public class WebMvcConfig implements WebMvcConfigurer {
 
+  private final SessionInterceptor sessionInterceptor;
   private final PermissionInterceptor permissionInterceptor;
   private final ThrottlerInterceptor throttlerInterceptor;
   private final HttpMetricsInterceptor httpMetricsInterceptor;
@@ -36,12 +37,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
   private final PathIdInterceptor pathIdInterceptor;
 
   public WebMvcConfig(
+    SessionInterceptor sessionInterceptor,
     PermissionInterceptor permissionInterceptor,
     ThrottlerInterceptor throttlerInterceptor,
     HttpMetricsInterceptor httpMetricsInterceptor,
     OrganizationLifecycleInterceptor organizationLifecycleInterceptor,
     PathIdInterceptor pathIdInterceptor
   ) {
+    this.sessionInterceptor = sessionInterceptor;
     this.permissionInterceptor = permissionInterceptor;
     this.throttlerInterceptor = throttlerInterceptor;
     this.httpMetricsInterceptor = httpMetricsInterceptor;
@@ -62,6 +65,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // for still consumes the rate-limit budget rather than a cheap 403 every
     // time.
     registry.addInterceptor(throttlerInterceptor);
+    // Then the session, as Node's `JwtAuthGuard` follows its throttler guard and precedes
+    // `PermissionGuard`: an anonymous caller is told to sign in before anything about the
+    // body they sent or the permission they lack.
+    registry.addInterceptor(sessionInterceptor);
     registry.addInterceptor(permissionInterceptor);
     // After the permission check, as Node's gate sits: a request that lacks a
     // permission is refused for THAT without the gate asking about the tenant.

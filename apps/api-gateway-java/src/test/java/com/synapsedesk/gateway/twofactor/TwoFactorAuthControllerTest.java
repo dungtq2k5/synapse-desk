@@ -17,6 +17,7 @@ import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.model.ActivateTwoFactorDto;
 import com.synapsedesk.gateway.model.AuthenticateTwoFactorDto;
+import com.synapsedesk.gateway.security.TwoFactorEnrolmentGuard;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Optional;
@@ -60,7 +61,8 @@ class TwoFactorAuthControllerTest {
       stub,
       currentUser,
       verifier,
-      cookies
+      cookies,
+      new TwoFactorEnrolmentGuard(currentUser, cookies, verifier)
     );
   }
 

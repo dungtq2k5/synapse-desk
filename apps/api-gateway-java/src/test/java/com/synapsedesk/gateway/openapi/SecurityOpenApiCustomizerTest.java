@@ -29,6 +29,9 @@ class SecurityOpenApiCustomizerTest {
 
     @RouteSecurity(RouteSecurity.Scheme.MFA_COOKIE)
     public void challenge() {}
+
+    @RouteSecurity(RouteSecurity.Scheme.SESSION_OR_CHALLENGE)
+    public void either() {}
   }
 
   private Operation publish(String method) throws Exception {
@@ -60,6 +63,12 @@ class SecurityOpenApiCustomizerTest {
   void theTwoSpecialCookiesAreNamedByTheirOwnScheme() throws Exception {
     assertThat(schemeOf(publish("refresh"))).isEqualTo("refresh-cookie");
     assertThat(schemeOf(publish("challenge"))).isEqualTo("mfa-cookie");
+  }
+
+  @Test
+  void aRouteThatAdmitsEitherCredentialIsPublishedAsTheSessionCookie()
+    throws Exception {
+    assertThat(schemeOf(publish("either"))).isEqualTo("access-cookie");
   }
 
   @Test

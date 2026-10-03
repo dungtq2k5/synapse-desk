@@ -29,5 +29,12 @@ public @interface RouteSecurity {
     REFRESH_COOKIE,
     /** The second-factor challenge cookie, for the 2FA-authenticate route only. */
     MFA_COOKIE,
+    /**
+     * A full session OR a live login challenge, checked by the handler itself (the
+     * two 2FA enrolment routes, which a member holding only a challenge must reach).
+     * Published as the session cookie, as the committed document does, and not
+     * gated ahead of the body: the handler decides which credential it was given.
+     */
+    SESSION_OR_CHALLENGE,
   }
 }

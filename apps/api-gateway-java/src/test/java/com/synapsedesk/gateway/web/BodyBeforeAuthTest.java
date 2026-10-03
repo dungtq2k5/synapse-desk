@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -113,6 +114,7 @@ class BodyBeforeAuthTest {
     }
 
     /** Unguarded, so the body genuinely reaches a handler. */
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @PostMapping("/probe/open")
     String open(@RequestBody Body body) {
       return body.name();

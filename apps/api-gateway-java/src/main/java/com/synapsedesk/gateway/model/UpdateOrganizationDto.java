@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.Matches;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -52,6 +53,7 @@ public class UpdateOrganizationDto {
    * @return slug
    */
   @Size(min = 2, max = 100)
+  @Matches(regex = "^[a-z0-9-]+$")
   @JsonProperty("slug")
   public @Nullable String getSlug() {
     return slug;
@@ -72,6 +74,9 @@ public class UpdateOrganizationDto {
    * @return domain
    */
   @Size(max = 255)
+  @Matches(
+    regex = "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+  )
   @JsonProperty("domain")
   public @Nullable String getDomain() {
     return domain;

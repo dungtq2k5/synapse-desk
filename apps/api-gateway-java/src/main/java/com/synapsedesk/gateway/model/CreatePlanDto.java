@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.synapsedesk.gateway.model.CreatePlanPriceDto;
+import com.synapsedesk.gateway.validation.Matches;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -189,6 +190,7 @@ public class CreatePlanDto {
    * @return stripeProductId
    */
   @Size(max = 255)
+  @Matches(regex = "^[A-Za-z0-9_-]+$")
   @JsonProperty("stripeProductId")
   public @Nullable String getStripeProductId() {
     return stripeProductId;

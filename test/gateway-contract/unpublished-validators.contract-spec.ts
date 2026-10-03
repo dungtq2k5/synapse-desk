@@ -57,7 +57,11 @@ const ISO_VALID = '2026-01-01T00:00:00.000Z';
 
 /** A value that satisfies the constraint and one that breaks it, by validator. */
 const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
-  IsStrongPassword: { sample: { valid: 'Str0ng!Passw0rd', invalid: 'weak' } },
+  // Long enough, so only the character classes are broken: a short value would also fail a
+  // length check, and a port that kept only that check would still pass.
+  IsStrongPassword: {
+    sample: { valid: 'Str0ng!Passw0rd', invalid: 'alllowercaseletters' },
+  },
   IsPhoneNumber: { sample: { valid: '+14155552671', invalid: 'abc' } },
   // A code carries a length range too (4 to 10), so the bad value is the right length.
   IsNumberString: {
@@ -182,31 +186,6 @@ const rows: Row[] = unpublished.flatMap((item) =>
   ),
 );
 
-/**
- * Measured on Java when these rows were written: the fields whose constraint the Java
- * gateway does not yet enforce. A field leaves this set in the commit that ports it.
- */
-const NOT_YET_ENFORCED = new Set<string>([
-  'PATCH /api/v1/auth/password newPassword IsStrongPassword',
-  'PATCH /api/v1/organizations/current domain Matches',
-  'PATCH /api/v1/organizations/current slug Matches',
-  'PATCH /api/v1/platform/plans/{id} stripeProductId Matches',
-  'PATCH /api/v1/users/me dob IsISO8601',
-  'PATCH /api/v1/users/{id} dob IsISO8601',
-  'PATCH /api/v1/users/{id} phoneNumber IsPhoneNumber',
-  'POST /api/v1/analytics/export from IsISO8601',
-  'POST /api/v1/analytics/export to IsISO8601',
-  'POST /api/v1/auth/email/verify code IsNumberString',
-  'POST /api/v1/auth/password/reset newPassword IsStrongPassword',
-  'POST /api/v1/auth/phone/verify code IsNumberString',
-  'POST /api/v1/auth/phone/verify/request phoneNumber IsPhoneNumber',
-  'POST /api/v1/auth/register password IsStrongPassword',
-  'POST /api/v1/platform/plans stripePriceId Matches',
-  'POST /api/v1/platform/plans stripeProductId Matches',
-  'POST /api/v1/users/{id}/lock lockedUntil IsFutureDate',
-  'POST /api/v1/users/{id}/lock lockedUntil IsISO8601',
-]);
-
 const keyOf = (row: Row) =>
   `${row.request.method} ${row.request.path} ${row.item.property} ${row.item.kind}`;
 
@@ -278,12 +257,11 @@ describe('a constraint the document does not publish', () => {
     () => peers,
   );
 
-  // One row per field and route, each with a LITERAL title, so `SKIPPED_FOR_JAVA` can name
-  // the ones Java does not enforce yet by their suffix.
+  // One row per field and route, each with a LITERAL title, so a row Java does not enforce
+  // can be named in `SKIPPED_FOR_JAVA`.
   for (const row of rows) {
-    const pending = NOT_YET_ENFORCED.has(keyOf(row));
     rowFor('Ops')(
-      `**\`${row.request.method} ${row.request.path}\` refuses a \`${row.item.property}\` that breaks \`@${row.item.kind}\`, before any peer is called**${pending ? ' (Java does not enforce this yet)' : ''}`,
+      `**\`${row.request.method} ${row.request.path}\` refuses a \`${row.item.property}\` that breaks \`@${row.item.kind}\`, before any peer is called**`,
       async () => {
         const sample = sampleFor(row.item)!;
         const { body, target } = bodyWith(row.request.schema, row.path);

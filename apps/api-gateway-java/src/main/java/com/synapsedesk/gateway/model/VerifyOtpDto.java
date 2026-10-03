@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.NumberString;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -40,6 +41,7 @@ public class VerifyOtpDto {
    */
   @NotNull
   @Size(min = 4, max = 10)
+  @NumberString
   @JsonProperty("code")
   public String getCode() {
     return code;

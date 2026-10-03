@@ -563,3 +563,17 @@ describe('diffOperationIds', () => {
     ).toHaveLength(1);
   });
 });
+
+describe('diffSecurity, the logout divergence', () => {
+  const doc = (security: unknown) => ({
+    paths: { '/api/v1/auth/logout': { post: { security } } },
+    components: { securitySchemes: {} },
+  });
+  const secured = [{ 'access-cookie': [] }];
+
+  it('accepts Node secured and Java public, and nothing else', () => {
+    expect(diffSecurity(doc(secured), doc([])).mismatches).toEqual([]);
+    expect(diffSecurity(doc(secured), doc(secured)).mismatches).toHaveLength(1);
+    expect(diffSecurity(doc([]), doc([])).mismatches).toHaveLength(1);
+  });
+});

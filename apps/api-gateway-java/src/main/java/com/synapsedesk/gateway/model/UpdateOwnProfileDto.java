@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.validation.StrictIso8601;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -112,6 +113,7 @@ public class UpdateOwnProfileDto {
    * @return dob
    */
 
+  @StrictIso8601
   @JsonProperty("dob")
   public @Nullable String getDob() {
     return dob;

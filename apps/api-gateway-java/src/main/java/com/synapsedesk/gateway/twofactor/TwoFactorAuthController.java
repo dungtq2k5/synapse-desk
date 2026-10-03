@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.twofactor;
 import com.synapsedesk.gateway.auth.CookieWriter;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.JwtPrincipal;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
@@ -21,6 +20,9 @@ import com.synapsedesk.gateway.model.RegenerateBackupCodesDto;
 import com.synapsedesk.gateway.model.TwoFactorAuthenticatedResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
+import com.synapsedesk.gateway.security.TwoFactorEnrolmentGuard;
+import com.synapsedesk.gateway.security.TwoFactorEnrolmentGuard.Enrollee;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
 import com.synapsedesk.gateway.throttle.ThrottleOverride;
@@ -35,7 +37,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -103,33 +104,35 @@ import synapsedesk.auth.TwoFactorAuthServiceGrpc;
 public class TwoFactorAuthController {
 
   private static final long DEADLINE_SECONDS = 5;
-  private static final String ENROLMENT_REFUSED =
-    "Enrolling in two-factor authentication requires a valid session or a live login challenge";
 
   private final TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub;
   private final CurrentUser currentUser;
   private final com.synapsedesk.gateway.auth.JwtVerifier verifier;
   private final CookieWriter cookies;
+  private final TwoFactorEnrolmentGuard enrolment;
 
   public TwoFactorAuthController(
     TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub,
     CurrentUser currentUser,
     com.synapsedesk.gateway.auth.JwtVerifier verifier,
-    CookieWriter cookies
+    CookieWriter cookies,
+    TwoFactorEnrolmentGuard enrolment
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.verifier = verifier;
     this.cookies = cookies;
+    this.enrolment = enrolment;
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.SESSION_OR_CHALLENGE)
   @PostMapping(value = "/auth/2fa/setup", produces = { "application/json" })
   @ApiErrors({ "401" })
   public ResponseEntity<
     ApiResponse<GenerateTwoFactorResponseDto>
   > twoFactorAuthControllerGenerateV1() {
     HttpServletRequest request = CurrentRequest.request();
-    Enrollee enrollee = requireEnrollee(request);
+    Enrollee enrollee = enrolment.require(request);
 
     GenerateTwoFactorResponse response = withMetadata(
       enrollee.origin()
@@ -149,6 +152,7 @@ public class TwoFactorAuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.SESSION_OR_CHALLENGE)
   @PostMapping(
     value = "/auth/2fa/enable",
     produces = { "application/json" },
@@ -161,7 +165,7 @@ public class TwoFactorAuthController {
     @Valid @RequestBody ActivateTwoFactorDto activateTwoFactorDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
-    Enrollee enrollee = requireEnrollee(request);
+    Enrollee enrollee = enrolment.require(request);
 
     ActivateTwoFactorResponse response = withMetadata(
       enrollee.origin()
@@ -338,34 +342,6 @@ public class TwoFactorAuthController {
             : null
         )
       )
-    );
-  }
-
-  /** `EnrolleeContext` — only what a full session and a mid-challenge caller share. */
-  private record Enrollee(String sub, RequestOrigin origin) {}
-
-  /**
-   * `TwoFactorEnrolmentGuard`, reproduced: a full session first, then a
-   * verified 2FA-challenge cookie, and a 401 naming both doors if neither
-   * holds. No guard/interceptor layer exists here, so this is a handler-body
-   * check — the same shape as {@code GuestCheck} and {@code
-   * requireEmailVerified}.
-   */
-  private Enrollee requireEnrollee(HttpServletRequest request) {
-    Optional<RequestContext> full = currentUser.read(request);
-    if (full.isPresent()) {
-      return new Enrollee(full.get().sub(), full.get().origin());
-    }
-
-    Optional<JwtPrincipal> challenge = cookies
-      .readTwoFactorToken(request)
-      .flatMap(verifier::verifyTwoFactor);
-    if (challenge.isPresent()) {
-      return new Enrollee(challenge.get().sub(), currentUser.origin(request));
-    }
-
-    throw GuardRefusal.refused(
-      new ResponseStatusException(HttpStatus.UNAUTHORIZED, ENROLMENT_REFUSED)
     );
   }
 

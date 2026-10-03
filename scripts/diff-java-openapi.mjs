@@ -190,7 +190,7 @@ try {
   if (!failed) {
     console.log(`${ids.matched} operations publish the same operationId.`);
     console.log(
-      `${security.matched} operations publish the same security as the committed document; ${security.named} named divergences (Node omits it on routes it guards).`,
+      `${security.matched} operations publish the same security as the committed document; ${security.named} named divergences (Node omits it on three routes it guards; Java publishes logout as public).`,
     );
     console.log(
       `${known.length} known divergence(s) all accounted for, none unexplained.`,

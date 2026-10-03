@@ -1,4 +1,4 @@
-package com.synapsedesk.gateway.inbound;
+package com.synapsedesk.gateway.validation;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 @Constraint(validatedBy = StrictIso8601.Validator.class)
 @Target({
   ElementType.FIELD,
+  ElementType.METHOD,
   ElementType.PARAMETER,
   ElementType.RECORD_COMPONENT,
 })
@@ -57,7 +58,7 @@ public @interface StrictIso8601 {
       return value == null || accepts(value);
     }
 
-    static boolean accepts(String value) {
+    public static boolean accepts(String value) {
       return ISO_8601.matcher(value).matches() && isValidDate(value);
     }
 

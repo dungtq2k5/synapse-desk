@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.ValidPhoneNumber;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -39,6 +40,7 @@ public class RequestPhoneVerificationDto {
    * @return phoneNumber
    */
   @NotNull
+  @ValidPhoneNumber
   @JsonProperty("phoneNumber")
   public String getPhoneNumber() {
     return phoneNumber;

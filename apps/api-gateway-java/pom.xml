@@ -213,6 +213,16 @@
       <artifactId>nimbus-jose-jwt</artifactId>
       <version>10.10</version>
     </dependency>
+    <!--
+      `@ValidPhoneNumber`: Node's `@IsPhoneNumber()` is libphonenumber-js, which is
+      generated from this library's metadata, so this is the one that agrees with it.
+      Version read from repo1 `maven-metadata.xml`.
+    -->
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>9.0.40</version>
+    </dependency>
     <!-- `@Generated` on the generated stubs; provided, not shipped. -->
     <dependency>
       <groupId>org.apache.tomcat</groupId>

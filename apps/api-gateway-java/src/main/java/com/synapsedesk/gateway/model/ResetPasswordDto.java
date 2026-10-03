@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.validation.StrongPassword;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -63,6 +64,7 @@ public class ResetPasswordDto {
    * @return newPassword
    */
   @NotNull
+  @StrongPassword
   @JsonProperty("newPassword")
   public String getNewPassword() {
     return newPassword;

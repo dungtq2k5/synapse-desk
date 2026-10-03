@@ -27269,11 +27269,7 @@
             }
           }
         },
-        "security": [
-          {
-            "access-cookie": []
-          }
-        ]
+        "security": []
       }
     },
     "/api/v1/auth/logout/all": {

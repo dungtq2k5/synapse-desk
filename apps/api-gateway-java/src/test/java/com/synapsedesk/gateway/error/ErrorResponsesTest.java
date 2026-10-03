@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import jakarta.validation.Valid;
@@ -80,11 +81,13 @@ class ErrorResponsesTest {
       @NotNull @NotBlank String password
     ) {}
 
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @PostMapping("/probe/validated")
     String validated(@Valid @RequestBody Credentials body) {
       return body.email();
     }
 
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @PostMapping("/probe/peer-down")
     String peerDown() {
       throw new StatusRuntimeException(
@@ -94,6 +97,7 @@ class ErrorResponsesTest {
       );
     }
 
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @PostMapping("/probe/marked")
     String marked() {
       throw new StatusRuntimeException(
@@ -109,6 +113,7 @@ class ErrorResponsesTest {
      * from the class-level `@Validated` proxy, not
      * `MethodArgumentNotValidException`.
      */
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @GetMapping("/probe/page")
     String page(
       @DecimalMin("1") @RequestParam(defaultValue = "1") BigDecimal page

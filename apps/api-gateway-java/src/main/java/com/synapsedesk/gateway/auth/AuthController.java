@@ -442,6 +442,7 @@ public class AuthController {
       .requiresTwoFactor(false);
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/logout",
     produces = { "application/json" },

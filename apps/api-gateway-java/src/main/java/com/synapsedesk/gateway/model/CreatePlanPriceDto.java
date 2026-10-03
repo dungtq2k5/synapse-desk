@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.validation.Matches;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -79,6 +80,7 @@ public class CreatePlanPriceDto {
    */
   @NotNull
   @Size(min = 1, max = 255)
+  @Matches(regex = "^[A-Za-z0-9_-]+$")
   @JsonProperty("stripePriceId")
   public String getStripePriceId() {
     return stripePriceId;
