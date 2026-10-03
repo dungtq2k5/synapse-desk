@@ -20,6 +20,7 @@ import com.synapsedesk.gateway.model.GenerateTwoFactorResponseDto;
 import com.synapsedesk.gateway.model.RegenerateBackupCodesDto;
 import com.synapsedesk.gateway.model.TwoFactorAuthenticatedResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
 import com.synapsedesk.gateway.throttle.ThrottleOverride;
@@ -180,6 +181,7 @@ public class TwoFactorAuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.MFA_COOKIE)
   @PostMapping(
     value = "/auth/2fa/authenticate",
     produces = { "application/json" },

@@ -22,6 +22,7 @@ import com.synapsedesk.gateway.model.TenantSelectionResponseDto;
 import com.synapsedesk.gateway.model.TwoFactorRequiredResponseDto;
 import com.synapsedesk.gateway.model.ValidatePasswordResetTokenResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
 import com.synapsedesk.gateway.throttle.ThrottleOverride;
@@ -154,6 +155,7 @@ public class AuthController {
       );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/register",
     produces = { "application/json" },
@@ -197,6 +199,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/login",
     produces = { "application/json" },
@@ -260,6 +263,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/login/tenant",
     produces = { "application/json" },
@@ -330,6 +334,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/google",
     produces = { "application/json" },
@@ -546,6 +551,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.REFRESH_COOKIE)
   @PostMapping(value = "/auth/refresh", produces = { "application/json" })
   @ApiErrors({ "401" })
   public ResponseEntity<
@@ -583,6 +589,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/password/forgot",
     produces = { "application/json" },
@@ -612,6 +619,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @GetMapping(
     value = "/auth/password/reset/{token}",
     produces = { "application/json" }
@@ -640,6 +648,7 @@ public class AuthController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/auth/password/reset",
     produces = { "application/json" },

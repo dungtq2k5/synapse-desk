@@ -2,6 +2,7 @@ import {
   checkKnownDivergences,
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
+  diffSecurity,
   extractOperations,
 } from './java-openapi-diff.cjs';
 
@@ -465,5 +466,78 @@ describe('diffResponseSchemaShapes', () => {
 
       expect(result.envelope.nodePublishesWarningOptional).toBe(false);
     });
+  });
+});
+
+describe('diffSecurity', () => {
+  const COOKIE = { type: 'apiKey', in: 'cookie', name: 'access_token' };
+  const document = (
+    operations: Record<string, unknown>,
+    schemes: Record<string, unknown> = { 'access-cookie': COOKIE },
+  ) => ({
+    paths: { '/x': operations, '/api/v1/feedback': { get: {} } },
+    components: { securitySchemes: schemes },
+  });
+  const secured = [{ 'access-cookie': [] }];
+  const withFeedback = (
+    ops: Record<string, unknown>,
+    feedback: unknown,
+    schemes?: Record<string, unknown>,
+  ) => {
+    const doc = document(ops, schemes);
+    doc.paths['/api/v1/feedback'] = { get: { security: feedback } } as never;
+
+    return doc;
+  };
+
+  it('matches equal requirements, scheme key order aside', () => {
+    const node = withFeedback({ get: { security: secured } }, undefined, {
+      a: { type: 'apiKey', in: 'cookie' },
+    });
+    const java = withFeedback({ get: { security: secured } }, secured, {
+      a: { in: 'cookie', type: 'apiKey' },
+    });
+
+    expect(diffSecurity(node, java).mismatches).toEqual([]);
+  });
+
+  it('tells public ([]) from secured, and from missing', () => {
+    const open = withFeedback({ get: { security: [] } }, undefined);
+    const secure = withFeedback({ get: { security: secured } }, secured);
+    const nodeSecure = withFeedback({ get: { security: secured } }, undefined);
+    const missing = withFeedback({ get: {} }, secured);
+
+    expect(diffSecurity(open, secure).mismatches).toMatchObject([
+      { route: 'get /x', kind: 'security' },
+    ]);
+    expect(diffSecurity(nodeSecure, missing).mismatches).toMatchObject([
+      { route: 'get /x', kind: 'security' },
+    ]);
+  });
+
+  it('fails when the schemes differ', () => {
+    const node = withFeedback({}, undefined);
+    const java = withFeedback({}, secured, {});
+
+    expect(diffSecurity(node, java).mismatches).toEqual([
+      { route: 'securitySchemes', kind: 'schemes' },
+    ]);
+  });
+
+  it('holds the named omission from both sides', () => {
+    const java = withFeedback({}, secured);
+
+    expect(diffSecurity(withFeedback({}, undefined), java).mismatches).toEqual(
+      [],
+    );
+    // Node starts publishing it: the record is stale.
+    expect(
+      diffSecurity(withFeedback({}, secured), java).mismatches,
+    ).toHaveLength(1);
+    // Java stops securing it.
+    expect(
+      diffSecurity(withFeedback({}, undefined), withFeedback({}, []))
+        .mismatches,
+    ).toHaveLength(1);
   });
 });

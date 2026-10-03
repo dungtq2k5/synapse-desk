@@ -312,7 +312,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/departments": {
@@ -616,7 +621,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/roles/{id}/permissions": {
@@ -920,7 +930,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/departments": {
@@ -1176,7 +1191,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "put": {
         "tags": ["Documents"],
@@ -1478,7 +1498,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhooks/stripe": {
@@ -1620,7 +1645,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/webhooks/email/resend": {
@@ -1790,7 +1816,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/webhook-endpoints": {
@@ -1960,7 +1987,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Webhook endpoints"],
@@ -2214,7 +2246,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhook-endpoints/{id}/test": {
@@ -2470,7 +2507,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhook-endpoints/{id}/rotate-secret": {
@@ -2726,7 +2768,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users": {
@@ -2988,7 +3035,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["User Admin"],
@@ -3242,7 +3294,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/unlock": {
@@ -3498,7 +3555,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/restore": {
@@ -3754,7 +3816,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/lock": {
@@ -4058,7 +4125,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/2fa/reset": {
@@ -4314,7 +4386,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/me/avatar/upload-url": {
@@ -4532,7 +4609,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/me/avatar/confirm": {
@@ -4750,7 +4832,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations": {
@@ -4980,7 +5067,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Invitations"],
@@ -5234,7 +5326,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations/{id}/resend": {
@@ -5490,7 +5587,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations/preview": {
@@ -5746,7 +5848,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations/accept": {
@@ -5964,7 +6071,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/tickets": {
@@ -6214,7 +6322,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Tickets"],
@@ -6468,7 +6581,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/messages": {
@@ -6734,7 +6852,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Messages"],
@@ -6998,7 +7121,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/upload-url": {
@@ -7272,7 +7400,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/confirm": {
@@ -7546,7 +7679,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/messages/attachments/upload-url": {
@@ -7812,7 +7950,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/ai/summary": {
@@ -8068,7 +8211,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Ai"],
@@ -8360,7 +8508,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/ai/suggestions": {
@@ -8616,7 +8769,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/ai/draft": {
@@ -8958,7 +9116,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/ai/classify": {
@@ -9252,7 +9415,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/status": {
@@ -9556,7 +9724,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/restore": {
@@ -9812,7 +9985,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/resolve": {
@@ -10116,7 +10294,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/reopen": {
@@ -10420,7 +10603,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/reassign": {
@@ -10724,7 +10912,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/read": {
@@ -10990,7 +11183,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/escalate": {
@@ -11256,7 +11454,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/close": {
@@ -11560,7 +11763,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/assign": {
@@ -11864,7 +12072,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Tickets"],
@@ -12118,7 +12331,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/assign/self": {
@@ -12422,7 +12640,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/export": {
@@ -12678,7 +12901,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/bulk/status": {
@@ -12934,7 +13162,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/bulk/priority": {
@@ -13190,7 +13423,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/roles": {
@@ -13420,7 +13658,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Roles"],
@@ -13674,7 +13917,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/roles/{id}/users": {
@@ -13978,7 +14226,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/roles": {
@@ -14185,7 +14438,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Platform"],
@@ -14401,7 +14659,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/plans": {
@@ -14602,7 +14865,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Platform"],
@@ -14818,7 +15086,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/plans/{id}/apply": {
@@ -15045,7 +15318,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/organizations": {
@@ -15245,7 +15523,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Platform"],
@@ -15461,7 +15744,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/organizations/{id}/status": {
@@ -15727,7 +16015,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/organizations/{id}/restore": {
@@ -15945,7 +16238,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/organizations/{id}/billing-cycle/reset": {
@@ -16211,7 +16509,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/jobs/{name}/run": {
@@ -16391,7 +16694,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/jobs/{name}/backfill": {
@@ -16657,7 +16965,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current/onboarding/complete": {
@@ -16827,7 +17140,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current/inbound-token": {
@@ -16997,7 +17315,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Organizations"],
@@ -17158,7 +17481,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/{id}/read": {
@@ -17376,7 +17704,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/{id}/archive": {
@@ -17594,7 +17927,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/read": {
@@ -17812,7 +18150,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/devices": {
@@ -17944,7 +18287,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Notifications"],
@@ -18160,7 +18508,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/messages/{messageId}/feedback": {
@@ -18378,7 +18731,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Feedback"],
@@ -18642,7 +19000,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Feedback"],
@@ -18851,7 +19214,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/knowledge/search": {
@@ -19069,7 +19437,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/knowledge/ask": {
@@ -19325,7 +19698,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/ingestion-jobs/{id}/retry": {
@@ -19581,7 +19959,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/restore": {
@@ -19837,7 +20220,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/replace": {
@@ -20179,7 +20567,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/reindex": {
@@ -20435,7 +20828,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/presign": {
@@ -20691,7 +21089,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/flags/{flagId}/replaced": {
@@ -20995,7 +21398,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/flags/{flagId}/fixed": {
@@ -21299,7 +21707,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/flags/{flagId}/dismiss": {
@@ -21603,7 +22016,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/confirm": {
@@ -21859,7 +22277,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/departments": {
@@ -22089,7 +22512,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Departments"],
@@ -22343,7 +22771,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/departments/{id}/restore": {
@@ -22599,7 +23032,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/departments/{id}/members": {
@@ -22904,7 +23342,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Departments"],
@@ -23206,7 +23649,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/chat/conversations": {
@@ -23466,7 +23914,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Chat"],
@@ -23682,7 +24135,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/chat/conversations/{id}/messages": {
@@ -23948,7 +24406,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Chat"],
@@ -24212,7 +24675,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/chat/conversations/{id}/escalate": {
@@ -24430,7 +24898,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/portal-session": {
@@ -24686,7 +25159,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/plan": {
@@ -25066,7 +25544,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/checkout-session": {
@@ -25322,7 +25805,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/register": {
@@ -25540,7 +26028,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/refresh": {
@@ -25672,7 +26161,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "refresh-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/phone/verify": {
@@ -25890,7 +26384,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/phone/verify/request": {
@@ -26108,7 +26607,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/password/reset": {
@@ -26326,7 +26830,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/password/forgot": {
@@ -26544,7 +27049,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/logout": {
@@ -26762,7 +27268,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/logout/all": {
@@ -26894,7 +27405,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/login": {
@@ -27140,7 +27656,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/login/tenant": {
@@ -27386,7 +27903,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/google": {
@@ -27632,7 +28150,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/email/verify": {
@@ -27850,7 +28369,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/email/verify/request": {
@@ -27982,7 +28506,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/2fa/setup": {
@@ -28114,7 +28643,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/2fa/enable": {
@@ -28332,7 +28866,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/2fa/backup-codes": {
@@ -28464,7 +29003,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "post": {
         "tags": ["Two Factor Auth"],
@@ -28680,7 +29224,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/2fa/authenticate": {
@@ -28898,7 +29447,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "mfa-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/audit-logs/export": {
@@ -29154,7 +29708,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/export": {
@@ -29410,7 +29969,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhook-endpoints/{id}": {
@@ -29666,7 +30230,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Webhook endpoints"],
@@ -29920,7 +30489,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Webhook endpoints"],
@@ -30222,7 +30796,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}": {
@@ -30478,7 +31057,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["User Admin"],
@@ -30732,7 +31316,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["User Admin"],
@@ -31034,7 +31623,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/me": {
@@ -31166,7 +31760,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Users"],
@@ -31382,7 +31981,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{ticketId}/messages/{messageId}": {
@@ -31646,7 +32250,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Messages"],
@@ -31918,7 +32527,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}": {
@@ -32136,7 +32750,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Tickets"],
@@ -32390,7 +33009,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Tickets"],
@@ -32692,7 +33316,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/roles/{id}": {
@@ -32948,7 +33577,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Roles"],
@@ -33202,7 +33836,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Roles"],
@@ -33504,7 +34143,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/plans/{id}": {
@@ -33722,7 +34366,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Platform"],
@@ -33976,7 +34625,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Platform"],
@@ -34240,7 +34894,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/organizations/{id}": {
@@ -34458,7 +35117,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Platform"],
@@ -34722,7 +35386,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Platform"],
@@ -34986,7 +35655,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current": {
@@ -35118,7 +35792,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Organizations"],
@@ -35372,7 +36051,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Organizations"],
@@ -35626,7 +36310,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current/settings": {
@@ -35796,7 +36485,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Organizations"],
@@ -36050,7 +36744,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/preferences": {
@@ -36182,7 +36881,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Notifications"],
@@ -36398,7 +37102,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}": {
@@ -36616,7 +37325,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Documents"],
@@ -36863,7 +37577,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Documents"],
@@ -37165,7 +37884,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/departments/{id}": {
@@ -37421,7 +38145,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Departments"],
@@ -37675,7 +38404,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "patch": {
         "tags": ["Departments"],
@@ -37977,7 +38711,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/password": {
@@ -38195,7 +38934,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/version": {
@@ -38289,7 +39033,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/health": {
@@ -38383,7 +39128,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/health/ready": {
@@ -38477,7 +39223,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/webhook-endpoints/{id}/deliveries": {
@@ -38744,7 +39491,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/webhook-endpoints/event-types": {
@@ -38914,7 +39666,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{userId}/sessions": {
@@ -39170,7 +39927,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["User Sessions"],
@@ -39424,7 +40186,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/{id}/permissions": {
@@ -39680,7 +40447,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations/{id}": {
@@ -39936,7 +40708,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Invitations"],
@@ -40190,7 +40967,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/invitations/token/{token}": {
@@ -40370,7 +41152,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments": {
@@ -40596,7 +41379,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/similar": {
@@ -40852,7 +41640,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/history": {
@@ -41070,7 +41863,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/{id}/assignments": {
@@ -41288,7 +42086,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/export/{id}": {
@@ -41544,7 +42347,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/tickets/by-number/{ticketNumber}": {
@@ -41762,7 +42570,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/users": {
@@ -41969,7 +42782,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/metrics": {
@@ -42101,7 +42919,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/jobs": {
@@ -42233,7 +43056,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/finance": {
@@ -42365,7 +43193,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/finance/events": {
@@ -42553,7 +43386,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/audit-logs": {
@@ -42779,7 +43617,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/platform/audit-logs/actions": {
@@ -42911,7 +43754,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/permissions": {
@@ -43081,7 +43929,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current/usage": {
@@ -43251,7 +44104,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/organizations/current/onboarding": {
@@ -43421,7 +44279,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications": {
@@ -43613,7 +44476,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/unread-count": {
@@ -43745,7 +44613,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/knowledge/articles": {
@@ -43965,7 +44838,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/knowledge/articles/{id}": {
@@ -44204,7 +45082,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/ingestion-jobs": {
@@ -44433,7 +45316,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/ingestion-jobs/{id}": {
@@ -44651,7 +45539,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Ingestion Jobs"],
@@ -44905,7 +45798,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/feedback": {
@@ -45151,7 +46049,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents": {
@@ -45369,7 +46272,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/ingestion-jobs": {
@@ -45625,7 +46533,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/download": {
@@ -45843,7 +46756,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/chunks": {
@@ -46183,7 +47101,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/{id}/chunks/{chunkId}": {
@@ -46409,7 +47332,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/storage": {
@@ -46579,7 +47507,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/flags": {
@@ -46829,7 +47762,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/documents/flags/{flagId}": {
@@ -47085,7 +48023,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       },
       "delete": {
         "tags": ["Documents"],
@@ -47332,7 +48275,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/chat/conversations/{id}": {
@@ -47550,7 +48498,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/subscription": {
@@ -47720,7 +48673,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/plans": {
@@ -47890,7 +48848,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/billing/invoices": {
@@ -48070,7 +49033,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/sessions": {
@@ -48202,7 +49170,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/password/reset/{token}": {
@@ -48382,7 +49355,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/auth/otp/status": {
@@ -48524,7 +49498,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/audit-logs": {
@@ -48788,7 +49767,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/audit-logs/export/{id}": {
@@ -49044,7 +50028,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/audit-logs/actions": {
@@ -49214,7 +50203,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/attachments/{id}/download": {
@@ -49432,7 +50426,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/volume": {
@@ -49638,7 +50637,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/satisfaction": {
@@ -49844,7 +50848,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/response-times": {
@@ -50050,7 +51059,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/overview": {
@@ -50256,7 +51270,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/knowledge-gaps": {
@@ -50473,7 +51492,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/export/{id}": {
@@ -50729,7 +51753,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/documents": {
@@ -50912,7 +51941,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/deflection": {
@@ -51118,7 +52152,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/ai-usage": {
@@ -51324,7 +52363,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/analytics/agents": {
@@ -51530,7 +52574,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/users/me/avatar": {
@@ -51662,7 +52711,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/roles/{id}/users/{userId}": {
@@ -51964,7 +53018,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/notifications/devices/{id}": {
@@ -52137,7 +53196,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/departments/{id}/members/{userId}": {
@@ -52401,7 +53465,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/sessions/{id}": {
@@ -52619,7 +53688,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/sessions/{id}/trust": {
@@ -52837,7 +53911,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/sessions/trusted": {
@@ -52969,7 +54048,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/auth/2fa": {
@@ -53187,7 +54271,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     },
     "/api/v1/attachments/{id}": {
@@ -53443,7 +54532,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
       }
     }
   },
@@ -62782,6 +63876,23 @@
           }
         },
         "required": ["code", "password"]
+      }
+    },
+    "securitySchemes": {
+      "access-cookie": {
+        "type": "apiKey",
+        "name": "access_token",
+        "in": "cookie"
+      },
+      "mfa-cookie": {
+        "type": "apiKey",
+        "name": "mfa_token",
+        "in": "cookie"
+      },
+      "refresh-cookie": {
+        "type": "apiKey",
+        "name": "refresh_token",
+        "in": "cookie"
       }
     }
   }

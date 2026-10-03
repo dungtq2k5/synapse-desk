@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.model.LivenessResponseDto;
 import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
 import com.synapsedesk.gateway.model.ReadinessResponseDto;
 import com.synapsedesk.gateway.model.VersionResponseDto;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.OffsetDateTime;
@@ -67,6 +68,7 @@ public class OpsController {
     this.gates = gates;
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @GetMapping(value = "/health", produces = { "application/json" })
   public ResponseEntity<
     ApiResponse<LivenessResponseDto>
@@ -78,6 +80,7 @@ public class OpsController {
     return ResponseEntity.ok(ApiResponse.of(OK, "Healthy", data));
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @GetMapping(value = "/health/ready", produces = { "application/json" })
   public ResponseEntity<
     ApiResponse<ReadinessResponseDto>
@@ -112,6 +115,7 @@ public class OpsController {
       : ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @GetMapping(value = "/version", produces = { "application/json" })
   public ResponseEntity<
     ApiResponse<VersionResponseDto>

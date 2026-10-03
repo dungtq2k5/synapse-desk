@@ -36,6 +36,7 @@ import {
   checkKnownDivergences,
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
+  diffSecurity,
 } from './lib/java-openapi-diff.cjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -161,7 +162,22 @@ try {
     );
   }
 
+  const security = diffSecurity(nodeDocument, javaDocument);
+
+  if (security.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${security.mismatches.length} operation(s) differ in the credential they publish:`,
+    );
+    for (const row of security.mismatches.slice(0, 40)) {
+      console.error(`  ${row.route}: ${JSON.stringify(row)}`);
+    }
+  }
+
   if (!failed) {
+    console.log(
+      `${security.matched} operations publish the same security as the committed document; ${security.named} named divergences (Node omits it on routes it guards).`,
+    );
     console.log(
       `${known.length} known divergence(s) all accounted for, none unexplained.`,
     );

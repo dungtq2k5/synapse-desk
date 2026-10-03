@@ -342,8 +342,79 @@ function diffResponseSchemaShapes(nodeDocument, javaDocument) {
   };
 }
 
+/**
+ * Compares what each document says a route needs in order to be called.
+ *
+ * <p>An EQUALITY over every operation both documents share (the three
+ * `components.securitySchemes` included, key order aside), with one named
+ * divergence: three routes Node guards but publishes no `security` for (they
+ * carry no auth decorator in its document; its guard still refuses an anonymous
+ * caller, which the anonymous-caller contract rows hold), where Java publishes
+ * the session cookie. Held from BOTH sides: Java must publish exactly that, and a
+ * Node document that starts publishing `security` for one of them makes the
+ * record stale.
+ */
+const NODE_OMITS_SECURITY = [
+  'get /api/v1/feedback',
+  'get /api/v1/platform/audit-logs',
+  'get /api/v1/platform/audit-logs/actions',
+];
+
+function sortedJson(value) {
+  if (Array.isArray(value)) return `[${value.map(sortedJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${sortedJson(value[key])}`)
+      .join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function diffSecurity(nodeDocument, javaDocument) {
+  const mismatches = [];
+  let matched = 0;
+
+  if (
+    sortedJson(nodeDocument.components.securitySchemes) !==
+    sortedJson(javaDocument.components.securitySchemes)
+  ) {
+    mismatches.push({ route: 'securitySchemes', kind: 'schemes' });
+  }
+
+  for (const [path, methods] of Object.entries(nodeDocument.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const java = ((javaDocument.paths || {})[path] || {})[method];
+      if (!java) continue;
+      const route = `${method} ${path}`;
+      if (NODE_OMITS_SECURITY.includes(route)) {
+        const javaCookie =
+          sortedJson(java.security) === sortedJson([{ 'access-cookie': [] }]);
+        if (operation.security !== undefined || !javaCookie) {
+          mismatches.push({ route, kind: 'named divergence stale or broken' });
+        }
+        continue;
+      }
+      if (sortedJson(operation.security) === sortedJson(java.security)) {
+        matched += 1;
+      } else {
+        mismatches.push({
+          route,
+          kind: 'security',
+          node: operation.security,
+          java: java.security,
+        });
+      }
+    }
+  }
+
+  return { matched, named: NODE_OMITS_SECURITY.length, mismatches };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
+  diffSecurity,
   extractOperations,
   routeKey,
   diffOpenApiDocuments,

@@ -23,6 +23,7 @@ import com.synapsedesk.gateway.model.PreviewInvitationResponseDto;
 import com.synapsedesk.gateway.model.PreviewInvitationsDto;
 import com.synapsedesk.gateway.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
@@ -319,6 +320,7 @@ public class InvitationsController {
 
   // Public: the invitee has no workspace yet.
   @OrgAccessKind(OrgAccess.AUTH)
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @GetMapping(
     value = "/users/invitations/token/{token}",
     produces = { "application/json" }
@@ -363,6 +365,7 @@ public class InvitationsController {
 
   // Public: the invitee has no workspace yet.
   @OrgAccessKind(OrgAccess.AUTH)
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/users/invitations/accept",
     produces = { "application/json" },

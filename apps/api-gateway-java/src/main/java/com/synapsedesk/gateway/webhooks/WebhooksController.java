@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.inbound.ResendInboundService;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
@@ -80,6 +81,7 @@ public class WebhooksController {
     this.resendInbound = resendInbound;
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(value = "/webhooks/stripe", produces = { "application/json" })
   @ApiErrors({ "400" })
   public ResponseEntity<
@@ -124,6 +126,7 @@ public class WebhooksController {
     );
   }
 
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(
     value = "/webhooks/email/resend",
     produces = { "application/json" }
