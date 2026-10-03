@@ -38,6 +38,7 @@ import {
   diffResponseSchemaShapes,
   diffSecurity,
   diffOperationIds,
+  diffRequestSchemaShapes,
 } from './lib/java-openapi-diff.cjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -187,8 +188,42 @@ try {
     }
   }
 
+  const requests = diffRequestSchemaShapes(nodeDocument, javaDocument);
+
+  if (requests.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${requests.mismatches.length} request schema difference(s) in required, property set or null:`,
+    );
+    for (const row of requests.mismatches.slice(0, 40)) {
+      console.error(
+        `  ${row.schema}.${row.property ?? ''}: ${JSON.stringify(row)}`,
+      );
+    }
+  }
+  if (requests.nodeNullableStale) {
+    failed = true;
+    console.error(
+      `\nNode's nullable request properties are no longer the six on record, so the named divergence is stale: ${JSON.stringify(requests.nodeNullable)}`,
+    );
+  }
+  for (const side of ['node', 'java']) {
+    if (requests.nullableParameters[side].length) {
+      failed = true;
+      console.error(
+        `\n${requests.nullableParameters[side].length} parameter(s) in the ${side} document accept null, which a URL cannot carry:`,
+      );
+      for (const row of requests.nullableParameters[side].slice(0, 40)) {
+        console.error(`  ${row}`);
+      }
+    }
+  }
+
   if (!failed) {
     console.log(`${ids.matched} operations publish the same operationId.`);
+    console.log(
+      `${requests.properties} request properties in ${requests.schemas} schemas agree on required and property set, and every optional one is nullable in Java (Node: ${requests.nodeNullable.length} of them, the named divergence); no parameter accepts null in either document.`,
+    );
     console.log(
       `${security.matched} operations publish the same security as the committed document; ${security.named} named divergences (Node omits it on three routes it guards; Java publishes logout as public).`,
     );

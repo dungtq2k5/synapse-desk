@@ -1,16 +1,10 @@
 package com.synapsedesk.gateway.openapi;
 
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.PathItem;
-import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.responses.ApiResponse;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.stereotype.Component;
 
@@ -48,34 +42,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class ResponseSchemasOpenApiCustomizer implements OpenApiCustomizer {
 
-  private static final String REF_PREFIX = "#/components/schemas/";
-
   @Override
-  @SuppressWarnings({ "rawtypes", "unchecked" })
+  @SuppressWarnings("rawtypes")
   public void customise(OpenAPI openApi) {
-    if (openApi.getComponents() == null || openApi.getPaths() == null) return;
+    if (openApi.getComponents() == null) return;
     Map<String, Schema> schemas = openApi.getComponents().getSchemas();
     if (schemas == null) return;
 
-    Set<String> fromRequests = new HashSet<>();
-    Set<String> fromResponses = new HashSet<>();
-    for (PathItem item : openApi.getPaths().values()) {
-      for (Operation operation : item.readOperations()) {
-        if (operation.getRequestBody() != null) {
-          collect(operation.getRequestBody().getContent(), fromRequests);
-        }
-        if (operation.getResponses() != null) {
-          operation.getResponses().forEach((status, response) -> {
-            if (status.startsWith("2")) collect(response, fromResponses);
-          });
-        }
-      }
-    }
-    Set<String> request = closure(fromRequests, schemas);
-    Set<String> response = closure(fromResponses, schemas);
-
-    for (String name : response) {
-      if (request.contains(name)) continue;
+    for (String name : SchemaGraph.of(openApi).responseOnly()) {
       Schema<?> schema = schemas.get(name);
       if (schema == null || schema.getProperties() == null) continue;
 
@@ -87,83 +61,9 @@ public class ResponseSchemasOpenApiCustomizer implements OpenApiCustomizer {
       for (Map.Entry<String, Schema> property : properties.entrySet()) {
         if (required.contains(property.getKey())) continue;
         required.add(property.getKey());
-        property.setValue(nullable(property.getValue()));
+        property.setValue(SchemaGraph.nullable(property.getValue()));
       }
       schema.setRequired(required);
     }
-  }
-
-  /** The schema, or one that also accepts null: {@code ["string", "null"]}, or {@code oneOf [$ref, null]}. */
-  @SuppressWarnings({ "rawtypes", "unchecked" })
-  private static Schema nullable(Schema property) {
-    if (property.get$ref() != null) {
-      Schema nullType = new Schema();
-      nullType.addType("null");
-      Schema wrapper = new Schema();
-      wrapper.addOneOfItem(property);
-      wrapper.addOneOfItem(nullType);
-
-      return wrapper;
-    }
-    if (property.getTypes() != null && !property.getTypes().contains("null")) {
-      property.addType("null");
-    }
-
-    return property;
-  }
-
-  private static void collect(Content content, Set<String> into) {
-    if (content != null) {
-      content.values().forEach(media -> refs(media.getSchema(), into));
-    }
-  }
-
-  private static void collect(ApiResponse response, Set<String> into) {
-    collect(response.getContent(), into);
-  }
-
-  @SuppressWarnings("rawtypes")
-  private static void refs(Schema<?> schema, Set<String> into) {
-    if (schema == null) return;
-    if (schema.get$ref() != null && schema.get$ref().startsWith(REF_PREFIX)) {
-      into.add(schema.get$ref().substring(REF_PREFIX.length()));
-    }
-    if (schema.getProperties() != null) {
-      schema
-        .getProperties()
-        .values()
-        .forEach(p -> refs((Schema<?>) p, into));
-    }
-    refs(schema.getItems(), into);
-    if (schema.getAdditionalProperties() instanceof Schema<?> additional) {
-      refs(additional, into);
-    }
-    for (List<Schema> group : java.util.Arrays.asList(
-      schema.getAllOf(),
-      schema.getAnyOf(),
-      schema.getOneOf()
-    )) {
-      if (group != null) group.forEach(s -> refs((Schema<?>) s, into));
-    }
-  }
-
-  /** Every schema reachable from the seeds, through the properties of each. */
-  @SuppressWarnings("rawtypes")
-  private static Set<String> closure(
-    Set<String> seeds,
-    Map<String, Schema> schemas
-  ) {
-    Set<String> seen = new HashSet<>();
-    List<String> pending = new ArrayList<>(seeds);
-    while (!pending.isEmpty()) {
-      String name = pending.remove(pending.size() - 1);
-      Schema<?> schema = schemas.get(name);
-      if (schema == null || !seen.add(name)) continue;
-      Set<String> next = new HashSet<>();
-      refs(schema, next);
-      pending.addAll(next);
-    }
-
-    return seen;
   }
 }

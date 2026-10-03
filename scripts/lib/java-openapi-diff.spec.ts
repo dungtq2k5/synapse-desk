@@ -3,6 +3,7 @@ import {
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
   diffOperationIds,
+  diffRequestSchemaShapes,
   diffSecurity,
   extractOperations,
 } from './java-openapi-diff.cjs';
@@ -575,5 +576,122 @@ describe('diffSecurity, the logout divergence', () => {
     expect(diffSecurity(doc(secured), doc([])).mismatches).toEqual([]);
     expect(diffSecurity(doc(secured), doc(secured)).mismatches).toHaveLength(1);
     expect(diffSecurity(doc([]), doc([])).mismatches).toHaveLength(1);
+  });
+});
+
+describe('diffRequestSchemaShapes', () => {
+  const SIX = [
+    'UpdateOrganizationSettingsDto.maxAttachmentBytesOverride',
+    'UpdateOrganizationSettingsDto.maxAttachmentsPerMessageOverride',
+    'UpdateOrganizationSettingsDto.maxDocumentBytesOverride',
+    'UpdateOwnProfileDto.dob',
+    'UpdateUserDto.dob',
+    'UpdateUserDto.phoneNumber',
+  ];
+  const STR = { type: 'string' };
+  const NULLABLE_STR = { type: ['string', 'null'] };
+
+  const operation = (parameters: unknown[] = []) => ({
+    parameters,
+    requestBody: {
+      content: {
+        'application/json': { schema: { $ref: '#/components/schemas/In' } },
+      },
+    },
+    responses: {
+      '200': {
+        content: {
+          'application/json': { schema: { $ref: '#/components/schemas/Out' } },
+        },
+      },
+    },
+  });
+  const document = (
+    inSchema: Record<string, unknown>,
+    parameters: unknown[] = [],
+  ) => ({
+    paths: { '/x': { post: operation(parameters) } },
+    components: {
+      schemas: { In: inSchema, Out: { type: 'object', properties: {} } },
+    },
+  });
+  const shape = (required: string[], properties: Record<string, unknown>) => ({
+    type: 'object',
+    required,
+    properties,
+  });
+
+  it('agrees when required and property sets match and Java says null for the optional one', () => {
+    const node = document(shape(['a'], { a: STR, b: STR }));
+    const java = document(shape(['a'], { a: STR, b: NULLABLE_STR }));
+
+    const result = diffRequestSchemaShapes(node, java);
+
+    expect(result.mismatches).toEqual([]);
+    expect(result.schemas).toBe(1);
+    expect(result.properties).toBe(2);
+  });
+
+  it('names an optional property Java does not publish as nullable', () => {
+    const node = document(shape(['a'], { a: STR, b: STR }));
+    const java = document(shape(['a'], { a: STR, b: STR }));
+
+    expect(diffRequestSchemaShapes(node, java).mismatches).toEqual([
+      { schema: 'In', property: 'b', kind: 'optional but not nullable' },
+    ]);
+  });
+
+  it('names a required property that Java publishes as nullable', () => {
+    const node = document(shape(['a'], { a: STR }));
+    const java = document(shape(['a'], { a: NULLABLE_STR }));
+
+    expect(diffRequestSchemaShapes(node, java).mismatches).toEqual([
+      { schema: 'In', property: 'a', kind: 'required but nullable' },
+    ]);
+  });
+
+  it('names a required set or a property set that differs', () => {
+    const node = document(shape(['a'], { a: STR, b: STR }));
+    const java = document(shape([], { a: NULLABLE_STR, b: NULLABLE_STR }));
+
+    expect(diffRequestSchemaShapes(node, java).mismatches).toEqual([
+      { schema: 'In', kind: 'required set' },
+    ]);
+    expect(
+      diffRequestSchemaShapes(node, document(shape(['a'], { a: STR })))
+        .mismatches,
+    ).toContainEqual({ schema: 'In', kind: 'property set' });
+  });
+
+  it('holds the six Node nullable request properties from its side', () => {
+    const java = document(shape(['a'], { a: STR }));
+    const node = document(shape(['a'], { a: STR }));
+
+    expect(diffRequestSchemaShapes(node, java).nodeNullableStale).toBe(true);
+    expect(SIX).toHaveLength(6);
+
+    // A Node document that names a seventh makes the record stale, not the check pass.
+    const seventh = document(
+      shape([], { a: { type: 'string', nullable: true } }),
+    );
+    const result = diffRequestSchemaShapes(seventh, java);
+
+    expect(result.nodeNullable).toEqual(['In.a']);
+    expect(result.nodeNullableStale).toBe(true);
+  });
+
+  it('names a parameter that accepts null in either document', () => {
+    const query = { name: 'q', in: 'query', schema: NULLABLE_STR };
+    const clean = document(shape([], {}));
+    const dirty = document(shape([], {}), [query]);
+
+    expect(diffRequestSchemaShapes(clean, dirty).nullableParameters).toEqual({
+      node: [],
+      java: ['post /x q'],
+    });
+    expect(diffRequestSchemaShapes(dirty, clean).nullableParameters).toEqual({
+      node: ['post /x q'],
+      java: [],
+    });
   });
 });

@@ -461,9 +461,126 @@ function diffOperationIds(nodeDocument, javaDocument) {
   return { matched, mismatches };
 }
 
+/**
+ * The request properties Node's document publishes as nullable, all of them: the date of
+ * birth and phone number on a user update, and the three settings overrides, which Node's
+ * handlers read `null` as an instruction for ("clear this"). Every other optional request
+ * property accepts `null` too (measured on both gateways), and Node's document does not
+ * say so. Held from BOTH sides: the set of Node's nullable request properties must be
+ * exactly this, so a Node document that starts saying more makes the record stale.
+ */
+const NODE_NULLABLE_REQUEST_PROPERTIES = [
+  'UpdateOrganizationSettingsDto.maxAttachmentBytesOverride',
+  'UpdateOrganizationSettingsDto.maxAttachmentsPerMessageOverride',
+  'UpdateOrganizationSettingsDto.maxDocumentBytesOverride',
+  'UpdateOwnProfileDto.dob',
+  'UpdateUserDto.dob',
+  'UpdateUserDto.phoneNumber',
+];
+
+/** Every parameter, in a document, whose schema accepts null: `[METHOD path name]`. */
+function nullableParameters(document) {
+  const found = [];
+  for (const [path, methods] of Object.entries(document.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      for (const parameter of operation.parameters || []) {
+        if (parameter.schema && acceptsNull(parameter.schema)) {
+          found.push(`${method} ${path} ${parameter.name}`);
+        }
+      }
+    }
+  }
+
+  return found.sort();
+}
+
+/**
+ * Compares, for every schema that ONLY requests reach and that both documents have, the
+ * `required` set, the property set, and what each property says about null; and what
+ * either document says about null for a URL parameter.
+ *
+ * <p>The two documents agree on required and on the property set, with no exception: a
+ * request field that is required in one and optional in the other changes what a client
+ * must send. On null the rule is Java's, because it is the measured one: an optional
+ * property accepts null (so it is nullable), a required one does not, and no parameter
+ * does (a query string cannot carry one). Node's document says "not nullable" for all but
+ * six, which is the named divergence held above, from both sides.
+ */
+function diffRequestSchemaShapes(nodeDocument, javaDocument) {
+  const nodeSchemas = nodeDocument.components.schemas;
+  const javaSchemas = javaDocument.components.schemas;
+  const node = reachableSchemas(nodeDocument);
+  const java = reachableSchemas(javaDocument);
+
+  const shared = [...node.request]
+    .filter(
+      (name) =>
+        javaSchemas[name] && java.request.has(name) && !java.response.has(name),
+    )
+    .filter((name) => !node.response.has(name))
+    .sort();
+  const mismatches = [];
+  const nodeNullable = [];
+  let properties = 0;
+
+  for (const name of shared) {
+    const nodeRequired = new Set(nodeSchemas[name].required || []);
+    const javaRequired = new Set(javaSchemas[name].required || []);
+    const nodeProperties = nodeSchemas[name].properties || {};
+    const javaProperties = javaSchemas[name].properties || {};
+
+    if ([...nodeRequired].sort().join() !== [...javaRequired].sort().join()) {
+      mismatches.push({ schema: name, kind: 'required set' });
+    }
+    if (
+      Object.keys(nodeProperties).sort().join() !==
+      Object.keys(javaProperties).sort().join()
+    ) {
+      mismatches.push({ schema: name, kind: 'property set' });
+      continue;
+    }
+
+    for (const key of Object.keys(javaProperties)) {
+      properties += 1;
+      const javaNull = acceptsNull(javaProperties[key]);
+      if (acceptsNull(nodeProperties[key])) nodeNullable.push(`${name}.${key}`);
+      if (javaRequired.has(key) && javaNull) {
+        mismatches.push({
+          schema: name,
+          property: key,
+          kind: 'required but nullable',
+        });
+      }
+      if (!javaRequired.has(key) && !javaNull) {
+        mismatches.push({
+          schema: name,
+          property: key,
+          kind: 'optional but not nullable',
+        });
+      }
+    }
+  }
+
+  nodeNullable.sort();
+
+  return {
+    schemas: shared.length,
+    properties,
+    mismatches,
+    nodeNullable,
+    nodeNullableStale:
+      nodeNullable.join() !== NODE_NULLABLE_REQUEST_PROPERTIES.join(),
+    nullableParameters: {
+      node: nullableParameters(nodeDocument),
+      java: nullableParameters(javaDocument),
+    },
+  };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
   diffSecurity,
+  diffRequestSchemaShapes,
   diffOperationIds,
   extractOperations,
   routeKey,
