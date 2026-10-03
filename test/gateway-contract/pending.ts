@@ -43,6 +43,18 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'messages) — the per-field text is already ruled loose; this ' +
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
+  'an explicit `null` clears the date of birth':
+    'Java reads an explicit null `dob` as absent, so a client clearing a date of ' +
+    'birth gets a silent no-op where Node asks the peer to clear it. The generated ' +
+    '`dob` is a plain nullable String (`openApiNullable` is off project-wide), so ' +
+    'null and absent are the same Java null; restoring it needs the request to say ' +
+    'whether the key was present',
+  'an explicit `null` clears the gender':
+    'the same as `dob`: an explicit null gender is read as absent on Java, and Node ' +
+    'asks the peer to clear it',
+  'an explicit `null` clears the tier':
+    'the same as `dob`, for the platform plan `aiModelTier`: Java reads null as ' +
+    'absent, and Node asks the peer to clear the tier',
   '**an explicit `dob: null` clears it**':
     '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
