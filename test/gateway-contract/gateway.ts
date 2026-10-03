@@ -45,6 +45,17 @@ export type Gateway = {
 };
 
 const READY_TIMEOUT_MS = 60_000;
+const LAUNCH_ATTEMPTS = 3;
+
+/**
+ * What a gateway prints when a port it was given is already taken: Spring's Tomcat, the
+ * Java realtime listener (netty-socketio), and Node's own `EADDRINUSE`.
+ */
+const PORT_TAKEN =
+  /was already in use|Address already in use|EADDRINUSE|SocketIO server start failed at port/u;
+
+/** A launch that failed only because a port was taken in the window `freePort` leaves. */
+class PortTaken extends Error {}
 const POLL_INTERVAL_MS = 200;
 
 /**
@@ -170,42 +181,53 @@ export async function startGateway(
   const impl = options.impl ?? process.env.GATEWAY_IMPL ?? 'node';
   assertBuilt(impl);
 
-  const port = await freePort();
-  const metricsPort = await freePort();
-  const wsPort = await freePort();
-  const { command, args } = commandFor(impl);
+  // A port is asked for and released, so another process can take it before the
+  // gateway binds it (see `freePort`). Rare when one suite runs alone, routine when
+  // several run at once, and the gateway then never becomes ready. So a launch that
+  // fails to BIND is retried with fresh ports; any other failure is not.
+  for (let attempt = 1; ; attempt += 1) {
+    const port = await freePort();
+    const metricsPort = await freePort();
+    const wsPort = await freePort();
+    const { command, args } = commandFor(impl);
 
-  const child = spawn(command, args, {
-    cwd: REPO_ROOT,
-    // Its own process group, so `kill(-pid)` reaches whatever it spawned.
-    detached: true,
-    env: environmentFor({
-      ...overrides,
-      PORT: String(port),
-      METRICS_PORT: String(metricsPort),
-      METRICS_HOST: '127.0.0.1',
-      // Node ignores this (its env schema allows unknown keys) — only the
-      // Java implementation's netty-socketio listener binds it.
-      WS_PORT: String(wsPort),
-    }),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+    const child = spawn(command, args, {
+      cwd: REPO_ROOT,
+      // Its own process group, so `kill(-pid)` reaches whatever it spawned.
+      detached: true,
+      env: environmentFor({
+        ...overrides,
+        PORT: String(port),
+        METRICS_PORT: String(metricsPort),
+        METRICS_HOST: '127.0.0.1',
+        // Node ignores this (its env schema allows unknown keys) — only the
+        // Java implementation's netty-socketio listener binds it.
+        WS_PORT: String(wsPort),
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 
-  const output: string[] = [];
-  child.stdout?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
-  child.stderr?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
+    const output: string[] = [];
+    child.stdout?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
+    child.stderr?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
 
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const gateway: Gateway = {
-    baseUrl,
-    wsUrl: impl === 'java' ? `http://127.0.0.1:${wsPort}` : baseUrl,
-    metricsUrl: `http://127.0.0.1:${metricsPort}`,
-    stop: () => stop(child),
-  };
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const gateway: Gateway = {
+      baseUrl,
+      wsUrl: impl === 'java' ? `http://127.0.0.1:${wsPort}` : baseUrl,
+      metricsUrl: `http://127.0.0.1:${metricsPort}`,
+      stop: () => stop(child),
+    };
 
-  await waitUntilReady(baseUrl, child, output, options.probe ?? 'ready');
+    try {
+      await waitUntilReady(baseUrl, child, output, options.probe ?? 'ready');
 
-  return gateway;
+      return gateway;
+    } catch (failure) {
+      if (failure instanceof PortTaken && attempt < LAUNCH_ATTEMPTS) continue;
+      throw failure;
+    }
+  }
 }
 
 async function waitUntilReady(
@@ -218,6 +240,12 @@ async function waitUntilReady(
   const deadline = Date.now() + READY_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
+    if (PORT_TAKEN.test(output.join(''))) {
+      await stop(child);
+      throw new PortTaken(
+        `A port the gateway was given was taken before it bound it:\n${output.join('')}`,
+      );
+    }
     if (child.exitCode !== null) {
       throw new Error(
         `The gateway exited with ${child.exitCode} before answering:\n${output.join('')}`,
