@@ -863,11 +863,15 @@ shipped without the gate and passed thirty-five rows that programmed its
 answer. A row that means to prove a lookup happens needs an id nothing else has
 warmed, and an assertion that the peer was called.
 
-**State a row writes is shared by every suite that reads it.** Not just cache
-keys — the values in them. A row that writes `FROZEN` into the shared status
-cache changes what later suites see, in the same way two rows sharing a
-fixture id share its cached entity. Dedicated ids are the fix in both
-directions.
+**State a row writes is shared by every suite that reads it — and so is state
+it spends.** Not just cache keys but the values in them, and not just values
+but quota. A row that writes `FROZEN` into the shared status cache changes what
+later suites see; two rows sharing a fixture id share its cached entity; and a
+row acting as a user that other suites also act as spends that user's rate
+limit, so a full run fails where a subset passes. **A fresh subject per row**
+is the fix for all three. Where a limit is keyed by address rather than
+subject, a row cannot vary it — say so in the spec's header rather than
+leaving the dependence unstated.
 
 **Which rows run for Java is read from one place.** Under
 `GATEWAY_IMPL=java` a row is skipped only when its title is named in

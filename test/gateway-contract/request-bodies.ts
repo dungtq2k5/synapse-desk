@@ -11,7 +11,13 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { REPO_ROOT } from './gateway';
+import { randomUUID } from 'node:crypto';
+import { sign } from 'jsonwebtoken';
+import { OrgStatus } from '@synapsedesk/common';
+import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
+import { Session } from './client';
+import { type Gateway, GATEWAY_ENV, REPO_ROOT } from './gateway';
+import { type Peers, TEST_KEYS } from './peers';
 
 type Schema = {
   $ref?: string;
@@ -153,8 +159,162 @@ export function jsonRequests(): JsonRequest[] {
   return found;
 }
 
+/** Whether the document has a component schema with this name. */
+export const hasSchema = (name: string): boolean =>
+  name in document.components.schemas;
+
+/** A property of a named component schema, as the document publishes it. */
+export function schemaProperty(
+  schema: string,
+  property: string,
+): Schema | undefined {
+  return document.components.schemas[schema]?.properties?.[property];
+}
+
 /** `{id}` and friends filled in: ids as a UUID, anything else (a token) as a plain string. */
 export const fillPath = (path: string): string =>
   path.replace(/\{(\w+)\}/gu, (_match, name: string) =>
     /^(id|\w+Id)$/u.test(name) ? ID : 'abc',
   );
+
+/** The object at `path` inside a body. */
+export function getAt(body: unknown, path: KeyPath): Record<string, unknown> {
+  let current = body as Record<string | number, unknown>;
+  for (const key of path)
+    current = current[key] as Record<string | number, unknown>;
+
+  return current;
+}
+
+/**
+ * Where, inside a request body, an object of the schema named `target` sits, through
+ * properties (required or not) and array items. A path through an OPTIONAL property
+ * needs its containers created first: see {@link bodyWith}.
+ */
+export function pathsTo(
+  raw: Schema,
+  target: string,
+  prefix: KeyPath = [],
+  depth = 0,
+): KeyPath[] {
+  if (depth > 6) return [];
+  if (raw.$ref?.split('/').pop() === target) return [prefix];
+
+  const schema = resolve(raw);
+  const found: KeyPath[] = [];
+  if (schema.type === 'object') {
+    for (const [key, value] of Object.entries(schema.properties ?? {})) {
+      found.push(...pathsTo(value, target, [...prefix, key], depth + 1));
+    }
+  } else if (schema.type === 'array') {
+    found.push(
+      ...pathsTo(schema.items ?? {}, target, [...prefix, 0], depth + 1),
+    );
+  }
+
+  return found;
+}
+
+/**
+ * A minimal body for `schema` with every container on `path` present, and the object
+ * at the end of the path. A property the minimal body leaves out (because it is
+ * optional) is added, built from its own schema, so a field nested inside one can be set.
+ */
+export function bodyWith(
+  schema: Schema,
+  path: KeyPath,
+): { body: unknown; target: Record<string, unknown> } {
+  const body = minimalValue(schema);
+  let current = body as Record<string | number, unknown>;
+  let here = resolve(schema);
+
+  for (const key of path) {
+    const child = typeof key === 'number' ? here.items : here.properties?.[key];
+    if (current[key] === undefined) current[key] = minimalValue(child ?? {});
+    current = current[key] as Record<string | number, unknown>;
+    here = resolve(child ?? {});
+  }
+
+  return { body, target: current };
+}
+
+const ORGANIZATION = 'a0490000-0000-4000-8000-000000000049';
+
+/** What one request did: its status, its error body, and every request it made of a peer. */
+export type Outcome = {
+  status: number;
+  body: unknown;
+  asked: { method: string; request: Record<string, unknown> }[];
+};
+
+/**
+ * Sends a request body as a caller who may do anything the contract lets anyone do
+ * (a super admin for `/platform/` routes, none for a public route, which refuses a
+ * caller already signed in), against a gateway whose organization is ACTIVE, and
+ * reports what the peers were then asked.
+ */
+export function bodySender(gateway: () => Gateway, peers: () => Peers) {
+  const cookie = (superAdmin: boolean, subject: string) => ({
+    cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
+      {
+        sub: subject,
+        organizationId: superAdmin ? null : ORGANIZATION,
+        isSuperAdmin: superAdmin,
+        departmentIds: [],
+        permissionCodes: PERMISSION_CODES,
+        isEmailVerified: true,
+      },
+      TEST_KEYS.access(),
+      { algorithm: 'RS256', expiresIn: '15m' },
+    )}`,
+    'idempotency-key': 'body-rows',
+  });
+
+  return async (
+    request: { method: string; path: string; public: boolean },
+    body: unknown,
+    subject: string = ID,
+  ): Promise<Outcome> => {
+    const fakes = peers();
+    fakes.reset();
+    fakes.auth.on('OrganizationService/GetOrganizationStatus').always({
+      status: toProtoOrgStatus(OrgStatus.ACTIVE),
+      deleted: false,
+    });
+    const response = await new Session(gateway().baseUrl).request(
+      request.method,
+      fillPath(request.path),
+      {
+        body,
+        headers: request.public
+          ? {}
+          : cookie(request.path.includes('/platform/'), subject),
+      },
+    );
+    const asked = [
+      fakes.auth,
+      fakes.ticket,
+      fakes.ingestion,
+      fakes.rag,
+      fakes.notification,
+    ]
+      .flatMap((peer) => peer.calls())
+      .filter(
+        (call) =>
+          !call.method.endsWith('JobHealth') &&
+          !call.method.endsWith('GetOrganizationStatus'),
+      )
+      .map((call) => ({ method: call.method, request: call.request }));
+
+    return { status: response.status, body: response.body, asked };
+  };
+}
+
+/**
+ * A caller no other row has been: the throttler counts an authenticated caller per
+ * USER (a public route, per address, which a row cannot vary), and the export routes
+ * allow 5 a minute, so rows that share one identity are refused with 429 as soon as
+ * another suite has used the budget. A row takes one subject and uses it for BOTH of
+ * its requests, so what a peer is asked can still be compared.
+ */
+export const freshSubject = (): string => randomUUID();

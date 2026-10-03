@@ -43,6 +43,16 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'messages) — the per-field text is already ruled loose; this ' +
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
+  'Java does not enforce this yet':
+    'the constraints Node enforces with class-validator decorators that the ' +
+    'published document does not describe, which Java forwards to the peer (and ' +
+    'nothing behind the gateway checks): password strength on register, reset and ' +
+    'change; the phone number format; the numeric OTP code; the pattern on an ' +
+    'organization slug and domain and on a Stripe id; and the ISO 8601 form of a ' +
+    'date of birth, an export range and a lock date (a malformed lock date also ' +
+    'answers 500), and that a lock date is in the future. 18 field and route pairs, ' +
+    'the exact set in unpublished-validators.contract-spec.ts; the other 7 run on ' +
+    'Java today',
   '**`changePlan` succeeds without an `Idempotency-Key` header**':
     'the published contract marks `idempotency-key` required on this route ' +
     '(no `@ApiHeader` names it in `billing.controller.ts` — this looks like ' +

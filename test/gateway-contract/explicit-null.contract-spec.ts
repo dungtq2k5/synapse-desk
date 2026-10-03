@@ -22,25 +22,18 @@
  * peer: otherwise it would compare two refusals and pass.
  */
 
-import { sign } from 'jsonwebtoken';
-import { OrgStatus } from '@synapsedesk/common';
-import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
-import { Session } from './client';
-import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
-import { type Peers, startPeers, TEST_KEYS } from './peers';
+import { type Gateway, startGateway } from './gateway';
+import { type Peers, startPeers } from './peers';
 import { rowFor } from './pending';
 import {
-  fillPath,
-  ID,
+  bodySender,
+  freshSubject,
   jsonRequests,
   minimalValue,
   optionalPaths,
-  PERMISSION_CODES,
   setAt,
 } from './request-bodies';
 import { readRunState } from './run-state';
-
-const ORGANIZATION = 'a0490000-0000-4000-8000-000000000049';
 
 /**
  * Fields where Node gives an explicit `null` a MEANING of its own, with what the
@@ -159,54 +152,20 @@ describe('an explicit null for an optional request field', () => {
     await peers.stop();
   });
 
-  const cookie = (superAdmin: boolean) => ({
-    cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
-      {
-        sub: ID,
-        organizationId: superAdmin ? null : ORGANIZATION,
-        isSuperAdmin: superAdmin,
-        departmentIds: [],
-        permissionCodes: PERMISSION_CODES,
-        isEmailVerified: true,
-      },
-      TEST_KEYS.access(),
-      { algorithm: 'RS256', expiresIn: '15m' },
-    )}`,
-    'idempotency-key': 'null-rows',
-  });
+  const sender = bodySender(
+    () => gateway,
+    () => peers,
+  );
 
-  /** What one request did: its status, and every request it made of a peer. */
-  const send = async (field: Field, body: unknown) => {
-    peers.reset();
-    peers.auth.on('OrganizationService/GetOrganizationStatus').always({
-      status: toProtoOrgStatus(OrgStatus.ACTIVE),
-      deleted: false,
-    });
-    const response = await new Session(gateway.baseUrl).request(
-      field.method,
-      fillPath(field.path),
-      {
-        body,
-        // A public route refuses a caller who is already signed in.
-        headers: field.public ? {} : cookie(field.path.includes('/platform/')),
-      },
-    );
-    const asked = [
-      peers.auth,
-      peers.ticket,
-      peers.ingestion,
-      peers.rag,
-      peers.notification,
-    ]
-      .flatMap((peer) => peer.calls())
-      .filter(
-        (call) =>
-          !call.method.endsWith('JobHealth') &&
-          !call.method.endsWith('GetOrganizationStatus'),
-      )
-      .map((call) => ({ method: call.method, request: call.request }));
+  /** What one request did: its status, its error body, and every request it made of a peer. */
+  const send = async (field: Field, body: unknown, subject: string) => {
+    const outcome = await sender(field, body, subject);
 
-    return { status: response.status, asked, error: response.body };
+    return {
+      status: outcome.status,
+      asked: outcome.asked,
+      error: outcome.body,
+    };
   };
 
   const bodies = (field: Field) => {
@@ -229,7 +188,9 @@ describe('an explicit null for an optional request field', () => {
       const field = fields.find((f) => f.key === key)!;
       const { absent, withNull } = bodies(field);
 
-      const before = await send(field, absent);
+      const subject = freshSubject();
+
+      const before = await send(field, absent, subject);
       // The row compares two ACCEPTED requests, or it would pass on two refusals.
       if (before.asked.length === 0) {
         throw new Error(
@@ -237,7 +198,7 @@ describe('an explicit null for an optional request field', () => {
         );
       }
 
-      const after = await send(field, withNull);
+      const after = await send(field, withNull, subject);
 
       expect({ status: after.status, asked: after.asked }).toEqual({
         status: before.status,
@@ -255,10 +216,12 @@ describe('an explicit null for an optional request field', () => {
         const field = fields.find((f) => f.key === key)!;
         const { absent, withNull } = bodies(field);
 
-        const before = await send(field, absent);
+        const subject = freshSubject();
+
+        const before = await send(field, absent, subject);
         expect(before.asked.length).toBeGreaterThan(0);
 
-        const after = await send(field, withNull);
+        const after = await send(field, withNull, subject);
 
         expect(after.asked.length).toBeGreaterThan(0);
         expect(after.asked[0].request).toMatchObject(meaning.asks);
