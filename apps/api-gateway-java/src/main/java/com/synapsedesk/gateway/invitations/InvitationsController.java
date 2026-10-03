@@ -10,7 +10,6 @@ import com.synapsedesk.gateway.auth.UserMapper;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.model.AcceptInvitationDto;
 import com.synapsedesk.gateway.model.CreateInvitationsDto;
 import com.synapsedesk.gateway.model.CreateInvitationsResponseDto;
@@ -25,6 +24,7 @@ import com.synapsedesk.gateway.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.security.RequireVerifiedEmail;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
 import com.synapsedesk.gateway.throttle.ThrottleOverride;
@@ -60,7 +60,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.Invitation.AcceptInvitationRequest;
@@ -132,6 +131,7 @@ public class InvitationsController {
   )
   @ApiErrors({ "400", "401", "403" })
   @ResponseStatus(HttpStatus.CREATED)
+  @RequireVerifiedEmail
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
   public ResponseEntity<
     ApiResponse<CreateInvitationsResponseDto>
@@ -139,7 +139,6 @@ public class InvitationsController {
     @Valid @RequestBody CreateInvitationsDto createInvitationsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-    requireEmailVerified(context);
 
     CreateInvitationsRequest wire = CreateInvitationsRequest.newBuilder()
       .setOrganizationId(context.organizationIdOrEmpty())
@@ -272,12 +271,12 @@ public class InvitationsController {
     ttlMs = RouteThrottle.INVITATION_RESEND_TTL_MS,
     limit = RouteThrottle.INVITATION_RESEND_LIMIT
   )
+  @RequireVerifiedEmail
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
   public ResponseEntity<
     ApiResponse<InvitationResponseDto>
   > invitationsControllerResendV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-    requireEmailVerified(context);
 
     InvitationResponse response = withMetadata(context).resendInvitation(
       InvitationIdRequest.newBuilder()
@@ -483,26 +482,6 @@ public class InvitationsController {
     return ResponseEntity.ok(
       ApiResponse.of(200, "OK", toInvitationResponseDto(response))
     );
-  }
-
-  /**
-   * `EmailVerifiedGuard`, reproduced — Java has no interceptor-layer
-   * equivalent yet, so this is a handler-body check, the same shape as
-   * {@code DepartmentsController}'s {@code includeDeleted} port. Stacked on
-   * {@code create} and {@code resend} only: both send mail on the tenant's
-   * behalf, and an unverified inviter could spray invitations from an
-   * unproven address. A Super Admin has no verification flow to have
-   * completed, so is exempt, matching Node.
-   */
-  private static void requireEmailVerified(RequestContext context) {
-    if (!context.isSuperAdmin() && !context.isEmailVerified()) {
-      throw GuardRefusal.refused(
-        new ResponseStatusException(
-          HttpStatus.FORBIDDEN,
-          "Verify your email address to use this feature."
-        )
-      );
-    }
   }
 
   private static InvitationStatus toInvitationStatus(

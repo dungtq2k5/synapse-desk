@@ -12,6 +12,7 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -47,6 +48,9 @@ class SessionInterceptorTest {
 
     @RouteSecurity(RouteSecurity.Scheme.SESSION_OR_CHALLENGE)
     public void either() {}
+
+    @RequireVerifiedEmail
+    public void sendsMail() {}
   }
 
   @SuperAdminOnly
@@ -140,6 +144,54 @@ class SessionInterceptorTest {
     interceptor.preHandle(request, response, handler("secured"));
 
     verify(superAdmin, never()).require(any());
+  }
+
+  private static RequestContext caller(boolean superAdmin, boolean verified) {
+    return new RequestContext(
+      "user-1",
+      superAdmin ? null : "org-1",
+      superAdmin,
+      List.of(),
+      List.of(),
+      verified,
+      "127.0.0.1",
+      "agent"
+    );
+  }
+
+  @Test
+  void anUnverifiedCallerIsRefusedWith403OnARouteThatNeedsAVerifiedEmail()
+    throws Exception {
+    when(currentUser.require(any())).thenReturn(caller(false, false));
+
+    assertThatThrownBy(() ->
+      interceptor.preHandle(request, response, handler("sendsMail"))
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("Verify your email address");
+  }
+
+  @Test
+  void aVerifiedCallerAndASuperAdminPassARouteThatNeedsAVerifiedEmail()
+    throws Exception {
+    when(currentUser.require(any())).thenReturn(caller(false, true));
+    assertThat(
+      interceptor.preHandle(request, response, handler("sendsMail"))
+    ).isTrue();
+
+    when(currentUser.require(any())).thenReturn(caller(true, false));
+    assertThat(
+      interceptor.preHandle(request, response, handler("sendsMail"))
+    ).isTrue();
+  }
+
+  @Test
+  void anUnverifiedCallerPassesARouteThatDoesNotAskForOne() throws Exception {
+    when(currentUser.require(any())).thenReturn(caller(false, false));
+
+    assertThat(
+      interceptor.preHandle(request, response, handler("secured"))
+    ).isTrue();
   }
 
   @Test

@@ -157,55 +157,24 @@ class InvitationsControllerTest {
   }
 
   @Test
-  void createRefusesAnUnverifiedEmailBeforeTouchingThePeer() {
-    when(currentUser.require(any())).thenReturn(
-      new RequestContext(
-        "agent-1",
-        "org-1",
-        false,
-        List.of(),
-        List.of("user.invite"),
-        false,
-        "127.0.0.1",
-        "test"
-      )
-    );
-
-    com.synapsedesk.gateway.model.CreateInvitationsDto dto =
-      new com.synapsedesk.gateway.model.CreateInvitationsDto();
-    dto.setInvitations(List.of());
-
-    assertThatThrownBy(() ->
-      controller.invitationsControllerCreateV1(dto)
-    ).isInstanceOf(ResponseStatusException.class);
-
-    verifyNoInteractions(stub);
-  }
-
-  @Test
-  void createAllowsASuperAdminWithNoEmailVerificationFlow() {
-    when(currentUser.require(any())).thenReturn(
-      new RequestContext(
-        "agent-1",
-        "org-1",
-        true,
-        List.of(),
-        List.of(),
-        false,
-        "127.0.0.1",
-        "test"
-      )
-    );
-    when(stub.createInvitations(any())).thenReturn(
-      synapsedesk.auth.Invitation.CreateInvitationsResponse.getDefaultInstance()
-    );
-
-    com.synapsedesk.gateway.model.CreateInvitationsDto dto =
-      new com.synapsedesk.gateway.model.CreateInvitationsDto();
-    dto.setInvitations(List.of());
-
-    controller.invitationsControllerCreateV1(dto);
-
-    verify(stub).createInvitations(any());
+  void createAndResendCarryTheVerifiedEmailMarker() {
+    // The mail-sending routes are the two Node puts `EmailVerifiedGuard` on. The marker is
+    // the declaration; `SessionInterceptor` is the mechanism and the contract rows hold it.
+    for (String name : List.of(
+      "invitationsControllerCreateV1",
+      "invitationsControllerResendV1"
+    )) {
+      assertThat(
+        java.util.Arrays.stream(
+          InvitationsController.class.getDeclaredMethods()
+        )
+          .filter(method -> method.getName().equals(name))
+          .allMatch(method ->
+            method.isAnnotationPresent(
+              com.synapsedesk.gateway.security.RequireVerifiedEmail.class
+            )
+          )
+      ).isTrue();
+    }
   }
 }

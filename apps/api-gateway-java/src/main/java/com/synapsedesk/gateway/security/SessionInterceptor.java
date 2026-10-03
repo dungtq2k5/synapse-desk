@@ -3,12 +3,15 @@ package com.synapsedesk.gateway.security;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
@@ -26,6 +29,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * {@link SuperAdminOnly} asks {@link SuperAdminCheck} right after the session, so a
  * tenant member is refused with 403 before the body is bound.
  *
+ * <p><b>A verified email, where Node asks for one.</b> A handler marked
+ * {@link RequireVerifiedEmail} is refused with 403 for an unverified caller (a super
+ * admin is exempt), here and so before the permission check, as Node's guards order it.
+ *
  * <p><b>Which routes.</b> The ones {@link RouteSecurity} is not on: the same
  * marker that publishes {@code security: []} or a special cookie, so a route is
  * published as secured exactly when this enforces it. The one marker that is still
@@ -37,6 +44,8 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class SessionInterceptor implements HandlerInterceptor {
 
   private static final String OURS = "com.synapsedesk.gateway";
+  private static final String VERIFY_EMAIL =
+    "Verify your email address to use this feature.";
 
   private final CurrentUser currentUser;
   private final TwoFactorEnrolmentGuard enrolment;
@@ -75,6 +84,15 @@ public class SessionInterceptor implements HandlerInterceptor {
         )
       ) {
         superAdmin.require(context);
+      }
+      if (
+        method.hasMethodAnnotation(RequireVerifiedEmail.class) &&
+        !context.isSuperAdmin() &&
+        !context.isEmailVerified()
+      ) {
+        throw GuardRefusal.refused(
+          new ResponseStatusException(HttpStatus.FORBIDDEN, VERIFY_EMAIL)
+        );
       }
     } else if (marker.value() == RouteSecurity.Scheme.SESSION_OR_CHALLENGE) {
       enrolment.require(request);

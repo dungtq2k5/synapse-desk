@@ -266,7 +266,7 @@ export type Outcome = {
  * reports what the peers were then asked.
  */
 export function bodySender(gateway: () => Gateway, peers: () => Peers) {
-  const cookie = (superAdmin: boolean, subject: string) => ({
+  const cookie = (superAdmin: boolean, subject: string, verified = true) => ({
     cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
       {
         sub: subject,
@@ -274,7 +274,7 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
         isSuperAdmin: superAdmin,
         departmentIds: [],
         permissionCodes: PERMISSION_CODES,
-        isEmailVerified: true,
+        isEmailVerified: verified,
       },
       TEST_KEYS.access(),
       { algorithm: 'RS256', expiresIn: '15m' },
@@ -289,6 +289,8 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
       public: boolean;
       /** Send as a tenant member even to a `/platform/` route, which is otherwise a super admin. */
       member?: boolean;
+      /** Send with an email address that is not verified. */
+      unverified?: boolean;
     },
     body: unknown,
     subject: string = ID,
@@ -309,6 +311,7 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
           : cookie(
               request.path.includes('/platform/') && !request.member,
               subject,
+              !request.unverified,
             ),
       },
     );
