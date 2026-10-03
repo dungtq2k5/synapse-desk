@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -54,6 +55,7 @@ public class AuthenticateTwoFactorDto {
    * @return rememberDevice
    */
 
+  @Schema(defaultValue = "false")
   @JsonProperty("rememberDevice")
   public Boolean getRememberDevice() {
     return rememberDevice;

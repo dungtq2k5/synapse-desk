@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -102,6 +103,7 @@ public class ReplaceDocumentDto {
    * @return ocrLanguages
    */
 
+  @Schema(defaultValue = "[]")
   @JsonProperty("ocrLanguages")
   public List<OcrLanguagesEnum> getOcrLanguages() {
     return ocrLanguages;

@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.synapsedesk.gateway.model.NewAttachmentDto;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -73,6 +74,7 @@ public class CreateMessageDto {
    * @return isInternalNote
    */
 
+  @Schema(defaultValue = "false")
   @JsonProperty("isInternalNote")
   public Boolean getIsInternalNote() {
     return isInternalNote;
@@ -93,6 +95,7 @@ public class CreateMessageDto {
    * @return invokeAi
    */
 
+  @Schema(defaultValue = "false")
   @JsonProperty("invokeAi")
   public Boolean getInvokeAi() {
     return invokeAi;
@@ -123,6 +126,7 @@ public class CreateMessageDto {
    * @return attachments
    */
   @Valid
+  @Schema(defaultValue = "[]")
   @JsonProperty("attachments")
   public List<@Valid NewAttachmentDto> getAttachments() {
     return attachments;

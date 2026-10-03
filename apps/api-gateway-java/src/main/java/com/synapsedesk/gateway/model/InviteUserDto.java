@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -57,6 +58,7 @@ public class InviteUserDto {
    * @return roleIds
    */
   @Valid
+  @Schema(defaultValue = "[]")
   @JsonProperty("roleIds")
   public List<UUID> getRoleIds() {
     return roleIds;
@@ -85,6 +87,7 @@ public class InviteUserDto {
    * @return departmentIds
    */
   @Valid
+  @Schema(defaultValue = "[]")
   @JsonProperty("departmentIds")
   public List<UUID> getDepartmentIds() {
     return departmentIds;

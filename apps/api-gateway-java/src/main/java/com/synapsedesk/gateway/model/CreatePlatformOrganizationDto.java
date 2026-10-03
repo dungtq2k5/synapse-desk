@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -79,6 +80,7 @@ public class CreatePlatformOrganizationDto {
    * @return allowedEmailDomains
    */
 
+  @Schema(defaultValue = "[]")
   @JsonProperty("allowedEmailDomains")
   public List<String> getAllowedEmailDomains() {
     return allowedEmailDomains;

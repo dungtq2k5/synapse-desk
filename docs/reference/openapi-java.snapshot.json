@@ -55244,6 +55244,7 @@
         "properties": {
           "roleIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55251,6 +55252,7 @@
           },
           "departmentIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55477,6 +55479,7 @@
         "properties": {
           "roleIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55484,6 +55487,7 @@
           },
           "departmentIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55656,6 +55660,7 @@
         "properties": {
           "roleIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "maxLength": 64
@@ -55663,6 +55668,7 @@
           },
           "departmentIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "maxLength": 64
@@ -55963,13 +55969,16 @@
             "minLength": 1
           },
           "isInternalNote": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": false
           },
           "invokeAi": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": false
           },
           "attachments": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "$ref": "#/components/schemas/NewAttachmentDto"
             }
@@ -57129,10 +57138,12 @@
         "type": "object",
         "properties": {
           "isActive": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": true
           },
           "prices": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "$ref": "#/components/schemas/CreatePlanPriceDto"
             }
@@ -57436,6 +57447,7 @@
         "properties": {
           "allowedEmailDomains": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string"
             }
@@ -57832,6 +57844,7 @@
         "properties": {
           "ids": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -58003,11 +58016,13 @@
         "properties": {
           "limit": {
             "type": ["number", "null"],
+            "default": 0,
             "maximum": 50,
             "minimum": 0
           },
           "skipRerank": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": false
           },
           "query": {
             "type": "string",
@@ -58228,6 +58243,7 @@
         "properties": {
           "ocrLanguages": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
@@ -58415,10 +58431,12 @@
         "type": "object",
         "properties": {
           "isOrganizationWide": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": true
           },
           "departmentIds": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "format": "uuid"
@@ -58426,6 +58444,7 @@
           },
           "ocrLanguages": {
             "type": ["array", "null"],
+            "default": [],
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
@@ -58531,7 +58550,8 @@
         "type": "object",
         "properties": {
           "isPrimary": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": false
           },
           "userIds": {
             "type": "array",
@@ -59209,7 +59229,8 @@
             "minLength": 1
           },
           "rememberDevice": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "default": false
           },
           "code": {
             "type": ["string", "null"],

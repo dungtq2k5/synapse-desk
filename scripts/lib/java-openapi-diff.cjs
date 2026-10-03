@@ -577,9 +577,72 @@ function diffRequestSchemaShapes(nodeDocument, javaDocument) {
   };
 }
 
+/**
+ * Compares the `default` of every property in a schema both documents have, and of every
+ * parameter they share: an EQUALITY, with no exception, in BOTH directions. A default the
+ * committed document gives and Java does not leaves a client believing that leaving a
+ * field out and sending the default differ; a default Java invents is a claim nothing
+ * holds. The behaviour behind each published default is held by the request-defaults
+ * contract rows (the field absent and the field sent as its default are the same request).
+ */
+function diffDefaults(nodeDocument, javaDocument) {
+  const mismatches = [];
+  let compared = 0;
+  let published = 0;
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  for (const [name, nodeSchema] of Object.entries(
+    nodeDocument.components.schemas,
+  )) {
+    const javaSchema = javaDocument.components.schemas[name];
+    if (!javaSchema) continue;
+    const nodeProperties = nodeSchema.properties || {};
+    const javaProperties = javaSchema.properties || {};
+
+    for (const key of Object.keys(nodeProperties)) {
+      if (!(key in javaProperties)) continue;
+      compared += 1;
+      const node = nodeProperties[key].default;
+      const java = javaProperties[key].default;
+      if (node !== undefined) published += 1;
+      if (!same(node, java)) {
+        mismatches.push({ where: `${name}.${key}`, node, java });
+      }
+    }
+  }
+
+  for (const [path, methods] of Object.entries(nodeDocument.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const javaOperation = ((javaDocument.paths || {})[path] || {})[method];
+      if (!javaOperation) continue;
+      for (const parameter of operation.parameters || []) {
+        const match = (javaOperation.parameters || []).find(
+          (candidate) =>
+            candidate.name === parameter.name && candidate.in === parameter.in,
+        );
+        if (!match) continue;
+        compared += 1;
+        const node = (parameter.schema || {}).default;
+        const java = (match.schema || {}).default;
+        if (node !== undefined) published += 1;
+        if (!same(node, java)) {
+          mismatches.push({
+            where: `${method} ${path} ${parameter.name}`,
+            node,
+            java,
+          });
+        }
+      }
+    }
+  }
+
+  return { compared, published, mismatches };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
   diffSecurity,
+  diffDefaults,
   diffRequestSchemaShapes,
   diffOperationIds,
   extractOperations,

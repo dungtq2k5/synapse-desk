@@ -2,6 +2,7 @@ import {
   checkKnownDivergences,
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
+  diffDefaults,
   diffOperationIds,
   diffRequestSchemaShapes,
   diffSecurity,
@@ -693,5 +694,60 @@ describe('diffRequestSchemaShapes', () => {
       node: ['post /x q'],
       java: [],
     });
+  });
+});
+
+describe('diffDefaults', () => {
+  const document = (
+    properties: Record<string, unknown>,
+    parameters: unknown[] = [],
+  ) => ({
+    paths: { '/x': { get: { parameters } } },
+    components: { schemas: { Dto: { type: 'object', properties } } },
+  });
+
+  it('agrees when both publish the same default, or neither does', () => {
+    const node = document({ a: { type: 'boolean', default: false }, b: {} });
+    const java = document({ a: { type: 'boolean', default: false }, b: {} });
+
+    const result = diffDefaults(node, java);
+
+    expect(result.mismatches).toEqual([]);
+    expect(result.published).toBe(1);
+    expect(result.compared).toBe(2);
+  });
+
+  it('names a default Java does not publish, and one it invents', () => {
+    const published = document({ a: { type: 'boolean', default: false } });
+    const silent = document({ a: { type: 'boolean' } });
+
+    expect(diffDefaults(published, silent).mismatches).toEqual([
+      { where: 'Dto.a', node: false, java: undefined },
+    ]);
+    expect(diffDefaults(silent, published).mismatches).toEqual([
+      { where: 'Dto.a', node: undefined, java: false },
+    ]);
+  });
+
+  it('tells false from absent, and a list from an empty list', () => {
+    expect(
+      diffDefaults(document({ a: { default: false } }), document({ a: {} }))
+        .mismatches,
+    ).toHaveLength(1);
+    expect(
+      diffDefaults(
+        document({ a: { default: [] } }),
+        document({ a: { default: [1] } }),
+      ).mismatches,
+    ).toHaveLength(1);
+  });
+
+  it('compares a parameter default too', () => {
+    const withDefault = [{ name: 'q', in: 'query', schema: { default: 1 } }];
+    const without = [{ name: 'q', in: 'query', schema: {} }];
+
+    expect(
+      diffDefaults(document({}, withDefault), document({}, without)).mismatches,
+    ).toEqual([{ where: 'get /x q', node: 1, java: undefined }]);
   });
 });

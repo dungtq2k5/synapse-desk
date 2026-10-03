@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -48,6 +49,7 @@ public class KnowledgeSearchDto {
   @Valid
   @DecimalMin(value = "0")
   @DecimalMax(value = "50")
+  @Schema(defaultValue = "0")
   @JsonProperty("limit")
   public BigDecimal getLimit() {
     return limit;
@@ -68,6 +70,7 @@ public class KnowledgeSearchDto {
    * @return skipRerank
    */
 
+  @Schema(defaultValue = "false")
   @JsonProperty("skipRerank")
   public Boolean getSkipRerank() {
     return skipRerank;

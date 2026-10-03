@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.synapsedesk.gateway.model.CreatePlanPriceDto;
 import com.synapsedesk.gateway.validation.Matches;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -121,6 +122,7 @@ public class CreatePlanDto {
    * @return isActive
    */
 
+  @Schema(defaultValue = "true")
   @JsonProperty("isActive")
   public Boolean getIsActive() {
     return isActive;
@@ -149,6 +151,7 @@ public class CreatePlanDto {
    * @return prices
    */
   @Valid
+  @Schema(defaultValue = "[]")
   @JsonProperty("prices")
   public List<@Valid CreatePlanPriceDto> getPrices() {
     return prices;

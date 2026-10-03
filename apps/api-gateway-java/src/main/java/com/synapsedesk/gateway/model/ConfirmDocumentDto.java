@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -102,6 +103,7 @@ public class ConfirmDocumentDto {
    * @return isOrganizationWide
    */
 
+  @Schema(defaultValue = "true")
   @JsonProperty("isOrganizationWide")
   public Boolean getIsOrganizationWide() {
     return isOrganizationWide;
@@ -130,6 +132,7 @@ public class ConfirmDocumentDto {
    * @return departmentIds
    */
   @Valid
+  @Schema(defaultValue = "[]")
   @JsonProperty("departmentIds")
   public List<UUID> getDepartmentIds() {
     return departmentIds;
@@ -160,6 +163,7 @@ public class ConfirmDocumentDto {
    * @return ocrLanguages
    */
 
+  @Schema(defaultValue = "[]")
   @JsonProperty("ocrLanguages")
   public List<OcrLanguagesEnum> getOcrLanguages() {
     return ocrLanguages;

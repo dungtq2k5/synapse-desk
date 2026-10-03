@@ -37,6 +37,7 @@ import {
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
   diffSecurity,
+  diffDefaults,
   diffOperationIds,
   diffRequestSchemaShapes,
 } from './lib/java-openapi-diff.cjs';
@@ -219,8 +220,23 @@ try {
     }
   }
 
+  const defaults = diffDefaults(nodeDocument, javaDocument);
+
+  if (defaults.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${defaults.mismatches.length} property or parameter default(s) differ:`,
+    );
+    for (const row of defaults.mismatches.slice(0, 40)) {
+      console.error(`  ${row.where}: ${JSON.stringify(row)}`);
+    }
+  }
+
   if (!failed) {
     console.log(`${ids.matched} operations publish the same operationId.`);
+    console.log(
+      `${defaults.compared} properties and parameters agree on their default, ${defaults.published} of them with one.`,
+    );
     console.log(
       `${requests.properties} request properties in ${requests.schemas} schemas agree on required and property set, and every optional one is nullable in Java (Node: ${requests.nodeNullable.length} of them, the named divergence); no parameter accepts null in either document.`,
     );
