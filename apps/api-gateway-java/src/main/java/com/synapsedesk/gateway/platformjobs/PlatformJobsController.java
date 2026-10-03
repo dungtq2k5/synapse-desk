@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.model.JobHealthResponseDto;
 import com.synapsedesk.gateway.model.JobRunResultResponseDto;
 import com.synapsedesk.gateway.model.JobRunStatusResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.security.SuperAdminOnly;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
@@ -72,7 +73,8 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  */
 @Tag(name = "Platform Jobs")
 @RestController
-// Refused to anyone but a super admin, whom the gate exempts, so the gate never decides here. Node's guard refuses first; this check runs in the handler, after the gate, so the route is exempt outright.
+// Refused to anyone but a super admin, as Node's guard does and before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
+@SuperAdminOnly
 @OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)
 @Validated

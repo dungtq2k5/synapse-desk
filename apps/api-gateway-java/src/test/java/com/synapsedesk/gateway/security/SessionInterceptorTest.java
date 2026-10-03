@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -27,9 +28,11 @@ class SessionInterceptorTest {
   private final TwoFactorEnrolmentGuard enrolment = mock(
     TwoFactorEnrolmentGuard.class
   );
+  private final SuperAdminCheck superAdmin = mock(SuperAdminCheck.class);
   private final SessionInterceptor interceptor = new SessionInterceptor(
     currentUser,
-    enrolment
+    enrolment,
+    superAdmin
   );
   private final MockHttpServletRequest request = new MockHttpServletRequest();
   private final MockHttpServletResponse response =
@@ -44,6 +47,12 @@ class SessionInterceptorTest {
 
     @RouteSecurity(RouteSecurity.Scheme.SESSION_OR_CHALLENGE)
     public void either() {}
+  }
+
+  @SuperAdminOnly
+  static class PlatformHandlers {
+
+    public void secured() {}
   }
 
   private HandlerMethod handler(String name) throws Exception {
@@ -103,6 +112,34 @@ class SessionInterceptorTest {
     assertThatThrownBy(() ->
       interceptor.preHandle(request, response, handler("either"))
     ).isInstanceOf(ResponseStatusException.class);
+  }
+
+  @Test
+  void aSuperAdminOnlyControllerAsksTheSuperAdminCheckAfterTheSession()
+    throws Exception {
+    RequestContext context = mock(RequestContext.class);
+    when(currentUser.require(any())).thenReturn(context);
+
+    assertThat(
+      interceptor.preHandle(
+        request,
+        response,
+        new HandlerMethod(
+          new PlatformHandlers(),
+          PlatformHandlers.class.getMethod("secured")
+        )
+      )
+    ).isTrue();
+    verify(superAdmin).require(context);
+  }
+
+  @Test
+  void anOrdinaryControllerIsNotAskedForSuperAdmin() throws Exception {
+    when(currentUser.require(any())).thenReturn(mock(RequestContext.class));
+
+    interceptor.preHandle(request, response, handler("secured"));
+
+    verify(superAdmin, never()).require(any());
   }
 
   @Test

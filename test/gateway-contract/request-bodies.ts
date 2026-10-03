@@ -283,7 +283,13 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
   });
 
   return async (
-    request: { method: string; path: string; public: boolean },
+    request: {
+      method: string;
+      path: string;
+      public: boolean;
+      /** Send as a tenant member even to a `/platform/` route, which is otherwise a super admin. */
+      member?: boolean;
+    },
     body: unknown,
     subject: string = ID,
   ): Promise<Outcome> => {
@@ -300,7 +306,10 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
         body,
         headers: request.public
           ? {}
-          : cookie(request.path.includes('/platform/'), subject),
+          : cookie(
+              request.path.includes('/platform/') && !request.member,
+              subject,
+            ),
       },
     );
     const asked = [

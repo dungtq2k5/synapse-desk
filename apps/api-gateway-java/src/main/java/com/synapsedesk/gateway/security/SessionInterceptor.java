@@ -1,9 +1,12 @@
 package com.synapsedesk.gateway.security;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
+import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -19,6 +22,10 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * without this an anonymous caller got a 400 on 28 of the 80 secured routes that
  * take a body, and a validation message for a route they cannot use.
  *
+ * <p><b>A super admin's surface is held here too.</b> A controller marked
+ * {@link SuperAdminOnly} asks {@link SuperAdminCheck} right after the session, so a
+ * tenant member is refused with 403 before the body is bound.
+ *
  * <p><b>Which routes.</b> The ones {@link RouteSecurity} is not on: the same
  * marker that publishes {@code security: []} or a special cookie, so a route is
  * published as secured exactly when this enforces it. The one marker that is still
@@ -33,13 +40,16 @@ public class SessionInterceptor implements HandlerInterceptor {
 
   private final CurrentUser currentUser;
   private final TwoFactorEnrolmentGuard enrolment;
+  private final SuperAdminCheck superAdmin;
 
   public SessionInterceptor(
     CurrentUser currentUser,
-    TwoFactorEnrolmentGuard enrolment
+    TwoFactorEnrolmentGuard enrolment,
+    SuperAdminCheck superAdmin
   ) {
     this.currentUser = currentUser;
     this.enrolment = enrolment;
+    this.superAdmin = superAdmin;
   }
 
   @Override
@@ -57,7 +67,15 @@ public class SessionInterceptor implements HandlerInterceptor {
 
     RouteSecurity marker = method.getMethodAnnotation(RouteSecurity.class);
     if (marker == null) {
-      currentUser.require(request);
+      RequestContext context = currentUser.require(request);
+      if (
+        AnnotatedElementUtils.hasAnnotation(
+          method.getBeanType(),
+          SuperAdminOnly.class
+        )
+      ) {
+        superAdmin.require(context);
+      }
     } else if (marker.value() == RouteSecurity.Scheme.SESSION_OR_CHALLENGE) {
       enrolment.require(request);
     }
