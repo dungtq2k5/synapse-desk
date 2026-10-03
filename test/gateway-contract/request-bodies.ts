@@ -32,8 +32,16 @@ type Schema = {
   properties?: Record<string, Schema>;
 };
 
+type Parameter = {
+  name: string;
+  in: string;
+  required?: boolean;
+  schema?: Schema;
+};
+
 type Operation = {
-  security?: unknown[];
+  security?: Record<string, unknown>[];
+  parameters?: Parameter[];
   requestBody?: { content?: Record<string, { schema?: Schema }> };
 };
 
@@ -173,9 +181,13 @@ export function schemaProperty(
 
 /** `{id}` and friends filled in: ids as a UUID, anything else (a token) as a plain string. */
 export const fillPath = (path: string): string =>
-  path.replace(/\{(\w+)\}/gu, (_match, name: string) =>
-    /^(id|\w+Id)$/u.test(name) ? ID : 'abc',
-  );
+  path.replace(/\{(\w+)\}/gu, (_match, name: string) => {
+    if (/^(id|\w+Id)$/u.test(name)) return ID;
+    // The document types a few path variables as numbers (a ticket number).
+    if (/number$/iu.test(name)) return '1';
+
+    return 'abc';
+  });
 
 /** The object at `path` inside a body. */
 export function getAt(body: unknown, path: KeyPath): Record<string, unknown> {
@@ -318,3 +330,50 @@ export function bodySender(gateway: () => Gateway, peers: () => Peers) {
  * its requests, so what a peer is asked can still be compared.
  */
 export const freshSubject = (): string => randomUUID();
+
+/** Every operation in the document, with what it needs to be called validly. */
+export type AnyOperation = {
+  method: string;
+  path: string;
+  /** The JSON body schema, when the route takes one. */
+  body: Schema | undefined;
+  /** The security the document declares: `undefined` when it says nothing, `[]` when public. */
+  security: string[] | undefined;
+  /** The query string that satisfies every REQUIRED query parameter. */
+  query: string;
+};
+
+const QUERY_VALUE: Record<string, string> = {
+  from: '2026-01-01',
+  to: '2026-01-31',
+};
+
+export function allOperations(): AnyOperation[] {
+  const found: AnyOperation[] = [];
+  for (const [path, methods] of Object.entries(document.paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const required = (operation.parameters ?? []).filter(
+        (parameter) => parameter.in === 'query' && parameter.required,
+      );
+      found.push({
+        method: method.toUpperCase(),
+        path,
+        body: operation.requestBody?.content?.['application/json']?.schema,
+        security: operation.security?.flatMap((entry) => Object.keys(entry)),
+        query: required
+          .map((parameter) => {
+            const first = parameter.schema?.enum?.[0];
+
+            return `${parameter.name}=${
+              typeof first === 'string'
+                ? first
+                : (QUERY_VALUE[parameter.name] ?? 'x')
+            }`;
+          })
+          .join('&'),
+      });
+    }
+  }
+
+  return found;
+}
