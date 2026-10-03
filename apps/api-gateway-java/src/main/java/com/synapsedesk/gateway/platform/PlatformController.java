@@ -25,6 +25,7 @@ import com.synapsedesk.gateway.model.SubscriptionPlanResponseDto;
 import com.synapsedesk.gateway.model.UpdatePlanDto;
 import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.validation.Matches;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.OrganizationSortField;
@@ -400,8 +401,14 @@ public class PlatformController {
   public ResponseEntity<
     ApiResponse<BillingEventsResponseDto>
   > platformControllerListBillingEventsV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to
+    @NotNull @Matches(regex = "^\\d{4}-\\d{2}-\\d{2}$") @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @Matches(regex = "^\\d{4}-\\d{2}-\\d{2}$") @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to
   ) {
     return usersRolesFinance.listBillingEvents(context(), from, to);
   }

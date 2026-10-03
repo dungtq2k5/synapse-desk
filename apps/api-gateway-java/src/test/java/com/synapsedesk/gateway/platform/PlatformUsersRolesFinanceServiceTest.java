@@ -116,13 +116,6 @@ class PlatformUsersRolesFinanceServiceTest {
   }
 
   @Test
-  void listBillingEventsRefusesAMalformedDate() {
-    assertThatThrownBy(() ->
-      service.listBillingEvents(context(), "not-a-date", "2026-01-31")
-    ).isInstanceOf(ResponseStatusException.class);
-  }
-
-  @Test
   void aDegradedRevenueSectionKeepsExcludesButNullsEverythingElse() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     FinanceSnapshotResponse response = FinanceSnapshotResponse.newBuilder()

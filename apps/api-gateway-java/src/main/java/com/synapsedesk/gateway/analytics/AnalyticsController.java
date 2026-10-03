@@ -32,6 +32,7 @@ import com.synapsedesk.gateway.model.VolumePointResponseDto;
 import com.synapsedesk.gateway.model.VolumeResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.validation.StrictIso8601;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.Granularity;
@@ -194,8 +195,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<OverviewResponseDto>
   > analyticsControllerOverviewV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -232,8 +239,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<DeflectionResponseDto>
   > analyticsControllerDeflectionV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -270,8 +283,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<ResponseTimesResponseDto>
   > analyticsControllerResponseTimesV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -305,8 +324,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<VolumeResponseDto>
   > analyticsControllerVolumeV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -343,8 +368,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<SatisfactionResponseDto>
   > analyticsControllerSatisfactionV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -378,8 +409,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<AiUsageResponseDto>
   > analyticsControllerAiUsageV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -477,8 +514,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<AgentAnalyticsResponseDto>
   > analyticsControllerAgentsV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @Valid @RequestParam(
       value = "departmentId",
       required = false
@@ -597,8 +640,14 @@ public class AnalyticsController {
   public ResponseEntity<
     ApiResponse<KnowledgeGapsResponseDto>
   > analyticsControllerKnowledgeGapsV1(
-    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
-    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "from",
+      required = true
+    ) String from,
+    @NotNull @StrictIso8601 @Valid @RequestParam(
+      value = "to",
+      required = true
+    ) String to,
     @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
       value = "limit",
       required = false,

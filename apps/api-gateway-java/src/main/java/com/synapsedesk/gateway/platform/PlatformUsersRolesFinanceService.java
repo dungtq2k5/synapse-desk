@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.platform;
 
-import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
@@ -64,12 +63,12 @@ import synapsedesk.auth.Role.RoleResponse;
  * carry. Reproduced exactly rather than "fixed", since the wire contract —
  * not the REST query shape — is the actual constraint.
  *
- * <p><b>{@code from}/{@code to} on {@code listBillingEvents}</b> carry no
- * ISO-8601 format constraint in the generated interface — same missing-
- * validation family as {@code PlatformJobsApi}'s {@code BackfillJobDto} —
- * checked via {@link com.synapsedesk.gateway.auth.IsoDateCheck}. Unlike
- * backfill, Node does NOT check {@code from > to} at the gateway (the
- * day-count ceiling is enforced in auth-service), so neither does this.
+ * <p><b>{@code from}/{@code to} on {@code listBillingEvents}</b> are checked at the
+ * edge, on the controller's parameters, by Node's own rule: a {@code YYYY-MM-DD}
+ * SHAPE and nothing more, so a date that does not exist ({@code 2026-02-30}) passes
+ * through to auth-service, as it does there. Unlike backfill, Node does NOT check
+ * {@code from > to} at the gateway (the day-count ceiling is enforced in
+ * auth-service), so neither does this.
  */
 @Component
 public class PlatformUsersRolesFinanceService {
@@ -239,9 +238,6 @@ public class PlatformUsersRolesFinanceService {
     ApiResponse<BillingEventsResponseDto>
   > listBillingEvents(RequestContext context, String from, String to) {
     superAdminCheck.require(context);
-
-    IsoDateCheck.requireIsoDate(from, "from");
-    IsoDateCheck.requireIsoDate(to, "to");
 
     ListBillingEventsResponse response = withMetadata(
       context
