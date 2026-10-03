@@ -8,7 +8,7 @@ import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.Objects;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * CheckoutSessionResponseDto

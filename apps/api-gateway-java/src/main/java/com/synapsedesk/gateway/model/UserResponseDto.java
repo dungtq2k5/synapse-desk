@@ -12,8 +12,8 @@ import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.Objects;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.lang.Nullable;
 
 /**
  * UserResponseDto
