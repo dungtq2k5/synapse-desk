@@ -17,10 +17,19 @@
  * after ONE build. Each starts its own Redis and NATS and its gateways take ephemeral
  * ports, which `test/gateway-contract/jest.config.ts` says concurrent invocations are
  * built for. Measured on the Java arm: 1263 s serial, 383 s as 6 shards and 390 s as
- * 5, with identical counts. A shard runs its files in the same relative order as the
- * serial run, so sharding can only SEPARATE rows that shared state, never put new ones
- * together: a row that passes only because its polluter moved to another shard is the
- * risk, and the serial run stays the oracle for anything arrangement-dependent.
+ * 5, with identical counts.
+ *
+ * **Separate in data, concurrent in time.** A shard keeps its files in the serial
+ * order and has its own Redis and NATS, so no row gains a neighbour in the DATA it
+ * did not have before; one can lose one (a row that passed only because its polluter
+ * ran first now passes for another reason). But the shards run at the same MOMENT on
+ * everything they still share: the host's ports, CPU timing, the built jar, the Docker
+ * daemon, any file a row writes. A row that relies on running before or after another
+ * against any of those now races where it used to queue. The port race below and the
+ * jar rewrite in the next paragraph are two measured instances; each shard draws its
+ * ports from its own block (`CONTRACT_SHARD`, see `gateway.ts`), so ports are no longer
+ * shared. The serial run stays
+ * the oracle for anything that depends on arrangement or timing.
  *
  * **The two arms must not overlap while one of them builds.** The Node arm's
  * cross-implementation cache row boots the Java jar too, and the Java arm's build
@@ -29,6 +38,8 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import { createWriteStream, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -74,13 +85,17 @@ const ENV = { ...process.env, GATEWAY_IMPL: IMPL };
 
 if (SHARDS > 1) {
   // Each shard's output is printed as one block when it ends: interleaved lines from N
-  // concurrent jest processes are unreadable.
+  // concurrent jest processes are unreadable. It is ALSO written to a file as it
+  // arrives, so a shard that hangs leaves its evidence behind instead of nothing.
+  const logs = mkdtempSync(join(tmpdir(), 'contract-shards-'));
+  console.log(`shard logs: ${logs}`);
   const results = await Promise.all(
     Array.from(
       { length: SHARDS },
       (_, index) =>
         new Promise((resolve) => {
           const output = [];
+          const log = createWriteStream(join(logs, `shard-${index + 1}.log`));
           const child = spawn(
             'npx', // NOSONAR
             [
@@ -88,14 +103,19 @@ if (SHARDS > 1) {
               `--shard=${index + 1}/${SHARDS}`,
               ...process.argv.slice(2),
             ],
-            { cwd: ROOT, env: ENV },
+            { cwd: ROOT, env: { ...ENV, CONTRACT_SHARD: String(index + 1) } },
           );
-          child.stdout.on('data', (chunk) => output.push(chunk));
-          child.stderr.on('data', (chunk) => output.push(chunk));
+          const keep = (chunk) => {
+            output.push(chunk);
+            log.write(chunk);
+          };
+          child.stdout.on('data', keep);
+          child.stderr.on('data', keep);
           child.on('close', (code) => {
             process.stdout.write(
               `\n===== shard ${index + 1}/${SHARDS} =====\n${Buffer.concat(output)}`,
             );
+            log.end();
             resolve(code ?? 1);
           });
         }),

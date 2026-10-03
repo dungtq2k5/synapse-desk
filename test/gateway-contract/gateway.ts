@@ -55,8 +55,42 @@ const PORT_TAKEN =
   /was already in use|Address already in use|EADDRINUSE|SocketIO server start failed at port/u;
 
 /** A launch that failed only because a port was taken in the window `freePort` leaves. */
-class PortTaken extends Error {}
+class PortTaken extends Error {
+  constructor(
+    message: string,
+    /** Everything the failed launch printed, kept so a retry does not lose the evidence. */
+    readonly output: string,
+  ) {
+    super(message);
+  }
+}
 const POLL_INTERVAL_MS = 200;
+const POLL_TIMEOUT_MS = 2_000;
+
+/**
+ * Where a SHARD's ports come from: its own block of 1000, below the OS's ephemeral range
+ * (32768 and up on Linux), so two shards running at once can never be handed the same
+ * port and neither can an outgoing connection. Without it, two shards each asked the OS
+ * for a free port, released it, and could both be given it: one gateway bound it, and the
+ * other shard's harness then polled it and could take the OTHER shard's gateway for its
+ * own. Set by `scripts/run-contract-suite.mjs` for each shard (`CONTRACT_SHARD=k`).
+ */
+const SHARD = Number(process.env.CONTRACT_SHARD ?? 0);
+const SHARD_PORT_BASE = 20_000 + (SHARD - 1) * 1_000;
+// A random start, so consecutive runs do not hand out the ports the last one just
+// closed: a port still in TIME_WAIT passes the free-port probe (which binds with
+// address reuse) and then fails a listener that binds without it (measured: netty's
+// realtime listener, on the first ports of a shard's block, one run after another).
+let shardPortCursor = Math.floor(Math.random() * 1_000);
+
+/** Whether nothing is listening on `port` now. */
+function isFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => server.close(() => resolve(true)));
+  });
+}
 
 /**
  * A port nothing is listening on, from the OS.
@@ -66,7 +100,18 @@ const POLL_INTERVAL_MS = 200;
  * — would mean parsing its log line, which is a contract this harness must not
  * depend on and which the Java implementation would not share.
  */
-function freePort(): Promise<number> {
+async function freePort(): Promise<number> {
+  if (SHARD > 0) {
+    // Never the same port twice in one invocation, and the next free one in the block.
+    for (let tried = 0; tried < 1_000; tried += 1) {
+      const port = SHARD_PORT_BASE + (shardPortCursor++ % 1_000);
+      if (await isFree(port)) return port;
+    }
+    throw new Error(
+      `No free port in shard ${SHARD}'s block from ${SHARD_PORT_BASE}`,
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const server = createServer();
     server.on('error', reject);
@@ -224,7 +269,17 @@ export async function startGateway(
 
       return gateway;
     } catch (failure) {
-      if (failure instanceof PortTaken && attempt < LAUNCH_ATTEMPTS) continue;
+      if (failure instanceof PortTaken && attempt < LAUNCH_ATTEMPTS) {
+        // Said out loud, so a run's log shows how often the window bites, instead of
+        // the retry absorbing it unseen.
+        process.stderr.write(
+          `gateway launch ${attempt}/${LAUNCH_ATTEMPTS}: a port was taken before the gateway bound it (ports ${port}, ${metricsPort}, ${wsPort}; the gateway said: ${failure.message}); retrying with fresh ports\n` +
+            // The whole launch, indented: rare, and the only record of what collided.
+            failure.output.replace(/^/gmu, '    | ') +
+            '\n',
+        );
+        continue;
+      }
       throw failure;
     }
   }
@@ -242,9 +297,12 @@ async function waitUntilReady(
   while (Date.now() < deadline) {
     if (PORT_TAKEN.test(output.join(''))) {
       await stop(child);
-      throw new PortTaken(
-        `A port the gateway was given was taken before it bound it:\n${output.join('')}`,
-      );
+      const said =
+        output
+          .join('')
+          .split('\n')
+          .find((line) => PORT_TAKEN.test(line)) ?? '';
+      throw new PortTaken(said.trim(), output.join(''));
     }
     if (child.exitCode !== null) {
       throw new Error(
@@ -253,7 +311,11 @@ async function waitUntilReady(
     }
 
     try {
-      const response = await fetch(`${baseUrl}${path}`);
+      // Bounded, or a port held by something that accepts and never answers hangs the
+      // poll past its own deadline (measured: the launch was then never retried).
+      const response = await fetch(`${baseUrl}${path}`, {
+        signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
+      });
       if (response.ok) return;
     } catch {
       // Not listening yet.
