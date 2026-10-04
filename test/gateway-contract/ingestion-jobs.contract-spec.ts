@@ -233,4 +233,29 @@ describe('ingestion-jobs', () => {
       expect(response.status).toBe(204);
     },
   );
+
+  rowFor('Ingestion Jobs')(
+    "**a document's ingestion history answers a PAGE (`data.items` and `data.meta`), as the worklist does, not a bare list**",
+    async () => {
+      // Both gateways ask the same RPC, which returns `{ items, meta }`. Node passes both
+      // on; a gateway that kept only the items answered `data: [...]`, a different body
+      // shape for the same route, which no row exercised until this one.
+      peers.ingestion
+        .on('DocumentService/ListDocumentIngestionJobs')
+        .reply({ items: [wireJob()], meta: { totalItems: 1, currentPage: 1 } });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/22222222-2222-4222-8222-222222222222/ingestion-jobs`,
+        headersWithCodes(['document.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          items: [{ id: JOB, status: 'FAILED' }],
+          meta: { totalItems: 1 },
+        },
+      });
+    },
+  );
 });

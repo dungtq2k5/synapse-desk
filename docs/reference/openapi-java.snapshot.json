@@ -46592,7 +46592,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListIngestionJobResponseDto"
+                  "$ref": "#/components/schemas/ApiResponsePagedDataIngestionJobResponseDto"
                 }
               }
             }
@@ -62797,31 +62797,6 @@
           }
         },
         "required": ["items", "meta"]
-      },
-      "ApiResponseListIngestionJobResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "statusCode": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "warning": {
-            "type": ["string", "null"]
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IngestionJobResponseDto"
-            }
-          }
-        },
-        "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ApiResponseDownloadDocumentResponseDto": {
         "type": "object",

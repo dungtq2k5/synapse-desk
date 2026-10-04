@@ -774,7 +774,7 @@ public class DocumentsController {
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
   public ResponseEntity<
-    ApiResponse<List<IngestionJobResponseDto>>
+    ApiResponse<PagedData<IngestionJobResponseDto>>
   > documentsControllerListIngestionJobsV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -782,11 +782,12 @@ public class DocumentsController {
       DocumentIdRequest.newBuilder().setId(id).build()
     );
 
-    List<IngestionJobResponseDto> data = response
-      .getItemsList()
-      .stream()
-      .map(IngestionJobMapper::toDto)
-      .toList();
+    // A page, as the ingestion-job worklist answers and as Node does: the RPC returns
+    // `{ items, meta }`, and dropping the meta answered a bare list instead.
+    PagedData<IngestionJobResponseDto> data = new PagedData<>(
+      response.getItemsList().stream().map(IngestionJobMapper::toDto).toList(),
+      PageMeta.from(response.getMeta())
+    );
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
