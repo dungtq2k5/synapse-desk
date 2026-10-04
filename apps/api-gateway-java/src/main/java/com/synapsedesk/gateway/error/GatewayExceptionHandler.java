@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.databind.DatabindException;
 
 /**
  * Every failure leaves as one {@link ErrorEnvelope} — the Node gateway's
@@ -141,14 +142,32 @@ public class GatewayExceptionHandler {
   }
 
   /**
-   * A body the parser refused. **Opaque by decision**: this message is
-   * Jackson's, as the Node one is V8's.
+   * A body that could not be read. Malformed JSON is **opaque by decision**: that
+   * message is the parser's, as the Node one is V8's. A body that parsed but does not
+   * fit the class (an unknown key, a wrong type) is answered in our own words, naming
+   * the field: Jackson's text for it names Java types, which are not the caller's
+   * business.
    */
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorEnvelope> onUnreadableBody(
     HttpMessageNotReadableException exception,
     HttpServletRequest request
   ) {
+    // Searched for, not taken as the most specific cause: an enum's own refusal sits
+    // BELOW the binding exception that knows which field it was.
+    for (
+      Throwable cause = exception.getCause();
+      cause != null;
+      cause = cause.getCause()
+    ) {
+      if (cause instanceof DatabindException binding) {
+        return envelope(
+          HttpStatus.BAD_REQUEST,
+          request,
+          ErrorMessages.format(BodyBindingMessage.of(binding))
+        );
+      }
+    }
     String detail = exception.getMostSpecificCause().getMessage();
 
     return envelope(

@@ -19,7 +19,7 @@ import { Session } from './client';
 import { type Gateway, GATEWAY_ENV, REPO_ROOT } from './gateway';
 import { type Peers, TEST_KEYS } from './peers';
 
-type Schema = {
+export type Schema = {
   $ref?: string;
   type?: string;
   format?: string;
