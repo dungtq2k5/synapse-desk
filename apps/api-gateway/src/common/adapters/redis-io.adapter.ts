@@ -78,7 +78,16 @@ export class RedisIoAdapter extends IoAdapter {
     return Promise.resolve();
   }
 
-  override createIOServer(port: number, options?: ServerOptions): Server {
+  /**
+   * On `WS_PORT`, whatever port a gateway decorator names: the Java gateway serves
+   * Socket.IO on its own listener at `WS_PORT`, and the two implementations must
+   * answer on the same port for one Service port and one Ingress path to reach
+   * whichever holds the lease. Read here rather than in the decorator, which is
+   * evaluated before `ConfigModule` has loaded the environment. `0` attaches to
+   * the HTTP server instead.
+   */
+  override createIOServer(_port: number, options?: ServerOptions): Server {
+    const port = this.configService.getOrThrow<number>('WS_PORT');
     // `IoAdapter.createIOServer` is typed `any` — this is the one place that
     // untyped return is narrowed, so every caller below sees a real `Server`.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

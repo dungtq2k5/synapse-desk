@@ -42,10 +42,6 @@ describe('the environment contract', () => {
     'APP_VERSION',
     'BUILD_SHA',
     'BUILD_TIME',
-    // The Java gateway's `/socket.io` listener — Node's socket.io shares
-    // `PORT` and never reads this; only `RealtimeProperties` on the Java
-    // side binds it.
-    'WS_PORT',
     // The stock Resend SDK reads this itself, so the Node gateway has no code
     // to validate it; the Java gateway binds it, and the contract suite points
     // both at a fake with it.

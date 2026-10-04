@@ -40,9 +40,10 @@ export type Gateway = {
   baseUrl: string;
   /**
    * Where `/ws` (a Socket.IO NAMESPACE, not a path — the wire path is
-   * `/socket.io`) actually answers. Equal to `baseUrl` for Node, which shares
-   * one `http.Server` for everything; a separate port for Java, whose
-   * netty-socketio listener cannot bind the port Tomcat already holds.
+   * `/socket.io`) actually answers: `WS_PORT`, a listener of its own, for BOTH
+   * implementations. One URL for both on purpose: a deployment exposes one
+   * Socket.IO port, and a harness that handed each implementation its own URL
+   * could not see that the cluster's Service exposed only the HTTP one.
    */
   wsUrl: string;
   metricsUrl: string;
@@ -278,7 +279,7 @@ export async function startGateway(
     const baseUrl = `http://127.0.0.1:${port}`;
     const gateway: Gateway = {
       baseUrl,
-      wsUrl: impl === 'java' ? `http://127.0.0.1:${wsPort}` : baseUrl,
+      wsUrl: `http://127.0.0.1:${wsPort}`,
       metricsUrl: `http://127.0.0.1:${metricsPort}`,
       stop: () => stop(child),
     };

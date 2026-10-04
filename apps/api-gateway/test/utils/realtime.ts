@@ -157,7 +157,13 @@ export async function bootstrapRealtimeTest(
   // The SAME adapter main.ts installs. Using the default in-memory one here
   // would leave the Redis path — the part that only fails across replicas —
   // untested by every suite that uses this fixture.
-  const redisIoAdapter = new RedisIoAdapter(app, configService);
+  // `WS_PORT = 0`: Socket.IO on the HTTP server's own ephemeral port, so the
+  // fixture keeps one free port per app. The separate listener is held by the
+  // contract suite, which starts the gateway as a process.
+  const redisIoAdapter = new RedisIoAdapter(app, {
+    getOrThrow: <T>(key: string): T =>
+      (key === 'WS_PORT' ? 0 : configService.getOrThrow<T>(key)) as T,
+  } as ConfigService);
   await redisIoAdapter.connect();
   app.useWebSocketAdapter(redisIoAdapter);
 

@@ -217,36 +217,44 @@ describe('the manifest contract', () => {
       ]).toEqual([service, port, port, port]);
     });
 
-    it('api-gateway probes HTTP on its own PORT, and never the metrics port', () => {
-      // The one service with an HTTP listener, and the one whose metrics sit on
-      // a SECOND port deliberately — `.env.example` calls that "what makes 'not
-      // reachable from the internet' structural rather than an Nginx rule". A
-      // probe pointed at 9464 would be checking the wrong listener.
-      const container = containersOf(
-        deployments().get('api-gateway') as Doc,
-      )[0] as {
-        ports?: { name?: string; containerPort?: number }[];
-        livenessProbe?: { httpGet?: { path?: string; port?: string } };
-        readinessProbe?: { httpGet?: { path?: string; port?: string } };
-      };
+    it.each([['api-gateway'], ['api-gateway-java']])(
+      '%s probes HTTP on its own PORT, and never the metrics port, and serves Socket.IO on WS_PORT',
+      (name) => {
+        // The one service with an HTTP listener, and the one whose metrics sit on
+        // a SECOND port deliberately — `.env.example` calls that "what makes 'not
+        // reachable from the internet' structural rather than an Nginx rule". A
+        // probe pointed at 9464 would be checking the wrong listener. Socket.IO is
+        // a third listener in both implementations, and the Service and Ingress
+        // reach it by this port's name: a Deployment without it is a gateway whose
+        // realtime traffic has nowhere to go.
+        const container = containersOf(deployments().get(name) as Doc)[0] as {
+          ports?: { name?: string; containerPort?: number }[];
+          livenessProbe?: { httpGet?: { path?: string; port?: string } };
+          readinessProbe?: { httpGet?: { path?: string; port?: string } };
+        };
 
-      const named = Object.fromEntries(
-        (container.ports ?? []).map((port) => [port.name, port.containerPort]),
-      );
+        const named = Object.fromEntries(
+          (container.ports ?? []).map((port) => [
+            port.name,
+            port.containerPort,
+          ]),
+        );
 
-      expect(named).toEqual({
-        http: Number(envValue('api-gateway', 'PORT')),
-        metrics: Number(envValue('api-gateway', 'METRICS_PORT')),
-      });
-      expect(container.livenessProbe?.httpGet).toEqual({
-        path: '/health',
-        port: 'http',
-      });
-      expect(container.readinessProbe?.httpGet).toEqual({
-        path: '/health/ready',
-        port: 'http',
-      });
-    });
+        expect(named).toEqual({
+          http: Number(envValue('api-gateway', 'PORT')),
+          ws: Number(envValue('api-gateway', 'WS_PORT')),
+          metrics: Number(envValue('api-gateway', 'METRICS_PORT')),
+        });
+        expect(container.livenessProbe?.httpGet).toEqual({
+          path: '/health',
+          port: 'http',
+        });
+        expect(container.readinessProbe?.httpGet).toEqual({
+          path: '/health/ready',
+          port: 'http',
+        });
+      },
+    );
   });
 
   // --------------------------------------------------- 2. the probe SERVICE names

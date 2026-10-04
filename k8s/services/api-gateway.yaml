@@ -83,6 +83,11 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+            # Socket.IO's own listener, `WS_PORT`, at the SAME port as the Java
+            # gateway's: one Service port and one Ingress path reach whichever
+            # implementation holds the lease.
+            - name: ws
+              containerPort: 3001
             # Its OWN listener, which is what makes "not reachable from the
             # internet" structural rather than an ingress rule. The Ingress
             # below routes to `http` only.
@@ -142,6 +147,9 @@ spec:
     - name: http
       port: 3000
       targetPort: http
+    - name: ws
+      port: 3001
+      targetPort: ws
     - name: metrics
       port: 9464
       targetPort: metrics

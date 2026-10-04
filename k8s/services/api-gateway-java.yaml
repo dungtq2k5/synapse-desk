@@ -61,6 +61,10 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+            # netty-socketio cannot share Tomcat's port; `WS_PORT`, as the Node
+            # gateway's.
+            - name: ws
+              containerPort: 3001
             - name: metrics
               containerPort: 9464
           # **The SAME ConfigMap and Secret the Node gateway reads.** Not a
