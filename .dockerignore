@@ -61,6 +61,8 @@ __pycache__
 .git
 .github
 docs
+# Except the published GraphQL schema, which the Java gateway is built from.
+!docs/reference/schema.gql
 .vscode
 .claude
 # Deployment manifests. Nothing in any stage COPYs them, and the context is
