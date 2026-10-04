@@ -1,7 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI definition",
+    "title": "SynapseDesk API",
+    "description": "The REST surface of the SynapseDesk gateway. Every response is wrapped in the standard envelope — `{ success, statusCode, message, warning, data }` on success and `{ success, statusCode, path, timestamp, error }` on failure — so the schema shown for a route describes the whole body, not just its payload.\n\n## Caching and staleness\n\nSome reads are served from a shared cache. An operation that is cached says so in its `x-cache` extension: `{ scope, ttlSeconds, varyBy }`. Everything else is computed per request.\n\n**A cached read can be stale for at most its TTL, and usually far less.** Cache entries are keyed by `(tenant, scope, parameters)` rather than by URL, so a write CAN find and evict them — a mutation drops its whole scope for that tenant before it answers, and changes that originate elsewhere in the system (a WebSocket message, a background job, another service) evict through domain events. The TTL is the backstop for a writer nobody has enumerated, not the mechanism.\n\n`varyBy` says what the entry depends on. `tenant` means every member of your organization shares one answer. `caller` means the answer is filtered by what you can see — `GET /documents` is scoped to your departments — so it is shared only with people whose visibility matches yours.\n\n**The one entry with no eviction is `GET /permissions`.** The permission catalogue is seeded and changes on deploy, so there is no request that could invalidate it; its one-hour TTL is the whole story.\n\n**Tickets, messages and notifications are never cached**, and neither is `GET /notifications/unread-count` — the WebSocket pushes that authoritatively, so polling it is the thing to remove rather than the thing to speed up.\n\n### GraphQL\n\nThere is **no response cache** on `/graphql`. A GraphQL response key would be a hash of the query document, and nothing in such a key says which entities the answer contains — so no write could ever find it, and a cached response would be stale for its full TTL no matter what changed. What is cached instead are the individual entities behind edges (`assignee`, `author`, `sender`, `actor`, `department`), keyed one per entity and evicted precisely when that entity changes.\n\n### Your half\n\nAfter a mutation, refetch or update your own store rather than trusting the next query to be fresh. A mutation returns fresh data to its own caller; another tab holding a rendered list is the server's problem only up to the eviction it just performed. Apollo Client does this by default with normalized cache updates.",
     "version": "v0"
   },
   "servers": [
@@ -14,6 +15,7 @@
     "/api/v1/users/{id}/roles": {
       "put": {
         "tags": ["User Admin"],
+        "summary": "Set roles",
         "operationId": "UserAdminController_setRoles_v1",
         "parameters": [
           {
@@ -323,6 +325,7 @@
     "/api/v1/users/{id}/departments": {
       "put": {
         "tags": ["User Admin"],
+        "summary": "Set departments",
         "operationId": "UserAdminController_setDepartments_v1",
         "parameters": [
           {
@@ -632,6 +635,7 @@
     "/api/v1/roles/{id}/permissions": {
       "put": {
         "tags": ["Roles"],
+        "summary": "Set permissions",
         "operationId": "RolesController_setPermissions_v1",
         "parameters": [
           {
@@ -941,6 +945,7 @@
     "/api/v1/documents/{id}/departments": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Departments scoped to this document",
         "operationId": "DocumentsController_listDepartments_v1",
         "parameters": [
           {
@@ -1200,6 +1205,7 @@
       },
       "put": {
         "tags": ["Documents"],
+        "summary": "Set departments",
         "operationId": "DocumentsController_setDepartments_v1",
         "parameters": [
           {
@@ -1509,6 +1515,8 @@
     "/api/v1/webhooks/stripe": {
       "post": {
         "tags": ["Webhooks"],
+        "summary": "Stripe event intake",
+        "description": "**Not a public endpoint despite carrying no security scheme.** Every request is authenticated by Stripe's `stripe-signature` header, computed as an HMAC over the exact raw bytes of the body — a stronger claim than a bearer token, and one OpenAPI cannot describe. Always answers 200, even for an event this system could not apply: Stripe retries on any non-2xx, so a 500 for an unmappable price id would turn one config typo into an escalating retry storm. The only non-2xx is a signature failure.",
         "operationId": "WebhooksController_stripe_v1",
         "parameters": [
           {
@@ -1652,6 +1660,8 @@
     "/api/v1/webhooks/email/resend": {
       "post": {
         "tags": ["Webhooks"],
+        "summary": "Inbound email intake",
+        "description": "**Not a public endpoint despite carrying no security scheme.** Every request is authenticated by a Standard Webhooks signature over the exact raw bytes of the body, in `svix-signature` with `svix-id` and `svix-timestamp` — a claim OpenAPI has no way to express. Called only by Resend; no client should ever reach it. Answers **200 for every outcome except a bad signature and a retryable fetch failure**, including mail this system deliberately drops: an unknown tenant token, a sender whose domain is not permitted, a mail that fails validation. A non-2xx tells Resend to retry for hours, so one misconfigured mail rule would become a retry loop; a 503 is answered only when fetching the mail failed in a way a retry can fix.",
         "operationId": "InboundEmailController_resend_v1",
         "responses": {
           "200": {
@@ -1823,6 +1833,7 @@
     "/api/v1/webhook-endpoints": {
       "get": {
         "tags": ["Webhook endpoints"],
+        "summary": "The tenant's endpoints. No secrets — ever",
         "operationId": "WebhookEndpointsController_list_v1",
         "responses": {
           "200": {
@@ -1996,6 +2007,7 @@
       },
       "post": {
         "tags": ["Webhook endpoints"],
+        "summary": "Register an endpoint. The secret is in THIS response only",
         "operationId": "WebhookEndpointsController_create_v1",
         "requestBody": {
           "content": {
@@ -2257,6 +2269,7 @@
     "/api/v1/webhook-endpoints/{id}/test": {
       "post": {
         "tags": ["Webhook endpoints"],
+        "summary": "Send a signed test event through the real path",
         "operationId": "WebhookEndpointsController_test_v1",
         "parameters": [
           {
@@ -2518,6 +2531,7 @@
     "/api/v1/webhook-endpoints/{id}/rotate-secret": {
       "post": {
         "tags": ["Webhook endpoints"],
+        "summary": "Rotate the signing secret. Old one verifies for 24h more",
         "operationId": "WebhookEndpointsController_rotateSecret_v1",
         "parameters": [
           {
@@ -2779,6 +2793,7 @@
     "/api/v1/users": {
       "get": {
         "tags": ["User Admin"],
+        "summary": "List tenant users",
         "operationId": "UserAdminController_list_v1",
         "parameters": [
           {
@@ -2839,6 +2854,7 @@
           {
             "name": "includeDeleted",
             "in": "query",
+            "description": "Requires `user.delete`, checked in the controller.",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -3044,6 +3060,7 @@
       },
       "post": {
         "tags": ["User Admin"],
+        "summary": "Create",
         "operationId": "UserAdminController_create_v1",
         "requestBody": {
           "content": {
@@ -3305,6 +3322,7 @@
     "/api/v1/users/{id}/unlock": {
       "post": {
         "tags": ["User Admin"],
+        "summary": "Unlock",
         "operationId": "UserAdminController_unlock_v1",
         "parameters": [
           {
@@ -3566,6 +3584,7 @@
     "/api/v1/users/{id}/restore": {
       "post": {
         "tags": ["User Admin"],
+        "summary": "Restore",
         "operationId": "UserAdminController_restore_v1",
         "parameters": [
           {
@@ -3827,6 +3846,7 @@
     "/api/v1/users/{id}/lock": {
       "post": {
         "tags": ["User Admin"],
+        "summary": "Lock",
         "operationId": "UserAdminController_lock_v1",
         "parameters": [
           {
@@ -4136,6 +4156,7 @@
     "/api/v1/users/{id}/2fa/reset": {
       "post": {
         "tags": ["User Admin"],
+        "summary": "Reset two factor",
         "operationId": "UserAdminController_resetTwoFactor_v1",
         "parameters": [
           {
@@ -4397,6 +4418,7 @@
     "/api/v1/users/me/avatar/upload-url": {
       "post": {
         "tags": ["Users"],
+        "summary": "Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }",
         "operationId": "UsersController_presignAvatar_v1",
         "requestBody": {
           "content": {
@@ -4620,6 +4642,7 @@
     "/api/v1/users/me/avatar/confirm": {
       "post": {
         "tags": ["Users"],
+        "summary": "{ objectPath } — confirms the upload landed, writes users.avatar_url (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the previous avatar if one existed",
         "operationId": "UsersController_confirmAvatar_v1",
         "requestBody": {
           "content": {
@@ -4843,6 +4866,7 @@
     "/api/v1/users/invitations": {
       "get": {
         "tags": ["Invitations"],
+        "summary": "List invitations",
         "operationId": "InvitationsController_list_v1",
         "parameters": [
           {
@@ -5076,6 +5100,7 @@
       },
       "post": {
         "tags": ["Invitations"],
+        "summary": "Create",
         "operationId": "InvitationsController_create_v1",
         "requestBody": {
           "content": {
@@ -5337,6 +5362,7 @@
     "/api/v1/users/invitations/{id}/resend": {
       "post": {
         "tags": ["Invitations"],
+        "summary": "Resend",
         "operationId": "InvitationsController_resend_v1",
         "parameters": [
           {
@@ -5598,6 +5624,7 @@
     "/api/v1/users/invitations/preview": {
       "post": {
         "tags": ["Invitations"],
+        "summary": "Dry-run a list before sending: flags addresses already in this tenant, malformed addresses, unknown role/department ids, and projected seat overrun",
         "operationId": "InvitationsController_previewBatch_v1",
         "requestBody": {
           "content": {
@@ -5859,6 +5886,7 @@
     "/api/v1/users/invitations/accept": {
       "post": {
         "tags": ["Invitations"],
+        "summary": "Redeem",
         "operationId": "InvitationsController_accept_v1",
         "requestBody": {
           "content": {
@@ -6078,6 +6106,7 @@
     "/api/v1/tickets": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Queue view",
         "operationId": "TicketsController_list_v1",
         "parameters": [
           {
@@ -6122,6 +6151,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Which column the list is ordered by. Defaults to the search default.",
             "required": false,
             "schema": {
               "type": "string",
@@ -6139,6 +6169,7 @@
           {
             "name": "includeDeleted",
             "in": "query",
+            "description": "Requires `ticket.delete` — the module's manage permission — which the\ncontroller enforces. Without that gate any member could enumerate deleted\ntickets, which is exactly the history someone would delete a ticket to\nremove.",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -6341,6 +6372,7 @@
       },
       "post": {
         "tags": ["Tickets"],
+        "summary": "Create",
         "operationId": "TicketsController_create_v1",
         "requestBody": {
           "content": {
@@ -6602,6 +6634,7 @@
     "/api/v1/tickets/{ticketId}/messages": {
       "get": {
         "tags": ["Messages"],
+        "summary": "Chronological thread, cursor-paginated (?before=&limit=)",
         "operationId": "MessagesController_list_v1",
         "parameters": [
           {
@@ -6636,6 +6669,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -6871,6 +6905,7 @@
       },
       "post": {
         "tags": ["Messages"],
+        "summary": "Create",
         "operationId": "MessagesController_create_v1",
         "parameters": [
           {
@@ -7142,6 +7177,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/upload-url": {
       "post": {
         "tags": ["Messages"],
+        "summary": "Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }",
         "operationId": "MessagesController_presignAttachment_v1",
         "parameters": [
           {
@@ -7421,6 +7457,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments/confirm": {
       "post": {
         "tags": ["Messages"],
+        "summary": "{ objectPath } — confirms, writes the message_attachments row",
         "operationId": "MessagesController_confirmAttachment_v1",
         "parameters": [
           {
@@ -7700,6 +7737,7 @@
     "/api/v1/tickets/{ticketId}/messages/attachments/upload-url": {
       "post": {
         "tags": ["Messages"],
+        "summary": "Presign an upload for a message not yet created: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }",
         "operationId": "MessagesController_presignNewAttachment_v1",
         "parameters": [
           {
@@ -7971,6 +8009,7 @@
     "/api/v1/tickets/{ticketId}/ai/summary": {
       "get": {
         "tags": ["Ai"],
+        "summary": "Get summary",
         "operationId": "AiController_getSummary_v1",
         "parameters": [
           {
@@ -8230,6 +8269,7 @@
       },
       "post": {
         "tags": ["Ai"],
+        "summary": "Generate summary",
         "operationId": "AiController_generateSummary_v1",
         "parameters": [
           {
@@ -8529,6 +8569,7 @@
     "/api/v1/tickets/{ticketId}/ai/suggestions": {
       "post": {
         "tags": ["Ai"],
+        "summary": "Get suggestions",
         "operationId": "AiController_getSuggestions_v1",
         "parameters": [
           {
@@ -8790,6 +8831,7 @@
     "/api/v1/tickets/{ticketId}/ai/draft": {
       "post": {
         "tags": ["Ai"],
+        "summary": "Generate draft",
         "operationId": "AiController_generateDraft_v1",
         "parameters": [
           {
@@ -9137,6 +9179,7 @@
     "/api/v1/tickets/{ticketId}/ai/classify": {
       "post": {
         "tags": ["Ai"],
+        "summary": "Classify",
         "operationId": "AiController_classify_v1",
         "parameters": [
           {
@@ -9436,6 +9479,7 @@
     "/api/v1/tickets/{id}/status": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Change status (non-terminal targets)",
         "operationId": "TicketsController_changeStatus_v1",
         "parameters": [
           {
@@ -9745,6 +9789,7 @@
     "/api/v1/tickets/{id}/restore": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Restore",
         "operationId": "TicketsController_restore_v1",
         "parameters": [
           {
@@ -10006,6 +10051,7 @@
     "/api/v1/tickets/{id}/resolve": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Resolve",
         "operationId": "TicketsController_resolve_v1",
         "parameters": [
           {
@@ -10315,6 +10361,7 @@
     "/api/v1/tickets/{id}/reopen": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Reopen",
         "operationId": "TicketsController_reopen_v1",
         "parameters": [
           {
@@ -10624,6 +10671,7 @@
     "/api/v1/tickets/{id}/reassign": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Reassign",
         "operationId": "TicketsController_reassign_v1",
         "parameters": [
           {
@@ -10933,6 +10981,7 @@
     "/api/v1/tickets/{id}/read": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Mark the thread read up to a message",
         "operationId": "TicketsController_markRead_v1",
         "parameters": [
           {
@@ -11204,6 +11253,7 @@
     "/api/v1/tickets/{id}/escalate": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Escalate",
         "operationId": "TicketsController_escalate_v1",
         "parameters": [
           {
@@ -11475,6 +11525,7 @@
     "/api/v1/tickets/{id}/close": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Close",
         "operationId": "TicketsController_close_v1",
         "parameters": [
           {
@@ -11784,6 +11835,7 @@
     "/api/v1/tickets/{id}/assign": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Assign",
         "operationId": "TicketsController_assign_v1",
         "parameters": [
           {
@@ -12091,6 +12143,7 @@
       },
       "delete": {
         "tags": ["Tickets"],
+        "summary": "Unassign",
         "operationId": "TicketsController_unassign_v1",
         "parameters": [
           {
@@ -12352,6 +12405,7 @@
     "/api/v1/tickets/{id}/assign/self": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Assign to self",
         "operationId": "TicketsController_assignToSelf_v1",
         "parameters": [
           {
@@ -12661,6 +12715,7 @@
     "/api/v1/tickets/export": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Request a ticket export",
         "operationId": "TicketsController_createExport_v1",
         "requestBody": {
           "content": {
@@ -12922,6 +12977,7 @@
     "/api/v1/tickets/bulk/status": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Bulk change status (non-terminal targets)",
         "operationId": "TicketsController_bulkChangeStatus_v1",
         "requestBody": {
           "content": {
@@ -13183,6 +13239,7 @@
     "/api/v1/tickets/bulk/priority": {
       "post": {
         "tags": ["Tickets"],
+        "summary": "Bulk change priority",
         "operationId": "TicketsController_bulkChangePriority_v1",
         "requestBody": {
           "content": {
@@ -13444,6 +13501,7 @@
     "/api/v1/roles": {
       "get": {
         "tags": ["Roles"],
+        "summary": "Tenant custom roles + global system roles (organization_id IS NULL)",
         "operationId": "RolesController_list_v1",
         "parameters": [
           {
@@ -13498,6 +13556,7 @@
           {
             "name": "includeSystem",
             "in": "query",
+            "description": "Adds the four global system roles to the result.\n\nDefaults to FALSE so a caller that wants the assignable set has to ask —\nsilently widening a list is the riskier default, and the role editor knows\nwhich view it wants.",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -13677,6 +13736,7 @@
       },
       "post": {
         "tags": ["Roles"],
+        "summary": "Create",
         "operationId": "RolesController_create_v1",
         "requestBody": {
           "content": {
@@ -13938,6 +13998,7 @@
     "/api/v1/roles/{id}/users": {
       "post": {
         "tags": ["Roles"],
+        "summary": "Assign this role to users",
         "operationId": "RolesController_assignUsers_v1",
         "parameters": [
           {
@@ -14247,6 +14308,7 @@
     "/api/v1/platform/roles": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Manage global system roles",
         "operationId": "PlatformController_listGlobalRoles_v1",
         "parameters": [
           {
@@ -14457,6 +14519,7 @@
       },
       "post": {
         "tags": ["Platform"],
+        "summary": "Create global role",
         "operationId": "PlatformController_createGlobalRole_v1",
         "requestBody": {
           "content": {
@@ -14680,6 +14743,7 @@
     "/api/v1/platform/plans": {
       "get": {
         "tags": ["Platform"],
+        "summary": "The plan catalogue",
         "operationId": "PlatformController_listPlans_v1",
         "parameters": [
           {
@@ -14884,6 +14948,7 @@
       },
       "post": {
         "tags": ["Platform"],
+        "summary": "Create a plan",
         "operationId": "PlatformController_createPlan_v1",
         "requestBody": {
           "content": {
@@ -15107,6 +15172,7 @@
     "/api/v1/platform/plans/{id}/apply": {
       "post": {
         "tags": ["Platform"],
+        "summary": "Apply a plan to its subscribers (or dry-run it)",
         "operationId": "PlatformController_applyPlan_v1",
         "parameters": [
           {
@@ -15339,6 +15405,7 @@
     "/api/v1/platform/organizations": {
       "get": {
         "tags": ["Platform"],
+        "summary": "All tenants, filter by status",
         "operationId": "PlatformController_listOrganizations_v1",
         "parameters": [
           {
@@ -15548,6 +15615,7 @@
       },
       "post": {
         "tags": ["Platform"],
+        "summary": "Create organization",
         "operationId": "PlatformController_createOrganization_v1",
         "requestBody": {
           "content": {
@@ -15771,6 +15839,7 @@
     "/api/v1/platform/organizations/{id}/status": {
       "post": {
         "tags": ["Platform"],
+        "summary": "Set status",
         "operationId": "PlatformController_setStatus_v1",
         "parameters": [
           {
@@ -16042,6 +16111,7 @@
     "/api/v1/platform/organizations/{id}/restore": {
       "post": {
         "tags": ["Platform"],
+        "summary": "Restore",
         "operationId": "PlatformController_restore_v1",
         "parameters": [
           {
@@ -16265,6 +16335,7 @@
     "/api/v1/platform/organizations/{id}/billing-cycle/reset": {
       "post": {
         "tags": ["Platform"],
+        "summary": "Reset billing cycle",
         "operationId": "PlatformController_resetBillingCycle_v1",
         "parameters": [
           {
@@ -16536,6 +16607,7 @@
     "/api/v1/platform/jobs/{name}/run": {
       "post": {
         "tags": ["Platform Jobs"],
+        "summary": "Runs a rollup now",
         "operationId": "PlatformJobsController_run_v1",
         "parameters": [
           {
@@ -16721,6 +16793,7 @@
     "/api/v1/platform/jobs/{name}/backfill": {
       "post": {
         "tags": ["Platform Jobs"],
+        "summary": "Recomputes an explicit from..to range, with a mandatory reason",
         "operationId": "PlatformJobsController_backfill_v1",
         "parameters": [
           {
@@ -16992,6 +17065,7 @@
     "/api/v1/organizations/current/onboarding/complete": {
       "post": {
         "tags": ["Organizations"],
+        "summary": "Complete onboarding",
         "operationId": "OrganizationsController_completeOnboarding_v1",
         "responses": {
           "200": {
@@ -17167,6 +17241,7 @@
     "/api/v1/organizations/current/inbound-token": {
       "post": {
         "tags": ["Organizations"],
+        "summary": "Enable or rotate the inbound email address",
         "operationId": "OrganizationsController_issueInboundToken_v1",
         "responses": {
           "201": {
@@ -17340,6 +17415,7 @@
       },
       "delete": {
         "tags": ["Organizations"],
+        "summary": "Disable the inbound email address",
         "operationId": "OrganizationsController_revokeInboundToken_v1",
         "responses": {
           "204": {
@@ -17508,6 +17584,7 @@
     "/api/v1/notifications/{id}/read": {
       "post": {
         "tags": ["Notifications"],
+        "summary": "Mark read",
         "operationId": "NotificationsController_markRead_v1",
         "parameters": [
           {
@@ -17731,6 +17808,7 @@
     "/api/v1/notifications/{id}/archive": {
       "post": {
         "tags": ["Notifications"],
+        "summary": "Archive",
         "operationId": "NotificationsController_archive_v1",
         "parameters": [
           {
@@ -17954,6 +18032,7 @@
     "/api/v1/notifications/read": {
       "post": {
         "tags": ["Notifications"],
+        "summary": "Mark many read",
         "operationId": "NotificationsController_markManyRead_v1",
         "requestBody": {
           "content": {
@@ -18177,6 +18256,7 @@
     "/api/v1/notifications/devices": {
       "get": {
         "tags": ["Notifications"],
+        "summary": "List push devices",
         "operationId": "NotificationsController_listDevices_v1",
         "responses": {
           "200": {
@@ -18312,6 +18392,7 @@
       },
       "post": {
         "tags": ["Notifications"],
+        "summary": "Register a push device",
         "operationId": "NotificationsController_registerDevice_v1",
         "requestBody": {
           "content": {
@@ -18535,6 +18616,7 @@
     "/api/v1/messages/{messageId}/feedback": {
       "get": {
         "tags": ["Feedback"],
+        "summary": "Own feedback on that message",
         "operationId": "MessageFeedbackController_own_v1",
         "parameters": [
           {
@@ -18756,6 +18838,7 @@
       },
       "post": {
         "tags": ["Feedback"],
+        "summary": "Thumbs up/down on an AI answer → ai_response_feedbacks (rating ∈ {1,-1}, feedback_text?, citation_accurate?)",
         "operationId": "MessageFeedbackController_submit_v1",
         "parameters": [
           {
@@ -19025,6 +19108,7 @@
       },
       "delete": {
         "tags": ["Feedback"],
+        "summary": "Withdraw feedback",
         "operationId": "MessageFeedbackController_withdraw_v1",
         "parameters": [
           {
@@ -19241,6 +19325,7 @@
     "/api/v1/knowledge/search": {
       "post": {
         "tags": ["Knowledge"],
+        "summary": "Hybrid semantic + keyword retrieval, filtered by tenant and the caller's departments (RDM §1.2)",
         "operationId": "KnowledgeController_search_v1",
         "requestBody": {
           "content": {
@@ -19464,6 +19549,7 @@
     "/api/v1/knowledge/ask": {
       "post": {
         "tags": ["Knowledge"],
+        "summary": "One-shot Q&A over the knowledge base — retrieval plus generation, with citations",
         "operationId": "KnowledgeController_ask_v1",
         "requestBody": {
           "content": {
@@ -19725,6 +19811,7 @@
     "/api/v1/ingestion-jobs/{id}/retry": {
       "post": {
         "tags": ["Ingestion Jobs"],
+        "summary": "Retry an ingestion job",
         "operationId": "IngestionJobsController_retry_v1",
         "parameters": [
           {
@@ -19986,6 +20073,7 @@
     "/api/v1/documents/{id}/restore": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Restore",
         "operationId": "DocumentsController_restore_v1",
         "parameters": [
           {
@@ -20247,6 +20335,7 @@
     "/api/v1/documents/{id}/replace": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Replace the file",
         "operationId": "DocumentsController_replace_v1",
         "parameters": [
           {
@@ -20594,6 +20683,7 @@
     "/api/v1/documents/{id}/reindex": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Reindex",
         "operationId": "DocumentsController_reindex_v1",
         "parameters": [
           {
@@ -20855,6 +20945,7 @@
     "/api/v1/documents/presign": {
       "post": {
         "tags": ["Documents"],
+        "summary": "{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }",
         "operationId": "DocumentsController_presign_v1",
         "requestBody": {
           "content": {
@@ -21116,6 +21207,7 @@
     "/api/v1/documents/flags/{flagId}/replaced": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Mark a quality flag replaced",
         "operationId": "DocumentsController_replaceFlag_v1",
         "parameters": [
           {
@@ -21425,6 +21517,7 @@
     "/api/v1/documents/flags/{flagId}/fixed": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Mark a quality flag fixed",
         "operationId": "DocumentsController_fixFlag_v1",
         "parameters": [
           {
@@ -21734,6 +21827,7 @@
     "/api/v1/documents/flags/{flagId}/dismiss": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Dismiss a quality flag",
         "operationId": "DocumentsController_dismissFlag_v1",
         "parameters": [
           {
@@ -22043,6 +22137,7 @@
     "/api/v1/documents/confirm": {
       "post": {
         "tags": ["Documents"],
+        "summary": "Confirm",
         "operationId": "DocumentsController_confirm_v1",
         "requestBody": {
           "content": {
@@ -22304,6 +22399,7 @@
     "/api/v1/departments": {
       "get": {
         "tags": ["Departments"],
+        "summary": "List departments in tenant (+ member counts, open-ticket counts)",
         "operationId": "DepartmentsController_list_v1",
         "parameters": [
           {
@@ -22358,6 +22454,7 @@
           {
             "name": "includeDeleted",
             "in": "query",
+            "description": "Requires `department.delete` — the module's manage permission — which the\ncontroller enforces. Without that gate any member could enumerate deleted\ndepartments, which is organizational history they have no claim to.",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -22537,6 +22634,7 @@
       },
       "post": {
         "tags": ["Departments"],
+        "summary": "Create",
         "operationId": "DepartmentsController_create_v1",
         "requestBody": {
           "content": {
@@ -22798,6 +22896,7 @@
     "/api/v1/departments/{id}/restore": {
       "post": {
         "tags": ["Departments"],
+        "summary": "Restore",
         "operationId": "DepartmentsController_restore_v1",
         "parameters": [
           {
@@ -23059,6 +23158,7 @@
     "/api/v1/departments/{id}/members": {
       "get": {
         "tags": ["Departments"],
+        "summary": "Members (via user_departments), flagging is_primary",
         "operationId": "DepartmentsController_listMembers_v1",
         "parameters": [
           {
@@ -23367,6 +23467,7 @@
       },
       "post": {
         "tags": ["Departments"],
+        "summary": "Add members",
         "operationId": "DepartmentsController_addMembers_v1",
         "parameters": [
           {
@@ -23676,6 +23777,7 @@
     "/api/v1/chat/conversations": {
       "get": {
         "tags": ["Chat"],
+        "summary": "List own conversations",
         "operationId": "ChatController_list_v1",
         "parameters": [
           {
@@ -23720,6 +23822,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Which column the list is ordered by. Defaults to the search default.",
             "required": false,
             "schema": {
               "type": "string",
@@ -23737,6 +23840,7 @@
           {
             "name": "includeDeleted",
             "in": "query",
+            "description": "Requires `ticket.delete` — the module's manage permission — which the\ncontroller enforces. Without that gate any member could enumerate deleted\ntickets, which is exactly the history someone would delete a ticket to\nremove.",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -23939,6 +24043,7 @@
       },
       "post": {
         "tags": ["Chat"],
+        "summary": "Start a Tier 1 conversation → creates a NEW ticket",
         "operationId": "ChatController_start_v1",
         "requestBody": {
           "content": {
@@ -24162,6 +24267,7 @@
     "/api/v1/chat/conversations/{id}/messages": {
       "get": {
         "tags": ["Chat"],
+        "summary": "List the thread, with citations per AI message",
         "operationId": "ChatController_listMessages_v1",
         "parameters": [
           {
@@ -24196,6 +24302,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -24431,6 +24538,7 @@
       },
       "post": {
         "tags": ["Chat"],
+        "summary": "Ask a question",
         "operationId": "ChatController_sendMessage_v1",
         "parameters": [
           {
@@ -24702,6 +24810,7 @@
     "/api/v1/chat/conversations/{id}/escalate": {
       "post": {
         "tags": ["Chat"],
+        "summary": "One-click hand-off to a human — alias of POST /tickets/:id/escalate",
         "operationId": "ChatController_escalate_v1",
         "parameters": [
           {
@@ -24925,6 +25034,7 @@
     "/api/v1/billing/portal-session": {
       "post": {
         "tags": ["Billing"],
+        "summary": "Create portal session",
         "operationId": "BillingController_createPortalSession_v1",
         "requestBody": {
           "content": {
@@ -25186,6 +25296,7 @@
     "/api/v1/billing/plan": {
       "post": {
         "tags": ["Billing"],
+        "summary": "Change the workspace plan",
         "operationId": "BillingController_changePlan_v1",
         "parameters": [
           {
@@ -25571,6 +25682,7 @@
     "/api/v1/billing/checkout-session": {
       "post": {
         "tags": ["Billing"],
+        "summary": "Create checkout session",
         "operationId": "BillingController_createCheckoutSession_v1",
         "requestBody": {
           "content": {
@@ -25832,6 +25944,7 @@
     "/api/v1/auth/register": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Sign up",
         "operationId": "AuthController_register_v1",
         "requestBody": {
           "content": {
@@ -26051,6 +26164,8 @@
     "/api/v1/auth/refresh": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Rotate the refresh token",
+        "description": "Authenticated by the REFRESH cookie, not the access one. It is the only route that accepts it, which is what limits the blast radius of a stolen refresh token to this single endpoint.",
         "operationId": "AuthController_refresh_v1",
         "responses": {
           "200": {
@@ -26188,6 +26303,7 @@
     "/api/v1/auth/phone/verify": {
       "post": {
         "tags": ["Otp"],
+        "summary": "Submit { code }",
         "operationId": "OtpController_verifyPhone_v1",
         "requestBody": {
           "content": {
@@ -26411,6 +26527,7 @@
     "/api/v1/auth/phone/verify/request": {
       "post": {
         "tags": ["Otp"],
+        "summary": "Issue an otps row (purpose = PHONE_VERIFICATION) and SMS the code",
         "operationId": "OtpController_requestPhoneVerification_v1",
         "requestBody": {
           "content": {
@@ -26634,6 +26751,7 @@
     "/api/v1/auth/password/reset": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Consume the token: set is_used = true, write the new password_hash, invalidate the user's other outstanding tokens, and revoke every device_sessions row",
         "operationId": "AuthController_resetPassword_v1",
         "requestBody": {
           "content": {
@@ -26853,6 +26971,7 @@
     "/api/v1/auth/password/forgot": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Create a password_reset_tokens row (hashed token, ip_address, user_agent, 1h expires_at) and email the reset link",
         "operationId": "AuthController_forgotPassword_v1",
         "requestBody": {
           "content": {
@@ -27072,6 +27191,7 @@
     "/api/v1/auth/logout": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Revoke the current session — expires every row in its family_id, not just the current token",
         "operationId": "AuthController_logout_v1",
         "requestBody": {
           "content": {
@@ -27291,6 +27411,7 @@
     "/api/v1/auth/logout/all": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Revoke every session for the user across all families (\"log out of all devices\", RDM §1.5)",
         "operationId": "AuthController_logoutAll_v1",
         "responses": {
           "200": {
@@ -27428,6 +27549,7 @@
     "/api/v1/auth/login": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Email + password",
         "operationId": "AuthController_login_v1",
         "requestBody": {
           "content": {
@@ -27675,6 +27797,7 @@
     "/api/v1/auth/login/tenant": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Exchange tenantSelectionToken + { organizationId } for tokens",
         "operationId": "AuthController_loginWithTenant_v1",
         "requestBody": {
           "content": {
@@ -27922,6 +28045,7 @@
     "/api/v1/auth/google": {
       "post": {
         "tags": ["Auth"],
+        "summary": "Verify a Firebase-issued Google ID token, upsert the user with password_hash = NULL, resolve the tenant, issue tokens",
         "operationId": "AuthController_googleSignIn_v1",
         "requestBody": {
           "content": {
@@ -28169,6 +28293,7 @@
     "/api/v1/auth/email/verify": {
       "post": {
         "tags": ["Otp"],
+        "summary": "Submit { code }",
         "operationId": "OtpController_verifyEmail_v1",
         "requestBody": {
           "content": {
@@ -28392,6 +28517,7 @@
     "/api/v1/auth/email/verify/request": {
       "post": {
         "tags": ["Otp"],
+        "summary": "Issue an otps row (purpose = EMAIL_VERIFICATION, target = users.email) and mail the 6-digit code",
         "operationId": "OtpController_requestEmailVerification_v1",
         "responses": {
           "202": {
@@ -28529,6 +28655,7 @@
     "/api/v1/auth/2fa/setup": {
       "post": {
         "tags": ["Two Factor Auth"],
+        "summary": "Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL",
         "operationId": "TwoFactorAuthController_generate_v1",
         "responses": {
           "200": {
@@ -28666,6 +28793,7 @@
     "/api/v1/auth/2fa/enable": {
       "post": {
         "tags": ["Two Factor Auth"],
+        "summary": "Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes",
         "operationId": "TwoFactorAuthController_activate_v1",
         "requestBody": {
           "content": {
@@ -28889,6 +29017,7 @@
     "/api/v1/auth/2fa/backup-codes": {
       "get": {
         "tags": ["Two Factor Auth"],
+        "summary": "Metadata only — count remaining, is_used, expires_at",
         "operationId": "TwoFactorAuthController_getBackupCodesStatus_v1",
         "responses": {
           "200": {
@@ -29024,6 +29153,7 @@
       },
       "post": {
         "tags": ["Two Factor Auth"],
+        "summary": "Regenerate two_factor_backup_codes (30d expiry)",
         "operationId": "TwoFactorAuthController_regenerateBackupCodes_v1",
         "requestBody": {
           "content": {
@@ -29247,6 +29377,8 @@
     "/api/v1/auth/2fa/authenticate": {
       "post": {
         "tags": ["Two Factor Auth"],
+        "summary": "Second leg of login",
+        "description": "Authenticated by the 2FA CHALLENGE cookie, not the access one. That token proves a password and nothing else; it is signed by a different keypair so it cannot verify where an access token is expected.",
         "operationId": "TwoFactorAuthController_authenticate_v1",
         "requestBody": {
           "content": {
@@ -29470,6 +29602,7 @@
     "/api/v1/audit-logs/export": {
       "post": {
         "tags": ["Audit Logs"],
+        "summary": "Request an audit-log export",
         "operationId": "AuditLogsController_createExport_v1",
         "requestBody": {
           "content": {
@@ -29731,6 +29864,7 @@
     "/api/v1/analytics/export": {
       "post": {
         "tags": ["Analytics"],
+        "summary": "Create export",
         "operationId": "AnalyticsController_createExport_v1",
         "requestBody": {
           "content": {
@@ -29992,6 +30126,7 @@
     "/api/v1/webhook-endpoints/{id}": {
       "get": {
         "tags": ["Webhook endpoints"],
+        "summary": "One endpoint, with its subscribed types — explicitly",
         "operationId": "WebhookEndpointsController_get_v1",
         "parameters": [
           {
@@ -30251,6 +30386,7 @@
       },
       "delete": {
         "tags": ["Webhook endpoints"],
+        "summary": "Delete the endpoint and its delivery history",
         "operationId": "WebhookEndpointsController_delete_v1",
         "parameters": [
           {
@@ -30510,6 +30646,7 @@
       },
       "patch": {
         "tags": ["Webhook endpoints"],
+        "summary": "Edit URL, description, subscriptions, or enable/disable",
         "operationId": "WebhookEndpointsController_update_v1",
         "parameters": [
           {
@@ -30819,6 +30956,7 @@
     "/api/v1/users/{id}": {
       "get": {
         "tags": ["User Admin"],
+        "summary": "Detail + roles + departments",
         "operationId": "UserAdminController_get_v1",
         "parameters": [
           {
@@ -31078,6 +31216,7 @@
       },
       "delete": {
         "tags": ["User Admin"],
+        "summary": "Remove",
         "operationId": "UserAdminController_remove_v1",
         "parameters": [
           {
@@ -31337,6 +31476,7 @@
       },
       "patch": {
         "tags": ["User Admin"],
+        "summary": "Update",
         "operationId": "UserAdminController_update_v1",
         "parameters": [
           {
@@ -31646,6 +31786,7 @@
     "/api/v1/users/me": {
       "get": {
         "tags": ["Users"],
+        "summary": "Own profile + org + departments + effective permission codes",
         "operationId": "UsersController_getCurrentUser_v1",
         "responses": {
           "200": {
@@ -31781,6 +31922,7 @@
       },
       "patch": {
         "tags": ["Users"],
+        "summary": "Update own profile fields (fullName, dob, gender)",
         "operationId": "UsersController_updateOwnProfile_v1",
         "requestBody": {
           "content": {
@@ -32004,6 +32146,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}": {
       "delete": {
         "tags": ["Messages"],
+        "summary": "Redact a message (content replaced, row retained for the audit timeline)",
         "operationId": "MessagesController_redact_v1",
         "parameters": [
           {
@@ -32271,6 +32414,7 @@
       },
       "patch": {
         "tags": ["Messages"],
+        "summary": "Edit own message inside a short window; internal notes editable by agents",
         "operationId": "MessagesController_update_v1",
         "parameters": [
           {
@@ -32550,6 +32694,7 @@
     "/api/v1/tickets/{id}": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Full detail: ticket + author + current_assignee + current_department + status + ai_summaries + attachment counts",
         "operationId": "TicketsController_get_v1",
         "parameters": [
           {
@@ -32771,6 +32916,7 @@
       },
       "delete": {
         "tags": ["Tickets"],
+        "summary": "Remove",
         "operationId": "TicketsController_remove_v1",
         "parameters": [
           {
@@ -33030,6 +33176,7 @@
       },
       "patch": {
         "tags": ["Tickets"],
+        "summary": "Update",
         "operationId": "TicketsController_update_v1",
         "parameters": [
           {
@@ -33339,6 +33486,7 @@
     "/api/v1/roles/{id}": {
       "get": {
         "tags": ["Roles"],
+        "summary": "Detail + attached permissions + user_assigned",
         "operationId": "RolesController_get_v1",
         "parameters": [
           {
@@ -33598,6 +33746,7 @@
       },
       "delete": {
         "tags": ["Roles"],
+        "summary": "Remove",
         "operationId": "RolesController_remove_v1",
         "parameters": [
           {
@@ -33857,6 +34006,7 @@
       },
       "patch": {
         "tags": ["Roles"],
+        "summary": "Update",
         "operationId": "RolesController_update_v1",
         "parameters": [
           {
@@ -34166,6 +34316,7 @@
     "/api/v1/platform/plans/{id}": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Plan detail, with its prices and subscriber count",
         "operationId": "PlatformController_getPlan_v1",
         "parameters": [
           {
@@ -34387,6 +34538,7 @@
       },
       "delete": {
         "tags": ["Platform"],
+        "summary": "Retire a plan",
         "operationId": "PlatformController_deletePlan_v1",
         "parameters": [
           {
@@ -34646,6 +34798,7 @@
       },
       "patch": {
         "tags": ["Platform"],
+        "summary": "Update a plan (does NOT change subscribers)",
         "operationId": "PlatformController_updatePlan_v1",
         "parameters": [
           {
@@ -34917,6 +35070,7 @@
     "/api/v1/platform/organizations/{id}": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Tenant detail + usage rollups",
         "operationId": "PlatformController_getOrganization_v1",
         "parameters": [
           {
@@ -35138,6 +35292,7 @@
       },
       "delete": {
         "tags": ["Platform"],
+        "summary": "Offboard",
         "operationId": "PlatformController_offboard_v1",
         "parameters": [
           {
@@ -35407,6 +35562,7 @@
       },
       "patch": {
         "tags": ["Platform"],
+        "summary": "Update organization",
         "operationId": "PlatformController_updateOrganization_v1",
         "parameters": [
           {
@@ -35678,6 +35834,7 @@
     "/api/v1/organizations/current": {
       "get": {
         "tags": ["Organizations"],
+        "summary": "Tenant profile + status + quotas",
         "operationId": "OrganizationsController_get_v1",
         "responses": {
           "200": {
@@ -35813,6 +35970,7 @@
       },
       "delete": {
         "tags": ["Organizations"],
+        "summary": "Request offboard",
         "operationId": "OrganizationsController_requestOffboard_v1",
         "requestBody": {
           "content": {
@@ -36072,6 +36230,7 @@
       },
       "patch": {
         "tags": ["Organizations"],
+        "summary": "Update",
         "operationId": "OrganizationsController_update_v1",
         "requestBody": {
           "content": {
@@ -36333,6 +36492,7 @@
     "/api/v1/organizations/current/settings": {
       "get": {
         "tags": ["Organizations"],
+        "summary": "Security governance: enforce_two_factor, allowed_email_domains",
         "operationId": "OrganizationsController_getSettings_v1",
         "responses": {
           "200": {
@@ -36506,6 +36666,7 @@
       },
       "patch": {
         "tags": ["Organizations"],
+        "summary": "Update settings",
         "operationId": "OrganizationsController_updateSettings_v1",
         "requestBody": {
           "content": {
@@ -36767,6 +36928,7 @@
     "/api/v1/notifications/preferences": {
       "get": {
         "tags": ["Notifications"],
+        "summary": "Full resolved catalogue per (type, channel) — exact match, else ('*', channel), else the hard-coded default",
         "operationId": "NotificationsController_listPreferences_v1",
         "responses": {
           "200": {
@@ -36902,6 +37064,7 @@
       },
       "patch": {
         "tags": ["Notifications"],
+        "summary": "Update preference",
         "operationId": "NotificationsController_updatePreference_v1",
         "requestBody": {
           "content": {
@@ -37125,6 +37288,7 @@
     "/api/v1/documents/{id}": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Metadata + ingestion status + linked departments + chunk count",
         "operationId": "DocumentsController_get_v1",
         "parameters": [
           {
@@ -37346,6 +37510,7 @@
       },
       "delete": {
         "tags": ["Documents"],
+        "summary": "Remove",
         "operationId": "DocumentsController_remove_v1",
         "parameters": [
           {
@@ -37598,6 +37763,7 @@
       },
       "patch": {
         "tags": ["Documents"],
+        "summary": "Update",
         "operationId": "DocumentsController_update_v1",
         "parameters": [
           {
@@ -37907,6 +38073,7 @@
     "/api/v1/departments/{id}": {
       "get": {
         "tags": ["Departments"],
+        "summary": "Detail",
         "operationId": "DepartmentsController_get_v1",
         "parameters": [
           {
@@ -38166,6 +38333,7 @@
       },
       "delete": {
         "tags": ["Departments"],
+        "summary": "Remove",
         "operationId": "DepartmentsController_remove_v1",
         "parameters": [
           {
@@ -38425,6 +38593,7 @@
       },
       "patch": {
         "tags": ["Departments"],
+        "summary": "Update",
         "operationId": "DepartmentsController_update_v1",
         "parameters": [
           {
@@ -38734,6 +38903,7 @@
     "/api/v1/auth/password": {
       "patch": {
         "tags": ["Auth"],
+        "summary": "Change password (requires current password)",
         "operationId": "AuthController_changePassword_v1",
         "requestBody": {
           "content": {
@@ -38957,6 +39127,8 @@
     "/version": {
       "get": {
         "tags": ["Ops"],
+        "summary": "Which build is this?",
+        "description": "Three fields and no more — version, commit SHA, build time. Node version, dependency lists and environment names are deliberately absent: they turn a support aid into a reconnaissance endpoint on a public route, and none of them answer the question this exists for.",
         "operationId": "VersionController_version",
         "responses": {
           "200": {
@@ -39052,6 +39224,8 @@
     "/health": {
       "get": {
         "tags": ["Ops"],
+        "summary": "Liveness — is this process alive?",
+        "description": "Checks NOTHING external, deliberately. A liveness probe that failed on a dependency outage would get every container restarted, which repairs none of it. Served outside the `/api/v1` prefix: an orchestrator is not an API client and cannot follow a version migration.",
         "operationId": "HealthController_liveness",
         "responses": {
           "200": {
@@ -39147,6 +39321,8 @@
     "/health/ready": {
       "get": {
         "tags": ["Ops"],
+        "summary": "Readiness — should traffic reach THIS instance?",
+        "description": "`ready` gates on Redis, on whether this instance is draining, and on this instance holding the implementation lease — a warm STANDBY answers 503 here and 200 on `/health`. Peer gRPC health is REPORTED under `peers` and deliberately does not gate: every instance sees the same peer down, so gating would remove all of them and turn one service outage into a total one. A partial outage should look partial. Returns 503 when not ready — a probe reads the status line, not the body.",
         "operationId": "HealthController_readiness",
         "responses": {
           "200": {
@@ -39242,6 +39418,7 @@
     "/api/v1/webhook-endpoints/{id}/deliveries": {
       "get": {
         "tags": ["Webhook endpoints"],
+        "summary": "Recent deliveries, newest first",
         "operationId": "WebhookEndpointsController_listDeliveries_v1",
         "parameters": [
           {
@@ -39514,6 +39691,8 @@
     "/api/v1/webhook-endpoints/event-types": {
       "get": {
         "tags": ["Webhook endpoints"],
+        "summary": "Every event type an endpoint can subscribe to",
+        "description": "The catalogue is what keeps \"not subscribed\" and \"never happened\" distinguishable — an integration reads it instead of guessing.",
         "operationId": "WebhookEndpointsController_listEventTypes_v1",
         "responses": {
           "200": {
@@ -39689,6 +39868,7 @@
     "/api/v1/users/{userId}/sessions": {
       "get": {
         "tags": ["User Sessions"],
+        "summary": "List invitations",
         "operationId": "UserSessionsController_list_v1",
         "parameters": [
           {
@@ -39948,6 +40128,7 @@
       },
       "delete": {
         "tags": ["User Sessions"],
+        "summary": "Revoke",
         "operationId": "UserSessionsController_revoke_v1",
         "parameters": [
           {
@@ -40209,6 +40390,7 @@
     "/api/v1/users/{id}/permissions": {
       "get": {
         "tags": ["User Admin"],
+        "summary": "Flattened effective permission codes (role union)",
         "operationId": "UserAdminController_getPermissions_v1",
         "parameters": [
           {
@@ -40470,6 +40652,7 @@
     "/api/v1/users/invitations/{id}": {
       "get": {
         "tags": ["Invitations"],
+        "summary": "Single invitation detail incl",
         "operationId": "InvitationsController_get_v1",
         "parameters": [
           {
@@ -40729,6 +40912,7 @@
       },
       "delete": {
         "tags": ["Invitations"],
+        "summary": "Revoke",
         "operationId": "InvitationsController_revoke_v1",
         "parameters": [
           {
@@ -40990,6 +41174,7 @@
     "/api/v1/users/invitations/token/{token}": {
       "get": {
         "tags": ["Invitations"],
+        "summary": "Public preview",
         "operationId": "InvitationsController_previewByToken_v1",
         "parameters": [
           {
@@ -41171,6 +41356,7 @@
     "/api/v1/tickets/{ticketId}/messages/{messageId}/attachments": {
       "get": {
         "tags": ["Messages"],
+        "summary": "List attachments",
         "operationId": "MessagesController_listAttachments_v1",
         "parameters": [
           {
@@ -41402,6 +41588,7 @@
     "/api/v1/tickets/{id}/similar": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Past resolved tickets with similar content — agent co-pilot",
         "operationId": "TicketsController_listSimilar_v1",
         "parameters": [
           {
@@ -41663,6 +41850,7 @@
     "/api/v1/tickets/{id}/history": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Status history: every transition, who made it, and why",
         "operationId": "TicketsController_listStatusChanges_v1",
         "parameters": [
           {
@@ -41886,6 +42074,7 @@
     "/api/v1/tickets/{id}/assignments": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Assignment history: full lifecycle of who held ticket, when, which department, why",
         "operationId": "TicketsController_listAssignments_v1",
         "parameters": [
           {
@@ -42109,6 +42298,7 @@
     "/api/v1/tickets/export/{id}": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Get a ticket export",
         "operationId": "TicketsController_getExport_v1",
         "parameters": [
           {
@@ -42370,6 +42560,7 @@
     "/api/v1/tickets/by-number/{ticketNumber}": {
       "get": {
         "tags": ["Tickets"],
+        "summary": "Lookup by human-friendly ticket_number (e.g. #1042)",
         "operationId": "TicketsController_getByNumber_v1",
         "parameters": [
           {
@@ -42593,6 +42784,7 @@
     "/api/v1/platform/users": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Cross-tenant user search (support escalations)",
         "operationId": "PlatformController_listUsers_v1",
         "parameters": [
           {
@@ -42805,6 +42997,7 @@
     "/api/v1/platform/metrics": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Platform-wide health: tenant count, MRR-ish usage, AI spend",
         "operationId": "PlatformController_getMetrics_v1",
         "responses": {
           "200": {
@@ -42942,6 +43135,7 @@
     "/api/v1/platform/jobs": {
       "get": {
         "tags": ["Platform Jobs"],
+        "summary": "Scheduled-job health",
         "operationId": "PlatformJobsController_getHealth_v1",
         "responses": {
           "200": {
@@ -43079,6 +43273,7 @@
     "/api/v1/platform/finance": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Plan mix, dunning, and an estimated MRR — revenue may degrade",
         "operationId": "PlatformController_getFinanceSnapshot_v1",
         "responses": {
           "200": {
@@ -43216,6 +43411,7 @@
     "/api/v1/platform/finance/events": {
       "get": {
         "tags": ["Platform"],
+        "summary": "Billing events per day, by type. Counts only",
         "operationId": "PlatformController_listBillingEvents_v1",
         "parameters": [
           {
@@ -43411,6 +43607,7 @@
     "/api/v1/platform/audit-logs": {
       "get": {
         "tags": ["PlatformAuditLogs"],
+        "summary": "Tenant-scoped immutable trail",
         "operationId": "PlatformAuditLogsController_list_v1",
         "parameters": [
           {
@@ -43437,6 +43634,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -43695,6 +43893,7 @@
     "/api/v1/platform/audit-logs/actions": {
       "get": {
         "tags": ["PlatformAuditLogs"],
+        "summary": "Distinct action values, for filter dropdowns",
         "operationId": "PlatformAuditLogsController_listActions_v1",
         "responses": {
           "200": {
@@ -43832,6 +44031,7 @@
     "/api/v1/permissions": {
       "get": {
         "tags": ["Permissions"],
+        "summary": "Full permission catalogue, grouped by target prefix — drives the role editor UI",
         "operationId": "PermissionsController_list_v1",
         "responses": {
           "200": {
@@ -44007,6 +44207,7 @@
     "/api/v1/organizations/current/usage": {
       "get": {
         "tags": ["Organizations"],
+        "summary": "Live meters: seats used/max, storage used/max, AI tokens used/budget, billing_cycle_start",
         "operationId": "OrganizationsController_getUsage_v1",
         "responses": {
           "200": {
@@ -44182,6 +44383,7 @@
     "/api/v1/organizations/current/onboarding": {
       "get": {
         "tags": ["Organizations"],
+        "summary": "Onboarding checklist state (departments created, first doc indexed, agents invited)",
         "operationId": "OrganizationsController_getOnboarding_v1",
         "responses": {
           "200": {
@@ -44357,6 +44559,7 @@
     "/api/v1/notifications": {
       "get": {
         "tags": ["Notifications"],
+        "summary": "Cursor-paginated feed (?type=&unreadOnly=false&cursor=), 20/page, newest first",
         "operationId": "NotificationsController_list_v1",
         "parameters": [
           {
@@ -44554,6 +44757,7 @@
     "/api/v1/notifications/unread-count": {
       "get": {
         "tags": ["Notifications"],
+        "summary": "Integer count of unread + non-archived",
         "operationId": "NotificationsController_unreadCount_v1",
         "responses": {
           "200": {
@@ -44691,6 +44895,7 @@
     "/api/v1/knowledge/articles": {
       "get": {
         "tags": ["Knowledge"],
+        "summary": "List the knowledge articles this caller may read",
         "operationId": "KnowledgeController_listArticles_v1",
         "parameters": [
           {
@@ -44717,6 +44922,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -44916,6 +45122,7 @@
     "/api/v1/knowledge/articles/{id}": {
       "get": {
         "tags": ["Knowledge"],
+        "summary": "Get one article and a page of its text",
         "operationId": "KnowledgeController_getArticle_v1",
         "parameters": [
           {
@@ -45160,6 +45367,7 @@
     "/api/v1/ingestion-jobs": {
       "get": {
         "tags": ["Ingestion Jobs"],
+        "summary": "List ingestion jobs",
         "operationId": "IngestionJobsController_list_v1",
         "parameters": [
           {
@@ -45186,6 +45394,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -45403,6 +45612,7 @@
     "/api/v1/ingestion-jobs/{id}": {
       "get": {
         "tags": ["Ingestion Jobs"],
+        "summary": "Get one ingestion job",
         "operationId": "IngestionJobsController_get_v1",
         "parameters": [
           {
@@ -45624,6 +45834,7 @@
       },
       "delete": {
         "tags": ["Ingestion Jobs"],
+        "summary": "Cancel an ingestion job",
         "operationId": "IngestionJobsController_cancel_v1",
         "parameters": [
           {
@@ -45885,6 +46096,7 @@
     "/api/v1/feedback": {
       "get": {
         "tags": ["Feedback"],
+        "summary": "Tenant feedback stream for quality review; filters ?rating=&citationAccurate=&from=&to=",
         "operationId": "FeedbackController_list_v1",
         "parameters": [
           {
@@ -45911,6 +46123,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -46136,6 +46349,7 @@
     "/api/v1/documents": {
       "get": {
         "tags": ["Documents"],
+        "summary": "List documents visible to the caller (org-wide ∪ their departments' via department_documents)",
         "operationId": "DocumentsController_list_v1",
         "parameters": [
           {
@@ -46162,6 +46376,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -46359,6 +46574,7 @@
     "/api/v1/documents/{id}/ingestion-jobs": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Ingestion history for this document",
         "operationId": "DocumentsController_listIngestionJobs_v1",
         "parameters": [
           {
@@ -46620,6 +46836,7 @@
     "/api/v1/documents/{id}/download": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Short-lived signed URL via GetSignedReadUrls",
         "operationId": "DocumentsController_download_v1",
         "parameters": [
           {
@@ -46843,6 +47060,7 @@
     "/api/v1/documents/{id}/chunks": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Paginated document_chunks: chunk_index, content_text, page_number, token_count",
         "operationId": "DocumentsController_listChunks_v1",
         "parameters": [
           {
@@ -46877,6 +47095,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -47188,6 +47407,7 @@
     "/api/v1/documents/{id}/chunks/{chunkId}": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Single chunk (citation deep-link target)",
         "operationId": "DocumentsController_getChunk_v1",
         "parameters": [
           {
@@ -47419,6 +47639,7 @@
     "/api/v1/documents/storage": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Storage usage breakdown vs max_storage_bytes",
         "operationId": "DocumentsController_storageUsage_v1",
         "responses": {
           "200": {
@@ -47594,6 +47815,7 @@
     "/api/v1/documents/flags": {
       "get": {
         "tags": ["Documents"],
+        "summary": "List quality flags",
         "operationId": "DocumentsController_listFlags_v1",
         "parameters": [
           {
@@ -47620,6 +47842,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -47849,6 +48072,7 @@
     "/api/v1/documents/flags/{flagId}": {
       "get": {
         "tags": ["Documents"],
+        "summary": "Get one quality flag",
         "operationId": "DocumentsController_getFlag_v1",
         "parameters": [
           {
@@ -48108,6 +48332,7 @@
       },
       "delete": {
         "tags": ["Documents"],
+        "summary": "Delete a quality flag",
         "operationId": "DocumentsController_deleteFlag_v1",
         "parameters": [
           {
@@ -48362,6 +48587,7 @@
     "/api/v1/chat/conversations/{id}": {
       "get": {
         "tags": ["Chat"],
+        "summary": "Get one own conversation (the ticket)",
         "operationId": "ChatController_get_v1",
         "parameters": [
           {
@@ -48585,6 +48811,7 @@
     "/api/v1/billing/subscription": {
       "get": {
         "tags": ["Billing"],
+        "summary": "Current plan, status, period, and the entitlements it granted",
         "operationId": "BillingController_getSubscription_v1",
         "responses": {
           "200": {
@@ -48760,6 +48987,7 @@
     "/api/v1/billing/plans": {
       "get": {
         "tags": ["Billing"],
+        "summary": "Plans this workspace can move to",
         "operationId": "BillingController_listPlans_v1",
         "responses": {
           "200": {
@@ -48935,6 +49163,7 @@
     "/api/v1/billing/invoices": {
       "get": {
         "tags": ["Billing"],
+        "summary": "Invoice history, proxied from Stripe and cached",
         "operationId": "BillingController_listInvoices_v1",
         "parameters": [
           {
@@ -49120,6 +49349,7 @@
     "/api/v1/auth/sessions": {
       "get": {
         "tags": ["Sessions"],
+        "summary": "List own sessions",
         "operationId": "SessionsController_list_v1",
         "responses": {
           "200": {
@@ -49257,6 +49487,7 @@
     "/api/v1/auth/password/reset/{token}": {
       "get": {
         "tags": ["Auth"],
+        "summary": "Validate a reset token before rendering the form (is_used = false AND expires_at > NOW())",
         "operationId": "AuthController_validatePasswordResetToken_v1",
         "parameters": [
           {
@@ -49438,6 +49669,7 @@
     "/api/v1/auth/otp/status": {
       "get": {
         "tags": ["Otp"],
+        "summary": "?purpose= — outstanding-challenge state for the resend UI: { pending, target (masked), expiresAt, attemptsRemaining }",
         "operationId": "OtpController_getOtpStatus_v1",
         "parameters": [
           {
@@ -49586,6 +49818,7 @@
     "/api/v1/audit-logs": {
       "get": {
         "tags": ["Audit Logs"],
+        "summary": "Tenant-scoped immutable trail",
         "operationId": "AuditLogsController_list_v1",
         "parameters": [
           {
@@ -49612,6 +49845,7 @@
           {
             "name": "sortBy",
             "in": "query",
+            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
             "required": false,
             "schema": {
               "type": "string",
@@ -49908,6 +50142,7 @@
     "/api/v1/audit-logs/export/{id}": {
       "get": {
         "tags": ["Audit Logs"],
+        "summary": "Get an audit-log export",
         "operationId": "AuditLogsController_getExport_v1",
         "parameters": [
           {
@@ -50169,6 +50404,7 @@
     "/api/v1/audit-logs/actions": {
       "get": {
         "tags": ["Audit Logs"],
+        "summary": "Distinct action values, for filter dropdowns",
         "operationId": "AuditLogsController_listActions_v1",
         "responses": {
           "200": {
@@ -50344,6 +50580,7 @@
     "/api/v1/attachments/{id}/download": {
       "get": {
         "tags": ["Attachments"],
+        "summary": "Short-lived pre-signed Firebase Storage URL (302 or { url, expiresAt })",
         "operationId": "AttachmentsController_download_v1",
         "parameters": [
           {
@@ -50567,6 +50804,7 @@
     "/api/v1/analytics/volume": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Volume",
         "operationId": "AnalyticsController_volume_v1",
         "parameters": [
           {
@@ -50780,6 +51018,7 @@
     "/api/v1/analytics/satisfaction": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Satisfaction",
         "operationId": "AnalyticsController_satisfaction_v1",
         "parameters": [
           {
@@ -50993,6 +51232,7 @@
     "/api/v1/analytics/response-times": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Response times",
         "operationId": "AnalyticsController_responseTimes_v1",
         "parameters": [
           {
@@ -51206,6 +51446,7 @@
     "/api/v1/analytics/overview": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Overview",
         "operationId": "AnalyticsController_overview_v1",
         "parameters": [
           {
@@ -51419,6 +51660,7 @@
     "/api/v1/analytics/knowledge-gaps": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Knowledge gaps",
         "operationId": "AnalyticsController_knowledgeGaps_v1",
         "parameters": [
           {
@@ -51643,6 +51885,7 @@
     "/api/v1/analytics/export/{id}": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Get export",
         "operationId": "AnalyticsController_getExport_v1",
         "parameters": [
           {
@@ -51904,6 +52147,7 @@
     "/api/v1/analytics/documents": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Documents",
         "operationId": "AnalyticsController_documents_v1",
         "parameters": [
           {
@@ -52092,6 +52336,7 @@
     "/api/v1/analytics/deflection": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Deflection",
         "operationId": "AnalyticsController_deflection_v1",
         "parameters": [
           {
@@ -52305,6 +52550,7 @@
     "/api/v1/analytics/ai-usage": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Ai usage",
         "operationId": "AnalyticsController_aiUsage_v1",
         "parameters": [
           {
@@ -52518,6 +52764,7 @@
     "/api/v1/analytics/agents": {
       "get": {
         "tags": ["Analytics"],
+        "summary": "Agents",
         "operationId": "AnalyticsController_agents_v1",
         "parameters": [
           {
@@ -52731,6 +52978,7 @@
     "/api/v1/users/me/avatar": {
       "delete": {
         "tags": ["Users"],
+        "summary": "Clear avatar_url to null; emits the async delete of the object that was there",
         "operationId": "UsersController_deleteAvatar_v1",
         "responses": {
           "200": {
@@ -52868,6 +53116,7 @@
     "/api/v1/roles/{id}/users/{userId}": {
       "delete": {
         "tags": ["Roles"],
+        "summary": "Revoke this role from a user",
         "operationId": "RolesController_revokeUser_v1",
         "parameters": [
           {
@@ -53175,6 +53424,7 @@
     "/api/v1/notifications/devices/{id}": {
       "delete": {
         "tags": ["Notifications"],
+        "summary": "Forget a push device",
         "operationId": "NotificationsController_forgetDevice_v1",
         "parameters": [
           {
@@ -53353,6 +53603,7 @@
     "/api/v1/departments/{id}/members/{userId}": {
       "delete": {
         "tags": ["Departments"],
+        "summary": "Remove member",
         "operationId": "DepartmentsController_removeMember_v1",
         "parameters": [
           {
@@ -53622,6 +53873,7 @@
     "/api/v1/auth/sessions/{id}": {
       "delete": {
         "tags": ["Sessions"],
+        "summary": "Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation",
         "operationId": "SessionsController_revoke_v1",
         "parameters": [
           {
@@ -53845,6 +54097,7 @@
     "/api/v1/auth/sessions/{id}/trust": {
       "delete": {
         "tags": ["Sessions"],
+        "summary": "Drop device trust for one session (clear device_token_hash / trusted_until, is_trusted = false) while leaving it logged in",
         "operationId": "SessionsController_revokeTrust_v1",
         "parameters": [
           {
@@ -54068,6 +54321,7 @@
     "/api/v1/auth/sessions/trusted": {
       "delete": {
         "tags": ["Sessions"],
+        "summary": "Un-trust every device → forces 2FA everywhere",
         "operationId": "SessionsController_revokeAllTrust_v1",
         "responses": {
           "200": {
@@ -54205,6 +54459,7 @@
     "/api/v1/auth/2fa": {
       "delete": {
         "tags": ["Two Factor Auth"],
+        "summary": "Disable 2FA (requires TOTP + password)",
         "operationId": "TwoFactorAuthController_disable_v1",
         "requestBody": {
           "content": {
@@ -54428,6 +54683,7 @@
     "/api/v1/attachments/{id}": {
       "delete": {
         "tags": ["Attachments"],
+        "summary": "Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object",
         "operationId": "AttachmentsController_remove_v1",
         "parameters": [
           {
@@ -54734,7 +54990,8 @@
           },
           "organizationId": {
             "type": ["string", "null"],
-            "format": "uuid"
+            "format": "uuid",
+            "description": "null for platform Super Admins, who belong to no tenant (RDM). Typed\nnon-nullable, this field made the seeded super admin impossible to return\nfrom the API at all."
           },
           "fullName": {
             "type": "string"
@@ -54757,7 +55014,8 @@
             "type": "boolean"
           },
           "dob": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, with no time and no\nzone. `null` when the user has not given one."
           },
           "gender": {
             "type": "string",
@@ -54772,7 +55030,8 @@
           },
           "lockedUntil": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When a temporary lock lapses. `null` means the lock is INDEFINITE.\n\nRender on `isLocked`; read this to show *when* the lock ends."
           },
           "isTwoFactorEnabled": {
             "type": "boolean"
@@ -54831,7 +55090,8 @@
           },
           "deletedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Non-null only on a deactivated account."
           },
           "deletedByName": {
             "type": ["string", "null"]
@@ -54864,6 +55124,7 @@
         "properties": {
           "departments": {
             "type": "array",
+            "description": "The departments to assign, and which of them is primary.\n\nExactly one entry must be primary when the list is non-empty; the service\nenforces it, because zero is as invalid as two.",
             "items": {
               "$ref": "#/components/schemas/DepartmentAssignmentDto"
             },
@@ -54965,7 +55226,8 @@
             "type": ["string", "null"]
           },
           "isSystemRole": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Readable by every tenant, mutable by none."
           },
           "userAssigned": {
             "type": "number"
@@ -55047,6 +55309,7 @@
         "properties": {
           "departmentIds": {
             "type": "array",
+            "description": "The FULL replacement set, not a delta.\n\nReplacement rather than add/remove because the fan-out ordering (\nThe fan-out ordering turns on whether a change restricts, and that is answerable from a\nbefore/after pair but not from a stream of deltas applied in unknown order.",
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55093,14 +55356,17 @@
             "type": "string"
           },
           "fileUrl": {
-            "type": "string"
+            "type": "string",
+            "description": "An internal object path today; a signed URL only via `/download`."
           },
           "fileType": {
             "type": "string",
+            "description": "The stored EXTENSION — `pdf`, `txt`, `md` — never the MIME type.\n\n`bin` is a real member: any accepted type with no extension mapping is\nfiled under it, as is a value this build does not recognise.",
             "enum": ["bin", "docx", "md", "pdf", "txt"]
           },
           "ocrLanguages": {
             "type": "array",
+            "description": "ISO 639-1 codes the uploader declared for OCR.\n\n`[]` means \"not specified\" — never `null`, so absent and empty are one\nvalue all the way to the client.",
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
@@ -55242,6 +55508,7 @@
           },
           "eventTypes": {
             "type": "array",
+            "description": "At least one — an endpoint subscribed to nothing is refused at creation,\nnever created silently useless, and an empty list never means \"all\".",
             "items": {
               "type": "string",
               "enum": [
@@ -55298,6 +55565,7 @@
           },
           "eventTypes": {
             "type": "array",
+            "description": "The `NotificationType` vocabulary (`ticket.assigned`) — the public event\nnames, never the internal transport subjects. **Never empty**: an empty\nlist never means \"all\", and zero subscriptions is refused at creation.",
             "items": {
               "type": "string",
               "enum": [
@@ -55318,7 +55586,8 @@
             "type": "boolean"
           },
           "disabledReason": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Why WE disabled it (auto-disable after sustained failure). NULL when the\ntenant disabled it themselves — the distinction a settings page renders."
           },
           "createdAt": {
             "type": "string",
@@ -55347,7 +55616,8 @@
             "$ref": "#/components/schemas/WebhookEndpointResponseDto"
           },
           "secret": {
-            "type": "string"
+            "type": "string",
+            "description": "`whsec_…` — store it now; no read returns it again."
           }
         },
         "required": ["endpoint", "secret"]
@@ -55449,12 +55719,13 @@
         "properties": {
           "reason": {
             "type": "string",
+            "description": "Why the account is being locked. Required — it lands in the audit metadata\nand in the email to the user.",
             "maxLength": 500,
             "minLength": 1
           },
           "lockedUntil": {
             "type": ["string", "null"],
-            "description": "Must be a date in the future.",
+            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.\n\nMust be a date in the future.",
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           }
         },
@@ -55527,6 +55798,7 @@
         "properties": {
           "contentType": {
             "type": "string",
+            "description": "No SVG. An SVG is a document that can carry script — the one image type\nthat behaves like an executable when served.",
             "enum": ["image/jpeg", "image/png", "image/webp"]
           },
           "sizeBytes": {
@@ -55585,6 +55857,7 @@
         "properties": {
           "objectPath": {
             "type": "string",
+            "description": "The path the presign step returned, echoed back.\n\nNot validated as a URL or a shape here, on purpose: storage-service checks\nit against the PendingUpload it recorded, which is a real authorization\ncheck rather than a syntactic one. A regex here would only reject\nwell-formed paths that were never authorized — the exact case the real\ncheck catches better.",
             "maxLength": 1024,
             "minLength": 1
           }
@@ -55632,6 +55905,7 @@
           "roleIds": {
             "type": ["array", "null"],
             "default": [],
+            "description": "PROPOSALS, resolved at redemption rather than now. A role deleted during\nthe 7-day window is skipped and reported, never fatal.",
             "items": {
               "type": "string",
               "format": "uuid"
@@ -55873,6 +56147,7 @@
           },
           "unknownRoleIds": {
             "type": "array",
+            "description": "Reported even on an OK row: these are skipped at redemption, not fatal.",
             "items": {
               "type": "string"
             }
@@ -55908,7 +56183,8 @@
             "type": "number"
           },
           "seatOverrun": {
-            "type": "number"
+            "type": "number",
+            "description": "Non-zero means the batch would be partially rejected at commit time."
           }
         },
         "required": ["maxAgentSeats", "rows", "seatOverrun", "seatsInUse"]
@@ -55929,6 +56205,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
+            "description": "Labels the session this call creates, in the user's active-device list.\n\nOptional: the client sends what it can identify itself as, and a session\nwith no label is still a session.",
             "maxLength": 100
           }
         },
@@ -55973,6 +56250,7 @@
         "properties": {
           "description": {
             "type": "string",
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 20000,
             "minLength": 1
           },
@@ -55991,7 +56269,8 @@
           },
           "authorId": {
             "type": ["string", "null"],
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Raising a ticket on behalf of an end user.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database."
           }
         },
         "required": ["description", "title"]
@@ -56025,7 +56304,8 @@
             "type": "string"
           },
           "ticketNumber": {
-            "type": "number"
+            "type": "number",
+            "description": "A number, not a string: `longs: Number` keeps int64 exact to 2^53."
           },
           "organizationId": {
             "type": "string"
@@ -56073,7 +56353,8 @@
             "format": "date-time"
           },
           "unreadCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Messages the caller has not read on this ticket.\n\nExcludes their own and any internal note they cannot see. A ticket never\nopened counts as ALL unread, not zero. Always `0` on a single-ticket read —\na badge is a list affordance, and a caller looking at one ticket is reading\nit."
           },
           "createdAt": {
             "type": "string",
@@ -56117,27 +56398,32 @@
         "properties": {
           "content": {
             "type": "string",
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 20000,
             "minLength": 1
           },
           "isInternalNote": {
             "type": ["boolean", "null"],
-            "default": false
+            "default": false,
+            "description": "Agent-only, enforced in ticket-service rather than by a route permission:\nthe route itself must stay open to end users, who post ordinary replies\nthrough it."
           },
           "invokeAi": {
             "type": ["boolean", "null"],
-            "default": false
+            "default": false,
+            "description": "Ask for an AI draft after this message lands.\n\nTwo writes, never one: the draft can fail without losing what the human\ntyped. Today it always fails — `rag-service` does not exist — and the\ncaller's own message still commits, which is exactly the behaviour that\nhas to survive Domain C shipping."
           },
           "attachments": {
             "type": ["array", "null"],
             "default": [],
+            "description": "Objects already uploaded, bound to this message as it is created\n\n\n**This is the ordering that makes a first-turn attachment readable.**\nPresign then confirm-against-a-message meant the row could only exist after\nthe message did, while `invokeAi` runs during the create — so the very\nscreenshot the question was about arrived a moment too late to be seen.\n\nA path that fails its confirm comes back in `skippedAttachments` and the\nmessage is still created, and that is why that is the only safe outcome.",
             "items": {
               "$ref": "#/components/schemas/NewAttachmentDto"
             }
           },
           "generatedFromId": {
             "type": ["string", "null"],
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The `ai_generations` row this reply came from — `AiDraftResponseDto`'s\n`generationId`, handed back.\n\nSend it when posting an AI-drafted reply so the draft is recorded ACCEPTED\nor EDITED rather than DISCARDED. Absent for an ordinary reply."
           }
         },
         "required": ["content"]
@@ -56193,7 +56479,8 @@
             "type": "string"
           },
           "fileUrl": {
-            "type": "string"
+            "type": "string",
+            "description": "An internal object path today; a signed URL once storage-service lands."
           },
           "fileSizeBytes": {
             "type": "number"
@@ -56229,10 +56516,12 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "The page this citation points at, or `null` when the source document has no\npages — a pasted text file, an HTML article. Never faked as 1."
           },
           "vectorPointId": {
-            "type": "string"
+            "type": "string",
+            "description": "The retrieval key the citation resolves through."
           }
         },
         "required": [
@@ -56251,6 +56540,7 @@
           },
           "skippedAttachments": {
             "type": "array",
+            "description": "File NAMES, never object paths and never contents — the same rule the AI's\nown skipped list follows, and for the same reason: a user reads this.",
             "items": {
               "type": "string"
             }
@@ -56268,7 +56558,8 @@
             "type": "string"
           },
           "senderId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null for an AI-generated message — no user wrote it."
           },
           "content": {
             "type": "string"
@@ -56307,10 +56598,12 @@
             }
           },
           "excludedFromAiContext": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Kept OUT of AI prompts.\n\nExposed rather than stripped: the transcript builder in `AiStreamService`\nfilters on it AFTER fetching, because the same route serves the UI, where a\nrefused message stays visible."
           },
           "answerStatus": {
             "type": ["string", "null"],
+            "description": "What the generation concluded.\n\n`null` for a human message, and also for a status this build cannot name.",
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
@@ -56321,6 +56614,7 @@
           },
           "citations": {
             "type": ["array", "null"],
+            "description": "What an AI answer cited.\n\n`null` for a human message and for an AI message written before citations\nwere stored; `[]` for an answer that cited nothing.",
             "items": {
               "$ref": "#/components/schemas/CitationResponseDto"
             }
@@ -56355,6 +56649,7 @@
           },
           "mimeType": {
             "type": "string",
+            "description": "An allowlist, never a denylist. A denylist is a promise to have thought of\nevery dangerous type, which is not a promise anyone can keep.",
             "enum": [
               "application/msword",
               "application/pdf",
@@ -56372,6 +56667,7 @@
           },
           "fileSizeBytes": {
             "type": "number",
+            "description": "Declared by the client and therefore not trustworthy on its own — the real\nenforcement is the signed URL's own size constraint. Checking it here still\nearns its place: it turns \"upload 2 GB, then be refused\" into an immediate\nrefusal, and it documents the cap in the API contract.",
             "maximum": 10485760,
             "minimum": 1
           }
@@ -56421,6 +56717,7 @@
         "properties": {
           "objectPath": {
             "type": "string",
+            "description": "Echoed back from the presign response.\n\nNot shape-validated here on purpose: ticket-service passes it to\nstorage-service, which checks it against the PendingUpload it recorded — a\nreal authorization check rather than a syntactic one. A regex here would\nonly reject well-formed paths that were never authorized, which is exactly\nthe case the real check catches better.",
             "maxLength": 1024,
             "minLength": 1
           },
@@ -56549,6 +56846,7 @@
           },
           "degraded": {
             "type": ["string", "null"],
+            "description": "`LEXICAL_ONLY` when the budget could not confirm room for a generation —\nthe workspace is at its AI allowance, or the quota counter was unreadable.\nThen `nextSteps` is empty because the model was never called, and\n`articles` came from keyword search. `null` on a normal answer, where an\nempty `nextSteps` means the model had nothing to add.\n\nRead it before rendering an empty `nextSteps`: without it, a client shows\n\"no suggestions\" where the truth is \"allowance used\".",
             "enum": ["LEXICAL_ONLY"]
           }
         },
@@ -56586,10 +56884,12 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "`null` for a source with no pages — a pasted text file, an HTML article."
           },
           "score": {
-            "type": "number"
+            "type": "number",
+            "description": "How well it matched, so a client can show or sort by relevance."
           }
         },
         "required": ["documentId", "documentTitle", "pageNumber", "score"]
@@ -56599,6 +56899,7 @@
         "properties": {
           "instruction": {
             "type": ["string", "null"],
+            "description": "An optional steer from the agent — \"shorter\", \"offer the refund\".\n\nAbsent means \"draft from the thread alone\", which is the ordinary case.\nBounded because this is user text that reaches a model prompt: an unbounded\nfield here is an unbounded token bill, quite apart from what someone could\ntry to write into it.",
             "maxLength": 500,
             "minLength": 1
           }
@@ -56620,7 +56921,9 @@
             "type": "number"
           },
           "generationId": {
-            "type": "string"
+            "type": "string",
+            "description": "The `ai_generations` row this draft came from.\n\n**Hand it back as `generatedFromId` when posting the reply.** That is what\nlets ticket-service record the draft as ACCEPTED or EDITED; omit it and the\nhourly sweep records it as DISCARDED instead.",
+            "example": ""
           },
           "citations": {
             "type": "array",
@@ -56673,7 +56976,8 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "The page this citation points at, or `null` when the source document has no\npages — a pasted text file, an HTML article. Never faked as 1."
           }
         },
         "required": ["chunkId", "documentId", "documentTitle", "pageNumber"]
@@ -56686,6 +56990,7 @@
           },
           "suggestedPriority": {
             "type": ["string", "null"],
+            "description": "Null when the model named something that is not a priority.\n\nThe value crosses two hops: rag-service (Python) answers a bare string, and\nticket-service narrows it there — at the one boundary where it is genuinely\nforeign — before putting it on `ClassifyTicketResponse` as a real enum. So a\n`MEDIUM-HIGH` or a translated label arrives here as null rather than as a\nsuggestion the UI would render and no agent could apply.",
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "confidenceScore": {
@@ -56746,6 +57051,7 @@
         "properties": {
           "reason": {
             "type": ["string", "null"],
+            "description": "Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves.",
             "maxLength": 500
           }
         }
@@ -56759,10 +57065,12 @@
           },
           "departmentId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Required, not inferred from the assignee's primary department.\n\nInferring it would put the ticket wherever that agent happens to sit, which\nis wrong the moment someone belongs to two teams — and it would make the\nqueue a ticket lands in depend on a fact about a PERSON rather than a\ndecision about the WORK. Both ids are validated against auth-service before\nanything is written."
           },
           "reason": {
             "type": ["string", "null"],
+            "description": "Why it moved. Absent means the service decides from context: `INITIAL` for\na first assignment, `MANUAL` for any later one.",
             "enum": [
               "DEPARTMENT_CHANGE",
               "ESCALATION",
@@ -56811,7 +57119,8 @@
             "type": "string"
           },
           "assignedById": {
-            "type": "string"
+            "type": "string",
+            "description": "Who assigned it. Always a person.\n\nWas `string | null`; the null had no writer — `writeAssignment` is the only\none and takes an actor (known-gaps #12). Part of the pre-client clearing —\nsee `PaginationDto`."
           },
           "departmentId": {
             "type": "string"
@@ -56913,7 +57222,8 @@
         "properties": {
           "filters": {
             "type": ["object", "null"],
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "`status`, `priority`, `assigneeId` — refused per kind at the service."
           },
           "from": {
             "type": "string",
@@ -56971,10 +57281,12 @@
           },
           "rollupComputedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "The newest rollup run behind the file — the disputed-number guard.\n\nTwo people exporting \"last quarter\" a week apart can see whether the data\nwas recomputed between them rather than guessing."
           },
           "downloadUrl": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Present only while READY, and minted per request.\n\nA signed URL to a tenant's full ticket history is a credential, so it is\nnever stored — which is also why polling twice yields two different URLs."
           },
           "error": {
             "type": ["string", "null"]
@@ -57144,6 +57456,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
           "name": {
@@ -57226,6 +57539,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
           "name": {
@@ -57406,10 +57720,12 @@
             "type": "string"
           },
           "stripePriceId": {
-            "type": "string"
+            "type": "string",
+            "description": "Stripe's id. `month` and `year` on one plan are the reason this is a list."
           },
           "interval": {
-            "type": "string"
+            "type": "string",
+            "description": "The billing period this price charges for — `month` or `year` in practice.\n\nNot narrowed to those two: the value is whatever Stripe sent, and Stripe's\nown vocabulary includes `day` and `week`."
           }
         },
         "required": ["id", "interval", "stripePriceId"]
@@ -57424,7 +57740,8 @@
             "type": "string"
           },
           "stripeProductId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "NULL for a plan ASSIGNED rather than sold — the negotiated agreement."
           },
           "maxAgentSeats": {
             "type": "number"
@@ -57448,7 +57765,8 @@
             "type": "number"
           },
           "maxAnalyticsRangeDays": {
-            "type": "number"
+            "type": "number",
+            "description": "Days of history analytics may look back over. Narrowing it is retroactive."
           },
           "isActive": {
             "type": "boolean"
@@ -57460,7 +57778,8 @@
             }
           },
           "subscriberCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Live tenants on this plan: the delete gate and the apply's blast radius."
           },
           "createdAt": {
             "type": "string",
@@ -57540,6 +57859,7 @@
           },
           "evaluatedDimensions": {
             "type": "array",
+            "description": "Which limits this run actually checked.\n\nA dimension absent from the list was NOT evaluated, and `overLimitCount`\nsays nothing about it — render it as unknown rather than as zero affected.",
             "items": {
               "type": "string"
             }
@@ -57567,25 +57887,30 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
-            }
+            },
+            "description": "Field name → `\"before -> after\"`, for the columns this apply would change."
           },
           "after": {
             "type": "object",
             "additionalProperties": {
               "type": "number"
-            }
+            },
+            "description": "The AFTER value of every NUMERIC column in `changes`, keyed the same way.\n\n`changes` renders for a human; this is what a machine reads. A key absent\nhere means the column is not changing — never \"zero\", which would put every\ntenant over. `aiModelTier` is a string and never appears.\n\nknown-gaps #21: the composer used to parse the display string, and a\ncosmetic change to its separator silently disarmed two limit checks."
           },
           "overLimit": {
             "type": "array",
+            "description": "Limits this tenant is ALREADY past under the new plan.\n\nReported, never enforced: a limit gates admission, never tenure. These\ntenants keep everything they have and are refused their next addition.",
             "items": {
               "type": "string"
             }
           },
           "skippedPinned": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Off-catalogue by deliberate policy; this apply does not touch them."
           },
           "budgetDeferred": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Held to the next cycle roll: lowering a part-spent budget is retroactive."
           }
         },
         "required": [
@@ -57697,6 +58022,7 @@
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`OrgStatus`, null when the bridge answers null for `UNSPECIFIED`",
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -57784,6 +58110,7 @@
         "properties": {
           "reason": {
             "type": "string",
+            "description": "Required — the audit row is read months later by someone who was not there.",
             "maxLength": 500,
             "minLength": 1
           },
@@ -57896,6 +58223,7 @@
         "properties": {
           "reason": {
             "type": "string",
+            "description": "**Mandatory.** A backfill rewrites numbers somebody may already have acted\non, and \"why\" is the only part of that a reader cannot reconstruct\nafterwards from the rows themselves.",
             "maxLength": 500,
             "minLength": 1
           },
@@ -57958,7 +58286,9 @@
         "type": "object",
         "properties": {
           "inboundAddress": {
-            "type": "string"
+            "type": "string",
+            "description": "Publish this as the tenant’s support address. Rotating it issues a new one and stops the previous address routing immediately.",
+            "example": "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.example.com"
           }
         },
         "required": ["inboundAddress"]
@@ -57992,7 +58322,8 @@
             "type": "number"
           },
           "unreadCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Pushed back so a client never recomputes a badge it can be told."
           }
         },
         "required": ["unreadCount", "updated"]
@@ -58067,6 +58398,7 @@
           },
           "platform": {
             "type": ["string", "null"],
+            "description": "`IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.",
             "enum": ["ANDROID", "IOS", "WEB"]
           },
           "deviceName": {
@@ -58074,7 +58406,8 @@
           },
           "lastUsedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Null until the first successful push — how stale this device is."
           },
           "createdAt": {
             "type": ["string", "null"],
@@ -58088,6 +58421,7 @@
         "properties": {
           "rating": {
             "type": "number",
+            "description": "A thumb: `1` for up, `-1` for down.",
             "enum": [-1, 1]
           },
           "feedbackText": {
@@ -58096,7 +58430,8 @@
             "minLength": 1
           },
           "citationAccurate": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "description": "Whether the citations the model gave were accurate.\n\nTri-state on purpose — absent means \"not assessed\", which is different from\n\"assessed and wrong\". Collapsing the two would make every un-assessed reply\nlook like a citation failure in the quality report."
           }
         },
         "required": ["rating"]
@@ -58146,7 +58481,8 @@
             "type": ["string", "null"]
           },
           "citationAccurate": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "description": "null means \"not assessed\", NOT \"assessed and wrong\"."
           },
           "createdAt": {
             "type": "string",
@@ -58180,7 +58516,8 @@
           },
           "skipRerank": {
             "type": ["boolean", "null"],
-            "default": false
+            "default": false,
+            "description": "Returns what the RETRIEVER found, before the reranker had an opinion.\n\nA diagnostic rather than a performance switch: a Knowledge Manager asking\n\"why isn't this document coming back\" needs to know whether it lost at\nretrieval or at rerank, and those are different problems with different\nfixes."
           },
           "query": {
             "type": "string",
@@ -58223,6 +58560,7 @@
           },
           "degraded": {
             "type": ["string", "null"],
+            "description": "Why this result set is thinner than usual, or `null` when it is not.\n\n`LEXICAL_ONLY` means the vector search was skipped.",
             "enum": ["LEXICAL_ONLY"]
           }
         },
@@ -58241,7 +58579,8 @@
             "type": "string"
           },
           "pageNumber": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "NULL for formats with no pages — never faked as 1."
           },
           "chunkIndex": {
             "type": "number"
@@ -58253,7 +58592,8 @@
             "type": "number"
           },
           "vectorPointId": {
-            "type": "string"
+            "type": "string",
+            "description": "The id a citation resolves through, and the two arms' fusion key."
           }
         },
         "required": [
@@ -58308,6 +58648,7 @@
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
@@ -58323,7 +58664,8 @@
             }
           },
           "generationId": {
-            "type": "string"
+            "type": "string",
+            "description": "The `ai_generations` row this answer was billed to.\n\nReturned so the answer is identifiable after the fact. Nothing can rate it\nyet — `ai_response_feedbacks` is keyed on `ticket_message_id` and an ask\nproduces no message."
           }
         },
         "required": ["citations", "content", "generationId", "status"]
@@ -58360,10 +58702,12 @@
             "type": "string"
           },
           "bullmqJobId": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty until the worker has queued it."
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "CANCELLED",
               "CHUNKING",
@@ -58379,7 +58723,8 @@
           },
           "processedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "`null` while the attempt is still running."
           },
           "createdAt": {
             "type": "string",
@@ -58402,6 +58747,7 @@
           "ocrLanguages": {
             "type": ["array", "null"],
             "default": [],
+            "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nRe-declared rather than inherited, and NOT carried over from the document\nbeing replaced: reading a scan in the wrong language is one of the main\nreasons to replace one, so the previous value is exactly what a caller may\nbe here to change. Absent means `[]`, which is the `eng` fallback — the\nsame meaning it has on confirm.",
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
@@ -58409,6 +58755,7 @@
           },
           "objectPath": {
             "type": "string",
+            "description": "The object path, echoed back from the presign response.",
             "maxLength": 1024,
             "minLength": 1
           }
@@ -58420,6 +58767,7 @@
         "properties": {
           "contentType": {
             "type": "string",
+            "description": "The document's MIME type. Must be one the parser accepts.",
             "enum": [
               "application/pdf",
               "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -58519,10 +58867,12 @@
             "type": "string"
           },
           "documentTitle": {
-            "type": "string"
+            "type": "string",
+            "description": "The flagged document's title, joined in so the list reads as a worklist."
           },
           "flagType": {
             "type": ["string", "null"],
+            "description": "What kind of attention this document needs, or `null` when the value is one\nthis build does not recognise — the same nullability\n{@link DocumentResponseDto.status} carries, and for the same reason.",
             "enum": [
               "CONFLICTING",
               "LOW_CONFIDENCE",
@@ -58549,13 +58899,16 @@
           },
           "resolvedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "`null` while the flag is open."
           },
           "resolvedById": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A bare id — the gateway does not hydrate it into a user."
           },
           "resolution": {
             "type": ["string", "null"],
+            "description": "`null` while the flag is open, which is what an open flag sends.",
             "enum": ["DISMISSED", "DOCUMENT_REPLACED", "FIXED"]
           },
           "resolutionComment": {
@@ -58590,7 +58943,8 @@
         "properties": {
           "isOrganizationWide": {
             "type": ["boolean", "null"],
-            "default": true
+            "default": true,
+            "description": "Defaults TRUE, matching RDM Table 17.\n\nThe permissive default is deliberate and worth stating: a knowledge base\nwhose documents defaulted to invisible would look broken to everyone who\ndid not also configure departments, and the failure mode of the other\ndefault — a document nobody can find — is a support ticket rather than a\ndisclosure. Restricting is then an explicit act."
           },
           "departmentIds": {
             "type": ["array", "null"],
@@ -58603,6 +58957,7 @@
           "ocrLanguages": {
             "type": ["array", "null"],
             "default": [],
+            "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nAn advanced field: leave it empty unless the upload is known to be scanned.\n`[]` and absent are the same thing, and the parser falls back to `eng`.",
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
@@ -58610,6 +58965,7 @@
           },
           "objectPath": {
             "type": "string",
+            "description": "The object path, echoed back from the presign response.",
             "maxLength": 1024,
             "minLength": 1
           },
@@ -58630,6 +58986,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
           "name": {
@@ -58679,7 +59036,8 @@
           },
           "deletedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Non-null only on a soft-deleted row."
           },
           "deletedByName": {
             "type": ["string", "null"]
@@ -58709,7 +59067,8 @@
         "properties": {
           "isPrimary": {
             "type": ["boolean", "null"],
-            "default": false
+            "default": false,
+            "description": "Makes THIS department primary for every user in the batch. A user has at\nmost one primary, so setting it here demotes whichever they had."
           },
           "userIds": {
             "type": "array",
@@ -58726,10 +59085,12 @@
         "type": "object",
         "properties": {
           "addedCount": {
-            "type": "number"
+            "type": "number",
+            "description": "New memberships."
           },
           "updatedCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Existing memberships whose `isPrimary`/assigner were refreshed instead."
           }
         },
         "required": ["addedCount", "updatedCount"]
@@ -58766,6 +59127,7 @@
           },
           "message": {
             "type": "string",
+            "description": "The opening question. Becomes the ticket's description.",
             "maxLength": 20000,
             "minLength": 1
           },
@@ -58826,6 +59188,7 @@
           },
           "priceId": {
             "type": "string",
+            "description": "Both ids, and they must agree.\n\nSending only the price would let a caller name Pro's plan and Starter's\nprice; sending only the plan would charge them for a price the plan does\nnot own. The endpoint refuses a mismatch rather than picking one.",
             "maxLength": 255,
             "minLength": 1
           }
@@ -58868,7 +59231,8 @@
             "format": "date-time"
           },
           "creditIssued": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "description": "Whether the proration credited rather than charged — **`null` when it could\nnot be determined.**\n\nA downgrade produces a credit against future invoices, never a refund, and\na client that does not say so is a support ticket. Three-valued on purpose:\n`always_invoice` does not guarantee the proration lands on the invoice this\nis read from, so a `false` can be wrong for a change that credited and a\n`true` can be read off an unrelated invoice. `null` means *say nothing* —\nwhich is the honest option, and the one a comment on a plain `boolean`\ncannot give a UI that is already rendering it."
           }
         },
         "required": ["creditIssued", "effectiveAt", "planId", "planName"]
@@ -59041,7 +59405,7 @@
         "properties": {
           "phoneNumber": {
             "type": "string",
-            "description": "Must be a valid phone number written with its international calling code, for example +14155552671."
+            "description": "Becomes `otps.target`. `users.phone_number` is not touched until a code for\nthis exact number verifies, which is what lets one endpoint serve both\nfirst-time verification and change-of-number.\n\nMust be a valid phone number written with its international calling code, for example +14155552671."
           }
         },
         "required": ["phoneNumber"]
@@ -59072,7 +59436,8 @@
         "type": "object",
         "properties": {
           "target": {
-            "type": "string"
+            "type": "string",
+            "description": "Masked: `a***e@acme.com` or `+44******1234`."
           },
           "expiresInMinutes": {
             "type": "number"
@@ -59121,7 +59486,8 @@
         "type": "object",
         "properties": {
           "revokedSessionCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Surfaced so the UI can say \"you have been signed out of N devices\"."
           }
         },
         "required": ["revokedSessionCount"]
@@ -59140,7 +59506,8 @@
         "type": "object",
         "properties": {
           "allDevices": {
-            "type": ["boolean", "null"]
+            "type": ["boolean", "null"],
+            "description": "Log out of all devices."
           }
         }
       },
@@ -59219,6 +59586,7 @@
           },
           "deviceName": {
             "type": ["string", "null"],
+            "description": "Display label for the \"your active sessions\" screen (\"Chrome on macOS\").\n\nIts destination is `device_sessions.device_name`, written when the session\nrow is created — which is why it looks unused in `login()`. Being\nclient-supplied, it must never influence a security decision: device trust\nis proven with the separate `deviceToken` cookie, a secret the server\nissued.\n\n`@MaxLength(100)` mirrors `device_sessions.device_name VarChar(100)`;\nwithout it an oversized value is a Postgres error on insert rather than a\n400 at the edge.\n\nOptional rather than nullable: absent means \"the client did not label this\ndevice\", which is what the proto's `optional string` expects.\n\n**There is deliberately no `ipAddress` field.** A body field is whatever\nthe client says it is, so accepting one would let an attacker post\n`{\"ipAddress\": \"10.0.0.1\"}` to poison the audit trail and evade IP-based\nlockout. The gateway derives it from the transport.",
             "maxLength": 100
           }
         },
@@ -59231,7 +59599,8 @@
             "type": "boolean"
           },
           "requiresTwoFactorSetup": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when the tenant REQUIRES 2FA and this account has not enrolled.\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
           }
         },
         "required": ["requiresTwoFactor", "requiresTwoFactorSetup"]
@@ -59285,6 +59654,7 @@
         "properties": {
           "idToken": {
             "type": "string",
+            "description": "The Firebase ID token the browser obtained from the Google flow.\n\nSafe to accept from the body precisely because it is not trusted:\nauth-service verifies its signature against Google's public keys, so a\nforged value fails there rather than being believed here.",
             "minLength": 1
           },
           "deviceName": {
@@ -59366,6 +59736,7 @@
         "properties": {
           "backupCodes": {
             "type": "array",
+            "description": "Shown once. Only hashes are stored.",
             "items": {
               "type": "string"
             }
@@ -59444,7 +59815,8 @@
         "properties": {
           "filters": {
             "type": ["object", "null"],
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "`action`, `resourceType`, `userId` — refused per kind at the service."
           },
           "from": {
             "type": "string",
@@ -59462,7 +59834,8 @@
         "properties": {
           "filters": {
             "type": ["object", "null"],
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "Per-kind predicates the three kinds do not share.\n\nValidated at the SERVICE against `EXPORT_FILTER_KEYS`, not here: the\nallowed keys differ per kind, and a DTO cannot see which kind it carries\nwithout splitting into three. An unknown key is refused rather than stored\nand ignored — a filter the caller believes applied and that silently did\nnot is the failure this shape is most exposed to."
           },
           "kind": {
             "type": "string",
@@ -59497,6 +59870,7 @@
           },
           "eventTypes": {
             "type": ["array", "null"],
+            "description": "Absent means \"leave them\"; an empty array is refused, same as create.",
             "items": {
               "type": "string",
               "enum": [
@@ -59559,6 +59933,7 @@
           },
           "dob": {
             "type": ["string", "null"],
+            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone.",
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           }
         }
@@ -59577,6 +59952,7 @@
           },
           "dob": {
             "type": ["string", "null"],
+            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone.",
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           }
         }
@@ -59586,6 +59962,7 @@
         "properties": {
           "content": {
             "type": "string",
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 20000,
             "minLength": 1
           }
@@ -59619,6 +59996,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 20000,
             "minLength": 1
           },
@@ -59638,6 +60016,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
           "name": {
@@ -59745,12 +60124,14 @@
           },
           "slug": {
             "type": ["string", "null"],
+            "description": "Appears in URLs, so changing it breaks every existing link. Treated as a\nrename with consequences rather than a cosmetic edit — the service rejects\na collision with 409 rather than silently suffixing it.",
             "maxLength": 100,
             "minLength": 2,
             "pattern": "^[a-z0-9-]+$"
           },
           "domain": {
             "type": ["string", "null"],
+            "description": "Empty string clears it. Globally unique across tenants.",
             "maxLength": 255,
             "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
           }
@@ -59764,22 +60145,26 @@
           },
           "allowedEmailDomains": {
             "type": ["array", "null"],
+            "description": "REPLACE semantics when present, untouched when absent.\n\nThe gateway can tell the two apart (`undefined` vs `[]`) but protobuf\ncannot, which is why the client sets an explicit replace flag on the wire.",
             "items": {
               "type": "string"
             }
           },
           "maxDocumentBytesOverride": {
             "type": ["number", "null"],
+            "description": "The largest document this workspace will accept, at or below the platform\nceiling. `null` clears it; an absent key leaves it unchanged.",
             "maximum": 104857600,
             "minimum": 1
           },
           "maxAttachmentBytesOverride": {
             "type": ["number", "null"],
+            "description": "See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}.",
             "maximum": 10485760,
             "minimum": 1
           },
           "maxAttachmentsPerMessageOverride": {
             "type": ["number", "null"],
+            "description": "See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}.",
             "maximum": 5,
             "minimum": 1
           }
@@ -59821,12 +60206,14 @@
           },
           "publicDomainWarnings": {
             "type": "array",
+            "description": "Accepted free-mail domains worth a second look. Never an error.",
             "items": {
               "type": "string"
             }
           },
           "maxDocumentBytesOverride": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "What this workspace has configured, or `null` where it has configured\nnothing.\n\n`null` rather than the platform number: a screen that renders the ceiling\nas if the tenant had chosen it cannot show the difference between an\ninherited limit and a deliberate one, and the tenant would have no way to\ntell whether clearing the field changes anything."
           },
           "maxAttachmentBytesOverride": {
             "type": ["number", "null"]
@@ -59849,6 +60236,7 @@
         "properties": {
           "type": {
             "type": "string",
+            "description": "A known type, or `'*'` for the catch-all that turns a channel off wholesale.",
             "enum": [
               "*",
               "billing.payment_failed",
@@ -59904,6 +60292,7 @@
         "properties": {
           "type": {
             "type": ["string", "null"],
+            "description": "The event this preference is for, or `'*'` for the catch-all row.",
             "enum": [
               "*",
               "billing.payment_failed",
@@ -59920,6 +60309,7 @@
           },
           "channel": {
             "type": ["string", "null"],
+            "description": "The transport this preference governs.",
             "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK"]
           },
           "isEnabled": {
@@ -59927,10 +60317,12 @@
           },
           "digest": {
             "type": ["string", "null"],
+            "description": "Whether matching notifications batch into a digest.",
             "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
           },
           "source": {
             "type": ["string", "null"],
+            "description": "Where the value came from.\n\nLets the UI show \"inherited\" rather than presenting a default as a choice.",
             "enum": ["DEFAULT", "EXPLICIT", "WILDCARD"]
           }
         },
@@ -59954,6 +60346,7 @@
         "properties": {
           "description": {
             "type": ["string", "null"],
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
           "name": {
@@ -60003,7 +60396,8 @@
         "type": "object",
         "properties": {
           "revokedSessionCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Other devices signed out by the change. The caller keeps this session."
           }
         },
         "required": ["revokedSessionCount"]
@@ -60119,14 +60513,16 @@
             "type": "boolean"
           },
           "draining": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "This instance is shutting down. Gates `ready`; see `DrainState`."
           },
           "dependencies": {
             "$ref": "#/components/schemas/ReadinessDependenciesResponseDto"
           },
           "peers": {
             "type": "object",
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "Peer connectivity, for humans during an incident. Does NOT gate."
           },
           "timestamp": {
             "type": "string",
@@ -60210,13 +60606,15 @@
             "type": "string"
           },
           "eventId": {
-            "type": "string"
+            "type": "string",
+            "description": "The payload `id` the receiver deduplicates on — stable across retries."
           },
           "eventType": {
             "type": "string"
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`null` for a wire value this build does not know — never invented.",
             "enum": ["DELIVERED", "FAILED", "PENDING"]
           },
           "attempts": {
@@ -60230,7 +60628,8 @@
           },
           "occurredAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the EVENT occurred — not when any attempt was made."
           },
           "deliveredAt": {
             "type": ["string", "null"],
@@ -60400,7 +60799,8 @@
             "type": "string"
           },
           "current": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "The session this request arrived on, matched by family — not by IP."
           },
           "isTrusted": {
             "type": "boolean"
@@ -60494,6 +60894,7 @@
           },
           "permissionCodes": {
             "type": "array",
+            "description": "Every permission code the caller holds, granted through their roles.",
             "items": {
               "type": "string",
               "enum": [
@@ -60826,6 +61227,7 @@
           },
           "fromStatus": {
             "type": ["string", "null"],
+            "description": "Null on a row with no prior status.",
             "enum": [
               "CLOSED",
               "ESCALATED",
@@ -60850,7 +61252,8 @@
             "type": "string"
           },
           "reason": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Null when the caller may not read it — see the route's docblock."
           },
           "changedAt": {
             "type": "string",
@@ -60973,7 +61376,8 @@
             "$ref": "#/components/schemas/UserResponseDto"
           },
           "organizationId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Always present on a tenant user; null only for a platform Super Admin."
           },
           "organizationName": {
             "type": ["string", "null"]
@@ -61172,10 +61576,12 @@
             }
           },
           "degraded": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when ANY expected job is unhealthy — the single field a monitor can\nalert on without knowing the job list."
           },
           "unavailable": {
             "type": "array",
+            "description": "Which legs could not be reached, so a partial answer is legible as one.",
             "items": {
               "type": "string"
             }
@@ -61188,6 +61594,7 @@
         "properties": {
           "service": {
             "type": "string",
+            "description": "Which service owns the schedule — the two have separate databases.",
             "enum": [
               "auth-service",
               "ingestion-service",
@@ -61217,6 +61624,7 @@
           },
           "health": {
             "type": "string",
+            "description": "How this row is doing — see {@link JobHealth} for the five values.\n\nComputed here rather than stored, because the judgement needs the list of\njobs this build EXPECTS: a job that has never run has no row, and a reader\nthat only looks at the rows it finds reports nothing wrong.",
             "enum": ["failing", "healthy", "never-ran", "stale", "step"]
           }
         },
@@ -61264,7 +61672,8 @@
           },
           "updatedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the tenant row last changed — **not when it went past due**.\n\n`organizations` has no status-change timestamp, so this is the closest\navailable fact and a rename or a quota edit moves it. Rendering it as a\ndunning age would be a confidently wrong number."
           }
         },
         "required": ["id", "name", "updatedAt"]
@@ -61294,10 +61703,12 @@
             "type": "string"
           },
           "subscribers": {
-            "type": "number"
+            "type": "number",
+            "description": "Live subscribers — **not** `SubscriptionPlanResponseDto.subscriberCount`.\n\nThat one is unfiltered and counts soft-deleted tenants, because\n`DELETE /platform/plans/:id` reads it to refuse retiring a plan somebody\nstill points at and an offboarded tenant can be restored. This one excludes\nthem, because an offboarded tenant is not a subscriber and the same\nresponse's `tenants.total` excludes them too."
           },
           "seatsAllocated": {
-            "type": "number"
+            "type": "number",
+            "description": "Summed from what tenants HOLD, so pinned and overridden grants count."
           }
         },
         "required": ["planId", "planName", "seatsAllocated", "subscribers"]
@@ -61309,23 +61720,28 @@
             "type": "boolean"
           },
           "unavailableReason": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Present exactly when `available` is false."
           },
           "estimatedMrr": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "Smallest currency unit. Annual prices divided by twelve."
           },
           "currency": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "NULL when there are no active subscriptions to take one from."
           },
           "activeSubscriptions": {
             "type": ["number", "null"]
           },
           "computedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the JOB read Stripe — never when this endpoint answered."
           },
           "excludes": {
             "type": "array",
+            "description": "The caveats, traveling with the number.\n\nOn the wire deliberately: a field called `mrr` gets quoted in a meeting,\nand a caveat that lives in a document nobody opens beside the chart is not\na caveat. Present on every response, including the ones with no number.",
             "items": {
               "type": "string"
             }
@@ -61361,7 +61777,8 @@
           },
           "generatedAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When this response was assembled; see `revenue.computedAt` for the snapshot's age."
           }
         },
         "required": ["dunning", "generatedAt", "plans", "revenue", "tenants"]
@@ -61376,7 +61793,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "number"
-            }
+            },
+            "description": "Keyed by status, so a new status needs no new field.\n\n**`ACTIVE` here is not `activeSubscriptions` below.** The Stripe status\nmapping folds `trialing` into `ACTIVE`, and the revenue estimate counts\n`status: 'active'` subscriptions only. Two populations, one adjective —\nsubtracting one from the other produces a number that means nothing."
           }
         },
         "required": ["byStatus", "total"]
@@ -61407,10 +61825,12 @@
         "type": "object",
         "properties": {
           "day": {
-            "type": "string"
+            "type": "string",
+            "description": "`YYYY-MM-DD`, UTC."
           },
           "eventType": {
-            "type": "string"
+            "type": "string",
+            "description": "**A string, and it carries two vocabularies.**\n\nIn `points` it is Stripe's (`invoice.payment_failed`); in\n`currentlyOffboarded` it is `organization.offboarded`, which this system\ninvented. A client writing a `switch` over this field will meet both."
           },
           "count": {
             "type": "number"
@@ -61429,12 +61849,14 @@
           },
           "currentlyOffboarded": {
             "type": "array",
+            "description": "Tenants CURRENTLY offboarded, bucketed by the day they were offboarded — a\ndifferent ending from a cancellation.\n\n**Named for the state rather than the event, deliberately.** It is derived\nfrom `organizations.deleted_at`, which a restore clears, so restoring a\ntenant removes it from every past range. As an event count that would be a\nseries rewriting its own history; as a projection of current state it\nbehaves as named. A stable churn line needs the audit log, which lives in\nanother service.",
             "items": {
               "$ref": "#/components/schemas/BillingEventPointResponseDto"
             }
           },
           "observedEventTypes": {
             "type": "array",
+            "description": "The event types actually seen in this range.\n\nA type that has never arrived is visibly absent here rather than reported\nas a zero — and which types arrive at all is the Stripe endpoint's\n`enabled_events`, which nothing in this repository configures.",
             "items": {
               "type": "string"
             }
@@ -61471,13 +61893,16 @@
             "type": "string"
           },
           "organizationId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null for a PLATFORM act — the event belongs to the platform, not a tenant."
           },
           "userId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null for system and cron actors, which have no user acting for them."
           },
           "action": {
             "type": ["string", "null"],
+            "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
@@ -61546,7 +61971,8 @@
           },
           "metadata": {
             "type": "object",
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "Parsed back into an object for the client.\n\nIt crosses gRPC as a JSON string because the shape differs per action; a\ntyped proto message could only be a `map<string, string>`, which would\nflatten every nested value in the before/after diff."
           },
           "createdAt": {
             "type": "string",
@@ -61743,10 +62169,12 @@
             "type": "string"
           },
           "group": {
-            "type": "string"
+            "type": "string",
+            "description": "The `target` prefix of the code, for grouping in the role editor."
           },
           "isRetired": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when the code is in the table and no longer in `PERMISSION_CODES`.\n\nRetired rather than deleted, because roles may still hold it (ADR 0038).\nAn editor should show it as ungrantable rather than as an option — the API\nrefuses it either way, and offering it makes the refusal read as a bug."
           }
         },
         "required": ["code", "group", "id", "isRetired", "name"]
@@ -61780,7 +62208,8 @@
             "$ref": "#/components/schemas/UsageMeterResponseDto"
           },
           "storage": {
-            "$ref": "#/components/schemas/UsageMeterResponseDto"
+            "$ref": "#/components/schemas/UsageMeterResponseDto",
+            "description": "Composed at the GATEWAY from ingestion's tenant-scoped usage read.\n\nauth-service cannot answer it — it does not count documents and cannot dial\nthe service that does — so it sends this meter unavailable and the gateway\nreplaces it. `available: false` here therefore means the ingestion leg did\nnot answer, and never \"this workspace has no storage\".\n\nThe number is the one a plan-change refusal quotes. It has to be: a tenant\ntold to reduce storage opens this page to find out what to delete."
           },
           "aiTokens": {
             "$ref": "#/components/schemas/UsageMeterResponseDto"
@@ -61791,6 +62220,7 @@
           },
           "aiModelTier": {
             "type": ["string", "null"],
+            "description": "The plan, beside the meters\n\nThis is the page a customer opens when they hit a limit, and a limit with\nno plan next to it is a number they cannot act on: the next question is\nalways \"what would I get if I upgraded\".",
             "enum": ["FAST", "QUALITY"]
           },
           "planName": {
@@ -61798,7 +62228,8 @@
           },
           "currentPeriodEnd": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "NULL for a grandfathered tenant, who has no invoice period at all."
           }
         },
         "required": [
@@ -61865,6 +62296,7 @@
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`OrgStatus` — see {@link OrganizationResponseDto.status}.",
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -61922,7 +62354,8 @@
             }
           },
           "nextCursor": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null on the last page — a client that keeps polling gets nothing forever."
           },
           "hasMore": {
             "type": "boolean"
@@ -61941,6 +62374,7 @@
           },
           "type": {
             "type": ["string", "null"],
+            "description": "The ORIGINATING event — `ticket.assigned`, never the NATS subject.\n\n`null` for a type this build does not recognise.",
             "enum": [
               "billing.payment_failed",
               "billing.plan_changed",
@@ -61956,6 +62390,7 @@
           },
           "priority": {
             "type": ["string", "null"],
+            "description": "How urgent it is. `null` when the wire value is one this build cannot name.",
             "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
           },
           "title": {
@@ -61966,7 +62401,8 @@
           },
           "data": {
             "type": "object",
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "description": "The event's payload, decoded from the JSON string the wire carries."
           },
           "actionUrl": {
             "type": ["string", "null"]
@@ -61976,16 +62412,19 @@
           },
           "resourceType": {
             "type": ["string", "null"],
+            "description": "What the notification is ABOUT. `null` when unset or unrecognized.",
             "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
           },
           "resourceId": {
             "type": ["string", "null"]
           },
           "groupKey": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "What collapses several events into one row — free-form, and deliberately\nnot an enum: the service composes it from a resource id."
           },
           "groupCount": {
-            "type": "number"
+            "type": "number",
+            "description": "\"12 new messages on #1042\" — how many events this row represents."
           },
           "readAt": {
             "type": ["string", "null"],
@@ -62136,7 +62575,8 @@
             "format": "date-time"
           },
           "chunkCount": {
-            "type": "number"
+            "type": "number",
+            "description": "The only reading-length signal on this response, `fileSizeBytes` being absent."
           }
         },
         "required": ["chunkCount", "id", "title", "updatedAt"]
@@ -62185,7 +62625,8 @@
             "type": "number"
           },
           "pageNumber": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "`null` for formats with no pages — never faked as 1."
           },
           "contentText": {
             "type": "string"
@@ -62206,10 +62647,12 @@
             }
           },
           "meta": {
-            "$ref": "#/components/schemas/PaginationMetaDataResponseDto"
+            "$ref": "#/components/schemas/PaginationMetaDataResponseDto",
+            "description": "Describes the BLOCK range, not a page of articles.\n\nA whole document is unbounded — a 200-page handbook is hundreds of blocks —\nso the detail view pages through the text rather than returning it whole."
           },
           "hasUnindexedPages": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when some of the source could not be read.\n\nThe blocks are then less than the document, and nothing in them shows it —\n`chunkIndex` is contiguous over what survived, so there is no gap to\nnotice. Render it as a notice rather than hiding the article: 197 readable\npages beat none, which is the trade indexing already made."
           }
         },
         "required": ["article", "blocks", "hasUnindexedPages", "meta"]
@@ -62218,13 +62661,16 @@
         "type": "object",
         "properties": {
           "totalItems": {
-            "type": "number"
+            "type": "number",
+            "description": "Total matching records, across every page."
           },
           "itemCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Records on THIS page — smaller than `itemsPerPage` on the last one."
           },
           "itemsPerPage": {
-            "type": "number"
+            "type": "number",
+            "description": "The requested page size."
           },
           "totalPages": {
             "type": "number"
@@ -62490,7 +62936,8 @@
             "type": "number"
           },
           "vectorPointId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null until the Qdrant upsert has written it back — i.e. not yet retrievable."
           },
           "createdAt": {
             "type": "string",
@@ -62736,13 +63183,15 @@
         "type": "object",
         "properties": {
           "stripeCustomerId": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "NULL for a grandfathered tenant — free, internal, or pre-billing."
           },
           "stripeSubscriptionId": {
             "type": ["string", "null"]
           },
           "planName": {
-            "type": "string"
+            "type": "string",
+            "description": "A label. Never an authorization input."
           },
           "maxAgentSeats": {
             "type": "number"
@@ -62763,6 +63212,7 @@
           },
           "status": {
             "type": ["string", "null"],
+            "description": "`OrgStatus` — **ours, not Stripe's**, despite living on a subscription\nresponse. The proto field is `OrgStatus` and its comment says so: *\"the\ntenant lifecycle status the subscription drove\"*. Only the neighbouring\n`InvoiceResponseDto.status` carries Stripe's vocabulary.",
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -62815,7 +63265,8 @@
             "type": "string"
           },
           "interval": {
-            "type": "string"
+            "type": "string",
+            "description": "Stripe's literal — `month` | `year` in practice, and wider in theory."
           }
         },
         "required": ["interval", "stripePriceId"]
@@ -62840,6 +63291,7 @@
           },
           "aiModelTier": {
             "type": ["string", "null"],
+            "description": "`AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}.",
             "enum": ["FAST", "QUALITY"]
           },
           "maxDocumentBytes": {
@@ -62916,7 +63368,8 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "description": "**STRIPE's** invoice status — `draft`, `open`, `paid`, `uncollectible`,\n`void` — passed through from a live API read, so it stays a `string`.\n\nThe one status field on this surface that must NOT be narrowed. An enum\nover a third party's vocabulary turns a value they add into a runtime\nsurprise on a page about money; a foreign literal is stored and forwarded\nas it arrives, the same rule `SubscriptionPlanPrice.interval` follows.\nWritten here rather than only in the proto because this is the third time\nthe question has been asked about a Stripe status field."
           },
           "created": {
             "type": ["string", "null"],
@@ -63129,7 +63582,8 @@
             }
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `OverviewResponseDto.dataThrough`."
           }
         },
         "required": [
@@ -63166,7 +63620,8 @@
         "type": "object",
         "properties": {
           "rate": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "null when the denominator is zero — NOT zero. The two are different facts."
           },
           "numerator": {
             "type": "number"
@@ -63208,7 +63663,8 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `OverviewResponseDto.dataThrough`."
           }
         },
         "required": [
@@ -63294,7 +63750,8 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `OverviewResponseDto.dataThrough`."
           }
         },
         "required": [
@@ -63349,7 +63806,8 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "humanFirstResponseSeconds": {
-            "$ref": "#/components/schemas/MeanResponseDto"
+            "$ref": "#/components/schemas/MeanResponseDto",
+            "description": "Reported apart from the AI figure, always."
           },
           "aiFirstResponseSeconds": {
             "$ref": "#/components/schemas/MeanResponseDto"
@@ -63358,14 +63816,17 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "openTicketMedianAgeSeconds": {
-            "type": ["number", "null"]
+            "type": ["number", "null"],
+            "description": "The counterweight to `resolutionSeconds`, which can only see tickets that\nclosed and is therefore biased optimistic."
           },
           "computedAt": {
             "type": ["string", "null"],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When the rollups behind this answer ran."
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "**The last day the rollups behind this answer cover**,\n`YYYY-MM-DD`, or `null` when no rollup has ever run for this tenant.\n\nNot the same as `computedAt`, and the gap between them is the diagnosis: a\nrecent `computedAt` beside a `dataThrough` two weeks old means the job runs\nand finds nothing, while `dataThrough: null` means it has never run at all.\nA dashboard of zeros looks identical in both cases without this field —\nwhich is how seven scheduled jobs sat uncalled and nothing complained."
           }
         },
         "required": [
@@ -63442,13 +63903,16 @@
             "type": "number"
           },
           "emptyRetrievalRate": {
-            "$ref": "#/components/schemas/RateResponseDto"
+            "$ref": "#/components/schemas/RateResponseDto",
+            "description": "Over ATTACHMENT-FREE answering generations only.\n\n`emptyRetrievals` above stays the total, so the two read together: a\nquestion about a user's own file retrieved nothing correctly, and is not a\ngap in the corpus."
           },
           "attachmentGroundedRate": {
-            "$ref": "#/components/schemas/RateResponseDto"
+            "$ref": "#/components/schemas/RateResponseDto",
+            "description": "How many answering generations were given a file — reported, not hidden."
           },
           "attachmentEmptyRetrievals": {
-            "type": "number"
+            "type": "number",
+            "description": "The part of `emptyRetrievals` the rate above excludes."
           },
           "flags": {
             "type": "array",
@@ -63457,7 +63921,8 @@
             }
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `AgentAnalyticsResponseDto.dataThrough`."
           },
           "unavailable": {
             "type": "array",
@@ -63481,7 +63946,8 @@
         "type": "object",
         "properties": {
           "source": {
-            "type": "string"
+            "type": "string",
+            "description": "Which leg failed, by service name."
           },
           "reason": {
             "type": "string"
@@ -63522,6 +63988,7 @@
           },
           "neverRetrieved": {
             "type": "array",
+            "description": "**Two DIFFERENT findings** (RDM Table 27), never merged into one list.",
             "items": {
               "$ref": "#/components/schemas/DocumentUsageResponseDto"
             }
@@ -63533,6 +64000,7 @@
             }
           },
           "citationAccuracy": {
+            "description": "Citation accuracy from `ai_response_feedbacks` — the other service's leg.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/RateResponseDto"
@@ -63543,7 +64011,8 @@
             ]
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `AgentAnalyticsResponseDto.dataThrough`."
           },
           "unavailable": {
             "type": "array",
@@ -63646,7 +64115,8 @@
             "$ref": "#/components/schemas/RateResponseDto"
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `OverviewResponseDto.dataThrough`."
           }
         },
         "required": ["dataThrough", "points", "total"]
@@ -63677,6 +64147,7 @@
           },
           "byPurpose": {
             "type": "array",
+            "description": "**The per-purpose split is the point** — where the budget actually goes.",
             "items": {
               "$ref": "#/components/schemas/AiUsageSliceResponseDto"
             }
@@ -63698,6 +64169,7 @@
           },
           "aiModelTier": {
             "type": ["string", "null"],
+            "description": "`FAST` | `QUALITY`, or null.\n\nThe wire field was a bare `string` while `billing.proto` spelled the same\nfact as `AiModelTier` — drift rather than a decision, and it is an enum on\nboth now. Null only for UNSPECIFIED, which means auth-service returned no\nentitlement.",
             "enum": ["FAST", "QUALITY"]
           },
           "draftAcceptance": {
@@ -63711,7 +64183,8 @@
             "format": "date-time"
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "See `OverviewResponseDto.dataThrough`."
           }
         },
         "required": [
@@ -63799,10 +64272,12 @@
             }
           },
           "dataThrough": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "**The last day the underlying rollups cover**, `YYYY-MM-DD`,\nor `null` when nothing has ever been rolled up.\n\nThis endpoint spans more than one service, so it reports the STALEST leg:\na composed answer is only as fresh as its oldest input, and reporting the\nfreshest would let one healthy service vouch for a broken one."
           },
           "unavailable": {
             "type": "array",
+            "description": "Which legs could not be reached. Empty when everything answered.",
             "items": {
               "$ref": "#/components/schemas/UnavailableBlockResponseDto"
             }
@@ -63817,7 +64292,8 @@
             "type": "string"
           },
           "fullName": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "null when the id could not be resolved — a deleted user, or a lookup that failed."
           },
           "assigned": {
             "type": "number"
@@ -63832,6 +64308,7 @@
             "$ref": "#/components/schemas/MeanResponseDto"
           },
           "draftAcceptance": {
+            "description": "From the AI ledger. null when that leg was unavailable.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/RateResponseDto"
@@ -64015,6 +64492,7 @@
         "properties": {
           "reason": {
             "type": "string",
+            "description": "Required. Offboarding is finalized by a Super Admin who was not in the\nroom, and \"why did Acme leave?\" is the first thing they will ask.",
             "maxLength": 500,
             "minLength": 1
           }

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import java.util.Map;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -33,6 +34,8 @@ import org.springframework.stereotype.Component;
  * in behaviour. With the rule, the annotation no longer decides what is published.
  */
 @Component
+// Before ProseOverlayOpenApiCustomizer, which describes the wrappers this creates.
+@Order(0)
 public class RequestNullabilityOpenApiCustomizer implements OpenApiCustomizer {
 
   @Override

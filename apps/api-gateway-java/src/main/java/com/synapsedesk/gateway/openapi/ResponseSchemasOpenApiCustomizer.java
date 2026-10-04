@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -40,6 +41,8 @@ import org.springframework.stereotype.Component;
  * the document now describes what they do.
  */
 @Component
+// Before ProseOverlayOpenApiCustomizer, which describes the wrappers this creates.
+@Order(0)
 public class ResponseSchemasOpenApiCustomizer implements OpenApiCustomizer {
 
   @Override
