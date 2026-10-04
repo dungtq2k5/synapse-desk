@@ -38,6 +38,7 @@ import {
   diffResponseSchemaShapes,
   diffSecurity,
   diffDefaults,
+  diffWholeDocument,
   diffOperationIds,
   diffParameterEnums,
   diffRequestSchemaShapes,
@@ -78,6 +79,42 @@ async function loadJavaDocument() {
 try {
   const nodeDocument = JSON.parse(readFileSync(NODE_DOC_PATH, 'utf8'));
   const javaDocument = await loadJavaDocument();
+
+  if (args.includes('--whole')) {
+    // The flip's acceptance test, in report form until it is green: every difference
+    // in the whole document is either named in the registry or listed here.
+    const registry = JSON.parse(
+      readFileSync(
+        join(ROOT, 'scripts/lib/openapi-document-divergences.json'),
+        'utf8',
+      ),
+    );
+    const whole = diffWholeDocument(nodeDocument, javaDocument, registry);
+    const groups = {};
+    for (const row of whole.unexplained) {
+      const signature = row.path
+        .replace(/(query|path|header):[^/]+/g, 'PARAM')
+        .replace(/properties\/[^/]+/g, 'properties/*')
+        .replace(/^responses\/2\d\d/, 'responses/2xx');
+      (groups[signature] ||= []).push(row);
+    }
+    console.log(
+      `${whole.differences} differences: ${whole.differences - whole.unexplained.length} named, ${whole.unexplained.length} UNEXPLAINED, ${whole.stale.length} stale registry entr(ies)`,
+    );
+    for (const [id, count] of Object.entries(whole.explained)) {
+      console.log(`  named ${String(count).padStart(4)}  ${id}`);
+    }
+    for (const id of whole.stale) console.log(`  STALE        ${id}`);
+    for (const [signature, rows] of Object.entries(groups).sort(
+      (a, b) => b[1].length - a[1].length,
+    )) {
+      const e = rows[0];
+      console.log(
+        `  unexplained ${String(rows.length).padStart(4)}  ${signature}   e.g. ${e.where}: node=${JSON.stringify(e.node)?.slice(0, 50)} java=${JSON.stringify(e.java)?.slice(0, 50)}`,
+      );
+    }
+    process.exit(whole.unexplained.length || whole.stale.length ? 1 : 0);
+  }
 
   const {
     missingInJava,

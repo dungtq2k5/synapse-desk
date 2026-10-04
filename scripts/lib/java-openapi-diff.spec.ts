@@ -3,6 +3,7 @@ import {
   diffOpenApiDocuments,
   diffResponseSchemaShapes,
   diffDefaults,
+  diffWholeDocument,
   diffOperationIds,
   diffParameterEnums,
   diffRequestSchemaShapes,
@@ -791,5 +792,118 @@ describe('diffParameterEnums', () => {
         document({ enum: ['A'] }),
       ).mismatches,
     ).toHaveLength(1);
+  });
+});
+
+describe('diffWholeDocument', () => {
+  const document = (
+    operation: Record<string, unknown>,
+    top: Record<string, unknown> = {},
+  ) => ({
+    openapi: '3.1.0',
+    info: { title: 'T', version: '1' },
+    ...top,
+    paths: { '/x': { get: operation } },
+    components: { schemas: {} },
+  });
+  const ok = (schema: Record<string, unknown>) => ({
+    responses: { '200': { content: { 'application/json': { schema } } } },
+  });
+
+  it('finds nothing where only the spelling differs', () => {
+    const node = document(
+      {
+        parameters: [],
+        ...ok({
+          type: 'object',
+          additionalProperties: true,
+          properties: { a: { type: 'string', nullable: true } },
+        }),
+      },
+      { tags: [] },
+    );
+    const java = document(
+      ok({
+        type: 'object',
+        additionalProperties: {},
+        properties: { a: { type: ['string', 'null'] } },
+      }),
+    );
+
+    expect(diffWholeDocument(node, java, []).differences).toBe(0);
+  });
+
+  it('lists a difference no entry names as unexplained', () => {
+    const result = diffWholeDocument(
+      document(
+        ok({
+          type: 'object',
+          properties: { a: { type: 'string', example: 'x' } },
+        }),
+      ),
+      document(ok({ type: 'object', properties: { a: { type: 'string' } } })),
+      [],
+    );
+
+    expect(result.unexplained).toEqual([
+      {
+        where: 'get /x',
+        path: 'responses/200/content/application/json/schema/properties/a/example',
+        node: 'x',
+        java: null,
+      },
+    ]);
+  });
+
+  it('names a difference only while BOTH pinned values still hold', () => {
+    const entry = {
+      id: 'e',
+      path: '/properties/a/type$',
+      node: 'number',
+      java: 'integer',
+      reason: 'r',
+    };
+    const node = document(
+      ok({ type: 'object', properties: { a: { type: 'number' } } }),
+    );
+
+    expect(
+      diffWholeDocument(
+        node,
+        document(
+          ok({ type: 'object', properties: { a: { type: 'integer' } } }),
+        ),
+        [entry],
+      ).unexplained,
+    ).toEqual([]);
+    // Java moves: the entry no longer names it, and it is stale.
+    const moved = diffWholeDocument(
+      node,
+      document(ok({ type: 'object', properties: { a: { type: 'string' } } })),
+      [entry],
+    );
+    expect(moved.unexplained).toHaveLength(1);
+    expect(moved.stale).toEqual(['e']);
+  });
+
+  it('reports an entry that names nothing as stale', () => {
+    const same = document(ok({ type: 'string' }));
+
+    expect(
+      diffWholeDocument(same, same, [
+        { id: 'gone', path: '^nothing$', reason: 'r' },
+      ]).stale,
+    ).toEqual(['gone']);
+  });
+
+  it('restricts an entry to the routes it names', () => {
+    const entry = { id: 'e', where: '^post ', path: '/example$', reason: 'r' };
+    const result = diffWholeDocument(
+      document(ok({ type: 'object', properties: { a: { example: 1 } } })),
+      document(ok({ type: 'object', properties: { a: {} } })),
+      [entry],
+    );
+
+    expect(result.unexplained).toHaveLength(1);
   });
 });

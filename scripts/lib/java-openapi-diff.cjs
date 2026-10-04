@@ -678,10 +678,245 @@ function diffParameterEnums(nodeDocument, javaDocument) {
   return { compared, mismatches };
 }
 
+/**
+ * The WHOLE document, compared semantically, against a registry of named divergences.
+ *
+ * Every operation's request and responses are fully dereferenced, so Java's named
+ * envelope wrappers compare against Node's inline ones; nullability is compared by
+ * meaning (3.0 `nullable` against 3.1 `type: [..., "null"]` or `oneOf` with null); key
+ * order is ignored; and four spellings that say the same thing are made equal before
+ * comparing (an empty `parameters` list against none, `additionalProperties: true`
+ * against `{}`, an empty `contact`, an empty `tags`). Every other difference is either
+ * named in the registry or UNEXPLAINED.
+ *
+ * The registry is held from both sides: an entry pins the Node and Java values where
+ * they are constant (so a change on either side stops matching), and an entry that
+ * matches nothing is STALE. When this reports nothing unexplained and nothing stale,
+ * the delta between the two documents is enumerated by a check rather than by a person.
+ */
+function derefSchema(document, schema, seen = new Set()) {
+  if (!schema || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema))
+    return schema.map((item) => derefSchema(document, item, seen));
+  if (schema.$ref) {
+    const name = schema.$ref.split('/').pop();
+    if (seen.has(name)) return { $cycle: name };
+    const merged = {
+      ...derefSchema(
+        document,
+        document.components.schemas[name],
+        new Set([...seen, name]),
+      ),
+    };
+    for (const [key, value] of Object.entries(schema)) {
+      if (key !== '$ref') merged[key] = derefSchema(document, value, seen);
+    }
+
+    return merged;
+  }
+  const out = {};
+  for (const [key, value] of Object.entries(schema)) {
+    out[key] = derefSchema(document, value, seen);
+  }
+
+  return out;
+}
+
+function normaliseSchema(schema) {
+  if (!schema || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) return schema.map(normaliseSchema);
+  let x = { ...schema };
+  let nullable = false;
+  if (x.nullable === true) {
+    nullable = true;
+    delete x.nullable;
+  }
+  if (Array.isArray(x.type)) {
+    if (x.type.includes('null')) nullable = true;
+    const rest = x.type.filter((type) => type !== 'null');
+    x.type = rest.length === 1 ? rest[0] : rest.sort();
+  }
+  const isNull = (branch) =>
+    branch && branch.type === 'null' && Object.keys(branch).length === 1;
+  for (const key of ['oneOf', 'anyOf']) {
+    if (Array.isArray(x[key]) && x[key].some(isNull)) {
+      nullable = true;
+      const rest = x[key].filter((branch) => !isNull(branch));
+      delete x[key];
+      if (rest.length === 1) x = { ...rest[0], ...x };
+      else x[key] = rest;
+    }
+  }
+  if (Array.isArray(x.allOf) && x.allOf.length === 1) {
+    const inner = x.allOf[0];
+    delete x.allOf;
+    x = { ...inner, ...x };
+  }
+  if (x.additionalProperties === true) x.additionalProperties = {};
+  if (Array.isArray(x.enum)) x.enum = x.enum.filter((value) => value !== null);
+  const out = {};
+  for (const key of Object.keys(x).sort()) out[key] = normaliseSchema(x[key]);
+  if (nullable) out.$nullable = true;
+  if (Array.isArray(out.required)) out.required = [...out.required].sort();
+
+  return out;
+}
+
+function normaliseOperation(document, operation) {
+  const copy = JSON.parse(JSON.stringify(operation));
+  if (copy.parameters && copy.parameters.length === 0) delete copy.parameters;
+  if (copy.parameters) {
+    copy.parameters = Object.fromEntries(
+      copy.parameters.map((parameter) => [
+        `${parameter.in}:${parameter.name}`,
+        normaliseSchema(derefSchema(document, parameter)),
+      ]),
+    );
+  }
+  if (copy.requestBody)
+    copy.requestBody = normaliseSchema(derefSchema(document, copy.requestBody));
+  if (copy.responses) {
+    copy.responses = Object.fromEntries(
+      Object.entries(copy.responses).map(([status, response]) => [
+        status,
+        normaliseSchema(derefSchema(document, response)),
+      ]),
+    );
+  }
+
+  return copy;
+}
+
+function walkDifferences(a, b, path, where, into) {
+  if (JSON.stringify(a) === JSON.stringify(b)) return;
+  const objects =
+    a &&
+    b &&
+    typeof a === 'object' &&
+    typeof b === 'object' &&
+    !Array.isArray(a) &&
+    !Array.isArray(b);
+  if (objects) {
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      walkDifferences(a[key], b[key], [...path, key], where, into);
+    }
+
+    return;
+  }
+  into.push({ where, path: path.join('/'), node: a ?? null, java: b ?? null });
+}
+
+const EMPTY = (value) =>
+  value == null ||
+  (Array.isArray(value) && value.length === 0) ||
+  (typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0);
+
+function wholeDocumentDifferences(nodeDocument, javaDocument) {
+  const found = [];
+  for (const key of new Set([
+    ...Object.keys(nodeDocument),
+    ...Object.keys(javaDocument),
+  ])) {
+    if (key === 'paths' || key === 'components') continue;
+    if (key === 'tags' && EMPTY(nodeDocument.tags) && EMPTY(javaDocument.tags))
+      continue;
+    const node = key === 'info' ? { ...nodeDocument.info } : nodeDocument[key];
+    const java = key === 'info' ? { ...javaDocument.info } : javaDocument[key];
+    if (key === 'info') {
+      if (EMPTY(node.contact)) delete node.contact;
+      if (EMPTY(java.contact)) delete java.contact;
+    }
+    walkDifferences(node, java, [key], 'document', found);
+  }
+  for (const key of new Set([
+    ...Object.keys(nodeDocument.components),
+    ...Object.keys(javaDocument.components),
+  ])) {
+    if (key === 'schemas') continue;
+    walkDifferences(
+      nodeDocument.components[key],
+      javaDocument.components[key],
+      ['components', key],
+      'document',
+      found,
+    );
+  }
+  for (const [path, methods] of Object.entries(nodeDocument.paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const route = `${method} ${path}`;
+      const java = ((javaDocument.paths || {})[path] || {})[method];
+      if (!java) {
+        found.push({ where: route, path: '', node: 'operation', java: null });
+        continue;
+      }
+      walkDifferences(
+        normaliseOperation(nodeDocument, operation),
+        normaliseOperation(javaDocument, java),
+        [],
+        route,
+        found,
+      );
+    }
+  }
+  for (const [path, methods] of Object.entries(javaDocument.paths || {})) {
+    for (const method of Object.keys(methods)) {
+      if (!(nodeDocument.paths[path] || {})[method]) {
+        found.push({
+          where: `${method} ${path}`,
+          path: '',
+          node: null,
+          java: 'operation',
+        });
+      }
+    }
+  }
+
+  return found;
+}
+
+/** Whether a registry entry names this difference: its route, its path, and its values. */
+function entryMatches(entry, difference) {
+  if (entry.where && !new RegExp(entry.where, 'u').test(difference.where))
+    return false;
+  if (!new RegExp(entry.path, 'u').test(difference.path)) return false;
+  for (const side of ['node', 'java']) {
+    if (!(side in entry) || entry[side] === '*') continue;
+    if (JSON.stringify(entry[side]) !== JSON.stringify(difference[side]))
+      return false;
+  }
+
+  return true;
+}
+
+function diffWholeDocument(nodeDocument, javaDocument, registry) {
+  const differences = wholeDocumentDifferences(nodeDocument, javaDocument);
+  const explained = Object.fromEntries(registry.map((entry) => [entry.id, 0]));
+  const unexplained = [];
+  for (const difference of differences) {
+    const entry = registry.find((candidate) =>
+      entryMatches(candidate, difference),
+    );
+    if (entry) explained[entry.id] += 1;
+    else unexplained.push(difference);
+  }
+
+  return {
+    differences: differences.length,
+    explained,
+    unexplained,
+    stale: registry
+      .filter((entry) => explained[entry.id] === 0)
+      .map((entry) => entry.id),
+  };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
   diffSecurity,
   diffDefaults,
+  diffWholeDocument,
   diffParameterEnums,
   diffRequestSchemaShapes,
   diffOperationIds,
