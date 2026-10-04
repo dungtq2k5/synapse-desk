@@ -6,7 +6,6 @@ import {
   IngestionJobStatus as ProtoIngestionJobStatus,
   TicketSource as ProtoTicketSource,
 } from '@synapsedesk/grpc-proto';
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
@@ -48,20 +47,8 @@ import { CACHE_SCOPES } from '../../src/common/config/cache.config';
 describe('The GraphQL surface (e2e)', () => {
   let fx: E2eFixture;
 
-  /** The committed SDL, which the drift test above keeps current. */
+  /** The generated SDL, which the drift test below holds equal to the committed one. */
   const schemaSdl = () => readFileSync(SCHEMA_PATH, 'utf8');
-
-  /**
-   * `git`, by absolute path, run with a PATH containing only system directories.
-   *
-   * `execFileSync` takes no shell, so the ARGUMENTS below cannot be injected —
-   * but a bare `'git'` is still resolved through the inherited `PATH`, and any
-   * writable directory earlier in it would supply the binary instead. Naming the
-   * absolute path settles which program runs; pinning the environment settles it
-   * for anything that program then shells out to itself.
-   */
-  const GIT = '/usr/bin/git';
-  const FIXED_PATH_ENV = { ...process.env, PATH: '/usr/bin:/bin' };
 
   /**
    * A `ConfigService` that answers `production` for `NODE_ENV` and defers
@@ -244,38 +231,18 @@ describe('The GraphQL surface (e2e)', () => {
 
   describe('The committed schema', () => {
     it('**matches the generated one**', () => {
-      // `schema.gql` is generated, and committing a
-      // generated file looks redundant until the first breaking change: with
-      // it, removing a field is a red line in a diff somebody reviews; without
-      // it, it is a client failing in staging a week later.
-      //
-      // **Compared against git's INDEX, not against HEAD.** Comparing to HEAD
-      // would fail on the very commit that legitimately changes the schema —
-      // the file is regenerated and staged, but HEAD still has the old one. The
-      // index is what the author is about to commit, which is the question
-      // being asked: *did you regenerate and stage it?*
-      //
-      // The fixture has already booted the app, which rewrites the file, so a
-      // difference here means someone changed a type and did not stage the
-      // result.
-      const repoRoot = join(__dirname, '../../../..');
-      const relative = 'apps/api-gateway/src/schema.gql';
+      // The committed contract is `docs/reference/schema.gql`, which the Java
+      // gateway is built from. The fixture has already booted the app, which
+      // rewrote the generated copy at `SCHEMA_PATH`, so a difference here means
+      // someone changed a type and did not copy the result to the contract.
+      const committed = join(
+        __dirname,
+        '../../../../docs/reference/schema.gql',
+      );
 
-      const tracked = execFileSync(GIT, ['ls-files', '--', relative], {
-        encoding: 'utf8',
-        cwd: repoRoot,
-        env: FIXED_PATH_ENV,
-      }).trim();
-      // An untracked schema would make the diff below vacuously clean.
-      expect(tracked).toBe(relative);
-
-      const diff = execFileSync(GIT, ['diff', '--', relative], {
-        encoding: 'utf8',
-        cwd: repoRoot,
-        env: FIXED_PATH_ENV,
-      });
-
-      expect(diff).toBe('');
+      expect(readFileSync(SCHEMA_PATH, 'utf8')).toBe(
+        readFileSync(committed, 'utf8'),
+      );
     });
 
     it('is sorted WITHIN each type, so a diff is a change not a reshuffle', () => {

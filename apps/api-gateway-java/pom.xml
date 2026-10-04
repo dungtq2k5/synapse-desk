@@ -78,10 +78,10 @@
       <version>3.1.1</version>
     </dependency>
     <!--
-      Schema-first: `schema.gql` is the tracked contract, copied
-      into `target/classes/schema/` by the resources execution below and
-      loaded from there — never regenerated. Node writes it from decorators;
-      Java only reads it, the same asymmetry as `openapi.json`.
+      Schema-first: `docs/reference/schema.gql` is the tracked contract,
+      copied into `target/classes/schema/` by the resources execution below
+      and loaded from there — never regenerated. Node generates its own copy
+      from decorators, which its e2e suite holds equal to this one.
     -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -295,9 +295,9 @@
       -->
       <!--
         The GraphQL schema, COPIED rather than duplicated: Spring for GraphQL
-        loads it from the classpath, and `apps/api-gateway/src/schema.gql` is
-        the one both implementations serve. Copied at build time so a change
-        there cannot be half-applied — there is no second file to forget.
+        loads it from the classpath, and `docs/reference/schema.gql` is the
+        published contract. Copied at build time so a change there cannot be
+        half-applied — there is no second file to forget.
       -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -314,7 +314,7 @@
               >${project.build.outputDirectory}/schema</outputDirectory>
               <resources>
                 <resource>
-                  <directory>${project.basedir}/../api-gateway/src</directory>
+                  <directory>${project.basedir}/../../docs/reference</directory>
                   <includes>
                     <include>schema.gql</include>
                   </includes>

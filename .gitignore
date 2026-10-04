@@ -7,6 +7,10 @@ cspell.json
 # since `.env.test` is tracked. Loaded FIRST by the test:e2e:* scripts (dotenv
 # never overwrites, so first wins); absent by default and silently skipped.
 .env.test.local
+# The SDL the Node gateway writes on every boot (`autoSchemaFile`). The
+# tracked contract is `docs/reference/schema.gql`, which its e2e suite holds
+# this generated copy equal to.
+apps/api-gateway/src/schema.gql
 # Generated per-service container env — `scripts/generate-docker-env.mjs`
 # rewrites `.env`'s host addresses to compose service names. Generated, never
 # tracked: a tracked copy would be a third hand-maintained value-set outside

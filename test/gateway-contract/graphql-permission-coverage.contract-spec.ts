@@ -273,7 +273,7 @@ export function schemaFieldsIn(
 
 function schemaRootFields(): { kind: 'Query' | 'Mutation'; name: string }[] {
   return schemaFieldsIn(
-    readFileSync(join(REPO_ROOT, 'apps/api-gateway/src/schema.gql'), 'utf8'),
+    readFileSync(join(REPO_ROOT, 'docs/reference/schema.gql'), 'utf8'),
   );
 }
 

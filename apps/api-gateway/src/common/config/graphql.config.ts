@@ -14,12 +14,13 @@ import {
 import { CacheService } from '../cache/cache.service';
 
 /**
- * Where the generated SDL is written — and it is COMMITTED.
+ * Where the generated SDL is written. Not tracked: the committed contract is
+ * `docs/reference/schema.gql`, which the e2e suite holds this file equal to.
  *
- * A generated file in source control looks redundant until the first breaking
- * change: with it, removing a field is a red line in a diff somebody reviews;
- * without it, a client fails in staging a week later. `sortSchema` keeps that
- * diff meaningful rather than reordered noise.
+ * A contract in source control looks redundant until the first breaking change:
+ * with it, removing a field is a red line in a diff somebody reviews; without
+ * it, a client fails in staging a week later. `sortSchema` keeps that diff
+ * meaningful rather than reordered noise.
  *
  * **Resolved from THIS file, not from `process.cwd()`.** A cwd-relative path is
  * correct only when the process starts at the repo root; booting from the

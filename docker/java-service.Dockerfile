@@ -5,9 +5,9 @@
 # and a JRE runtime share nothing with a node build but the registry.
 #
 # **It reads two things from OUTSIDE the module**, and that is deliberate:
-# the protos and the GraphQL schema are shared with the other services and
-# the Node gateway. So the build context is the REPOSITORY ROOT, not
-# `apps/api-gateway-java`.
+# the protos, shared with the other services, and the published GraphQL
+# schema in `docs/reference/`. So the build context is the REPOSITORY ROOT,
+# not `apps/api-gateway-java`.
 
 # Pinned to a full version for the reason `image-contract.spec.ts` states: a
 # floating tag makes the image a function of the pull date. Both are read by
@@ -30,7 +30,7 @@ RUN cd apps/api-gateway-java && mvn -q -B dependency:go-offline -DskipTests
 # The two inputs from other workspaces, then the sources — see the note at
 # the top.
 COPY libs/grpc-proto/src/proto libs/grpc-proto/src/proto
-COPY apps/api-gateway/src/schema.gql apps/api-gateway/src/schema.gql
+COPY docs/reference/schema.gql docs/reference/schema.gql
 COPY apps/api-gateway-java/src apps/api-gateway-java/src
 
 # `-DskipTests`: the tests are `./mvnw verify`'s job, and CI has already run
