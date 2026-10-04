@@ -64,7 +64,11 @@ export const getGraphqlConfig = (
     configService.getOrThrow<NodeEnv>('NODE_ENV') === 'production';
 
   return {
-    autoSchemaFile: SCHEMA_PATH,
+    // In production the schema is built in memory: the image runs as a user that
+    // cannot write beside its compiled sources, and the file is a development
+    // artefact (the contract is `docs/reference/schema.gql`). Writing it there
+    // failed every pod at boot with EACCES.
+    autoSchemaFile: isProduction ? true : SCHEMA_PATH,
     sortSchema: true,
 
     // **OFF in production**. The schema is a map of the API: every
