@@ -9,7 +9,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   RUNTIME_OUTPUTS,
-  assignEnvFile,
   firstDifferingLine,
   missingOutputs,
   openapiViolations,
@@ -19,7 +18,7 @@ import {
  * The OpenAPI export's decisions, without booting the gateway.
  *
  * The script itself does its work when it runs, so it is not imported here;
- * CI's `build` job runs it for real as `npm run openapi:check`.
+ * CI's `contract-java` job runs it for real as `npm run openapi:check`.
  */
 describe('the OpenAPI export — the pure half', () => {
   describe('missingOutputs', () => {
@@ -65,30 +64,6 @@ describe('the OpenAPI export — the pure half', () => {
     });
   });
 
-  describe('assignEnvFile', () => {
-    it('**the file wins over a variable already in the environment**', () => {
-      // `process.loadEnvFile` would leave this alone, and a cookie name
-      // exported in a shell would reach the published document.
-      const env: Record<string, string | undefined> = {
-        JWT_ACCESS_NAME: 'leak',
-        UNRELATED: 'kept',
-      };
-
-      const assigned = assignEnvFile(
-        'JWT_ACCESS_NAME = access_token\nAPP_VERSION = 0.0.0-local\n',
-        env,
-      );
-
-      // `util.parseEnv` does not keep the file's key order.
-      expect([...assigned].sort()).toEqual(['APP_VERSION', 'JWT_ACCESS_NAME']);
-      expect(env).toEqual({
-        JWT_ACCESS_NAME: 'access_token',
-        APP_VERSION: '0.0.0-local',
-        UNRELATED: 'kept',
-      });
-    });
-  });
-
   describe('firstDifferingLine', () => {
     it.each([
       ['a\nb\n', 'a\nb\n', null],
@@ -99,9 +74,9 @@ describe('the OpenAPI export — the pure half', () => {
     });
   });
   describe('openapiViolations', () => {
-    /** The smallest document the OAS 3 meta-schema accepts. */
+    /** The smallest document the OAS 3.1 schema accepts. */
     const valid = () => ({
-      openapi: '3.0.0',
+      openapi: '3.1.0',
       info: { title: 'probe', version: '1' },
       paths: {},
       components: { schemas: {} },
@@ -125,6 +100,34 @@ describe('the OpenAPI export — the pure half', () => {
 
       expect(openapiViolations(document).join('\n')).toContain(
         '/components/schemas/Probe/properties/codes/items',
+      );
+    });
+
+    it('a document claiming 3.0 is reported: the gateway publishes 3.1, and the file is held to it', () => {
+      const document = { ...valid(), openapi: '3.0.0' };
+
+      expect(openapiViolations(document).join('\n')).toContain('/openapi');
+    });
+
+    it('**a Schema Object inside an operation is checked too**, not only the named components', () => {
+      // The OAS schema reaches these through `$dynamicRef`, which the validator
+      // cannot resolve; they are checked on their own, so they must be found.
+      const document = valid() as Record<string, unknown>;
+      document.paths = {
+        '/probe': {
+          get: {
+            responses: {
+              '200': {
+                description: 'ok',
+                content: { 'application/json': { schema: { type: 'strin' } } },
+              },
+            },
+          },
+        },
+      };
+
+      expect(openapiViolations(document).join('\n')).toContain(
+        '/paths/~1probe/get/responses/200/content/application~1json/schema/type',
       );
     });
 

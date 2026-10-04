@@ -4,10 +4,10 @@
 # same reason rag-service has one: the stages genuinely differ. A Maven build
 # and a JRE runtime share nothing with a node build but the registry.
 #
-# **It reads four things from OUTSIDE the module**, and that is deliberate:
-# the OpenAPI document, the protos, the GraphQL schema and the generated
-# contracts are the files the Node gateway is built from too. So the build
-# context is the REPOSITORY ROOT, not `apps/api-gateway-java`.
+# **It reads two things from OUTSIDE the module**, and that is deliberate:
+# the protos and the GraphQL schema are shared with the other services and
+# the Node gateway. So the build context is the REPOSITORY ROOT, not
+# `apps/api-gateway-java`.
 
 # Pinned to a full version for the reason `image-contract.spec.ts` states: a
 # floating tag makes the image a function of the pull date. Both are read by
@@ -27,9 +27,8 @@ COPY apps/api-gateway-java/.mvn apps/api-gateway-java/.mvn
 COPY apps/api-gateway-java/mvnw apps/api-gateway-java/mvnw
 RUN cd apps/api-gateway-java && mvn -q -B dependency:go-offline -DskipTests
 
-# The four codegen inputs, then the sources. Each is a file this module reads
-# from another workspace — see the note at the top.
-COPY docs/reference/openapi.json docs/reference/openapi.json
+# The two inputs from other workspaces, then the sources — see the note at
+# the top.
 COPY libs/grpc-proto/src/proto libs/grpc-proto/src/proto
 COPY apps/api-gateway/src/schema.gql apps/api-gateway/src/schema.gql
 COPY apps/api-gateway-java/src apps/api-gateway-java/src

@@ -25,7 +25,7 @@ const read = (path: string) =>
 const overlay = read(
   'apps/api-gateway-java/src/main/resources/openapi/prose-overlay.json',
 );
-const document = read('docs/reference/openapi-java.snapshot.json');
+const document = read('docs/reference/openapi.json');
 
 const operationAt = (key: string) => {
   const space = key.indexOf(' ');

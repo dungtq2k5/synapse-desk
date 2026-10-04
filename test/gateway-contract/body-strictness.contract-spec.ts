@@ -67,10 +67,15 @@ const UNKNOWN = 'zzUnknown';
 const JAVA_TYPE_NAME =
   /\b(java|javax|jakarta|com\.synapsedesk)\.|tools\.jackson|JsonToken|START_OBJECT|VALUE_(TRUE|FALSE|NUMBER_\w+|STRING)/u;
 
-/** A field read from a JSON string: a plain string of any format but a date, or a string enum. */
+/**
+ * A field read from a JSON string: a plain string of any format but a date, or a string
+ * enum. The schema is `resolve`d, so an optional field's `null` is already set aside.
+ */
 const isStringLike = (schema: Schema): boolean =>
   schema.enum
-    ? schema.enum.every((value) => typeof value === 'string')
+    ? schema.enum
+        .filter((value) => value !== null)
+        .every((value) => typeof value === 'string')
     : schema.type === 'string' && schema.format !== 'date-time';
 
 /** Every field of the minimal body (and every optional one beside them), with its schema. */

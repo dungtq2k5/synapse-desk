@@ -18,7 +18,6 @@ export * from './utils/masking';
 export * from './utils/format-error';
 export * from './utils/class-transformer';
 export * from './utils/sorting';
-export * from './utils/openapi-canonical';
 export * from './utils/limits';
 export * from './utils/analytics-range';
 export * from './configs/limit-alerts.config';

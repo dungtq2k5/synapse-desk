@@ -21,13 +21,15 @@ import { type Peers, TEST_KEYS } from './peers';
 
 export type Schema = {
   $ref?: string;
-  type?: string;
+  /** OpenAPI 3.1 writes an optional field as `["string", "null"]`. */
+  type?: string | string[];
   format?: string;
   enum?: unknown[];
   minLength?: number;
   minimum?: number;
   minItems?: number;
   items?: Schema;
+  oneOf?: Schema[];
   required?: string[];
   properties?: Record<string, Schema>;
 };
@@ -59,12 +61,34 @@ export const PERMISSION_CODES = (document.components.schemas
   .CurrentUserResponseDto.properties?.permissionCodes?.items?.enum ??
   []) as string[];
 
-export const resolve = (schema: Schema): Schema =>
-  schema.$ref
-    ? resolve(
-        document.components.schemas[schema.$ref.split('/').pop() as string],
-      )
-    : schema;
+/**
+ * The schema a value must match, with any `$ref` followed and `null` set aside.
+ *
+ * OpenAPI 3.1 writes an optional field as `type: ["string", "null"]`, or as a `oneOf`
+ * with a `null` branch around a `$ref`. Every generator here asks what the NON-null
+ * value is (a string? an array to walk into?), so this answers that once, for all of
+ * them, rather than each reading `type` as a single string and quietly skipping the
+ * field.
+ *
+ * @example resolve({ type: ['array', 'null'], items }) // { type: 'array', items }
+ */
+export const resolve = (schema: Schema): Schema => {
+  if (schema.$ref) {
+    return resolve(
+      document.components.schemas[schema.$ref.split('/').pop() as string],
+    );
+  }
+  const branches = schema.oneOf?.filter((branch) => branch.type !== 'null');
+  if (branches?.length === 1 && branches.length < schema.oneOf!.length) {
+    return resolve({ ...schema, oneOf: undefined, ...branches[0] });
+  }
+  if (Array.isArray(schema.type)) {
+    const types = schema.type.filter((type) => type !== 'null');
+    return { ...schema, type: types.length === 1 ? types[0] : types };
+  }
+
+  return schema;
+};
 
 /** The smallest valid value for a schema: required properties only. */
 export function minimalValue(raw: Schema, name = ''): unknown {
@@ -170,14 +194,6 @@ export function jsonRequests(): JsonRequest[] {
 /** Whether the document has a component schema with this name. */
 export const hasSchema = (name: string): boolean =>
   name in document.components.schemas;
-
-/** A property of a named component schema, as the document publishes it. */
-export function schemaProperty(
-  schema: string,
-  property: string,
-): Schema | undefined {
-  return document.components.schemas[schema]?.properties?.[property];
-}
 
 /** `{id}` and friends filled in: ids as a UUID, anything else (a token) as a plain string. */
 export const fillPath = (path: string): string =>

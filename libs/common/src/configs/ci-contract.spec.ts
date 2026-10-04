@@ -220,8 +220,8 @@ describe('the CI contract', () => {
         why: '`mvnw verify` — surefire’s unit rows and failsafe’s ITs against a real Redis and NATS; unrun, the Java gateway’s own suites are laptop-only',
       },
       {
-        script: 'openapi:check:java',
-        why: 'the Java half of the OpenAPI check; Node’s own half runs in `build`, and only together do they hold the committed document from both sides',
+        script: 'openapi:check',
+        why: 'the committed OpenAPI document is what the gateway serves, and valid OpenAPI 3.1; unrun, the published contract drifts from the code',
       },
     ];
 

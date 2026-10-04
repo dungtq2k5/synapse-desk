@@ -22,8 +22,8 @@ import { declaredTags, tagsIn } from './pending';
 describe('the rows declared tags', () => {
   /**
    * Every tag the published document names, read from the document itself —
-   * the file `openapi:check` and `openapi:check:java` both hold the gateways
-   * to, so it stays the authority on what the APIs are called.
+   * the file `openapi:check` holds to what the gateway serves, so it stays the
+   * authority on what the APIs are called.
    */
   const publishedTags = (): Set<string> => {
     const document = JSON.parse(

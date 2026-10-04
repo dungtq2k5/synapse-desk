@@ -16,8 +16,8 @@ import org.springframework.test.context.ContextConfiguration;
 
 /**
  * Writes the document this gateway serves at {@code /v3/api-docs} to
- * {@code target/openapi-java.json}, for {@code npm run openapi:check:java} to
- * compare against the committed one.
+ * {@code target/openapi-java.json}, which {@code npm run openapi:export} commits as
+ * {@code docs/reference/openapi.json} and {@code npm run openapi:check} compares with it.
  *
  * <p>A test rather than a running process on purpose: a gateway booted by hand
  * holds its ports and collides with the suite's own boot, and a check that
@@ -25,8 +25,8 @@ import org.springframework.test.context.ContextConfiguration;
  * never a stale one. Producing the file in the same command that consumes it
  * closes both.
  *
- * <p>It asserts only that a real document was written — the comparison itself
- * lives in {@code scripts/lib/java-openapi-diff.cjs}, where it is red-proven.
+ * <p>It asserts only that a real document was written; the validation and the
+ * comparison are {@code scripts/export-openapi.mjs}'s.
  *
  * <p><b>Closes its context when it finishes.</b> Spring caches a booted context
  * for the rest of the JVM, and this one holds the gateway lease with a live

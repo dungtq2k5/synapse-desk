@@ -6,7 +6,7 @@ import { join } from 'node:path';
  *
  * `ConstraintPublishingCustomizer` writes each constraint annotation into the document as
  * a `pattern` (or, where no keyword can say it, a fixed sentence). A pattern string that
- * merely exists proves nothing: this reads the committed snapshot of the Java document,
+ * merely exists proves nothing: this reads the committed document,
  * compiles each published pattern with a real ECMA-262 engine (the dialect JSON Schema
  * patterns are written in), and holds it to the shared validator table, whose answers
  * the Node gateway's spec recomputed from validator.js itself.
@@ -22,7 +22,7 @@ const ROOT = join(__dirname, '..', '..');
 const read = (path: string) =>
   JSON.parse(readFileSync(join(ROOT, path), 'utf8')) as Record<string, any>;
 
-const document = read('docs/reference/openapi-java.snapshot.json');
+const document = read('docs/reference/openapi.json');
 const table = read(
   'apps/api-gateway/test/fixtures/inbound-email/validator-parity.json',
 ) as Record<string, [string, boolean][]>;

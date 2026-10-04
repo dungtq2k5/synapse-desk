@@ -9,11 +9,13 @@
  * behind the gateway checks either: auth-service validates no password or phone.
  *
  * **Found from the SOURCE, not the document.** A scan from the document outward finds
- * only the constraints it already has, which is the set that is empty here. The DTO
- * sources are scanned (`validator-scan.ts`, held to a hostile fixture and a floor), and
- * every decorator whose constraint the schema does not carry becomes a row: the field
- * set to a value that breaks it must be refused, with 400, naming the field, before any
- * peer is called. Each row first requires the SAME request with a VALID value to reach
+ * only the constraints it already has. The DTO sources are scanned (`validator-scan.ts`,
+ * held to a hostile fixture and a floor), and every decorator of these kinds becomes a
+ * row: the field set to a value that breaks it must be refused, with 400, naming the
+ * field, before any peer is called. Whether the document now publishes the constraint
+ * (the Java gateway publishes these as a `pattern` or a sentence) does not decide the
+ * row: `scripts/lib/published-constraints.spec.ts` holds what is published, and these
+ * rows hold what is enforced. Each row first requires the SAME request with a VALID value to reach
  * the peer, so a refusal for another reason cannot satisfy it.
  *
  * **A stated limit.** A row pins the FIELD, not the validator: it requires the refusal to
@@ -30,8 +32,7 @@
  * requests each and rely on the suite not spending that budget elsewhere.
  *
  * Porting a constraint closes the behaviour gap; PUBLISHING it closes the document
- * gap. They are separate changes, and this file holds only the first: when a row goes
- * green the document may still describe nothing.
+ * gap. This file holds only the first.
  */
 
 import { type Gateway, startGateway } from './gateway';
@@ -44,7 +45,6 @@ import {
   hasSchema,
   jsonRequests,
   pathsTo,
-  schemaProperty,
 } from './request-bodies';
 import { readRunState } from './run-state';
 import { scanDtoDirectory } from './validator-scan';
@@ -56,7 +56,7 @@ type Sample = { valid: string; invalid: string };
 const ISO_VALID = '2026-01-01T00:00:00.000Z';
 
 /** A value that satisfies the constraint and one that breaks it, by validator. */
-const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
+const KINDS: Record<string, { sample: Sample }> = {
   // Long enough, so only the character classes are broken: a short value would also fail a
   // length check, and a port that kept only that check would still pass.
   IsStrongPassword: {
@@ -66,7 +66,6 @@ const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
   // A code carries a length range too (4 to 10), so the bad value is the right length.
   IsNumberString: {
     sample: { valid: '123456', invalid: 'abcdef' },
-    expressedBy: ['pattern'],
   },
   IsFutureDate: {
     sample: {
@@ -76,13 +75,11 @@ const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
   },
   IsISO8601: {
     sample: { valid: ISO_VALID, invalid: 'not-a-date' },
-    expressedBy: ['format'],
   },
   IsDate: {
     sample: { valid: ISO_VALID, invalid: 'not-a-date' },
-    expressedBy: ['format'],
   },
-  Matches: { sample: { valid: '', invalid: '' }, expressedBy: ['pattern'] },
+  Matches: { sample: { valid: '', invalid: '' } },
 };
 
 /** `@Matches` carries a different pattern on each field, so its samples are per field. */
@@ -113,12 +110,6 @@ const found: Found[] = scanDtoDirectory(
   dto.properties.flatMap((property) =>
     property.decorators
       .filter((decorator) => decorator in KINDS)
-      .filter((decorator) => {
-        const published = schemaProperty(dto.name, property.name);
-        const keywords = KINDS[decorator].expressedBy ?? [];
-
-        return !(published && keywords.some((keyword) => keyword in published));
-      })
       .map((kind) => ({
         schema: dto.name,
         property: property.name,
@@ -233,7 +224,7 @@ describe('the scan itself', () => {
   });
 });
 
-describe('a constraint the document does not publish', () => {
+describe('a constraint a body field carries beyond its JSON type', () => {
   let gateway: Gateway;
   let peers: Peers;
 

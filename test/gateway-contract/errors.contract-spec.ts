@@ -104,7 +104,7 @@ describe('the error envelope and the edges around it', () => {
       });
 
       expect(response.status).toBe(400);
-      expect(Object.keys(response.body).sort()).toEqual([
+      expect(Object.keys(response.body as object).sort()).toEqual([
         'error',
         'path',
         'statusCode',
