@@ -12,7 +12,13 @@
 # Pinned to a full version for the reason `image-contract.spec.ts` states: a
 # floating tag makes the image a function of the pull date. Both are read by
 # that guard, which requires an `x.y.z`.
-ARG MAVEN_VERSION=3.9.11-eclipse-temurin-21-alpine
+#
+# **The build stage is glibc, not Alpine.** Maven downloads
+# `protoc-gen-grpc-java` as a glibc binary, which musl cannot run ("program not
+# found or is not executable"), so on an Alpine build image no gRPC stub is
+# generated and the build fails. Only the build needs it; the runtime stays on
+# the Alpine JRE.
+ARG MAVEN_VERSION=3.9.11-eclipse-temurin-21
 ARG JRE_VERSION=21.0.5_11-jre-alpine
 
 # ----------------------------------------------------------------- build
@@ -46,10 +52,15 @@ FROM eclipse-temurin:${JRE_VERSION} AS runtime
 # is "unknown" — the answer you get exactly when you need the real one.
 ARG GIT_SHA
 ARG BUILD_TIME
+# The node image's default and the same build arg: `APP_VERSION` is build-injected,
+# so no ConfigMap carries it, and without it the gateway refuses to start
+# ("runtime.app-version is unset").
+ARG APP_VERSION=1.0.0
 RUN test -n "$GIT_SHA" || (echo "GIT_SHA is required" >&2 && exit 1)
 RUN test -n "$BUILD_TIME" || (echo "BUILD_TIME is required" >&2 && exit 1)
 ENV BUILD_SHA=${GIT_SHA}
 ENV BUILD_TIME=${BUILD_TIME}
+ENV APP_VERSION=${APP_VERSION}
 
 # Not root. The JVM needs no privileged port here — the gateway listens on
 # `PORT`, which is above 1024 in every environment this ships to.
