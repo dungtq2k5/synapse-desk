@@ -306,8 +306,5 @@ export const TEST_KEYS = {
 };
 
 function key(file: string): string {
-  return readFileSync(
-    join(__dirname, '../../apps/api-gateway/test/fixtures/keys', file),
-    'utf8',
-  );
+  return readFileSync(join(__dirname, '../fixtures/keys', file), 'utf8');
 }

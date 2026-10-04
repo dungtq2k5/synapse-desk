@@ -134,7 +134,7 @@ public class JwtVerifier {
    *   <li>`.env.example`'s `./secrets/…` — measured — is relative to the
    *       NODE MODULE (`apps/api-gateway`, where the file actually lives),
    *       matching that gateway's own `WORKDIR`.
-   *   <li>`.env.test`'s `./apps/api-gateway/test/fixtures/…` is relative to
+   *   <li>`.env.test`'s `./test/fixtures/…` is relative to
    *       the REPO ROOT — the harness's own spawn `cwd` — the same
    *       convention `SharedEnvironment.ENV_EXAMPLE` already works around for
    *       that one file.

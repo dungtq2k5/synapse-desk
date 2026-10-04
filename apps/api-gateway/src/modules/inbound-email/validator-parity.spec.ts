@@ -30,7 +30,7 @@ describe('the validator parity table', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/validator-parity.json',
+        '../../../../../test/fixtures/inbound-email/validator-parity.json',
       ),
       'utf8',
     ),

@@ -34,7 +34,7 @@ class InboundPayloadContractTest {
 
   private static final Path PAYLOADS = Path.of(
     "..",
-    "api-gateway",
+    "..",
     "test",
     "fixtures",
     "inbound-email",

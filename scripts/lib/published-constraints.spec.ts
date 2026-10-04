@@ -24,7 +24,7 @@ const read = (path: string) =>
 
 const document = read('docs/reference/openapi.json');
 const table = read(
-  'apps/api-gateway/test/fixtures/inbound-email/validator-parity.json',
+  'test/fixtures/inbound-email/validator-parity.json',
 ) as Record<string, [string, boolean][]>;
 const schemas = document.components.schemas as Record<string, any>;
 

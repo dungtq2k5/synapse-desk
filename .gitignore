@@ -57,7 +57,7 @@ secrets/
 # purpose: without it, a fresh clone cannot run `npm run test:e2e`, and the
 # alternative (generate-on-first-run) means the suite silently passes against
 # whatever key happens to be lying around.
-!apps/api-gateway/test/fixtures/keys/*.key
+!test/fixtures/keys/*.key
 
 # Firebase emulator: docker-compose mounts `docker/firebase` as the container's
 # HOME (`/home/node`), so the emulator writes its own home-directory junk there.

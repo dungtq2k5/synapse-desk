@@ -35,7 +35,7 @@ class InboundBodyCapParityTest {
   private static final int MAX = InboundLimits.MAX_INBOUND_BODY_LENGTH;
   private static final Path TABLE = Path.of(
     "..",
-    "api-gateway",
+    "..",
     "test",
     "fixtures",
     "inbound-email",

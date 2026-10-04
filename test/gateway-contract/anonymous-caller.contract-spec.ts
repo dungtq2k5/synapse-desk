@@ -43,10 +43,7 @@ type TableRow = [string, string, string, boolean, boolean];
 /** Node's guard truth for every route: `[METHOD, path, kind, jwtGuarded, superAdminOnly]`. */
 const table = JSON.parse(
   readFileSync(
-    join(
-      REPO_ROOT,
-      'apps/api-gateway/test/fixtures/lifecycle/org-access-routes.json',
-    ),
+    join(REPO_ROOT, 'test/fixtures/lifecycle/org-access-routes.json'),
     'utf8',
   ),
 ) as TableRow[];

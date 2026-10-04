@@ -21,7 +21,7 @@ describe('the quoted-reply parity table', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/quoted-reply-parity.json',
+        '../../../../../test/fixtures/inbound-email/quoted-reply-parity.json',
       ),
       'utf8',
     ),

@@ -29,7 +29,7 @@ class InboundAddressParityTest {
 
   private static final Path TABLE = Path.of(
     "..",
-    "api-gateway",
+    "..",
     "test",
     "fixtures",
     "inbound-email",

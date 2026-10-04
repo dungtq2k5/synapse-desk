@@ -24,7 +24,7 @@ describe('the inbound body cap', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/body-cap-parity.json',
+        '../../../../../test/fixtures/inbound-email/body-cap-parity.json',
       ),
       'utf8',
     ),

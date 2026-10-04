@@ -26,7 +26,7 @@ describe('the idempotency-key parity table', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/idempotency-parity.json',
+        '../../../../../test/fixtures/inbound-email/idempotency-parity.json',
       ),
       'utf8',
     ),

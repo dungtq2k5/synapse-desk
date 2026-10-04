@@ -20,7 +20,7 @@ describe('the inbound fixture payloads satisfy InboundEmailDto', () => {
    */
   const PAYLOADS = join(
     __dirname,
-    '../../../test/fixtures/inbound-email/payloads',
+    '../../../../../test/fixtures/inbound-email/payloads',
   );
 
   const fixtures = readdirSync(PAYLOADS).filter((name) =>

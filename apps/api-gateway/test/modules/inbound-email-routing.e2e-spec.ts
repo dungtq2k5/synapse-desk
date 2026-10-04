@@ -530,7 +530,10 @@ describe('Inbound email routing (e2e)', () => {
   describe('the fixture payloads', () => {
     // Hand-built mail shapes, delivered through the real webhook — the closest
     // this suite gets to the mail transport without a live Resend account.
-    const PAYLOADS = join(__dirname, '../fixtures/inbound-email/payloads');
+    const PAYLOADS = join(
+      __dirname,
+      '../../../../test/fixtures/inbound-email/payloads',
+    );
 
     const fixture = (name: string) =>
       JSON.parse(readFileSync(join(PAYLOADS, name), 'utf8')) as Record<

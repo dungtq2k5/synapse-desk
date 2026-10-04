@@ -19,7 +19,7 @@ describe('the quoted-reply fuzz corpus', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/quoted-reply-fuzz.json',
+        '../../../../../test/fixtures/inbound-email/quoted-reply-fuzz.json',
       ),
       'utf8',
     ),

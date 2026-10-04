@@ -6,12 +6,12 @@ import type { JwtPayload, TwoFactorJwtPayload } from '@synapsedesk/common';
 /**
  * Resolved from `__dirname`, not from cwd.
  *
- * The suite is launched from the repo root (`npm run test:e2e`), so a relative
- * `test/fixtures/...` would resolve to a path that does not exist. Anchoring to
- * this file keeps the helper working from any cwd — which matters the first
+ * The keys are the repository's shared test pair in `test/fixtures/keys`. A
+ * cwd-relative path would resolve only from the repo root; anchoring to this
+ * file keeps the helper working from any cwd — which matters the first
  * time somebody runs a single spec from inside `apps/api-gateway`.
  */
-const KEY_DIR = join(__dirname, '..', 'fixtures', 'keys');
+const KEY_DIR = join(__dirname, '../../../../test/fixtures/keys');
 
 /**
  * The PRIVATE halves of the test-only keypair.

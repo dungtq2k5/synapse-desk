@@ -19,7 +19,7 @@ describe('the inbound address parity table', () => {
     readFileSync(
       join(
         __dirname,
-        '../../../test/fixtures/inbound-email/address-parity.json',
+        '../../../../../test/fixtures/inbound-email/address-parity.json',
       ),
       'utf8',
     ),

@@ -24,7 +24,7 @@ import { OPS_ROUTES } from '../../modules/health/ops-routes';
 describe('the tenant-lifecycle category of every route', () => {
   const FIXTURE = join(
     __dirname,
-    '../../../test/fixtures/lifecycle/org-access-routes.json',
+    '../../../../../test/fixtures/lifecycle/org-access-routes.json',
   );
   const METHODS = [
     'GET',

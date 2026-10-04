@@ -46,7 +46,7 @@ class OrgAccessRoutesTest {
 
   private static final Path TABLE = Path.of(
     "..",
-    "api-gateway",
+    "..",
     "test",
     "fixtures",
     "lifecycle",

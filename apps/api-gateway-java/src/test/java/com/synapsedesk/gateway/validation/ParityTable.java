@@ -19,7 +19,7 @@ public final class ParityTable {
 
   private static final Path TABLE = Path.of(
     "..",
-    "api-gateway",
+    "..",
     "test",
     "fixtures",
     "inbound-email",
