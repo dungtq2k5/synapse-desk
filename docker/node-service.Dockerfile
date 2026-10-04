@@ -207,6 +207,13 @@ RUN npm run typecheck
 # question worth a clean answer rather than a clever one.
 FROM deps AS prod-deps
 WORKDIR /app
+# **Without the root `prepare` script.** It installs git hooks with
+# `simple-git-hooks`, a devDependency that `--omit=dev` does not install, so
+# `npm ci` runs it and fails (`simple-git-hooks: not found`, exit 127) for
+# every service. `--ignore-scripts` would also skip the production
+# dependencies' own install scripts, which native modules need, so only the
+# one script goes, in this stage's copy of the manifest.
+RUN npm pkg delete scripts.prepare
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 # --------------------------------------------------------------- runtime
