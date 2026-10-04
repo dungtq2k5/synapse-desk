@@ -10,9 +10,10 @@
  * answered 400 where Node answers 403 (found by sending `{}` as an unverified member to
  * every secured route that takes a required body field: 51 routes, 1 differed).
  *
- * **The route set is found in Node's source, then named.** A scan of the controllers for
- * `EmailVerifiedGuard` in a `@UseGuards(...)` list must find exactly the two routes named
- * here, so a third guarded route fails until it is given rows.
+ * **The route set is found in the Java gateway's source, then named.** A scan of its
+ * sources for a method annotated `@RequireVerifiedEmail` (the interceptor reads it from
+ * the method, never the class) must find exactly the two routes named here, so a third
+ * guarded route fails until it is given rows.
  *
  * **Controls make each refusal mean something.** The creating route is also sent the same
  * invalid body by a VERIFIED caller, which must be a 400: that shows the body really is
@@ -40,18 +41,12 @@ const RESEND = 'POST /api/v1/users/invitations/{id}/resend';
 
 describe('the routes that need a verified email', () => {
   it('are exactly the two named here', () => {
-    const guarded = globSync(
-      'apps/api-gateway/src/modules/**/*.controller.ts',
-      {
-        cwd: REPO_ROOT,
-      },
-    ).flatMap((file) =>
+    const guarded = globSync('apps/api-gateway-java/src/main/java/**/*.java', {
+      cwd: REPO_ROOT,
+    }).flatMap((file) =>
       readFileSync(join(REPO_ROOT, file), 'utf8')
         .split('\n')
-        .filter(
-          (line) =>
-            line.includes('@UseGuards(') && line.includes('EmailVerifiedGuard'),
-        ),
+        .filter((line) => /^\s*@RequireVerifiedEmail\s*$/u.test(line)),
     );
 
     expect(guarded).toHaveLength(2);
