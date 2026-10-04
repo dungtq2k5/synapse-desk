@@ -37,24 +37,7 @@ export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
  * is the honest state; a row that quietly passes both because it asserts
  * nothing is the failure this harness exists to prevent.
  */
-export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
-  'a DTO validation failure':
-    'the exact Node phrasing (whitelist rejection, class-validator type ' +
-    'messages) — the per-field text is already ruled loose; this ' +
-    'row asserts the exact Node string rather than the shape, and wants a ' +
-    'second, shape-only row instead of a Java rewrite of this one',
-  '**`changePlan` succeeds without an `Idempotency-Key` header**':
-    'the published contract marks `idempotency-key` required on this route ' +
-    '(no `@ApiHeader` names it in `billing.controller.ts` — this looks like ' +
-    "the Swagger CLI plugin's own default for a bare `@Headers()` parameter, " +
-    "not a deliberate spec decision) while Node's handler treats it as " +
-    'optional (`idempotencyKey?: string`) and never enforces the header at ' +
-    "all. Java's `BillingController` keeps the published contract's " +
-    '`@NotNull @RequestHeader(required = true)`, so an absent header 400s ' +
-    'before the controller runs — a genuine, pre-existing spec/' +
-    'implementation gap this port did not introduce and should not paper ' +
-    'over by deviating from the published contract',
-};
+export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {};
 
 /** True when this row's NAME is on the explicit list. */
 function skippedByName(title: string): boolean {

@@ -25,7 +25,6 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -88,12 +87,12 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
  * so cannot be blocked by an unrelated outage. An unreadable usage leg
  * refuses (503) rather than allowing the dimension through unchecked.
  *
- * <p><b>Migrated off `BillingApi`.</b> `changePlan`'s {@code
- * idempotency-key} header stays REQUIRED, matching the generated
- * interface exactly — the published contract marks it required while
- * Node's own handler treats it as optional, a pre-existing spec/
- * implementation gap this port does not paper over (the corresponding
- * `SKIPPED_FOR_JAVA` entry in the harness names this same deviation).
+ * <p><b>`changePlan`'s {@code idempotency-key} header is OPTIONAL.</b> auth-service
+ * prefers the caller's key and, without one, derives {@code
+ * plan-change:<org>:<plan>:<price>} — still enough to collapse a double-click onto one
+ * Stripe update. Only the caller can tell a retry from next month's identical change,
+ * which is what the header is for; refusing the request without it would refuse a
+ * change that is safe to make.
  */
 @Tag(name = "Billing")
 @RestController
@@ -256,9 +255,9 @@ public class BillingController {
   public ResponseEntity<
     ApiResponse<PlanChangeResponseDto>
   > billingControllerChangePlanV1(
-    @NotNull @RequestHeader(
+    @RequestHeader(
       value = "idempotency-key",
-      required = true
+      required = false
     ) String idempotencyKey,
     @Valid @RequestBody ChangePlanDto changePlanDto
   ) {
@@ -273,12 +272,13 @@ public class BillingController {
 
     enforcePlanChangeFits(preview, context);
 
+    PlanChangeRequest.Builder change = PlanChangeRequest.newBuilder()
+      .setPlanId(changePlanDto.getPlanId().toString())
+      .setPriceId(changePlanDto.getPriceId());
+    // Unset reads as "", which auth-service treats as "no key" and derives one.
+    if (idempotencyKey != null) change.setIdempotencyKey(idempotencyKey);
     PlanChangeResponse response = withStripeMetadata(context).changePlan(
-      PlanChangeRequest.newBuilder()
-        .setPlanId(changePlanDto.getPlanId().toString())
-        .setPriceId(changePlanDto.getPriceId())
-        .setIdempotencyKey(idempotencyKey)
-        .build()
+      change.build()
     );
 
     return ResponseEntity.ok(

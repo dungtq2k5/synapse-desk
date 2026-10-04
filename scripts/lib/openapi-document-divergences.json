@@ -61,6 +61,14 @@
     "reason": "Node omits security on three routes it guards, and publishes logout as secured though it answers 200 with no session. Held as well by diffSecurity."
   },
   {
+    "id": "plan-change-key-is-optional",
+    "where": "^post /api/v1/billing/plan$",
+    "path": "^parameters/header:idempotency-key/required$",
+    "node": true,
+    "java": false,
+    "reason": "Both gateways serve a plan change without the header (held by the `changePlan` succeeds-without-a-key row): auth-service derives the key from the organisation, plan and price when the caller sends none. Node's document marks it required only because a bare `@Headers()` parameter defaults to required. Decided 2026-10-04."
+  },
+  {
     "id": "webhook-endpoints-answer-201",
     "where": "^post /api/v1/webhook-endpoints(/\\{id\\}/(rotate-secret|test))?$",
     "path": "^responses/20[01]$",

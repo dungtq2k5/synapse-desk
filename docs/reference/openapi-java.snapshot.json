@@ -25305,7 +25305,7 @@
           {
             "name": "idempotency-key",
             "in": "header",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }

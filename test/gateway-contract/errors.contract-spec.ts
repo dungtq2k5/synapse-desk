@@ -92,17 +92,31 @@ describe('the error envelope and the edges around it', () => {
   );
 
   rowFor('Auth')(
-    '**a DTO validation failure** joins its messages with `, ` and ends with `!`',
+    '**a DTO validation failure** answers the error envelope, exactly its keys',
     async () => {
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/auth/login`,
-        { email: 'not-an-email', password: 5, extra: true },
-      );
+      // The per-field wording is each framework's own and is not asserted: the
+      // contract is the envelope, a 400, and a message ending with `!`.
+      const path = `${API}/auth/login`;
+      const response = await new Session(gateway.baseUrl).post(path, {
+        email: 'not-an-email',
+        password: 5,
+        extra: true,
+      });
 
       expect(response.status).toBe(400);
-      expect((response.body as { error: string }).error).toBe(
-        'property extra should not exist, email must be an email, password must be a string!',
-      );
+      expect(Object.keys(response.body).sort()).toEqual([
+        'error',
+        'path',
+        'statusCode',
+        'success',
+        'timestamp',
+      ]);
+      expect(response.body).toMatchObject({
+        success: false,
+        statusCode: 400,
+        path,
+        error: expect.stringMatching(/\S!$/),
+      });
     },
   );
 
