@@ -7,7 +7,6 @@ import {
   listFieldDefaults,
   scoreDocument,
 } from './query-cost.plugin';
-import { SCHEMA_PATH } from '../config/graphql.config';
 import {
   FIELD_COST,
   MAX_PAGE_SIZE,
@@ -269,8 +268,15 @@ describe('Query complexity', () => {
   });
 
   describe('The list-default blind spot', () => {
-    // The real schema, so the defaults are the ones clients actually meet.
-    const schema = buildSchema(readFileSync(SCHEMA_PATH, 'utf8'));
+    // The published schema, so the defaults are the ones clients actually meet.
+    // The committed contract rather than the copy a boot generates: that copy
+    // is untracked, and a clean checkout has none.
+    const schema = buildSchema(
+      readFileSync(
+        join(__dirname, '../../../../../docs/reference/schema.gql'),
+        'utf8',
+      ),
+    );
     const defaults = listFieldDefaults(schema);
     const priced = (query: string) =>
       scoreDocument(parse(query), undefined, defaults);
