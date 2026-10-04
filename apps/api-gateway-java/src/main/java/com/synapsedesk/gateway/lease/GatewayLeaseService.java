@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,7 @@ import org.springframework.stereotype.Component;
  * the same keys. {@link GatewayLease} holds the shared half.
  */
 @Component
-public class GatewayLeaseService implements ReadinessGate {
+public class GatewayLeaseService implements ReadinessGate, SmartLifecycle {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     GatewayLeaseService.class
@@ -53,9 +54,14 @@ public class GatewayLeaseService implements ReadinessGate {
   private final LeaseRuntime runtime;
   private final AtomicBoolean active = new AtomicBoolean();
   private final AtomicBoolean stopping = new AtomicBoolean();
+  private final AtomicBoolean started = new AtomicBoolean();
 
-  private final java.util.concurrent.ScheduledExecutorService beats =
-    java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+  /** Built per start: a stopped executor cannot be restarted. */
+  private volatile java.util.concurrent.ScheduledExecutorService beats =
+    newBeats();
+
+  private static java.util.concurrent.ScheduledExecutorService newBeats() {
+    return java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
       runnable -> {
         Thread thread = new Thread(runnable, "gateway-lease");
         thread.setDaemon(true);
@@ -63,6 +69,8 @@ public class GatewayLeaseService implements ReadinessGate {
         return thread;
       }
     );
+  }
+
   private volatile long lastRefreshAt;
 
   public GatewayLeaseService(StringRedisTemplate redis, LeaseRuntime runtime) {
@@ -113,9 +121,17 @@ public class GatewayLeaseService implements ReadinessGate {
    *
    * <p>The thread is a DAEMON: a gateway whose only remaining work is this
    * timer should exit, which is what `unref()` buys on the Node side.
+   *
+   * <p>A lifecycle start, in {@link #PHASE}, so it begins after the Redis
+   * connection factory (phase 0) has started. Restartable: Spring stops and
+   * restarts a context's lifecycle beans (a cached test context is paused while
+   * unused), so a start after a stop claims again on a fresh scheduler.
    */
-  @jakarta.annotation.PostConstruct
+  @Override
   public void start() {
+    if (beats.isShutdown()) beats = newBeats();
+    stopping.set(false);
+    started.set(true);
     beats.scheduleAtFixedRate(
       this::beat,
       0,
@@ -240,10 +256,38 @@ public class GatewayLeaseService implements ReadinessGate {
     }
   }
 
+  /**
+   * When the lease is released on shutdown: after the web server has stopped
+   * serving (its graceful drain and stop are phases {@code DEFAULT_PHASE - 1024}
+   * and {@code - 2048}), and BEFORE the Redis connection factory stops (phase 0).
+   *
+   * <p>Spring stops every lifecycle bean, highest phase first, before it destroys
+   * any bean. A release in {@code @PreDestroy} therefore met a stopped Lettuce
+   * factory, failed, and left the entry to its 30 s TTL. Measured in the cutover
+   * rehearsal: the old side's entry outlived its pods by ~28 s, and that was most
+   * of the handover window.
+   */
+  static final int PHASE = SmartLifecycle.DEFAULT_PHASE - 4096;
+
+  @Override
+  public int getPhase() {
+    return PHASE;
+  }
+
+  @Override
+  public boolean isRunning() {
+    return started.get() && !stopping.get();
+  }
+
   /** Releases the lease on shutdown, so the other side may claim at once. */
-  @jakarta.annotation.PreDestroy
+  @Override
+  public void stop() {
+    onShutdown();
+  }
+
+  /** Idempotent: the lifecycle stop and a direct call may both reach it. */
   public void onShutdown() {
-    stopping.set(true);
+    if (stopping.getAndSet(true)) return;
     beats.shutdownNow();
 
     if (active.get()) {

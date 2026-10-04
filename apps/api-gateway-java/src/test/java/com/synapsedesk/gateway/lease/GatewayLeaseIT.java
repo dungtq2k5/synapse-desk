@@ -189,6 +189,42 @@ class GatewayLeaseIT {
   }
 
   @Test
+  void closingTheApplicationContextReleasesTheEntryBeforeRedisCloses() {
+    // The row above calls the shutdown hook by hand, with Redis open. A real
+    // shutdown is Spring closing the context, which stops every lifecycle bean
+    // (the Lettuce connection factory among them) before it destroys any bean:
+    // a release that ran in `@PreDestroy` met a stopped factory, the entry
+    // stayed, and the other side waited out the 30 s TTL. Measured in the
+    // cutover rehearsal: the old side's entry outlived its pods by ~28 s.
+    var context =
+      new org.springframework.context.annotation.AnnotationConfigApplicationContext();
+    String url = SharedEnvironment.values().getOrDefault(
+      "REDIS_URL",
+      "redis://localhost:6379"
+    );
+    context.registerBean(LettuceConnectionFactory.class, () ->
+      new LettuceConnectionFactory(redisStandalone(url))
+    );
+    context.registerBean(StringRedisTemplate.class, () ->
+      new StringRedisTemplate(context.getBean(LettuceConnectionFactory.class))
+    );
+    context.registerBean(LeaseRuntime.class, Recorder::new);
+    context.registerBean(GatewayLeaseService.class);
+    context.refresh();
+
+    context.getBean(GatewayLeaseService.class).beat();
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isEqualTo(1);
+
+    context.close();
+
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isZero();
+  }
+
+  @Test
   void aHolderWhoseEntryVanishedStepsDownOnTheNextBeat() {
     Recorder java = new Recorder();
     GatewayLeaseService lease = lease(java);
