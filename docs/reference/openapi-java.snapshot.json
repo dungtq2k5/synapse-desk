@@ -3,14 +3,9 @@
   "info": {
     "title": "SynapseDesk API",
     "description": "The REST surface of the SynapseDesk gateway. Every response is wrapped in the standard envelope — `{ success, statusCode, message, warning, data }` on success and `{ success, statusCode, path, timestamp, error }` on failure — so the schema shown for a route describes the whole body, not just its payload.\n\n## Caching and staleness\n\nSome reads are served from a shared cache. An operation that is cached says so in its `x-cache` extension: `{ scope, ttlSeconds, varyBy }`. Everything else is computed per request.\n\n**A cached read can be stale for at most its TTL, and usually far less.** Cache entries are keyed by `(tenant, scope, parameters)` rather than by URL, so a write CAN find and evict them — a mutation drops its whole scope for that tenant before it answers, and changes that originate elsewhere in the system (a WebSocket message, a background job, another service) evict through domain events. The TTL is the backstop for a writer nobody has enumerated, not the mechanism.\n\n`varyBy` says what the entry depends on. `tenant` means every member of your organization shares one answer. `caller` means the answer is filtered by what you can see — `GET /documents` is scoped to your departments — so it is shared only with people whose visibility matches yours.\n\n**The one entry with no eviction is `GET /permissions`.** The permission catalogue is seeded and changes on deploy, so there is no request that could invalidate it; its one-hour TTL is the whole story.\n\n**Tickets, messages and notifications are never cached**, and neither is `GET /notifications/unread-count` — the WebSocket pushes that authoritatively, so polling it is the thing to remove rather than the thing to speed up.\n\n### GraphQL\n\nThere is **no response cache** on `/graphql`. A GraphQL response key would be a hash of the query document, and nothing in such a key says which entities the answer contains — so no write could ever find it, and a cached response would be stale for its full TTL no matter what changed. What is cached instead are the individual entities behind edges (`assignee`, `author`, `sender`, `actor`, `department`), keyed one per entity and evicted precisely when that entity changes.\n\n### Your half\n\nAfter a mutation, refetch or update your own store rather than trusting the next query to be fresh. A mutation returns fresh data to its own caller; another tab holding a rendered list is the server's problem only up to the eviction it just performed. Apollo Client does this by default with normalized cache updates.",
-    "version": "v0"
+    "version": "1.0.0"
   },
-  "servers": [
-    {
-      "url": "http://HOST",
-      "description": "Generated server url"
-    }
-  ],
+  "servers": [],
   "paths": {
     "/api/v1/users/{id}/roles": {
       "put": {
@@ -39,7 +34,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -349,7 +344,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -659,7 +654,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -959,7 +954,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1229,7 +1224,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1530,7 +1525,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Event accepted. The body carries an acknowledgement only.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1665,7 +1660,7 @@
         "operationId": "InboundEmailController_resend_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Accepted, or deliberately dropped. The body carries an acknowledgement and the outcome, never the message.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1837,7 +1832,7 @@
         "operationId": "WebhookEndpointsController_list_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2021,7 +2016,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2283,7 +2278,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2545,7 +2540,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2890,7 +2885,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3074,7 +3069,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3336,7 +3331,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3598,7 +3593,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3870,7 +3865,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4170,7 +4165,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4432,7 +4427,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4656,7 +4651,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4930,7 +4925,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5114,7 +5109,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5376,7 +5371,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5638,7 +5633,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5900,7 +5895,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6240,7 +6235,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6386,7 +6381,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6697,7 +6692,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6929,7 +6924,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7209,7 +7204,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7489,7 +7484,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7761,7 +7756,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8023,7 +8018,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8283,7 +8278,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8583,7 +8578,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8855,7 +8850,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9193,7 +9188,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9503,7 +9498,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9803,7 +9798,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10075,7 +10070,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10385,7 +10380,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10695,7 +10690,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11005,7 +11000,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11277,7 +11272,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11549,7 +11544,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11859,7 +11854,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12157,14 +12152,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -12429,7 +12417,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12729,7 +12717,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12991,7 +12979,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13253,7 +13241,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13566,7 +13554,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13750,7 +13738,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14022,7 +14010,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14387,7 +14375,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14533,7 +14521,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14816,7 +14804,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14962,7 +14950,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15195,7 +15183,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15483,7 +15471,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15629,7 +15617,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15863,7 +15851,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16125,7 +16113,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16359,7 +16347,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16621,7 +16609,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16817,7 +16805,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17069,7 +17057,7 @@
         "operationId": "OrganizationsController_completeOnboarding_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17245,7 +17233,7 @@
         "operationId": "OrganizationsController_issueInboundToken_v1",
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "The new address. Any previous one stops routing immediately — mail already in flight to it is dropped as unroutable, which is the point of a rotation and also its cost.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17419,7 +17407,7 @@
         "operationId": "OrganizationsController_revokeInboundToken_v1",
         "responses": {
           "204": {
-            "description": "No Content"
+            "description": "Inbound mail is off. The address stops routing immediately."
           },
           "401": {
             "description": "No valid session cookie, or the session has expired.",
@@ -17598,7 +17586,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17822,7 +17810,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18046,7 +18034,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18260,7 +18248,7 @@
         "operationId": "NotificationsController_listDevices_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18406,7 +18394,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18630,7 +18618,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18862,7 +18850,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19122,7 +19110,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content"
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -19339,7 +19327,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19563,7 +19551,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19825,7 +19813,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20087,7 +20075,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20359,7 +20347,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20697,7 +20685,7 @@
         ],
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20959,7 +20947,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21231,7 +21219,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21541,7 +21529,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21851,7 +21839,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22151,7 +22139,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22464,7 +22452,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22648,7 +22636,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22910,7 +22898,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -23221,7 +23209,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -23491,7 +23479,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -23911,7 +23899,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24057,7 +24045,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24330,7 +24318,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24562,7 +24550,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24824,7 +24812,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25048,7 +25036,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25320,7 +25308,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25696,7 +25684,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -25958,7 +25946,7 @@
         },
         "responses": {
           "201": {
-            "description": "Created",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26169,7 +26157,7 @@
         "operationId": "AuthController_refresh_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26317,7 +26305,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26541,7 +26529,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26765,7 +26753,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26985,7 +26973,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -27205,7 +27193,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -27415,7 +27403,7 @@
         "operationId": "AuthController_logoutAll_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -27563,24 +27551,27 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "example": true
                     },
                     "statusCode": {
                       "type": "integer",
                       "format": "int32"
                     },
                     "message": {
-                      "type": "string"
+                      "type": "string",
+                      "example": "OK"
                     },
                     "warning": {
-                      "type": ["string", "null"]
+                      "type": ["string", "null"],
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
                       "oneOf": [
@@ -27811,24 +27802,27 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "example": true
                     },
                     "statusCode": {
                       "type": "integer",
                       "format": "int32"
                     },
                     "message": {
-                      "type": "string"
+                      "type": "string",
+                      "example": "OK"
                     },
                     "warning": {
-                      "type": ["string", "null"]
+                      "type": ["string", "null"],
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
                       "oneOf": [
@@ -28059,24 +28053,27 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "success": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "example": true
                     },
                     "statusCode": {
                       "type": "integer",
                       "format": "int32"
                     },
                     "message": {
-                      "type": "string"
+                      "type": "string",
+                      "example": "OK"
                     },
                     "warning": {
-                      "type": ["string", "null"]
+                      "type": ["string", "null"],
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
                       "oneOf": [
@@ -28307,7 +28304,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -28521,7 +28518,7 @@
         "operationId": "OtpController_requestEmailVerification_v1",
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -28659,7 +28656,7 @@
         "operationId": "TwoFactorAuthController_generate_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -28807,7 +28804,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29021,7 +29018,7 @@
         "operationId": "TwoFactorAuthController_getBackupCodesStatus_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29167,7 +29164,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29392,7 +29389,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29616,7 +29613,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29878,7 +29875,7 @@
         },
         "responses": {
           "202": {
-            "description": "Accepted",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30140,7 +30137,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30400,7 +30397,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30670,7 +30667,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -30970,7 +30967,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31230,7 +31227,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31500,7 +31497,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31790,7 +31787,7 @@
         "operationId": "UsersController_getCurrentUser_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31936,7 +31933,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32168,7 +32165,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32446,7 +32443,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32708,7 +32705,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32930,14 +32927,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -33200,7 +33190,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33500,7 +33490,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33760,7 +33750,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34030,7 +34020,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34330,7 +34320,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34552,7 +34542,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34822,7 +34812,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35084,7 +35074,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35316,7 +35306,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35586,7 +35576,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35838,7 +35828,7 @@
         "operationId": "OrganizationsController_get_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35984,7 +35974,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36244,7 +36234,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36496,7 +36486,7 @@
         "operationId": "OrganizationsController_getSettings_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36680,7 +36670,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36932,7 +36922,7 @@
         "operationId": "NotificationsController_listPreferences_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37078,7 +37068,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37302,7 +37292,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -37524,7 +37514,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content"
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -37787,7 +37777,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -38087,7 +38077,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -38347,7 +38337,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -38617,7 +38607,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -38917,7 +38907,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39132,7 +39122,7 @@
         "operationId": "VersionController_version",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39229,7 +39219,7 @@
         "operationId": "HealthController_liveness",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39326,7 +39316,7 @@
         "operationId": "HealthController_readiness",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39443,7 +39433,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39696,7 +39686,7 @@
         "operationId": "WebhookEndpointsController_listEventTypes_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -39882,7 +39872,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40142,7 +40132,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40404,7 +40394,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40666,7 +40656,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40926,7 +40916,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41188,7 +41178,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41378,7 +41368,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41602,7 +41592,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41864,7 +41854,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42088,7 +42078,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42312,7 +42302,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42574,7 +42564,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42863,7 +42853,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43001,7 +42991,7 @@
         "operationId": "PlatformController_getMetrics_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43139,7 +43129,7 @@
         "operationId": "PlatformJobsController_getHealth_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43277,7 +43267,7 @@
         "operationId": "PlatformController_getFinanceSnapshot_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43435,7 +43425,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43759,7 +43749,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43897,7 +43887,7 @@
         "operationId": "PlatformAuditLogsController_listActions_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44035,7 +44025,7 @@
         "operationId": "PermissionsController_list_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44211,7 +44201,7 @@
         "operationId": "OrganizationsController_getUsage_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44387,7 +44377,7 @@
         "operationId": "OrganizationsController_getOnboarding_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44623,7 +44613,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44761,7 +44751,7 @@
         "operationId": "NotificationsController_unreadCount_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44950,7 +44940,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45157,7 +45147,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45440,7 +45430,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45626,7 +45616,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45848,14 +45838,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -46177,7 +46160,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46440,7 +46423,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46588,7 +46571,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46850,7 +46833,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -47159,7 +47142,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -47429,7 +47412,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -47643,7 +47626,7 @@
         "operationId": "DocumentsController_storageUsage_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -47900,7 +47883,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48086,7 +48069,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48346,7 +48329,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content"
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -48601,7 +48584,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48815,7 +48798,7 @@
         "operationId": "BillingController_getSubscription_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48991,7 +48974,7 @@
         "operationId": "BillingController_listPlans_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49177,7 +49160,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49353,7 +49336,7 @@
         "operationId": "SessionsController_list_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49501,7 +49484,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49684,7 +49667,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49970,7 +49953,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50156,7 +50139,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50408,7 +50391,7 @@
         "operationId": "AuditLogsController_listActions_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50594,7 +50577,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -50846,7 +50829,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51060,7 +51043,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51274,7 +51257,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51488,7 +51471,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51713,7 +51696,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51899,7 +51882,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52164,7 +52147,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52378,7 +52361,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52592,7 +52575,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52806,7 +52789,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52982,7 +52965,7 @@
         "operationId": "UsersController_deleteAvatar_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -53138,7 +53121,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -53438,7 +53421,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content"
+            "description": "The device is forgotten; no push will reach it again."
           },
           "401": {
             "description": "No valid session cookie, or the session has expired.",
@@ -53625,7 +53608,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -53887,7 +53870,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54111,7 +54094,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54325,7 +54308,7 @@
         "operationId": "SessionsController_revokeAllTrust_v1",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54473,7 +54456,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54697,14 +54680,7 @@
         ],
         "responses": {
           "204": {
-            "description": "No Content",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -54963,17 +54939,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/UserSummaryResponseDto"
@@ -55195,17 +55174,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RoleResponseDto"
@@ -55322,17 +55304,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DocumentResponseDto"
@@ -55430,17 +55415,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/StripeWebhookAcknowledgementDto"
@@ -55464,17 +55452,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ResendWebhookAcknowledgementDto"
@@ -55533,17 +55524,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointWithSecretResponseDto"
@@ -55626,17 +55620,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/TestWebhookResponseDto"
@@ -55698,19 +55695,24 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
-          "data": {}
+          "data": {
+            "type": "null"
+          }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
@@ -55735,17 +55737,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RevokedSessionCountResponseDto"
@@ -55766,17 +55771,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/UntrustedDeviceCountResponseDto"
@@ -55818,17 +55826,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PresignAvatarResponseDto"
@@ -55868,17 +55879,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/UserResponseDto"
@@ -55934,17 +55948,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/CreateInvitationsResponseDto"
@@ -56050,17 +56067,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/InvitationResponseDto"
@@ -56115,17 +56135,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PreviewInvitationsResponseDto"
@@ -56215,17 +56238,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/LoginResponseDto"
@@ -56279,17 +56305,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/TicketResponseDto"
@@ -56448,17 +56477,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/CreateMessageResponseDto"
@@ -56678,17 +56710,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PresignAttachmentResponseDto"
@@ -56733,17 +56768,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AttachmentResponseDto"
@@ -56796,17 +56834,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AiSummaryResponseDto"
@@ -56856,17 +56897,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AiSuggestionsResponseDto"
@@ -56945,17 +56989,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AiDraftResponseDto"
@@ -57007,17 +57054,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AiClassificationResponseDto"
@@ -57088,17 +57138,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AssignmentResponseDto"
@@ -57179,17 +57232,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/MarkTicketReadResponseDto"
@@ -57244,17 +57300,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ExportResponseDto"
@@ -57345,17 +57404,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/BulkTicketStatusResponseDto"
@@ -57415,17 +57477,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/BulkTicketPriorityResponseDto"
@@ -57695,17 +57760,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/SubscriptionPlanResponseDto"
@@ -57818,17 +57886,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ApplyPlanResponseDto"
@@ -57975,17 +58046,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/CreatePlatformOrganizationResponseDto"
@@ -58130,17 +58204,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PlatformOrganizationResponseDto"
@@ -58163,17 +58240,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/JobRunResultResponseDto"
@@ -58242,17 +58322,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OrganizationResponseDto"
@@ -58264,17 +58347,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/InboundAddressResponseDto"
@@ -58297,17 +58383,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/MarkReadResponseDto"
@@ -58372,17 +58461,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DeviceTokenResponseDto"
@@ -58440,17 +58532,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/FeedbackResponseDto"
@@ -58531,17 +58626,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/KnowledgeSearchResponseDto"
@@ -58622,17 +58720,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/KnowledgeAskResponseDto"
@@ -58674,17 +58775,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/IngestionJobResponseDto"
@@ -58792,17 +58896,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PresignDocumentResponseDto"
@@ -58839,17 +58946,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DocumentFlagResponseDto"
@@ -59001,17 +59111,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DepartmentResponseDto"
@@ -59099,17 +59212,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AddDepartmentMembersResponseDto"
@@ -59152,17 +59268,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PortalSessionResponseDto"
@@ -59199,17 +59318,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PlanChangeResponseDto"
@@ -59260,17 +59382,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/CheckoutSessionResponseDto"
@@ -59310,17 +59435,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RegisterResponseDto"
@@ -59367,17 +59495,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/VerifyOtpResponseDto"
@@ -59414,17 +59545,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RequestOtpResponseDto"
@@ -59464,17 +59598,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ResetPasswordResponseDto"
@@ -59515,17 +59652,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/LogoutResponseDto"
@@ -59546,17 +59686,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/LogoutAllResponseDto"
@@ -59668,17 +59811,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/GenerateTwoFactorResponseDto"
@@ -59713,17 +59859,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/BackupCodesResponseDto"
@@ -59780,17 +59929,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/TwoFactorAuthenticatedResponseDto"
@@ -59897,17 +60049,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointResponseDto"
@@ -59973,17 +60128,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/MessageResponseDto"
@@ -60174,17 +60332,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OrganizationSettingsResponseDto"
@@ -60269,17 +60430,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PreferenceResponseDto"
@@ -60374,17 +60538,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ChangePasswordResponseDto"
@@ -60406,17 +60573,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/VersionResponseDto"
@@ -60443,17 +60613,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/LivenessResponseDto"
@@ -60478,17 +60651,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ReadinessResponseDto"
@@ -60535,17 +60711,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/WebhookEndpointsResponseDto"
@@ -60569,17 +60748,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/WebhookDeliveriesResponseDto"
@@ -60652,17 +60834,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/WebhookEventTypesResponseDto"
@@ -60698,17 +60883,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataUserSummaryResponseDto"
@@ -60720,10 +60908,12 @@
         "type": "object",
         "properties": {
           "totalItems": {
-            "type": "number"
+            "type": "number",
+            "description": "Total matching records, across every page."
           },
           "itemCount": {
-            "type": "number"
+            "type": "number",
+            "description": "Records on THIS page."
           },
           "itemsPerPage": {
             "type": "number"
@@ -60762,17 +60952,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -60834,17 +61027,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/UserPermissionsResponseDto"
@@ -60868,17 +61064,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/CurrentUserResponseDto"
@@ -60959,17 +61158,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataInvitationResponseDto"
@@ -60996,17 +61198,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PreviewInvitationResponseDto"
@@ -61053,17 +61258,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataTicketResponseDto"
@@ -61090,17 +61298,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataMessageResponseDto"
@@ -61127,17 +61338,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -61152,17 +61366,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -61195,17 +61412,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -61274,17 +61494,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -61299,17 +61522,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataRoleResponseDto"
@@ -61336,17 +61562,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataPlatformUserResponseDto"
@@ -61405,17 +61634,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataSubscriptionPlanResponseDto"
@@ -61442,17 +61674,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataPlatformOrganizationResponseDto"
@@ -61479,17 +61714,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PlatformMetricsResponseDto"
@@ -61548,17 +61786,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/JobHealthResponseDto"
@@ -61643,17 +61884,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/FinanceSnapshotResponseDto"
@@ -61803,17 +62047,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/BillingEventsResponseDto"
@@ -61868,17 +62115,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataAuditLogResponseDto"
@@ -62011,17 +62261,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AuditActionsResponseDto"
@@ -62089,17 +62342,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -62183,17 +62439,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OrganizationUsageResponseDto"
@@ -62264,17 +62523,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OnboardingResponseDto"
@@ -62326,17 +62588,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/NotificationFeedResponseDto"
@@ -62462,17 +62727,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/UnreadCountResponseDto"
@@ -62493,17 +62761,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -62518,17 +62789,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -62543,17 +62817,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataKnowledgeArticleResponseDto"
@@ -62600,17 +62877,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/KnowledgeArticleDetailResponseDto"
@@ -62691,17 +62971,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataIngestionJobResponseDto"
@@ -62728,17 +63011,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataFeedbackResponseDto"
@@ -62765,17 +63051,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentResponseDto"
@@ -62802,17 +63091,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DownloadDocumentResponseDto"
@@ -62837,17 +63129,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DocumentDepartmentsResponseDto"
@@ -62871,17 +63166,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentChunkResponseDto"
@@ -62949,17 +63247,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DocumentChunkResponseDto"
@@ -62971,17 +63272,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/StorageUsageResponseDto"
@@ -63008,17 +63312,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataDocumentFlagResponseDto"
@@ -63045,17 +63352,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataDepartmentResponseDto"
@@ -63082,17 +63392,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/PagedDataDepartmentMemberResponseDto"
@@ -63103,7 +63416,9 @@
       "DepartmentMemberResponseDto": {
         "type": "object",
         "properties": {
-          "user": {},
+          "user": {
+            "type": "object"
+          },
           "isPrimary": {
             "type": "boolean"
           },
@@ -63136,17 +63451,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/SubscriptionResponseDto"
@@ -63212,17 +63530,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -63306,17 +63627,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "type": "array",
@@ -63368,17 +63692,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ValidatePasswordResetTokenResponseDto"
@@ -63402,17 +63729,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OtpStatusResponseDto"
@@ -63443,17 +63773,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/BackupCodesStatusResponseDto"
@@ -63481,17 +63814,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/VolumeResponseDto"
@@ -63573,17 +63909,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/SatisfactionResponseDto"
@@ -63653,17 +63992,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/ResponseTimesResponseDto"
@@ -63741,17 +64083,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OverviewResponseDto"
@@ -63823,17 +64168,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/KnowledgeGapsResponseDto"
@@ -63934,17 +64282,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DocumentAnalyticsResponseDto"
@@ -64036,17 +64387,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DeflectionResponseDto"
@@ -64219,17 +64573,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AiUsageResponseDto"
@@ -64308,17 +64665,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/AgentAnalyticsResponseDto"
@@ -64330,17 +64690,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DeleteWebhookEndpointResponseDto"
@@ -64361,17 +64724,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RevokedCountDto"
@@ -64393,17 +64759,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/DeletePlanResponseDto"
@@ -64435,17 +64804,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/OffboardResponseDto"
@@ -64478,17 +64850,20 @@
         "type": "object",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "example": true
           },
           "statusCode": {
             "type": "integer",
             "format": "int32"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "example": "OK"
           },
           "warning": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
             "$ref": "#/components/schemas/RevokeTrustResponseDto"

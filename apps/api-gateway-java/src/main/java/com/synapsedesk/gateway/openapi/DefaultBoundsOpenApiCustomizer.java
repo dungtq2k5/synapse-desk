@@ -11,6 +11,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,6 +36,7 @@ import org.springframework.stereotype.Component;
  * written value, not a default.
  */
 @Component
+@Order(OpenApiCustomizerOrder.DEFAULT_BOUNDS)
 public class DefaultBoundsOpenApiCustomizer implements OpenApiCustomizer {
 
   @Override

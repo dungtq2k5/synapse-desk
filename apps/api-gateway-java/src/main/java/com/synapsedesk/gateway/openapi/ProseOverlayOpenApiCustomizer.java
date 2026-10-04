@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.openapi;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
-import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -10,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -37,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
  * state) keeps it: the overlay's text goes first and the existing text after it.
  */
 @Component
-@Order(Ordered.LOWEST_PRECEDENCE)
+@Order(OpenApiCustomizerOrder.PROSE_OVERLAY)
 public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
 
   private static final String OVERLAY = "openapi/prose-overlay.json";
@@ -60,7 +58,11 @@ public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
       if (openApi.getInfo() == null) openApi.setInfo(new Info());
       openApi.getInfo().setTitle(info.get("title").asString());
       openApi.getInfo().setDescription(info.get("description").asString());
+      openApi.getInfo().setVersion(info.get("version").asString());
     }
+    // No `servers`: springdoc would otherwise publish the requesting host, which is a
+    // fact about whoever asked, not about the API.
+    openApi.setServers(new java.util.ArrayList<>());
 
     if (openApi.getPaths() != null) {
       openApi
@@ -79,6 +81,9 @@ public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
       openApi.getComponents().getSchemas() != null
     ) {
       Map<String, Schema> schemas = openApi.getComponents().getSchemas();
+      schemas.forEach((name, schema) -> {
+        if (name.startsWith("ApiResponse")) describeEnvelope(schema);
+      });
       overlay
         .get("properties")
         .properties()
@@ -102,6 +107,31 @@ public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
   }
 
   private void describe(String key, Operation operation) {
+    if (operation.getResponses() != null) {
+      operation.getResponses().forEach((status, response) -> {
+        if (!status.startsWith("2")) return;
+        // An envelope declared inline (a route whose body is one of several shapes)
+        // gets the same envelope prose as a named one.
+        if (response.getContent() != null) {
+          response
+            .getContent()
+            .values()
+            .forEach(media -> {
+              Schema<?> body = media.getSchema();
+              if (body != null && body.get$ref() == null) describeEnvelope(
+                body
+              );
+            });
+        }
+        JsonNode own = overlay.get("responses").get(key + " " + status);
+        response.setDescription(
+          (own != null
+            ? own
+            : overlay.get("responses").get("default")
+          ).asString()
+        );
+      });
+    }
     JsonNode entry = overlay.get("operations").get(key);
     if (entry != null) {
       if (entry.has("summary")) operation.setSummary(
@@ -118,6 +148,23 @@ public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
         .get(key + " " + parameter.getIn() + ":" + parameter.getName());
       if (text != null) parameter.setDescription(text.asString());
     }
+  }
+
+  /** The envelope's own prose, on any schema that IS an envelope (it has `warning`). */
+  @SuppressWarnings("rawtypes")
+  private void describeEnvelope(Schema<?> schema) {
+    if (schema.getProperties() == null) return;
+    Map<String, Schema> fields = schema.getProperties();
+    if (fields.get("warning") == null) return;
+    JsonNode envelope = overlay.get("envelope");
+    fields.get("warning").setDescription(envelope.get("warning").asString());
+    envelope
+      .get("examples")
+      .properties()
+      .forEach(example -> {
+        Schema<?> field = fields.get(example.getKey());
+        if (field != null) field.setExample(plain(example.getValue()));
+      });
   }
 
   /** The overlay's text, then whatever was already there and is not already in it. */

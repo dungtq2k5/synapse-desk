@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.List;
 import org.springdoc.core.customizers.GlobalOpenApiCustomizer;
 import org.springdoc.core.customizers.OperationCustomizer;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 
@@ -23,6 +24,7 @@ import org.springframework.web.method.HandlerMethod;
  * 401 before any peer is asked) is held by the anonymous-caller contract rows.
  */
 @Component
+@Order(OpenApiCustomizerOrder.SECURITY_SCHEMES)
 public class SecurityOpenApiCustomizer
   implements OperationCustomizer, GlobalOpenApiCustomizer
 {

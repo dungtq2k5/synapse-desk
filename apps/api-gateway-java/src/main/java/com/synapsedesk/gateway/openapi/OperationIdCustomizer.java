@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.Operation;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springdoc.core.customizers.OperationCustomizer;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 
@@ -22,6 +23,7 @@ import org.springframework.web.method.HandlerMethod;
  * names it, rather than guessed at.
  */
 @Component
+@Order(OpenApiCustomizerOrder.OPERATION_ID)
 public class OperationIdCustomizer implements OperationCustomizer {
 
   private static final Pattern HANDLER_NAME = Pattern.compile(

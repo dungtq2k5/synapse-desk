@@ -71,5 +71,24 @@
     "where": "^post /api/v1/webhooks/(email/resend|stripe)$",
     "path": "^responses/429$",
     "reason": "Java has no route-level throttle exemption, so a 429 is genuinely possible and documented. Held as well by openapi-known-divergences.json."
+  },
+  {
+    "id": "status-code-has-no-example",
+    "path": "^responses/2\\d\\d/content/application/json/schema/properties/statusCode/example$",
+    "node": 200,
+    "java": null,
+    "reason": "Node's example is 200 on every success, including the 15 that answer 201 and the 8 that answer 202. Java's envelopes are shared schemas serving several statuses, so no single example is true for all; none is published rather than a wrong one. Decided 2026-10-04."
+  },
+  {
+    "id": "acknowledgement-data-is-null",
+    "where": "^(post /api/v1/auth/password/forgot|delete /api/v1/auth/2fa|delete /api/v1/users/invitations/\\{id\\}|post /api/v1/users/\\{id\\}/unlock|delete /api/v1/departments/\\{id\\}|delete /api/v1/departments/\\{id\\}/members/\\{userId\\}|delete /api/v1/roles/\\{id\\})$",
+    "path": "^responses/2\\d\\d/content/application/json/schema/properties/data/(type|example)$",
+    "reason": "Measured on both gateways: these answer `data: null`. Java publishes exactly that (`type: \"null\"`); Node publishes a nullable object with example null, which says the same about the value but claims an object type."
+  },
+  {
+    "id": "node-understates-the-success-body",
+    "where": "^(post /api/v1/webhooks/email/resend|post /api/v1/webhooks/stripe|delete /api/v1/auth/sessions/\\{id\\}|delete /api/v1/users/\\{userId\\}/sessions|post /api/v1/tickets/\\{ticketId\\}/messages/attachments/upload-url|post /api/v1/tickets/\\{ticketId\\}/messages/\\{messageId\\}/attachments/upload-url|get /api/v1/attachments/\\{id\\}/download)$",
+    "path": "^responses/2\\d\\d/content/application/json/schema/properties/data/(properties|required|type|example|\\$nullable)$",
+    "reason": "Measured on both gateways (and pinned by the webhook, session and attachment rows): these answer an object (an acknowledgement, a revoked count, an upload or download URL). Java's document describes it; Node's says data is null or leaves it undescribed."
   }
 ]

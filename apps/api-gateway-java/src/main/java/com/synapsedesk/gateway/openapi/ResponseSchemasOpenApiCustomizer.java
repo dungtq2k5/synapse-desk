@@ -41,8 +41,7 @@ import org.springframework.stereotype.Component;
  * the document now describes what they do.
  */
 @Component
-// Before ProseOverlayOpenApiCustomizer, which describes the wrappers this creates.
-@Order(0)
+@Order(OpenApiCustomizerOrder.RESPONSE_SCHEMAS)
 public class ResponseSchemasOpenApiCustomizer implements OpenApiCustomizer {
 
   @Override

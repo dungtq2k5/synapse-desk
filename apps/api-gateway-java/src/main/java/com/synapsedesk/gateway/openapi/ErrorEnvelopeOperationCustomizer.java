@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.springdoc.core.customizers.OperationCustomizer;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.method.HandlerMethod;
@@ -39,6 +40,7 @@ import org.springframework.web.method.HandlerMethod;
  * two is reachable at runtime to read from.
  */
 @Component
+@Order(OpenApiCustomizerOrder.ERROR_ENVELOPE)
 public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
 
   private static final Map<String, String> DESCRIPTIONS = descriptions();

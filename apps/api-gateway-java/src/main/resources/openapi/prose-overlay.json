@@ -2,7 +2,24 @@
   "_about": "The prose of the published document: operation summaries and descriptions, parameter and property descriptions, examples, and the API description. Extracted once from the committed document Node published, and the source of truth from then on. Applied by ProseOverlayOpenApiCustomizer; scripts/lib/prose-overlay.spec.ts holds it two-sided against the published document (every entry lands on a real target, every operation has a summary).",
   "info": {
     "title": "SynapseDesk API",
-    "description": "The REST surface of the SynapseDesk gateway. Every response is wrapped in the standard envelope — `{ success, statusCode, message, warning, data }` on success and `{ success, statusCode, path, timestamp, error }` on failure — so the schema shown for a route describes the whole body, not just its payload.\n\n## Caching and staleness\n\nSome reads are served from a shared cache. An operation that is cached says so in its `x-cache` extension: `{ scope, ttlSeconds, varyBy }`. Everything else is computed per request.\n\n**A cached read can be stale for at most its TTL, and usually far less.** Cache entries are keyed by `(tenant, scope, parameters)` rather than by URL, so a write CAN find and evict them — a mutation drops its whole scope for that tenant before it answers, and changes that originate elsewhere in the system (a WebSocket message, a background job, another service) evict through domain events. The TTL is the backstop for a writer nobody has enumerated, not the mechanism.\n\n`varyBy` says what the entry depends on. `tenant` means every member of your organization shares one answer. `caller` means the answer is filtered by what you can see — `GET /documents` is scoped to your departments — so it is shared only with people whose visibility matches yours.\n\n**The one entry with no eviction is `GET /permissions`.** The permission catalogue is seeded and changes on deploy, so there is no request that could invalidate it; its one-hour TTL is the whole story.\n\n**Tickets, messages and notifications are never cached**, and neither is `GET /notifications/unread-count` — the WebSocket pushes that authoritatively, so polling it is the thing to remove rather than the thing to speed up.\n\n### GraphQL\n\nThere is **no response cache** on `/graphql`. A GraphQL response key would be a hash of the query document, and nothing in such a key says which entities the answer contains — so no write could ever find it, and a cached response would be stale for its full TTL no matter what changed. What is cached instead are the individual entities behind edges (`assignee`, `author`, `sender`, `actor`, `department`), keyed one per entity and evicted precisely when that entity changes.\n\n### Your half\n\nAfter a mutation, refetch or update your own store rather than trusting the next query to be fresh. A mutation returns fresh data to its own caller; another tab holding a rendered list is the server's problem only up to the eviction it just performed. Apollo Client does this by default with normalized cache updates."
+    "description": "The REST surface of the SynapseDesk gateway. Every response is wrapped in the standard envelope — `{ success, statusCode, message, warning, data }` on success and `{ success, statusCode, path, timestamp, error }` on failure — so the schema shown for a route describes the whole body, not just its payload.\n\n## Caching and staleness\n\nSome reads are served from a shared cache. An operation that is cached says so in its `x-cache` extension: `{ scope, ttlSeconds, varyBy }`. Everything else is computed per request.\n\n**A cached read can be stale for at most its TTL, and usually far less.** Cache entries are keyed by `(tenant, scope, parameters)` rather than by URL, so a write CAN find and evict them — a mutation drops its whole scope for that tenant before it answers, and changes that originate elsewhere in the system (a WebSocket message, a background job, another service) evict through domain events. The TTL is the backstop for a writer nobody has enumerated, not the mechanism.\n\n`varyBy` says what the entry depends on. `tenant` means every member of your organization shares one answer. `caller` means the answer is filtered by what you can see — `GET /documents` is scoped to your departments — so it is shared only with people whose visibility matches yours.\n\n**The one entry with no eviction is `GET /permissions`.** The permission catalogue is seeded and changes on deploy, so there is no request that could invalidate it; its one-hour TTL is the whole story.\n\n**Tickets, messages and notifications are never cached**, and neither is `GET /notifications/unread-count` — the WebSocket pushes that authoritatively, so polling it is the thing to remove rather than the thing to speed up.\n\n### GraphQL\n\nThere is **no response cache** on `/graphql`. A GraphQL response key would be a hash of the query document, and nothing in such a key says which entities the answer contains — so no write could ever find it, and a cached response would be stale for its full TTL no matter what changed. What is cached instead are the individual entities behind edges (`assignee`, `author`, `sender`, `actor`, `department`), keyed one per entity and evicted precisely when that entity changes.\n\n### Your half\n\nAfter a mutation, refetch or update your own store rather than trusting the next query to be fresh. A mutation returns fresh data to its own caller; another tab holding a rendered list is the server's problem only up to the eviction it just performed. Apollo Client does this by default with normalized cache updates.",
+    "version": "1.0.0"
+  },
+  "envelope": {
+    "_about": "Applied to every ApiResponse* wrapper: the same envelope on every success.",
+    "warning": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say.",
+    "examples": {
+      "message": "OK",
+      "success": true
+    }
+  },
+  "responses": {
+    "default": "Success.",
+    "POST /api/v1/webhooks/email/resend 200": "Accepted, or deliberately dropped. The body carries an acknowledgement and the outcome, never the message.",
+    "POST /api/v1/organizations/current/inbound-token 201": "The new address. Any previous one stops routing immediately — mail already in flight to it is dropped as unroutable, which is the point of a rotation and also its cost.",
+    "DELETE /api/v1/organizations/current/inbound-token 204": "Inbound mail is off. The address stops routing immediately.",
+    "DELETE /api/v1/notifications/devices/{id} 204": "The device is forgotten; no push will reach it again.",
+    "POST /api/v1/webhooks/stripe 200": "Event accepted. The body carries an acknowledgement only."
   },
   "operations": {
     "DELETE /api/v1/attachments/{id}": {
@@ -1136,6 +1153,12 @@
     },
     "OverviewResponseDto.openTicketMedianAgeSeconds": {
       "description": "The counterweight to `resolutionSeconds`, which can only see tickets that\nclosed and is therefore biased optimistic."
+    },
+    "PageMeta.itemCount": {
+      "description": "Records on THIS page."
+    },
+    "PageMeta.totalItems": {
+      "description": "Total matching records, across every page."
     },
     "PaginationMetaDataResponseDto.itemCount": {
       "description": "Records on THIS page — smaller than `itemsPerPage` on the last one."

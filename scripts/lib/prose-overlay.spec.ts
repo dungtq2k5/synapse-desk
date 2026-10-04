@@ -131,4 +131,53 @@ describe('the prose overlay, against the published document', () => {
     expect(property.description.startsWith(text)).toBe(true);
     expect(property.description).toContain('Must be a date in the future.');
   });
+
+  it('every envelope wrapper publishes the envelope prose', () => {
+    const wrappers = Object.entries<any>(document.components.schemas).filter(
+      ([name, schema]) =>
+        name.startsWith('ApiResponse') && schema.properties?.warning,
+    );
+
+    expect(wrappers.length).toBeGreaterThan(100);
+    for (const [name, schema] of wrappers) {
+      expect({ name, warning: schema.properties.warning.description }).toEqual({
+        name,
+        warning: overlay.envelope.warning,
+      });
+      for (const [field, example] of Object.entries(
+        overlay.envelope.examples,
+      )) {
+        expect({
+          name,
+          field,
+          example: schema.properties[field]?.example,
+        }).toEqual({ name, field, example });
+      }
+    }
+  });
+
+  it('every success response publishes its own description from the overlay, or the default', () => {
+    const dangling = Object.keys(overlay.responses).filter((key) => {
+      if (key === 'default') return false;
+      const [method, path, status] = key.split(' ');
+
+      return !document.paths[path]?.[method.toLowerCase()]?.responses?.[status];
+    });
+    expect(dangling).toEqual([]);
+
+    for (const [path, methods] of Object.entries<any>(document.paths)) {
+      for (const [method, operation] of Object.entries<any>(methods)) {
+        for (const [status, response] of Object.entries<any>(
+          operation.responses ?? {},
+        )) {
+          if (!status.startsWith('2')) continue;
+          const key = `${method.toUpperCase()} ${path} ${status}`;
+          expect({ key, description: response.description }).toEqual({
+            key,
+            description: overlay.responses[key] ?? overlay.responses.default,
+          });
+        }
+      }
+    }
+  });
 });

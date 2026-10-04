@@ -34,8 +34,7 @@ import org.springframework.stereotype.Component;
  * in behaviour. With the rule, the annotation no longer decides what is published.
  */
 @Component
-// Before ProseOverlayOpenApiCustomizer, which describes the wrappers this creates.
-@Order(0)
+@Order(OpenApiCustomizerOrder.REQUEST_NULLABILITY)
 public class RequestNullabilityOpenApiCustomizer implements OpenApiCustomizer {
 
   @Override

@@ -731,6 +731,10 @@ function normaliseSchema(schema) {
     nullable = true;
     delete x.nullable;
   }
+  if (x.type === 'null') {
+    nullable = true;
+    delete x.type;
+  }
   if (Array.isArray(x.type)) {
     if (x.type.includes('null')) nullable = true;
     const rest = x.type.filter((type) => type !== 'null');
