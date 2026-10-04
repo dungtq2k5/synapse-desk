@@ -58045,6 +58045,7 @@
           },
           "slug": {
             "type": "string",
+            "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`.",
             "maxLength": 100,
             "minLength": 2
           },
@@ -60289,6 +60290,7 @@
           },
           "slug": {
             "type": ["string", "null"],
+            "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`.",
             "maxLength": 100,
             "minLength": 2
           },

@@ -886,6 +886,9 @@
     "CreateMessageResponseDto.skippedAttachments": {
       "description": "File NAMES, never object paths and never contents — the same rule the AI's\nown skipped list follows, and for the same reason: a user reads this."
     },
+    "CreatePlatformOrganizationDto.slug": {
+      "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`."
+    },
     "CreateRoleDto.description": {
       "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
     },
@@ -1360,6 +1363,9 @@
     },
     "UpdateOwnProfileDto.dob": {
       "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone."
+    },
+    "UpdatePlatformOrganizationDto.slug": {
+      "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`."
     },
     "UpdatePreferenceDto.type": {
       "description": "A known type, or `'*'` for the catch-all that turns a channel off wholesale."
