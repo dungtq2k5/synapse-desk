@@ -55395,7 +55395,7 @@
           },
           "status": {
             "type": ["string", "null"],
-            "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
+            "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING", null]
           },
           "departmentIds": {
             "type": "array",
@@ -56317,11 +56317,11 @@
           },
           "priority": {
             "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
           },
           "source": {
             "type": ["string", "null"],
-            "enum": ["API", "CHAT", "EMAIL", "WEB"]
+            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
           },
           "authorId": {
             "type": ["string", "null"],
@@ -56374,7 +56374,7 @@
           },
           "source": {
             "type": ["string", "null"],
-            "enum": ["API", "CHAT", "EMAIL", "WEB"]
+            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
           },
           "status": {
             "type": ["string", "null"],
@@ -56384,12 +56384,13 @@
               "NEW",
               "OPEN",
               "PENDING_AGENT",
-              "RESOLVED"
+              "RESOLVED",
+              null
             ]
           },
           "priority": {
             "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
           },
           "title": {
             "type": "string"
@@ -56671,7 +56672,8 @@
               "DOC_ANSWER",
               "DOC_MISSING",
               "GREETING",
-              "REFUSED"
+              "REFUSED",
+              null
             ]
           },
           "citations": {
@@ -56918,7 +56920,7 @@
           "degraded": {
             "type": ["string", "null"],
             "description": "`LEXICAL_ONLY` when the budget could not confirm room for a generation —\nthe workspace is at its AI allowance, or the quota counter was unreadable.\nThen `nextSteps` is empty because the model was never called, and\n`articles` came from keyword search. `null` on a normal answer, where an\nempty `nextSteps` means the model had nothing to add.\n\nRead it before rendering an empty `nextSteps`: without it, a client shows\n\"no suggestions\" where the truth is \"allowance used\".",
-            "enum": ["LEXICAL_ONLY"]
+            "enum": ["LEXICAL_ONLY", null]
           }
         },
         "required": ["articles", "degraded", "nextSteps"]
@@ -57068,7 +57070,7 @@
           "suggestedPriority": {
             "type": ["string", "null"],
             "description": "Null when the model named something that is not a priority.\n\nThe value crosses two hops: rag-service (Python) answers a bare string, and\nticket-service narrows it there — at the one boundary where it is genuinely\nforeign — before putting it on `ClassifyTicketResponse` as a real enum. So a\n`MEDIUM-HIGH` or a translated label arrives here as null rather than as a\nsuggestion the UI would render and no agent could apply.",
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
           },
           "confidenceScore": {
             "type": "number"
@@ -57158,7 +57160,8 @@
               "LOAD_BALANCING",
               "MANUAL",
               "SELF_ASSIGNED",
-              "UNAVAILABLE"
+              "UNAVAILABLE",
+              null
             ]
           }
         },
@@ -57225,7 +57228,8 @@
               "LOAD_BALANCING",
               "MANUAL",
               "SELF_ASSIGNED",
-              "UNAVAILABLE"
+              "UNAVAILABLE",
+              null
             ]
           },
           "isCurrent": {
@@ -57359,11 +57363,11 @@
           },
           "status": {
             "type": ["string", "null"],
-            "enum": ["FAILED", "PENDING", "READY"]
+            "enum": ["FAILED", "PENDING", "READY", null]
           },
           "kind": {
             "type": ["string", "null"],
-            "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY"]
+            "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY", null]
           },
           "rowCount": {
             "type": ["number", "null"]
@@ -58131,7 +58135,8 @@
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE"
+              "SUSPENDED_PAST_DUE",
+              null
             ]
           },
           "enforceTwoFactor": {
@@ -58460,7 +58465,7 @@
           },
           "resourceType": {
             "type": ["string", "null"],
-            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
+            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER", null]
           },
           "resourceId": {
             "type": ["string", "null"],
@@ -58521,7 +58526,7 @@
           "platform": {
             "type": ["string", "null"],
             "description": "`IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.",
-            "enum": ["ANDROID", "IOS", "WEB"]
+            "enum": ["ANDROID", "IOS", "WEB", null]
           },
           "deviceName": {
             "type": ["string", "null"]
@@ -58689,7 +58694,7 @@
           "degraded": {
             "type": ["string", "null"],
             "description": "Why this result set is thinner than usual, or `null` when it is not.\n\n`LEXICAL_ONLY` means the vector search was skipped.",
-            "enum": ["LEXICAL_ONLY"]
+            "enum": ["LEXICAL_ONLY", null]
           }
         },
         "required": ["chunks", "degraded"]
@@ -58785,7 +58790,8 @@
               "DOC_ANSWER",
               "DOC_MISSING",
               "GREETING",
-              "REFUSED"
+              "REFUSED",
+              null
             ]
           },
           "citations": {
@@ -58849,7 +58855,8 @@
               "EMBEDDING",
               "FAILED",
               "PARSING",
-              "QUEUED"
+              "QUEUED",
+              null
             ]
           },
           "errorLog": {
@@ -59020,12 +59027,13 @@
               "OUTDATED",
               "PAGES_NOT_INDEXED",
               "UNCITED",
-              "UNRETRIEVED"
+              "UNRETRIEVED",
+              null
             ]
           },
           "severity": {
             "type": ["string", "null"],
-            "enum": ["CRITICAL", "INFO", "WARNING"]
+            "enum": ["CRITICAL", "INFO", "WARNING", null]
           },
           "detail": {
             "type": "string"
@@ -59049,7 +59057,7 @@
           "resolution": {
             "type": ["string", "null"],
             "description": "`null` while the flag is open, which is what an open flag sends.",
-            "enum": ["DISMISSED", "DOCUMENT_REPLACED", "FIXED"]
+            "enum": ["DISMISSED", "DOCUMENT_REPLACED", "FIXED", null]
           },
           "resolutionComment": {
             "type": ["string", "null"]
@@ -59279,7 +59287,7 @@
           },
           "priority": {
             "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
           }
         },
         "required": ["message", "title"]
@@ -60114,7 +60122,7 @@
           },
           "gender": {
             "type": ["string", "null"],
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
+            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED", null]
           },
           "dob": {
             "type": ["string", "null"],
@@ -60133,7 +60141,7 @@
           },
           "gender": {
             "type": ["string", "null"],
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
+            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED", null]
           },
           "dob": {
             "type": ["string", "null"],
@@ -60195,7 +60203,7 @@
           },
           "priority": {
             "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
           }
         }
       },
@@ -60244,7 +60252,7 @@
           },
           "aiModelTier": {
             "type": ["string", "null"],
-            "enum": ["FAST", "QUALITY"]
+            "enum": ["FAST", "QUALITY", null]
           },
           "maxDocumentBytes": {
             "type": ["number", "null"],
@@ -60451,7 +60459,7 @@
           },
           "digest": {
             "type": ["string", "null"],
-            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
+            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF", null]
           }
         },
         "required": ["channel", "type"]
@@ -60498,13 +60506,14 @@
               "ticket.message_created",
               "ticket.reassigned",
               "ticket.status_changed",
-              "webhook.endpoint_disabled"
+              "webhook.endpoint_disabled",
+              null
             ]
           },
           "channel": {
             "type": ["string", "null"],
             "description": "The transport this preference governs.",
-            "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK"]
+            "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK", null]
           },
           "isEnabled": {
             "type": "boolean"
@@ -60512,12 +60521,12 @@
           "digest": {
             "type": ["string", "null"],
             "description": "Whether matching notifications batch into a digest.",
-            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
+            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF", null]
           },
           "source": {
             "type": ["string", "null"],
             "description": "Where the value came from.\n\nLets the UI show \"inherited\" rather than presenting a default as a choice.",
-            "enum": ["DEFAULT", "EXPLICIT", "WILDCARD"]
+            "enum": ["DEFAULT", "EXPLICIT", "WILDCARD", null]
           }
         },
         "required": ["channel", "digest", "isEnabled", "source", "type"]
@@ -60827,7 +60836,7 @@
           "status": {
             "type": ["string", "null"],
             "description": "`null` for a wire value this build does not know — never invented.",
-            "enum": ["DELIVERED", "FAILED", "PENDING"]
+            "enum": ["DELIVERED", "FAILED", "PENDING", null]
           },
           "attempts": {
             "type": "number"
@@ -61484,7 +61493,8 @@
               "NEW",
               "OPEN",
               "PENDING_AGENT",
-              "RESOLVED"
+              "RESOLVED",
+              null
             ]
           },
           "toStatus": {
@@ -62225,7 +62235,8 @@
               "USER_SESSIONS_REVOKED",
               "USER_TWO_FACTOR_RESET",
               "USER_UNLOCKED",
-              "USER_UPDATED"
+              "USER_UPDATED",
+              null
             ]
           },
           "resourceType": {
@@ -62237,7 +62248,8 @@
               "ORGANIZATION",
               "ROLE",
               "SUBSCRIPTION_PLAN",
-              "USER"
+              "USER",
+              null
             ]
           },
           "resourceId": {
@@ -62510,7 +62522,7 @@
           "aiModelTier": {
             "type": ["string", "null"],
             "description": "The plan, beside the meters\n\nThis is the page a customer opens when they hit a limit, and a limit with\nno plan next to it is a number they cannot act on: the next question is\nalways \"what would I get if I upgraded\".",
-            "enum": ["FAST", "QUALITY"]
+            "enum": ["FAST", "QUALITY", null]
           },
           "planName": {
             "type": "string"
@@ -62593,7 +62605,8 @@
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE"
+              "SUSPENDED_PAST_DUE",
+              null
             ]
           }
         },
@@ -62680,13 +62693,14 @@
               "ticket.message_created",
               "ticket.reassigned",
               "ticket.status_changed",
-              "webhook.endpoint_disabled"
+              "webhook.endpoint_disabled",
+              null
             ]
           },
           "priority": {
             "type": ["string", "null"],
             "description": "How urgent it is. `null` when the wire value is one this build cannot name.",
-            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
+            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL", null]
           },
           "title": {
             "type": "string"
@@ -62708,7 +62722,7 @@
           "resourceType": {
             "type": ["string", "null"],
             "description": "What the notification is ABOUT. `null` when unset or unrecognized.",
-            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
+            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER", null]
           },
           "resourceId": {
             "type": ["string", "null"]
@@ -63527,7 +63541,7 @@
           },
           "aiModelTier": {
             "type": ["string", "null"],
-            "enum": ["FAST", "QUALITY"]
+            "enum": ["FAST", "QUALITY", null]
           },
           "billingCycleStart": {
             "type": ["string", "null"],
@@ -63540,7 +63554,8 @@
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE"
+              "SUSPENDED_PAST_DUE",
+              null
             ]
           }
         },
@@ -63618,7 +63633,7 @@
           "aiModelTier": {
             "type": ["string", "null"],
             "description": "`AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}.",
-            "enum": ["FAST", "QUALITY"]
+            "enum": ["FAST", "QUALITY", null]
           },
           "maxDocumentBytes": {
             "type": "number"
@@ -64237,7 +64252,8 @@
               "OUTDATED",
               "PAGES_NOT_INDEXED",
               "UNCITED",
-              "UNRETRIEVED"
+              "UNRETRIEVED",
+              null
             ]
           },
           "detail": {
@@ -64529,7 +64545,7 @@
           "aiModelTier": {
             "type": ["string", "null"],
             "description": "`FAST` | `QUALITY`, or null.\n\nThe wire field was a bare `string` while `billing.proto` spelled the same\nfact as `AiModelTier` — drift rather than a decision, and it is an enum on\nboth now. Null only for UNSPECIFIED, which means auth-service returned no\nentitlement.",
-            "enum": ["FAST", "QUALITY"]
+            "enum": ["FAST", "QUALITY", null]
           },
           "draftAcceptance": {
             "$ref": "#/components/schemas/RateResponseDto"

@@ -78,7 +78,14 @@ final class SchemaGraph {
     );
   }
 
-  /** The schema, or one that also accepts null: {@code ["string", "null"]}, or {@code oneOf [$ref, null]}. */
+  /**
+   * The schema, or one that also accepts null: {@code ["string", "null"]}, or {@code
+   * oneOf [$ref, null]}.
+   *
+   * <p>An {@code enum} gets {@code null} as a value too: a value must ALSO be one of
+   * the enum's, so {@code type: ["string", "null"]} beside an enum without null still
+   * forbids null, and the schema would both allow and refuse it.
+   */
   @SuppressWarnings({ "rawtypes", "unchecked" })
   static Schema nullable(Schema property) {
     if (property.get$ref() != null) {
@@ -92,6 +99,9 @@ final class SchemaGraph {
     }
     if (property.getTypes() != null && !property.getTypes().contains("null")) {
       property.addType("null");
+    }
+    if (property.getEnum() != null && !property.getEnum().contains(null)) {
+      property.getEnum().add(null);
     }
 
     return property;

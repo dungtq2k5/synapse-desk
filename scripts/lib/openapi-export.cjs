@@ -99,6 +99,9 @@ const OAS_SCHEMA = join(__dirname, 'oas-3.1-schema.json');
  * Object is then checked on its own against JSON Schema 2020-12, which is the
  * dialect OAS 3.1 uses.
  *
+ * And one rule no schema can state: a schema whose `type` allows null must list null
+ * in its `enum` ({@link nullContradictions}).
+ *
  * Returns [] for a valid document, so a caller reads it as a finding list.
  *
  * @example openapiViolations({ openapi: '3.1.0' }) // ["/: must have required property 'info'"]
@@ -128,6 +131,33 @@ function openapiViolations(document) {
     if (!ajv.validateSchema(value)) {
       found.push(...ajv.errors.map(readable(pointer)));
     }
+    found.push(...nullContradictions(value, pointer));
+  }
+
+  return found;
+}
+
+/**
+ * Every schema, at any depth under `schema`, whose `type` allows `null` and whose
+ * `enum` does not list it. Valid JSON Schema, and a contradiction: a value must match
+ * BOTH, so null is permitted by one keyword and refused by the other, and client
+ * generators resolve that differently.
+ */
+function nullContradictions(schema, pointer) {
+  if (!schema || typeof schema !== 'object') return [];
+  const found = [];
+  if (
+    Array.isArray(schema.type) &&
+    schema.type.includes('null') &&
+    Array.isArray(schema.enum) &&
+    !schema.enum.includes(null)
+  ) {
+    found.push(
+      `${pointer}: its type allows null and its enum does not list it`,
+    );
+  }
+  for (const [key, value] of Object.entries(schema)) {
+    found.push(...nullContradictions(value, `${pointer}/${segment(key)}`));
   }
 
   return found;

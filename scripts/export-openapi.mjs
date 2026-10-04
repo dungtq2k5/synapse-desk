@@ -16,9 +16,9 @@
  * varies run to run (its `servers` list is empty), so the committed file is exactly
  * what a client fetching `/v3/api-docs` reads.
  *
- * **Validated before the write AND before the comparison** against OpenAPI 3.1
- * (`openapiViolations`): an invalid document must not reach the file, and must not
- * pass CI if it is already in it.
+ * **Validated before the write AND before the comparison** against OpenAPI 3.1, and
+ * for a schema that both allows and refuses null (`openapiViolations`): such a
+ * document must not reach the file, and must not pass CI if it is already in it.
  *
  * **`--check` never writes.** A check that repairs what it reports passes on its
  * second run.
@@ -56,7 +56,7 @@ const actual = await prettier.format(JSON.stringify(document, null, 2), {
 const violations = openapiViolations(document);
 if (violations.length) {
   console.error(
-    `${OPENAPI_OUTPUT} is not a valid OpenAPI 3.1 document (${violations.length} problems):\n` +
+    `${OPENAPI_OUTPUT} fails OpenAPI 3.1 validation (${violations.length} problems):\n` +
       `${violations.slice(0, 10).join('\n')}` +
       (violations.length > 10 ? `\n…and ${violations.length - 10} more` : ''),
   );
