@@ -57,6 +57,15 @@ public class RealtimeServerConfig {
     return Redisson.create(config);
   }
 
+  /**
+   * <b>{@code SO_REUSEADDR} on the listening socket</b>, which netty-socketio leaves
+   * off by default. Without it, a gateway restarted on the same host within the
+   * TIME_WAIT window (60 s on Linux) cannot bind its realtime port while the
+   * previous process's closed connections still hold it: "SocketIO server start
+   * failed at port". Tomcat sets it on the HTTP port, which is why only this one
+   * failed. Measured: two contract-suite boots failed 43 s and 59 s after a gateway
+   * on the same port shut down, and a bare bind reproduces it.
+   */
   @Bean
   public SocketIOServer socketIOServer(
     RealtimeProperties realtime,
@@ -65,6 +74,7 @@ public class RealtimeServerConfig {
     Configuration config = new Configuration();
     config.setHostname("0.0.0.0");
     config.setPort(realtime.port());
+    config.getSocketConfig().setReuseAddress(true);
     config.setContext("/socket.io");
     config.setTransports(Transport.WEBSOCKET);
     config.setPingTimeout(20_000);
