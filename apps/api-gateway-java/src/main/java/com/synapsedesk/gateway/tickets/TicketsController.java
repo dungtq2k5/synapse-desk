@@ -28,7 +28,10 @@ import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
+import com.synapsedesk.gateway.web.TicketPriorityFilter;
 import com.synapsedesk.gateway.web.TicketSortField;
+import com.synapsedesk.gateway.web.TicketSourceFilter;
+import com.synapsedesk.gateway.web.TicketStatusFilter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -149,15 +152,15 @@ public class TicketsController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status,
+    ) @Nullable TicketStatusFilter statusFilter,
     @Valid @RequestParam(
       value = "priority",
       required = false
-    ) @Nullable String priority,
+    ) @Nullable TicketPriorityFilter priorityFilter,
     @Valid @RequestParam(
       value = "source",
       required = false
-    ) @Nullable String source,
+    ) @Nullable TicketSourceFilter sourceFilter,
     @Valid @RequestParam(
       value = "assigneeId",
       required = false
@@ -171,6 +174,9 @@ public class TicketsController {
       required = false
     ) @Nullable UUID authorId
   ) {
+    String status = statusFilter == null ? null : statusFilter.name();
+    String priority = priorityFilter == null ? null : priorityFilter.name();
+    String source = sourceFilter == null ? null : sourceFilter.name();
     return crud.list(
       context(),
       page,

@@ -39,6 +39,7 @@ import {
   diffSecurity,
   diffDefaults,
   diffOperationIds,
+  diffParameterEnums,
   diffRequestSchemaShapes,
 } from './lib/java-openapi-diff.cjs';
 
@@ -220,6 +221,18 @@ try {
     }
   }
 
+  const enums = diffParameterEnums(nodeDocument, javaDocument);
+
+  if (enums.mismatches.length) {
+    failed = true;
+    console.error(
+      `\n${enums.mismatches.length} parameter(s) publish a different enum:`,
+    );
+    for (const row of enums.mismatches.slice(0, 40)) {
+      console.error(`  ${row.where}: ${JSON.stringify(row).slice(0, 300)}`);
+    }
+  }
+
   const defaults = diffDefaults(nodeDocument, javaDocument);
 
   if (defaults.mismatches.length) {
@@ -234,6 +247,9 @@ try {
 
   if (!failed) {
     console.log(`${ids.matched} operations publish the same operationId.`);
+    console.log(
+      `${enums.compared} parameters with an enum publish the same set in both documents.`,
+    );
     console.log(
       `${defaults.compared} properties and parameters agree on their default, ${defaults.published} of them with one.`,
     );

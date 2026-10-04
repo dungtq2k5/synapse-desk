@@ -4,6 +4,7 @@ import {
   diffResponseSchemaShapes,
   diffDefaults,
   diffOperationIds,
+  diffParameterEnums,
   diffRequestSchemaShapes,
   diffSecurity,
   extractOperations,
@@ -749,5 +750,46 @@ describe('diffDefaults', () => {
     expect(
       diffDefaults(document({}, withDefault), document({}, without)).mismatches,
     ).toEqual([{ where: 'get /x q', node: 1, java: undefined }]);
+  });
+});
+
+describe('diffParameterEnums', () => {
+  const document = (schema: Record<string, unknown>) => ({
+    paths: {
+      '/x': { get: { parameters: [{ name: 'q', in: 'query', schema }] } },
+    },
+  });
+
+  it('agrees on the same set in any order', () => {
+    const result = diffParameterEnums(
+      document({ type: 'string', enum: ['A', 'B'] }),
+      document({ type: 'string', enum: ['B', 'A'] }),
+    );
+
+    expect(result).toEqual({ compared: 1, mismatches: [] });
+  });
+
+  it('names a parameter Java publishes as a bare string', () => {
+    expect(
+      diffParameterEnums(
+        document({ type: 'string', enum: ['A'] }),
+        document({ type: 'string' }),
+      ).mismatches,
+    ).toEqual([{ where: 'get /x q', node: ['A'], java: null }]);
+  });
+
+  it('names a different set, and an enum only Java publishes', () => {
+    expect(
+      diffParameterEnums(
+        document({ enum: ['A', 'B'] }),
+        document({ enum: ['A'] }),
+      ).mismatches,
+    ).toHaveLength(1);
+    expect(
+      diffParameterEnums(
+        document({ type: 'string' }),
+        document({ enum: ['A'] }),
+      ).mismatches,
+    ).toHaveLength(1);
   });
 });

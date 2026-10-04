@@ -30,6 +30,7 @@ import com.synapsedesk.gateway.validation.Matches;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.OrganizationSortField;
+import com.synapsedesk.gateway.web.OrganizationStatusFilter;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.PlanSortField;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -144,8 +145,9 @@ public class PlatformController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status
+    ) @Nullable OrganizationStatusFilter statusFilter
   ) {
+    String status = statusFilter == null ? null : statusFilter.name();
     return organizations.listOrganizations(
       context(),
       page,

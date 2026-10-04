@@ -1,11 +1,9 @@
 package com.synapsedesk.gateway.ingestionjobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,7 +20,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.ingestion.Document.CancelIngestionJobResponse;
 import synapsedesk.ingestion.Document.IngestionJobResponse;
 import synapsedesk.ingestion.Document.IngestionJobStatus;
@@ -76,22 +73,6 @@ class IngestionJobsControllerTest {
   }
 
   @Test
-  void listRefusesAnUnrecognizedStatusWith400NotAPeerCall() {
-    assertThatThrownBy(() ->
-      controller.ingestionJobsControllerListV1(
-        java.math.BigDecimal.ONE,
-        java.math.BigDecimal.TEN,
-        "createdAt",
-        SortDirection.ASC,
-        "NOT_A_REAL_STATUS",
-        null
-      )
-    ).isInstanceOf(ResponseStatusException.class);
-
-    verify(stub, never()).listIngestionJobs(any());
-  }
-
-  @Test
   void listForwardsARecognizedStatusFilter() {
     when(stub.listIngestionJobs(any())).thenReturn(
       ListIngestionJobsResponse.getDefaultInstance()
@@ -102,7 +83,7 @@ class IngestionJobsControllerTest {
       java.math.BigDecimal.TEN,
       "createdAt",
       SortDirection.ASC,
-      "FAILED",
+      com.synapsedesk.gateway.web.IngestionJobStatusFilter.FAILED,
       null
     );
 

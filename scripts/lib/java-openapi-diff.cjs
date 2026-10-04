@@ -639,10 +639,50 @@ function diffDefaults(nodeDocument, javaDocument) {
   return { compared, published, mismatches };
 }
 
+/**
+ * Compares the `enum` of every parameter both documents share: an EQUALITY, with no
+ * exception, ignoring order. A parameter the committed document restricts and Java
+ * publishes as a bare string tells a generated client any value will do; the refusal
+ * behind each enum is held by the query-enum contract rows.
+ */
+function diffParameterEnums(nodeDocument, javaDocument) {
+  const mismatches = [];
+  let compared = 0;
+  const sorted = (values) => JSON.stringify(values ? [...values].sort() : null);
+
+  for (const [path, methods] of Object.entries(nodeDocument.paths || {})) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const javaOperation = ((javaDocument.paths || {})[path] || {})[method];
+      if (!javaOperation) continue;
+      for (const parameter of operation.parameters || []) {
+        const match = (javaOperation.parameters || []).find(
+          (candidate) =>
+            candidate.name === parameter.name && candidate.in === parameter.in,
+        );
+        if (!match) continue;
+        const node = (parameter.schema || {}).enum;
+        const java = (match.schema || {}).enum;
+        if (!node && !java) continue;
+        compared += 1;
+        if (sorted(node) !== sorted(java)) {
+          mismatches.push({
+            where: `${method} ${path} ${parameter.name}`,
+            node: node ?? null,
+            java: java ?? null,
+          });
+        }
+      }
+    }
+  }
+
+  return { compared, mismatches };
+}
+
 module.exports = {
   diffResponseSchemaShapes,
   diffSecurity,
   diffDefaults,
+  diffParameterEnums,
   diffRequestSchemaShapes,
   diffOperationIds,
   extractOperations,

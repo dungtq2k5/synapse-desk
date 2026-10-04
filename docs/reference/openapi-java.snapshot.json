@@ -6150,7 +6150,15 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "CLOSED",
+                "ESCALATED",
+                "NEW",
+                "OPEN",
+                "PENDING_AGENT",
+                "RESOLVED"
+              ]
             }
           },
           {
@@ -6158,7 +6166,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
             }
           },
           {
@@ -6166,7 +6175,8 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["API", "CHAT", "EMAIL", "WEB"]
             }
           },
           {
@@ -15394,7 +15404,13 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "FROZEN",
+                "PENDING_ONBOARDING",
+                "SUSPENDED_PAST_DUE"
+              ]
             }
           }
         ],
@@ -43440,7 +43456,51 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "DATA_EXPORT_REQUESTED",
+                "DEPARTMENT_CREATED",
+                "DEPARTMENT_DELETED",
+                "DEPARTMENT_MEMBERS_ADDED",
+                "DEPARTMENT_MEMBER_REMOVED",
+                "DEPARTMENT_RESTORED",
+                "DEPARTMENT_UPDATED",
+                "DOCUMENT_FLAG_DELETED",
+                "DOCUMENT_FLAG_DISMISSED",
+                "DOCUMENT_FLAG_RESOLVED",
+                "ORGANIZATION_OFFBOARD_REQUESTED",
+                "ORGANIZATION_ONBOARDING_COMPLETED",
+                "ORGANIZATION_SETTINGS_UPDATED",
+                "ORGANIZATION_UPDATED",
+                "PASSWORD_CHANGED",
+                "PLATFORM_BILLING_CYCLE_RESET",
+                "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_ORGANIZATION_CREATED",
+                "PLATFORM_ORGANIZATION_OFFBOARDED",
+                "PLATFORM_ORGANIZATION_RESTORED",
+                "PLATFORM_ORGANIZATION_STATUS_CHANGED",
+                "PLATFORM_ORGANIZATION_UPDATED",
+                "PLATFORM_PLAN_APPLIED",
+                "PLATFORM_PLAN_CREATED",
+                "PLATFORM_PLAN_DELETED",
+                "PLATFORM_PLAN_UPDATED",
+                "ROLE_CREATED",
+                "ROLE_DELETED",
+                "ROLE_PERMISSIONS_UPDATED",
+                "ROLE_UPDATED",
+                "USER_AVATAR_UPDATED",
+                "USER_CREATED",
+                "USER_DELETED",
+                "USER_DEPARTMENTS_UPDATED",
+                "USER_LOCKED",
+                "USER_LOGOUT_ALL",
+                "USER_RESTORED",
+                "USER_ROLES_UPDATED",
+                "USER_SESSIONS_REVOKED",
+                "USER_TWO_FACTOR_RESET",
+                "USER_UNLOCKED",
+                "USER_UPDATED"
+              ]
             }
           },
           {
@@ -43457,7 +43517,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "DEPARTMENT",
+                "DOCUMENT_FLAG",
+                "EXPORT",
+                "ORGANIZATION",
+                "ROLE",
+                "SUBSCRIPTION_PLAN",
+                "USER"
+              ]
             }
           },
           {
@@ -45136,7 +45205,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "CANCELLED",
+                "CHUNKING",
+                "COMPLETED",
+                "EMBEDDING",
+                "FAILED",
+                "PARSING",
+                "QUEUED"
+              ]
             }
           },
           {
@@ -49365,7 +49443,8 @@
             "in": "query",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": ["EMAIL_VERIFICATION", "PHONE_VERIFICATION"]
             }
           }
         ],
@@ -49552,7 +49631,51 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "DATA_EXPORT_REQUESTED",
+                "DEPARTMENT_CREATED",
+                "DEPARTMENT_DELETED",
+                "DEPARTMENT_MEMBERS_ADDED",
+                "DEPARTMENT_MEMBER_REMOVED",
+                "DEPARTMENT_RESTORED",
+                "DEPARTMENT_UPDATED",
+                "DOCUMENT_FLAG_DELETED",
+                "DOCUMENT_FLAG_DISMISSED",
+                "DOCUMENT_FLAG_RESOLVED",
+                "ORGANIZATION_OFFBOARD_REQUESTED",
+                "ORGANIZATION_ONBOARDING_COMPLETED",
+                "ORGANIZATION_SETTINGS_UPDATED",
+                "ORGANIZATION_UPDATED",
+                "PASSWORD_CHANGED",
+                "PLATFORM_BILLING_CYCLE_RESET",
+                "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_ORGANIZATION_CREATED",
+                "PLATFORM_ORGANIZATION_OFFBOARDED",
+                "PLATFORM_ORGANIZATION_RESTORED",
+                "PLATFORM_ORGANIZATION_STATUS_CHANGED",
+                "PLATFORM_ORGANIZATION_UPDATED",
+                "PLATFORM_PLAN_APPLIED",
+                "PLATFORM_PLAN_CREATED",
+                "PLATFORM_PLAN_DELETED",
+                "PLATFORM_PLAN_UPDATED",
+                "ROLE_CREATED",
+                "ROLE_DELETED",
+                "ROLE_PERMISSIONS_UPDATED",
+                "ROLE_UPDATED",
+                "USER_AVATAR_UPDATED",
+                "USER_CREATED",
+                "USER_DELETED",
+                "USER_DEPARTMENTS_UPDATED",
+                "USER_LOCKED",
+                "USER_LOGOUT_ALL",
+                "USER_RESTORED",
+                "USER_ROLES_UPDATED",
+                "USER_SESSIONS_REVOKED",
+                "USER_TWO_FACTOR_RESET",
+                "USER_UNLOCKED",
+                "USER_UPDATED"
+              ]
             }
           },
           {
@@ -49569,7 +49692,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "DEPARTMENT",
+                "DOCUMENT_FLAG",
+                "EXPORT",
+                "ORGANIZATION",
+                "ROLE",
+                "SUBSCRIPTION_PLAN",
+                "USER"
+              ]
             }
           },
           {

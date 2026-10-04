@@ -10,6 +10,7 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.IngestionJobStatusFilter;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -111,12 +112,13 @@ public class IngestionJobsController {
     @Valid @RequestParam(
       value = "status",
       required = false
-    ) @Nullable String status,
+    ) @Nullable IngestionJobStatusFilter statusFilter,
     @Valid @RequestParam(
       value = "documentId",
       required = false
     ) @Nullable UUID documentId
   ) {
+    String status = statusFilter == null ? null : statusFilter.name();
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     PageRequest pageRequest = PageRequest.newBuilder()

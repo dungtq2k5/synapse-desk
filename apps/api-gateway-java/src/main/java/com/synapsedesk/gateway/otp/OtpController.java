@@ -18,6 +18,7 @@ import com.synapsedesk.gateway.throttle.ThrottleOverride;
 import com.synapsedesk.gateway.throttle.ThrottlerTiers;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.OtpPurposeFilter;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -224,8 +225,9 @@ public class OtpController {
     @NotNull @Valid @RequestParam(
       value = "purpose",
       required = true
-    ) String purpose
+    ) OtpPurposeFilter purposeFilter
   ) {
+    String purpose = purposeFilter.name();
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     OtpStatusResponse response = withMetadata(context).getOtpStatus(

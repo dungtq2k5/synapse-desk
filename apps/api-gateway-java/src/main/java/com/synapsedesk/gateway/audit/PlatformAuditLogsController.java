@@ -13,6 +13,8 @@ import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.SuperAdminOnly;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.AuditActionFilter;
+import com.synapsedesk.gateway.web.AuditResourceTypeFilter;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
 import com.synapsedesk.gateway.web.SortDirection;
@@ -117,7 +119,7 @@ public class PlatformAuditLogsController {
     @Valid @RequestParam(
       value = "action",
       required = false
-    ) @Nullable String action,
+    ) @Nullable AuditActionFilter actionFilter,
     @Valid @RequestParam(
       value = "userId",
       required = false
@@ -125,7 +127,7 @@ public class PlatformAuditLogsController {
     @Valid @RequestParam(
       value = "resourceType",
       required = false
-    ) @Nullable String resourceType,
+    ) @Nullable AuditResourceTypeFilter resourceTypeFilter,
     @Valid @RequestParam(
       value = "resourceId",
       required = false
@@ -137,6 +139,9 @@ public class PlatformAuditLogsController {
       iso = DateTimeFormat.ISO.DATE_TIME
     ) @Nullable OffsetDateTime to
   ) {
+    String action = actionFilter == null ? null : actionFilter.name();
+    String resourceType =
+      resourceTypeFilter == null ? null : resourceTypeFilter.name();
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
