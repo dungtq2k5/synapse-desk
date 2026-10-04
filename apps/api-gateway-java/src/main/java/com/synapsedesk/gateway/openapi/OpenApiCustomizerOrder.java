@@ -21,8 +21,10 @@ public final class OpenApiCustomizerOrder {
   // SECURITY_SCHEMES below: a class carries one order, and it touches only `security`)
   /** The operation's id. Touches only {@code operationId}. */
   public static final int OPERATION_ID = 20;
-  /** The error responses. Adds responses; must not see a half-built set, so it runs last. */
+  /** The error responses. Adds responses; must not see a half-built set. */
   public static final int ERROR_ENVELOPE = 30;
+  /** The {@code x-cache} and {@code x-webhook} extensions. Touches only extensions. */
+  public static final int EXTENSIONS = 40;
 
   // ---- document customizers, at the end
   /** Drops annotation-default bounds. Before anything copies a schema. */

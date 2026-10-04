@@ -16,6 +16,9 @@ import java.util.Map;
  */
 public final class ResendPayloads {
 
+  /** The payload field a delivery is made idempotent on. */
+  public static final String MESSAGE_ID = "message_id";
+
   private ResendPayloads() {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -37,7 +40,7 @@ public final class ResendPayloads {
     String subject,
     String text,
     String html,
-    @JsonProperty("message_id") String messageId,
+    @JsonProperty(MESSAGE_ID) String messageId,
     @JsonProperty("received_for") List<String> receivedFor,
     Map<String, String> headers,
     List<Attachment> attachments

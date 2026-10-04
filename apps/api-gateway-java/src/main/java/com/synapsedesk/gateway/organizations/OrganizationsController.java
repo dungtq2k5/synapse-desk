@@ -21,6 +21,7 @@ import com.synapsedesk.gateway.model.UpdateOrganizationDto;
 import com.synapsedesk.gateway.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.model.UsageMeterResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.CachedRead;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -147,6 +148,11 @@ public class OrganizationsController {
 
   // The workspace's own record, which the billing screens read.
   @OrgAccessKind(OrgAccess.BILLING)
+  @CachedRead(
+    scope = CACHE_SCOPE,
+    ttlSeconds = GET_CACHE_TTL_SECONDS,
+    varyBy = CachedRead.VaryBy.TENANT
+  )
   @GetMapping(
     value = "/organizations/current",
     produces = { "application/json" }

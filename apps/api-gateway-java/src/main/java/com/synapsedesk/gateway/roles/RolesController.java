@@ -12,6 +12,7 @@ import com.synapsedesk.gateway.model.RoleResponseDto;
 import com.synapsedesk.gateway.model.SetRolePermissionsDto;
 import com.synapsedesk.gateway.model.UpdateRoleDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.CachedRead;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -111,6 +112,11 @@ public class RolesController {
     this.cache = cache;
   }
 
+  @CachedRead(
+    scope = CACHE_SCOPE,
+    ttlSeconds = LIST_CACHE_TTL_SECONDS,
+    varyBy = CachedRead.VaryBy.TENANT
+  )
   @RequestMapping(
     method = RequestMethod.GET,
     value = "/roles",

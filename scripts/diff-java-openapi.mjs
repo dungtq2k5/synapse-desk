@@ -81,8 +81,9 @@ try {
   const javaDocument = await loadJavaDocument();
 
   if (args.includes('--whole')) {
-    // The flip's acceptance test, in report form until it is green: every difference
-    // in the whole document is either named in the registry or listed here.
+    // The whole-document comparison in detail: every named divergence with its count,
+    // and every unexplained difference grouped by where it is. The same check runs,
+    // failing, in the default mode below.
     const registry = JSON.parse(
       readFileSync(
         join(ROOT, 'scripts/lib/openapi-document-divergences.json'),
@@ -203,6 +204,31 @@ try {
     );
   }
 
+  // The flip's acceptance test: the WHOLE document, every difference equal or named in
+  // the registry, and no entry stale. Run with --whole for the detail.
+  const whole = diffWholeDocument(
+    nodeDocument,
+    javaDocument,
+    JSON.parse(
+      readFileSync(
+        join(ROOT, 'scripts/lib/openapi-document-divergences.json'),
+        'utf8',
+      ),
+    ),
+  );
+  if (whole.unexplained.length || whole.stale.length) {
+    failed = true;
+    console.error(
+      `\nThe whole document: ${whole.unexplained.length} unexplained difference(s), ${whole.stale.length} stale registry entr(ies). Run with --whole for the detail.`,
+    );
+    for (const row of whole.unexplained.slice(0, 20)) {
+      console.error(
+        `  ${row.where} ${row.path}: node=${JSON.stringify(row.node)?.slice(0, 60)} java=${JSON.stringify(row.java)?.slice(0, 60)}`,
+      );
+    }
+    for (const id of whole.stale) console.error(`  STALE ${id}`);
+  }
+
   const security = diffSecurity(nodeDocument, javaDocument);
 
   if (security.mismatches.length) {
@@ -283,6 +309,9 @@ try {
   }
 
   if (!failed) {
+    console.log(
+      `The whole document: ${whole.differences} differences, every one named in the divergence registry; none unexplained, none stale.`,
+    );
     console.log(`${ids.matched} operations publish the same operationId.`);
     console.log(
       `${enums.compared} parameters with an enum publish the same set in both documents.`,

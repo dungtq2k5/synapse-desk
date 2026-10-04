@@ -1822,7 +1822,12 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "x-webhook": {
+          "signatureHeader": "svix-signature",
+          "idempotencyKey": "message_id",
+          "caller": "resend"
+        }
       }
     },
     "/api/v1/webhook-endpoints": {
@@ -13720,7 +13725,12 @@
           {
             "access-cookie": []
           }
-        ]
+        ],
+        "x-cache": {
+          "scope": "roles",
+          "ttlSeconds": 300,
+          "varyBy": "tenant"
+        }
       },
       "post": {
         "tags": ["Roles"],
@@ -22618,7 +22628,12 @@
           {
             "access-cookie": []
           }
-        ]
+        ],
+        "x-cache": {
+          "scope": "departments",
+          "ttlSeconds": 300,
+          "varyBy": "tenant"
+        }
       },
       "post": {
         "tags": ["Departments"],
@@ -35956,7 +35971,12 @@
           {
             "access-cookie": []
           }
-        ]
+        ],
+        "x-cache": {
+          "scope": "organizations",
+          "ttlSeconds": 60,
+          "varyBy": "tenant"
+        }
       },
       "delete": {
         "tags": ["Organizations"],
@@ -44191,7 +44211,12 @@
           {
             "access-cookie": []
           }
-        ]
+        ],
+        "x-cache": {
+          "scope": "permissions",
+          "ttlSeconds": 3600,
+          "varyBy": "tenant"
+        }
       }
     },
     "/api/v1/organizations/current/usage": {
@@ -46551,7 +46576,12 @@
           {
             "access-cookie": []
           }
-        ]
+        ],
+        "x-cache": {
+          "scope": "documents",
+          "ttlSeconds": 60,
+          "varyBy": "caller"
+        }
       }
     },
     "/api/v1/documents/{id}/ingestion-jobs": {

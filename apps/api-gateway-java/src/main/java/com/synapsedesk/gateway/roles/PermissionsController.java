@@ -8,6 +8,7 @@ import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.PermissionResponseDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.CachedRead;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -44,6 +45,7 @@ import synapsedesk.auth.RoleServiceGrpc;
 public class PermissionsController {
 
   private static final long DEADLINE_SECONDS = 5;
+  private static final String CACHE_SCOPE = "permissions";
   private static final long TTL_SECONDS = 60 * 60;
 
   private final RoleServiceGrpc.RoleServiceBlockingStub stub;
@@ -60,6 +62,11 @@ public class PermissionsController {
     this.cache = cache;
   }
 
+  @CachedRead(
+    scope = CACHE_SCOPE,
+    ttlSeconds = TTL_SECONDS,
+    varyBy = CachedRead.VaryBy.TENANT
+  )
   @GetMapping(value = "/permissions", produces = { "application/json" })
   @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
@@ -70,7 +77,7 @@ public class PermissionsController {
 
     String key = cache.buildKey(
       context.organizationId(),
-      "permissions",
+      CACHE_SCOPE,
       Map.of()
     );
     PermissionResponseDto[] data = cache.wrap(

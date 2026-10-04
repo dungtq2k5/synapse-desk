@@ -66,7 +66,9 @@ public class ResendInboundService {
   /** The Standard Webhooks headers Resend signs a delivery with. */
   static final String SVIX_ID = "svix-id";
   static final String SVIX_TIMESTAMP = "svix-timestamp";
-  static final String SVIX_SIGNATURE = "svix-signature";
+  public static final String SVIX_SIGNATURE = "svix-signature";
+  /** Who calls this intake. */
+  public static final String CALLER = "resend";
 
   /**
    * The longest signed URL passed on to storage-service — validator.js's default

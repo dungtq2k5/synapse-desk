@@ -4,10 +4,12 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.inbound.ResendInboundService;
+import com.synapsedesk.gateway.inbound.ResendPayloads;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
+import com.synapsedesk.gateway.openapi.WebhookIntake;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
@@ -127,6 +129,11 @@ public class WebhooksController {
   }
 
   @RouteSecurity(RouteSecurity.Scheme.NONE)
+  @WebhookIntake(
+    signatureHeader = ResendInboundService.SVIX_SIGNATURE,
+    idempotencyKey = ResendPayloads.MESSAGE_ID,
+    caller = ResendInboundService.CALLER
+  )
   @PostMapping(
     value = "/webhooks/email/resend",
     produces = { "application/json" }

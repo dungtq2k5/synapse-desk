@@ -22,6 +22,7 @@ import com.synapsedesk.gateway.model.SetDocumentDepartmentsDto;
 import com.synapsedesk.gateway.model.StorageUsageResponseDto;
 import com.synapsedesk.gateway.model.UpdateDocumentDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.CachedRead;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -157,6 +158,11 @@ public class DocumentsController {
       );
   }
 
+  @CachedRead(
+    scope = CACHE_SCOPE,
+    ttlSeconds = LIST_CACHE_TTL_SECONDS,
+    varyBy = CachedRead.VaryBy.CALLER
+  )
   @GetMapping(value = "/documents", produces = { "application/json" })
   @ApiErrors({ "401" })
   public ResponseEntity<

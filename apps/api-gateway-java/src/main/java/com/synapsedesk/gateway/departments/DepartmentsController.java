@@ -15,6 +15,7 @@ import com.synapsedesk.gateway.model.DepartmentMemberResponseDto;
 import com.synapsedesk.gateway.model.DepartmentResponseDto;
 import com.synapsedesk.gateway.model.UpdateDepartmentDto;
 import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.openapi.CachedRead;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -119,6 +120,11 @@ public class DepartmentsController {
     this.cache = cache;
   }
 
+  @CachedRead(
+    scope = CACHE_SCOPE,
+    ttlSeconds = LIST_CACHE_TTL_SECONDS,
+    varyBy = CachedRead.VaryBy.TENANT
+  )
   @GetMapping(value = "/departments", produces = { "application/json" })
   @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
