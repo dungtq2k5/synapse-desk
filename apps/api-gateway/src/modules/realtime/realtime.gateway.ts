@@ -10,7 +10,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Socket } from 'socket.io';
 import { isUUID, validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import {
@@ -78,7 +78,9 @@ import {
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  @WebSocketServer() server!: Server;
+  // A NAMESPACE, not the root `Server`: Nest injects `/ws`, whose `sockets` is
+  // the map of THIS process's own sockets.
+  @WebSocketServer() server!: Namespace;
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly ACCESS_COOKIE_NAME: string;
@@ -945,9 +947,19 @@ export class RealtimeGateway
    * Called when the lease is lost: the clients reconnect, the Service sends
    * them to whichever pod is Ready, and the alternative is sockets held open
    * by a process that has stopped consuming the events they are waiting for.
+   *
+   * **Closes each TRANSPORT, never `disconnectSockets`.** That sends Socket.IO's
+   * disconnect packet, and a client told `io server disconnect` does not
+   * reconnect on its own: measured in the cutover rehearsal, every client stayed
+   * offline after a deploy. A closed transport reads as `transport close`, which
+   * the client retries, as the Java gateway's `server.stop()` does. And only this
+   * process's own sockets: the namespace-wide call goes through the Redis
+   * adapter and can reach every replica's.
    */
   dropEverySocket(): void {
-    this.server.disconnectSockets(true);
+    for (const socket of this.server.sockets.values()) {
+      socket.conn.close();
+    }
   }
 
   /**
