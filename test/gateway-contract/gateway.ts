@@ -129,14 +129,15 @@ async function freePort(): Promise<number> {
 }
 
 /**
- * `.env.test` as the base, the harness's own values ASSIGNED over it.
+ * `gateway.env`, the harness's own file, as the base for EITHER implementation, and
+ * the per-launch values ASSIGNED over it.
  *
  * Assigned rather than loaded: `loadEnvFile` leaves a variable
  * already in the environment alone, so a developer's exported `REDIS_URL`
  * would otherwise point the gateway under test at their own Redis.
  */
 export const GATEWAY_ENV = parseEnv(
-  readFileSync(join(REPO_ROOT, 'apps/api-gateway/.env.test'), 'utf8'),
+  readFileSync(join(REPO_ROOT, 'test/gateway-contract/gateway.env'), 'utf8'),
 ) as Record<string, string>;
 
 function environmentFor(overrides: Record<string, string>): NodeJS.ProcessEnv {
@@ -211,7 +212,7 @@ function assertBuilt(impl: string): void {
 /**
  * Starts one gateway and waits until it reports ready.
  *
- * @param overrides environment on top of `.env.test` — the peer URLs, and
+ * @param overrides environment on top of `gateway.env` — the peer URLs, and
  * anything a row needs to change about the implementation under test.
  * @param options.impl forces a specific implementation rather than reading
  * `GATEWAY_IMPL` — only for the cross-implementation cache-invalidation row,

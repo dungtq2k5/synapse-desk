@@ -86,7 +86,7 @@ export function startInfra(): Infra {
 
   return {
     containers: [redis, nats],
-    // Database 15, as `.env.test` uses: the suites that share a developer's
+    // Database 15, as `gateway.env` uses: the suites that share a developer's
     // Redis keep their keys out of database 0, and matching it keeps the
     // gateway's configuration identical apart from the port.
     redisUrl: `redis://127.0.0.1:${redisPort}/15`,

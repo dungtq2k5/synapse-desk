@@ -55,7 +55,7 @@ export function parseSetCookie(line: string): {
 }
 
 /**
- * `/api/v1` — the prefix from the same `.env.test` the gateway is started with,
+ * `/api/v1` — the prefix from the same `gateway.env` the gateway is started with,
  * and the version the gateway pins.
  *
  * Built here rather than imported: `apiBasePath` lives in the gateway's own
