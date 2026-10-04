@@ -24,16 +24,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * P4: the series this gateway publishes are the series Node publishes.
+ * The series this gateway publishes are exactly the series the registry
+ * {@code test/fixtures/metrics/series.json} declares, family by family and label by
+ * label.
  *
- * <p><b>Compared against the Node REGISTRY's source, not against a list kept
- * here.</b> Two implementations answer on one Service under one scrape job, so
- * a name that differs by a suffix makes every alert selecting it match
- * nothing — and a dashboard of empty panels reads as a quiet system rather
- * than a broken one. A list copied into this file would agree with itself
- * forever.
+ * <p><b>A registry, not a list kept here.</b> Alerts and dashboards select these names,
+ * so a name that differs by a suffix makes every alert selecting it match nothing, and
+ * a dashboard of empty panels reads as a quiet system rather than a broken one. The
+ * registry was frozen from the Node gateway's own registry, its last word, when this
+ * gateway matched it; a list derived from this gateway's code would agree with itself
+ * forever. Changing a series is an edit to it, made on purpose.
  *
  * <p>The scrape is read from the MANAGEMENT port, which is where the endpoint
  * actually is; a test that read it from the public port would pass against a
@@ -52,14 +56,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class MetricsSeriesContractTest {
 
-  /** The Node registry, read where it lives. */
-  private static final Path NODE_REGISTRY = Path.of(
-    "../api-gateway/src/modules/metrics/metrics.registry.ts"
-  );
-
-  private static final Pattern NAME = Pattern.compile("name:\\s*'([a-z_]+)'");
-  private static final Pattern LABELS = Pattern.compile(
-    "labelNames:\\s*\\[([^\\]]*)]"
+  /** The series registry: family to its label names. */
+  private static final Path REGISTRY = Path.of(
+    "..",
+    "..",
+    "test",
+    "fixtures",
+    "metrics",
+    "series.json"
   );
 
   @Autowired
@@ -99,37 +103,37 @@ class MetricsSeriesContractTest {
   }
 
   @Test
-  void publishesExactlyTheSeriesTheNodeRegistryDeclares() throws IOException {
-    Map<String, Set<String>> node = nodeRegistry();
+  void publishesExactlyTheSeriesTheRegistryDeclares() throws IOException {
+    Map<String, Set<String>> registry = registry();
     Map<String, Set<String>> java = scraped();
 
     // Names first, because a missing or extra FAMILY is the failure that
     // silences an alert; the label comparison below is the one that silences
     // a selector inside a family that exists.
-    assertThat(java.keySet()).isEqualTo(node.keySet());
+    assertThat(java.keySet()).isEqualTo(registry.keySet());
 
-    for (String series : new TreeSet<>(node.keySet())) {
+    for (String series : new TreeSet<>(registry.keySet())) {
       assertThat(java.get(series))
         .as("labels of %s", series)
-        .isEqualTo(node.get(series));
+        .isEqualTo(registry.get(series));
     }
   }
 
   @Test
-  void theDeclaredLabelsAreTheNodeRegistrysLabels() throws IOException {
+  void theDeclaredLabelsAreTheRegistrysLabels() throws IOException {
     // `PublishedSeries.LABELS` drives the allowlist, so it is real
     // configuration — but the scrape comparison above cannot see it, because
     // the tags a meter actually carries are written at the call site. Without
     // this row the declaration could name `job`/`service` (the scraper-
     // colliding pair) and every other row would stay green.
-    Map<String, Set<String>> node = nodeRegistry();
+    Map<String, Set<String>> registry = registry();
     Map<String, Set<String>> declared = new LinkedHashMap<>();
 
     PublishedSeries.LABELS.forEach((series, labels) ->
       declared.put(series, new TreeSet<>(labels))
     );
 
-    assertThat(declared).isEqualTo(node);
+    assertThat(declared).isEqualTo(registry);
   }
 
   @Test
@@ -164,11 +168,11 @@ class MetricsSeriesContractTest {
   }
 
   @Test
-  void theScanReadsARealRegistryRatherThanAnEmptyFile() throws IOException {
-    // A path that stopped resolving, or a pattern that stopped matching, would
-    // compare an empty set to an empty set and report agreement.
-    assertThat(Files.exists(NODE_REGISTRY)).isTrue();
-    assertThat(nodeRegistry()).hasSize(7);
+  void theRegistryIsARealOneRatherThanAnEmptyFile() throws IOException {
+    // A path that stopped resolving would compare an empty set to an empty set
+    // and report agreement.
+    assertThat(Files.exists(REGISTRY)).isTrue();
+    assertThat(registry()).hasSize(7);
   }
 
   private String scrape() {
@@ -237,33 +241,17 @@ class MetricsSeriesContractTest {
     return name.substring(0, name.length() - suffix.length());
   }
 
-  /** series -> label names, parsed from the Node registry's source. */
-  private Map<String, Set<String>> nodeRegistry() throws IOException {
-    String source = Files.readString(NODE_REGISTRY);
+  /** series -> label names, as the registry declares them. */
+  private Map<String, Set<String>> registry() throws IOException {
+    JsonNode root = JsonMapper.builder()
+      .build()
+      .readTree(Files.readString(REGISTRY));
     Map<String, Set<String>> declared = new LinkedHashMap<>();
-    Matcher names = NAME.matcher(source);
-
-    while (names.find()) {
-      String series = names.group(1);
-      Matcher labels = LABELS.matcher(source);
-      Set<String> found = new TreeSet<>();
-
-      while (labels.find()) {
-        if (
-          labels.start() > names.end() && labels.start() - names.end() < 400
-        ) {
-          for (String label : labels.group(1).split(",")) {
-            String cleaned = label.trim().replaceAll("['\"]", "");
-            if (!cleaned.isEmpty()) {
-              found.add(cleaned);
-            }
-          }
-          break;
-        }
-      }
-
-      declared.put(series, found);
-    }
+    root.properties().forEach(series -> {
+      Set<String> labels = new TreeSet<>();
+      series.getValue().forEach(label -> labels.add(label.asString()));
+      declared.put(series.getKey(), labels);
+    });
 
     return declared;
   }
