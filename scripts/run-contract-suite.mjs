@@ -81,14 +81,17 @@ if (build.status !== 0) {
 
 const JEST = ['jest', '--config', 'test/gateway-contract/jest.config.ts'];
 const SHARDS = Number(process.env.CONTRACT_SHARDS ?? 1);
-const ENV = { ...process.env, GATEWAY_IMPL: IMPL };
+// Every gateway a row starts writes its whole output here (see `gateway.ts`), so a
+// failure leaves the gateway's side of the story behind as well as the test's.
+const LOG_DIR = mkdtempSync(join(tmpdir(), `contract-${IMPL}-`));
+console.log(`gateway and shard logs: ${LOG_DIR}`);
+const ENV = { ...process.env, GATEWAY_IMPL: IMPL, CONTRACT_LOG_DIR: LOG_DIR };
 
 if (SHARDS > 1) {
   // Each shard's output is printed as one block when it ends: interleaved lines from N
   // concurrent jest processes are unreadable. It is ALSO written to a file as it
   // arrives, so a shard that hangs leaves its evidence behind instead of nothing.
-  const logs = mkdtempSync(join(tmpdir(), 'contract-shards-'));
-  console.log(`shard logs: ${logs}`);
+  const logs = LOG_DIR;
   const results = await Promise.all(
     Array.from(
       { length: SHARDS },

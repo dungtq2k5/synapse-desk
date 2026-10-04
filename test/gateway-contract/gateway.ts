@@ -19,7 +19,12 @@
 
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  readFileSync,
+  readdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 import {
@@ -253,8 +258,21 @@ export async function startGateway(
     });
 
     const output: string[] = [];
-    child.stdout?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
-    child.stderr?.on('data', (chunk: Buffer) => output.push(chunk.toString()));
+    // Every launch's whole output, to a file, when the runner names a directory: a
+    // gateway that started "fine" and then misbehaved (a listener that never bound)
+    // otherwise leaves nothing to read, since its output is printed only on failure.
+    const log = process.env.CONTRACT_LOG_DIR
+      ? createWriteStream(
+          join(process.env.CONTRACT_LOG_DIR, `gateway-${impl}-${port}.log`),
+        )
+      : undefined;
+    const keep = (chunk: Buffer) => {
+      output.push(chunk.toString());
+      log?.write(chunk);
+    };
+    child.stdout?.on('data', keep);
+    child.stderr?.on('data', keep);
+    child.once('exit', () => log?.end());
 
     const baseUrl = `http://127.0.0.1:${port}`;
     const gateway: Gateway = {
