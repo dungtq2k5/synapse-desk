@@ -28,6 +28,9 @@ import java.util.regex.Pattern;
 })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface NumberString {
+  /** validator.js's {@code isNumeric} expression; also the published {@code pattern}. */
+  String REGEX = "^[+-]?([0-9]*[.])?[0-9]+$";
+
   String message() default "must be a number string";
 
   Class<?>[] groups() default {};
@@ -36,9 +39,7 @@ public @interface NumberString {
 
   class Validator implements ConstraintValidator<NumberString, String> {
 
-    private static final Pattern NUMERIC = Pattern.compile(
-      "^[+-]?([0-9]*[.])?[0-9]+$"
-    );
+    private static final Pattern NUMERIC = Pattern.compile(REGEX);
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {

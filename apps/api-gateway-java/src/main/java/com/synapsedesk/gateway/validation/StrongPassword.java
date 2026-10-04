@@ -34,6 +34,16 @@ import java.lang.annotation.Target;
 })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface StrongPassword {
+  /**
+   * The same rule as one ECMA-262 expression, for the published {@code pattern}: a
+   * lookahead per character class and a length. {@code [\s\S]} counts UTF-16 units, as
+   * the library's {@code length} does. The shared parity table holds this expression to
+   * the library's answers row for row, so it is not a second rule but a second spelling
+   * of the first, checked.
+   */
+  String REGEX =
+    "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$";
+
   String message() default "is not strong enough";
 
   Class<?>[] groups() default {};
