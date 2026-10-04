@@ -1,24 +1,28 @@
 /**
- * @file **The permission-parity guard**: every generated operation Node gates
- * with `@RequirePermission` must be gated the same way in Java, for every
- * operation whose owning `*Api` tag Java has actually implemented.
+ * @file **The permission registry for REST**: every operation the published document
+ * declares is gated in the Java gateway exactly as `test/fixtures/permissions/rest-routes.json`
+ * says, and that table names exactly the operations the document declares.
  *
- * Node fails OPEN on a missing `@RequirePermission` — correct for a
- * caller-scoped route, wrong for one that forgot the annotation. Comparing
- * against a hand-kept list would just relocate that same risk into this
- * file, so this reads the two real sources of truth instead: Node's
- * decorators (`@RequirePermission` and its own `PERMISSION_KEY`), and the
- * PUBLISHED contract's `operationId`, which is the exact string Java's
- * generated method names are derived from (`AuthController_login_v1` ->
- * `authControllerLoginV1` — openapi-generator's own transform, not this
- * file's).
+ * **A registry, checked from both sides.** The table maps each `METHOD path` to the
+ * permission codes it requires, and `[]` to a route that is deliberately open (a public
+ * route, or a caller-scoped one such as `GET /users/me`). A route added to the gateway
+ * is published, so it is missing from the table until someone writes down what it
+ * requires; a route removed leaves an entry that names nothing. Both fail.
  *
- * `ponytail:` this is a targeted regex reader, not a TypeScript parser. It
- * assumes this codebase's own decorator style (one decorator per line,
- * string-literal codes) and Java's own style (`@RequirePermission` on its
- * own line directly above `@Override`, or directly above the method). A
- * decorator built from a variable, or split across lines, reads as "no
- * permission" here and would need a real AST if that ever shows up.
+ * **Frozen from the Node gateway.** The table was generated once from the Node gateway's
+ * `@RequirePermission` decorators, its last word on the question, when the Java gateway
+ * matched it on every operation (230; 124 gated). Reading Java's own annotations back
+ * against a scan of Java would agree with itself forever; this table is what the code
+ * must match, and changing a route's permission is an edit to it.
+ *
+ * **An open route is checked too.** `[]` requires the Java handler to carry NO
+ * `@RequirePermission`, and the handler must be found: a renamed method is a failure,
+ * never "open".
+ *
+ * `ponytail:` a targeted regex reader of Java, not a parser. It assumes this codebase's
+ * style: `@RequirePermission(PermissionCodesEnum.X, ...)` on its own line in the
+ * annotation block directly above the handler. An annotation split across lines would
+ * need a real parser if that ever shows up.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -26,159 +30,64 @@ import { join } from 'node:path';
 import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 
-type Operation = {
-  operationId: string;
-  tag: string;
-  controllerClass: string;
-  methodName: string;
-};
+const read = <T>(path: string): T =>
+  JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8')) as T;
 
-/** Every operation the published contract declares, straight off `paths`. */
-function operations(): Operation[] {
-  const document = JSON.parse(
-    readFileSync(join(REPO_ROOT, 'docs/reference/openapi.json'), 'utf8'),
-  ) as {
-    paths: Record<
-      string,
-      Record<string, { operationId?: string; tags?: string[] }>
-    >;
-  };
+const TABLE = read<Record<string, string[]>>(
+  'test/fixtures/permissions/rest-routes.json',
+);
 
-  const found: Operation[] = [];
-  for (const methods of Object.values(document.paths)) {
-    for (const op of Object.values(methods)) {
-      if (!op.operationId || !op.tags?.length) continue;
-
-      // `{Controller}_{method}_v1` — Nest's raw operationId, before
-      // openapi-generator lower-cases and joins it into a Java method name.
-      const match = /^(\w+Controller)_(\w+)_v\d+$/u.exec(op.operationId);
-      if (!match) continue;
-
-      found.push({
-        operationId: op.operationId,
-        tag: op.tags[0],
-        controllerClass: match[1],
-        methodName: match[2],
-      });
+/** `METHOD path` to `operationId`, for every operation the published document declares. */
+function documentedOperations(): Map<string, string> {
+  const document = read<{
+    paths: Record<string, Record<string, { operationId: string }>>;
+  }>('docs/reference/openapi.json');
+  const found = new Map<string, string>();
+  for (const [path, methods] of Object.entries(document.paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      found.set(`${method.toUpperCase()} ${path}`, operation.operationId);
     }
   }
 
   return found;
 }
 
-/** `AuthController_login_v1` -> `authControllerLoginV1` — openapi-generator's transform. */
-function javaMethodName(op: Operation): string {
-  const controller =
-    op.controllerClass.charAt(0).toLowerCase() + op.controllerClass.slice(1);
-  const method = op.methodName.charAt(0).toUpperCase() + op.methodName.slice(1);
-
-  return `${controller}${method}V1`;
-}
-
-/** Every `*.controller.ts` source under the gateway, read once. */
-function nodeControllerSources(): Map<string, string> {
-  const sources = new Map<string, string>();
-  const root = join(REPO_ROOT, 'apps/api-gateway/src/modules');
-
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) walk(path);
-      else if (entry.name.endsWith('.controller.ts'))
-        sources.set(path, readFileSync(path, 'utf8'));
-    }
-  };
-  walk(root);
-
-  return sources;
-}
-
-const REQUIRE_PERMISSION = /@RequirePermission\(([^)]*)\)/u;
-const STRING_LITERAL = /'([^']+)'/gu;
-
-/** The codes a decorator's argument list names, in call order. */
-function codesIn(decoratorArgs: string): string[] {
-  return [...decoratorArgs.matchAll(STRING_LITERAL)].map((m) => m[1]);
-}
-
 /**
- * What Node requires for one controller method, or `null` for none.
+ * The Java handler's name: the `operationId`'s parts joined in camel case.
  *
- * Method-level wins over class-level when both exist — `Reflector
- * .getAllAndOverride`'s own precedence, the reason `PermissionGuard` reads
- * it that way rather than merging the two.
- *
- * **Bounded by the PREVIOUS method's closing brace, not walked decorator by
- * decorator.** A walk that consumes one `@decorator\n` line at a time only
- * works when `@RequirePermission` is the LAST decorator directly above the
- * signature — true of every method tested until `UserAdminController`, whose
- * `@ResponseMessage(...)` comes AFTER it on six of its twelve routes. There
- * the walk stopped at `@ResponseMessage` and never saw `@RequirePermission`,
- * returned `null`, and the per-operation assertion below took `null` to mean
- * "Node is open here" and passed without checking anything — a failure
- * latent because every existing caller's shape happened not to trigger it.
- * Slicing to the nearest preceding `\n  }\n`
- * is order- and decorator-count-independent: whatever sits between the last
- * method's end and this signature IS this method's own decorator block.
+ * @example javaMethodName('AuthController_login_v1') // 'authControllerLoginV1'
  */
-function nodeRequiredCodes(
-  source: string,
-  className: string,
-  methodName: string,
-): string[] | null {
-  const classMatch = new RegExp(
-    String.raw`((?:@\w[^\n]*\n)*)export class ${className}\b`,
-    'u',
-  ).exec(source);
-  const classDecorators = classMatch?.[1] ?? '';
-  const classLevel = REQUIRE_PERMISSION.exec(classDecorators);
-
-  const bodyStart = classMatch
-    ? source.indexOf(classMatch[0]) + classMatch[0].length
-    : -1;
-  if (bodyStart < 0) return classLevel ? codesIn(classLevel[1]) : null;
-
-  const rest = source.slice(bodyStart);
-  // The signature at the START of a line (this codebase's 2-space method
-  // indent), optionally `async` — never a same-named call elsewhere in the
-  // class (`this.users.restore(...)` must not be mistaken for `restore(`).
-  const signature = new RegExp(
-    String.raw`\n(\s*)(?:async\s+)?${methodName}\s*\(`,
-    'u',
-  ).exec(rest);
-  if (!signature) return classLevel ? codesIn(classLevel[1]) : null;
-
-  const beforeSignature = rest.slice(0, signature.index);
-  const previousMethodEnd = beforeSignature.lastIndexOf('\n  }\n');
-  const decoratorBlock = beforeSignature.slice(previousMethodEnd + 1);
-  const methodLevel = REQUIRE_PERMISSION.exec(decoratorBlock);
-
-  if (methodLevel) return codesIn(methodLevel[1]);
-
-  return classLevel ? codesIn(classLevel[1]) : null;
+function javaMethodName(operationId: string): string {
+  return operationId
+    .split('_')
+    .map((part, index) =>
+      index === 0
+        ? part.charAt(0).toLowerCase() + part.slice(1)
+        : part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join('');
 }
 
 /**
- * A generated wrapper class kept every return type flat
- * (`ResponseEntity<FooV1200Response>`), which a single-level `[^>]*>` regex
- * matched fine. The OpenAPI-ownership flip's own envelope nests
- * (`ResponseEntity<ApiResponse<PagedData<T>>>`), and a flat pattern stops at
- * the FIRST `>` — reading no method there at all, silently, for every
- * migrated controller from here on. {@link matchingBracketIndex} is the
- * fix, shared with the same problem in `graphql-permission-coverage`'s
- * decorator parsing.
+ * The `>` closing the `<` at `start`. Return types nest
+ * (`ResponseEntity<ApiResponse<PagedData<T>>>`), and a flat `[^>]*>` pattern stops at
+ * the first `>`, reading no method there at all, silently.
  */
 function matchingAngleBracketEnd(source: string, start: number): number {
   return matchingBracketIndex(source, start, '<', '>');
 }
 
-/** What Java requires for one generated method, or `null` for none. */
+/**
+ * The codes a Java handler's `@RequirePermission` names: `[]` when the handler carries
+ * none, and `undefined` when no handler of that name exists at all, which is never read
+ * as open.
+ */
 function javaRequiredCodes(
   javaSources: string,
   methodName: string,
-): string[] | null {
+): string[] | undefined {
   const anchor = /ResponseEntity</gu;
-  let decorators: string | null = null;
+  let decorators: string | undefined;
 
   for (
     let found = anchor.exec(javaSources);
@@ -195,11 +104,9 @@ function javaRequiredCodes(
     );
     if (!signature) continue;
 
-    // Bounded to the previous method's end, not the whole file up to here —
-    // `nodeRequiredCodes`'s own reasoning: whatever sits between the last
-    // `\n  }\n` and this signature IS this method's own decorator block, and
-    // searching only that window (rather than every prefix of a large file)
-    // keeps the match itself bounded too.
+    // Bounded to the previous method's end: whatever sits between the last
+    // `\n  }\n` and this signature IS this method's own annotation block, and
+    // searching only that window keeps the match bounded too.
     const beforeType = javaSources.slice(0, found.index);
     const previousMethodEnd = beforeType.lastIndexOf('\n  }\n');
     const window = beforeType.slice(previousMethodEnd + 1);
@@ -208,99 +115,66 @@ function javaRequiredCodes(
     break;
   }
 
-  if (decorators === null) return null;
+  if (decorators === undefined) return undefined;
 
   const found = /@RequirePermission\(([^)]*)\)/u.exec(decorators);
-  if (!found) return null;
+  if (!found) return [];
 
   return [...found[1].matchAll(/PermissionCodesEnum\.(\w+)/gu)].map((m) =>
     m[1].toLowerCase().replace(/_/gu, '.'),
   );
 }
 
-describe('permission coverage — every gated Node operation stays gated in Java', () => {
-  const nodeSources = nodeControllerSources();
-  const javaRoot = join(REPO_ROOT, 'apps/api-gateway-java/src/main/java');
-  const javaFiles = (() => {
-    const files: string[] = [];
-    const walk = (dir: string): void => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) walk(path);
-        else if (entry.name.endsWith('.java')) files.push(path);
-      }
-    };
-    walk(javaRoot);
+const javaSources = (() => {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.java')) files.push(path);
+    }
+  };
+  walk(join(REPO_ROOT, 'apps/api-gateway-java/src/main/java'));
 
-    return files;
-  })();
-  const javaSourcesConcatenated = javaFiles
-    .map((f) => readFileSync(f, 'utf8'))
-    .join('\n');
+  return files.map((file) => readFileSync(file, 'utf8')).join('\n');
+})();
 
-  // Every published operation: nothing is pending, so none is excused.
-  const implemented = operations();
+describe('permission coverage — every documented operation is gated as the table says', () => {
+  const documented = documentedOperations();
 
-  it('found at least one implemented, permission-gated operation to check', () => {
-    // A guard with nothing to guard is vacuous — `Feedback`'s
-    // `analytics.read` route is the one this floor exists to keep exercised.
-    const gated = implemented.filter((op) => {
-      const source = [...nodeSources.values()].find((s) =>
-        s.includes(`class ${op.controllerClass}`),
-      );
-
-      return (
-        source &&
-        nodeRequiredCodes(source, op.controllerClass, op.methodName) !== null
-      );
-    });
-
-    expect(gated.length).toBeGreaterThanOrEqual(1);
+  it('the table names exactly the documented operations, no more and no fewer', () => {
+    expect({
+      missingFromTheTable: [...documented.keys()].filter(
+        (key) => !(key in TABLE),
+      ),
+      namingNothing: Object.keys(TABLE).filter((key) => !documented.has(key)),
+    }).toEqual({ missingFromTheTable: [], namingNothing: [] });
   });
 
-  for (const op of implemented) {
-    const source = [...nodeSources.entries()].find(([, s]) =>
-      s.includes(`class ${op.controllerClass}`),
-    )?.[1];
+  it('gates at least the 124 operations it was frozen with', () => {
+    // A table emptied of codes would pass every row below as "open".
+    expect(
+      Object.values(TABLE).filter((codes) => codes.length > 0).length,
+    ).toBeGreaterThanOrEqual(124);
+  });
 
-    it(`${op.operationId} is gated the same in Java as in Node`, () => {
-      if (!source) {
-        throw new Error(
-          `No controller source found declaring class ${op.controllerClass}`,
-        );
-      }
+  for (const [key, codes] of Object.entries(TABLE)) {
+    it(`${key} requires ${codes.length ? codes.join(', ') : 'no permission'} in Java`, () => {
+      const operationId = documented.get(key);
+      expect(operationId).toBeDefined();
 
-      const nodeCodes = nodeRequiredCodes(
-        source,
-        op.controllerClass,
-        op.methodName,
-      );
-      const javaCodes = javaRequiredCodes(
-        javaSourcesConcatenated,
-        javaMethodName(op),
-      );
+      const java = javaRequiredCodes(javaSources, javaMethodName(operationId!));
 
-      if (nodeCodes === null) {
-        // Node itself is open here — nothing for Java to be missing.
-        return;
-      }
-
-      expect(javaCodes).not.toBeNull();
-      expect(new Set(javaCodes)).toEqual(new Set(nodeCodes));
+      expect(java).toBeDefined();
+      expect(new Set(java)).toEqual(new Set(codes));
     });
   }
 
   it('javaRequiredCodes finds the right decorator block past a lambda that closes at two-space indent', () => {
-    // `javaRequiredCodes` bounds its decorator window at
-    // `lastIndexOf('\n  }\n')` — the previous method's own closing brace,
-    // at the class-body indent. A lambda argument whose OWN closing brace
-    // lands alone on a two-space-indent line (a reformatter's choice, not
-    // this codebase's convention, but not this scanner's to assume) is the
-    // shape that could be mistaken for that boundary. This pins that a
-    // lambda inside the PRECEDING method does not corrupt the window found
-    // for the FOLLOWING one — `lastIndexOf` always resolves to whichever
-    // `\n  }\n` sits CLOSEST to the target, and the true method boundary is
-    // always closer than anything nested inside an earlier method.
+    // The window is bounded at `lastIndexOf('\n  }\n')`, the previous method's
+    // closing brace. A lambda in the PRECEDING method whose own closing brace
+    // lands alone at that indent must not corrupt the window found for the
+    // FOLLOWING one: the true boundary is always the closer of the two.
     const hostile = `
 class Foo {
 
@@ -317,9 +191,15 @@ class Foo {
   public ResponseEntity<ApiResponse<Bar>> target() {
     return null;
   }
+
+  public ResponseEntity<Void> open() {
+    return null;
+  }
 }
 `;
 
     expect(javaRequiredCodes(hostile, 'target')).toEqual(['real.code']);
+    expect(javaRequiredCodes(hostile, 'open')).toEqual([]);
+    expect(javaRequiredCodes(hostile, 'renamed')).toBeUndefined();
   });
 });
