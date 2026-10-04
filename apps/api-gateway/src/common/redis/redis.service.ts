@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { formatErrorMsg } from '@synapsedesk/common';
@@ -19,7 +19,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
  * `docs/decisions/0033-redis-noeviction.md`.
  */
 @Injectable()
-export class RedisService implements OnModuleDestroy {
+export class RedisService implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisService.name);
 
   /**
@@ -45,7 +45,12 @@ export class RedisService implements OnModuleDestroy {
     );
   }
 
-  async onModuleDestroy(): Promise<void> {
+  /**
+   * The last hook Nest runs, so every provider that releases something in Redis on
+   * its way out (the gateway lease, in `beforeApplicationShutdown`) still has an
+   * open client. Quit in `onModuleDestroy`, it ran before them all.
+   */
+  async onApplicationShutdown(): Promise<void> {
     // `.catch()` because a quit against an already-broken connection rejects,
     // and a shutdown path that throws turns a clean stop into a crash — after
     // the work is done and with nothing left to save.

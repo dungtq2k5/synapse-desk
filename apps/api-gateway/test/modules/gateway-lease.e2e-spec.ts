@@ -85,7 +85,7 @@ describe('The gateway implementation lease (e2e)', () => {
   });
 
   afterEach(async () => {
-    while (leases.length) await leases.pop()?.onApplicationShutdown();
+    while (leases.length) await leases.pop()?.beforeApplicationShutdown();
   });
 
   afterAll(() => {
@@ -145,7 +145,7 @@ describe('The gateway implementation lease (e2e)', () => {
     const lease = await bind(node.runtime);
     expect(await redis.zcard(holdersKey('node'))).toBe(1);
 
-    await leases.pop()?.onApplicationShutdown();
+    await leases.pop()?.beforeApplicationShutdown();
 
     // Stopped consuming AND gave the entry back — the entry last, so the
     // handover window is bounded by this process having already stopped rather

@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
-import { Injectable, Logger, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type BeforeApplicationShutdown,
+} from '@nestjs/common';
 import { formatErrorMsg } from '@synapsedesk/common';
 import { RedisService } from '../redis/redis.service';
 
@@ -101,7 +105,7 @@ export type LeaseRuntime = {
  * app.get(GatewayLeaseService).bind({ activate, deactivate });
  */
 @Injectable()
-export class GatewayLeaseService implements OnApplicationShutdown {
+export class GatewayLeaseService implements BeforeApplicationShutdown {
   private readonly logger = new Logger(GatewayLeaseService.name);
 
   /** This process's entry. Unique per pod AND per restart. */
@@ -249,7 +253,12 @@ export class GatewayLeaseService implements OnApplicationShutdown {
     }
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  /**
+   * Before `onApplicationShutdown`, where `RedisService` quits its client: Nest
+   * finishes this phase for every provider before it starts that one, so the entry
+   * is released while Redis is still open, and the other side may claim at once.
+   */
+  async beforeApplicationShutdown(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     if (this.active) await this.stepDown();
