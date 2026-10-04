@@ -7,6 +7,7 @@ import {
 } from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
 import { GatewayLeaseService } from './common/lease/gateway-lease.service';
+import { natsLeaseRuntime } from './common/lease/lease-runtime';
 import { RealtimeGateway } from './modules/realtime/realtime.gateway';
 import { setupSwagger } from './common/config/swagger.config';
 import { SECURITY_HEADERS } from './common/config/security-headers.config';
@@ -162,18 +163,11 @@ async function bootstrap() {
   // it must have run at least once before the port opens or the first probe
   // would find a process that has not yet asked.
   const lease = app.get(GatewayLeaseService);
-  await lease.bind({
-    activate: async () => {
-      await natsConsumer.listen();
-    },
-    deactivate: async () => {
-      // Order matters and is the opposite of starting: stop consuming, then
-      // drop the sockets this process was serving, so no frame is relayed to
-      // a client the new owner is about to take over.
-      await natsConsumer.close();
-      app.get(RealtimeGateway).dropEverySocket();
-    },
-  });
+  await lease.bind(
+    natsLeaseRuntime(natsConsumer, () =>
+      app.get(RealtimeGateway).dropEverySocket(),
+    ),
+  );
 
   const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);
