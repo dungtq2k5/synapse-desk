@@ -106,16 +106,15 @@ class EnvBindingContractTest {
   @Test
   void theScanReachesEveryFieldRatherThanAnEmptyList() {
     // A reflection call that stopped returning components would report a
-    // compliant tree. Ten classes and 48 fields today — two more than the Joi
-    // schema's key count: `WS_PORT` is a key Node never reads (see
-    // `RealtimeProperties`'s own docblock), and `RESEND_BASE_URL` is read by the
-    // vendor's SDK rather than validated.
+    // compliant tree. Ten classes and 47 fields today — one more than the Joi
+    // schema's key count: `RESEND_BASE_URL` is read by the vendor's SDK rather
+    // than validated.
     int fields = PROPERTIES.stream()
       .mapToInt(type -> type.getRecordComponents().length)
       .sum();
 
     assertThat(PROPERTIES).hasSize(10);
-    assertThat(fields).isEqualTo(48);
+    assertThat(fields).isEqualTo(47);
     // A FLOOR, not equality: a key the file publishes and Java does not yet
     // bind is correct while this is a skeleton, and equality here would turn
     // that into the reverse-direction check this suite deliberately omits.

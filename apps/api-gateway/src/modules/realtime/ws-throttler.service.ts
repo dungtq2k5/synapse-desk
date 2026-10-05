@@ -24,7 +24,6 @@ export class WsThrottlerService {
 
   private readonly LIMIT: number;
   private readonly TTL: number;
-  private readonly BLOCK_DURATION: number;
 
   constructor(
     @Inject(ThrottlerStorage) private readonly storage: ThrottlerStorage,
@@ -32,9 +31,6 @@ export class WsThrottlerService {
   ) {
     this.LIMIT = configService.getOrThrow<number>('WS_HANDSHAKE_LIMIT');
     this.TTL = configService.getOrThrow<number>('WS_HANDSHAKE_TTL');
-    this.BLOCK_DURATION = configService.getOrThrow<number>(
-      'WS_HANDSHAKE_BLOCK_DURATION',
-    );
   }
 
   /**
@@ -47,7 +43,10 @@ export class WsThrottlerService {
    *
    * The NAT cost is real and accepted here: a whole office shares one budget for
    * OPENING connections. The limit is sized for that (many per minute, not
-   * five), and the consequence of exhausting it is a retry, not a lockout.
+   * five), and exhausting it SHEDS, never blocks: a block duration of 0, so a
+   * refused handshake retries on the client's own backoff and succeeds once the
+   * window moves on. A block would turn a burst into a guaranteed outage: a
+   * switch drops every socket at once, and an office reconnects together.
    */
   async allowHandshake(client: Socket, gatewayName: string): Promise<boolean> {
     // `handshake.address` rather than `client.conn.remoteAddress`: Socket.IO
@@ -61,7 +60,7 @@ export class WsThrottlerService {
         key,
         this.TTL,
         this.LIMIT,
-        this.BLOCK_DURATION,
+        0,
         gatewayName,
       );
 

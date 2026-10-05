@@ -53,47 +53,34 @@ public class WsThrottlerService {
     this.throttle = throttle;
   }
 
-  /** The handshake budget — refuses silently past the limit, THEN blocks. */
+  /**
+   * The handshake budget: sheds past the limit, and never blocks. A refused
+   * handshake retries on the client's own backoff and succeeds once the window
+   * moves on. A block would turn a burst into a guaranteed outage: a switch drops
+   * every socket at once, and an office behind one NAT reconnects together.
+   */
   public boolean allowHandshake(String ip) {
     String key = "ws_handshake:" + GATEWAY_IDENTITY + ":" + ip;
 
-    return allow(
-      key,
-      throttle.wsHandshakeTtl(),
-      throttle.wsHandshakeLimit(),
-      throttle.wsHandshakeBlockDuration()
-    );
+    return allow(key, throttle.wsHandshakeTtl(), throttle.wsHandshakeLimit());
   }
 
-  /** The per-event budget — no block duration; exceeding it is normal. */
+  /** The per-event budget: sheds past the limit like the handshake; exceeding it is normal. */
   public boolean allowEvent(String event, String subject) {
     WsEventLimits.Limit limit = WsEventLimits.of(event);
     String key = "ws_event:" + event + ":" + subject;
 
-    return allow(key, limit.ttlMs(), limit.count(), 0);
+    return allow(key, limit.ttlMs(), limit.count());
   }
 
-  private boolean allow(
-    String key,
-    long ttlMs,
-    int limit,
-    long blockDurationMs
-  ) {
+  private boolean allow(String key, long ttlMs, int limit) {
     try {
       long count = redis.opsForValue().increment(key);
       if (count == 1) {
         redis.expire(key, Duration.ofMillis(ttlMs));
       }
 
-      if (count > limit) {
-        if (blockDurationMs > 0) {
-          redis.expire(key, Duration.ofMillis(blockDurationMs));
-        }
-
-        return false;
-      }
-
-      return true;
+      return count <= limit;
     } catch (RuntimeException redisFailure) {
       LOG.error(
         "WS rate-limit storage unavailable; allowing unthrottled: {}",

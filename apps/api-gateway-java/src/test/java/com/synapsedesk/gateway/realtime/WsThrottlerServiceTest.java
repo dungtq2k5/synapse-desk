@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.realtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -39,8 +40,7 @@ class WsThrottlerServiceTest {
     1000L,
     10,
     /* wsHandshakeLimit */ 5,
-    /* wsHandshakeTtl */ 60_000L,
-    /* wsHandshakeBlockDuration */ 300_000L
+    /* wsHandshakeTtl */ 60_000L
   );
   private final WsThrottlerService throttler = new WsThrottlerService(
     redis,
@@ -64,14 +64,14 @@ class WsThrottlerServiceTest {
   }
 
   @Test
-  void handshakeRefusesPastTheLimitAndAppliesTheBlockDuration() {
+  void handshakeShedsPastTheLimitAndNeverBlocks() {
+    // Refused, and the window is NOT extended: the next handshake after it
+    // moves on succeeds. A block would hold a whole NAT'd office out after a
+    // switch drops every socket at once.
     when(values.increment(anyString())).thenReturn(6L);
 
     assertThat(throttler.allowHandshake("1.2.3.4")).isFalse();
-    verify(redis).expire(
-      eq("ws_handshake:java-realtime-gateway:1.2.3.4"),
-      eq(Duration.ofMillis(300_000L))
-    );
+    verify(redis, never()).expire(anyString(), any(Duration.class));
   }
 
   @Test
@@ -94,8 +94,8 @@ class WsThrottlerServiceTest {
     assertThat(
       throttler.allowEvent(RealtimeEvents.CLIENT_EVENTS_TYPING_START, "user-1")
     ).isFalse();
-    // Exceeding an event budget is normal — no lockout, unlike the handshake.
-    verify(redis, never()).expire(anyString(), eq(Duration.ofMillis(300_000L)));
+    // Exceeding an event budget is normal: no lockout.
+    verify(redis, never()).expire(anyString(), any(Duration.class));
   }
 
   @Test

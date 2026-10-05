@@ -121,7 +121,6 @@ throttle:
   auth-limit: ${THROTTLER_AUTH_LIMIT}
   ws-handshake-limit: ${WS_HANDSHAKE_LIMIT}
   ws-handshake-ttl: ${WS_HANDSHAKE_TTL}
-  ws-handshake-block-duration: ${WS_HANDSHAKE_BLOCK_DURATION}
 
 inbound:
   secret: ${INBOUND_EMAIL_SECRET}

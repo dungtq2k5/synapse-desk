@@ -22,7 +22,6 @@ import org.springframework.validation.annotation.Validated;
  * @param authLimit attempts allowed on auth routes
  * @param wsHandshakeLimit handshakes allowed per window
  * @param wsHandshakeTtl the handshake window
- * @param wsHandshakeBlockDuration how long an offender stays blocked
  */
 @Validated
 @ConfigurationProperties(prefix = "throttle")
@@ -36,6 +35,5 @@ public record ThrottleProperties(
   @NotNull Long authTtl,
   @NotNull Integer authLimit,
   @NotNull Integer wsHandshakeLimit,
-  @NotNull Long wsHandshakeTtl,
-  @NotNull Long wsHandshakeBlockDuration
+  @NotNull Long wsHandshakeTtl
 ) {}

@@ -54,8 +54,7 @@ class ThrottlerInterceptorTest {
     900_000L,
     5,
     30,
-    60_000L,
-    300_000L
+    60_000L
   );
 
   private final ThrottlerInterceptor interceptor = new ThrottlerInterceptor(
