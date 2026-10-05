@@ -849,8 +849,8 @@ gateway: a peer is programmed by answering its RPC, never by
 `parseSetCookie` in `client.ts` is what a cookie row reads: the name, the
 value and the attributes a value we authored — `Max-Age`, `Path`, `HttpOnly`,
 `Secure` — exactly, `SameSite`'s casing loosely, and attribute order and the
-`Expires` date not at all. Those three are the serializer's, and Express and
-Spring spell them differently for the same cookie. A clear is the semantic
+`Expires` date not at all. Those three are the serializer's to choose, so a
+row that pins them pins the library rather than the contract. A clear is the semantic
 form: empty value **and** (`Max-Age=0` **or** a past `Expires`) **and** the
 `Path`, `HttpOnly` and `SameSite` it was set with, since a browser only
 replaces a cookie whose path matches.
@@ -858,20 +858,16 @@ replaces a cookie whose path matches.
 **A cached lookup hides its own absence from any row that does not use a cold
 key.** The lifecycle gate's status read is cached in Redis for 30 seconds, so a
 row reusing an organization id another suite has already touched cannot tell
-whether the gateway asked at all — which is how an entire implementation
-shipped without the gate and passed thirty-five rows that programmed its
-answer. A row that means to prove a lookup happens needs an id nothing else has
+whether the gateway asked at all: a gateway with no gate would pass every such
+row that programs the peer's answer. A row that means to prove a lookup happens needs an id nothing else has
 warmed, and an assertion that the peer was called.
 
 **A row that sends a valid request cannot see a guard that runs late.** Every
 contract row sends an otherwise-valid call, so an ordering defect — a body
-validated before the session is checked, a 415 where the other implementation
-serves a bodyless action, a permission refused after the body is read — is
-invisible to all of them. The complement is a sweep: **send an invalid request
-as the weakest caller a route allows, to every route, and compare statuses
-across implementations.** It found six behaviour gaps nothing else had,
-including 21 routes answering 415 to a bodyless `POST` the other implementation
-serves. Run it with a fresh subject and a fresh tenant per call — a cached
+validated before the session is checked, a permission refused after the body is
+read — is invisible to all of them. The complement is a sweep: **send an invalid
+request as the weakest caller a route allows, to every route, and require the
+refusal to be the guard's** — the 401 or 403, never the body's 400. Run it with a fresh subject and a fresh tenant per call — a cached
 tenant status or a spent quota decides the answer otherwise, and the sweep
 measures the cache instead of the route.
 
@@ -885,16 +881,12 @@ is the fix for all three. Where a limit is keyed by address rather than
 subject, a row cannot vary it — say so in the spec's header rather than
 leaving the dependence unstated.
 
-**Which rows run for Java is read from one place.** Under
-`GATEWAY_IMPL=java` a row is skipped only when its title is named in
-`SKIPPED_FOR_JAVA` in `test/gateway-contract/pending.ts` — the route exists,
-the behaviour does not yet — and each entry names what it waits for. A row
-declares the API tag it exercises, and `declared-tags.contract-spec.ts` proves
-every published API has one.
+**A row declares the API tag it exercises**, and
+`declared-tags.contract-spec.ts` proves every published API has one.
 
-**A row here is the one the Java gateway must also pass**, so a
-wire behaviour that only the in-process suite pins is a behaviour the second
-implementation is free to get wrong.
+**A wire behaviour belongs in a row here**, not only in the in-process e2e
+suite: this suite reads the gateway the way a client does, from outside the
+process.
 
 ### 13.5 What never gets mocked, and what always does
 

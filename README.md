@@ -24,7 +24,6 @@ A Turborepo monorepo. The npm workspaces are `apps/*` and `libs/*`; everything e
 | Service | Port | Speaks | Owns |
 | :--- | :--- | :--- | :--- |
 | [`api-gateway`](apps/api-gateway/) | `3000` | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out |
-| [`api-gateway-java`](apps/api-gateway-java/) | `3000` | the same | **A second implementation of the same gateway**, in Spring Boot. Exactly one of the two serves at a time — see below |
 | [`auth-service`](apps/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
 | [`ticket-service`](apps/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
 | [`storage-service`](apps/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
@@ -73,17 +72,6 @@ Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on 
 ```sh
 npm ci
 ```
-
-**Two gateways, one at a time.** `apps/api-gateway-java/` is a Spring Boot
-implementation of the same contract — the same routes from
-`docs/reference/openapi.json`, the same GraphQL schema, the same cookies and
-envelope. `GATEWAY_IMPL` in the root `.env` (`node` by default) decides which
-one `npm run dev` starts; the other's `dev` script exits saying so. At
-runtime a lease in Redis enforces it: the implementation that does not hold
-it stays a standby — `/health` 200, `/health/ready` 503, no NATS
-subscription, no socket accepted. In Kubernetes both Deployments sit behind
-the one `api-gateway` Service and exactly one is scaled above zero, so
-switching implementations, and switching back, is two commits.
 
 ### 2. The root `.env` — read by Compose, and by nothing else
 
