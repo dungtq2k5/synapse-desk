@@ -12,11 +12,10 @@ import {
  * URI versioning is applied, the same way, by every composition root.
  *
  * **Why the static half exists.** The e2e suites boot `test/utils/bootstrap.ts`
- * and `test/utils/realtime.ts`, never `main.ts`, and the OpenAPI export boots
- * the built gateway from `scripts/export-openapi.mjs`. A root that forgot
+ * and `test/utils/realtime.ts`, never `main.ts`. A root that forgot
  * `enableVersioning` — or kept applying the raw `GLOBAL_PREFIX` — would serve
- * its own set of paths and every test against it would stay green; the export
- * would publish paths no client can call. The CORS and helmet sweeps found
+ * its own set of paths and every test against it would stay green. The CORS
+ * and helmet sweeps found
  * exactly that shape; this is the same guard for routing.
  *
  * **The property is two facts, checked separately**: every root routes through
@@ -25,7 +24,6 @@ import {
  */
 describe('URI versioning is applied by every composition root', () => {
   const SRC = join(__dirname, '../../src');
-  const REPO_ROOT = join(__dirname, '../../../..');
   const code = (path: string): string =>
     stripComments(readFileSync(path, 'utf8'));
 
@@ -33,7 +31,6 @@ describe('URI versioning is applied by every composition root', () => {
     'src/main.ts': join(SRC, 'main.ts'),
     'test/utils/bootstrap.ts': join(__dirname, '../utils/bootstrap.ts'),
     'test/utils/realtime.ts': join(__dirname, '../utils/realtime.ts'),
-    'scripts/export-openapi.mjs': join(REPO_ROOT, 'scripts/export-openapi.mjs'),
   };
 
   /** What `applyApiRouting`'s body must contain, as source text. */
