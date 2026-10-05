@@ -206,6 +206,27 @@ jobs:
       # it say more about a contract break than a failing unit row does.
       - run: npm run test:e2e:gateway-java
 
+  # -------------------------------------------------------- gateway images
+  #
+  # **The images that ship, started.** Every other gateway job runs the code
+  # from the checkout; this one builds both gateway images, runs each, and
+  # waits for `/health`. Nothing is pushed: an image that cannot start is a
+  # PR failure here instead of a deploy failure in CD.
+  #
+  # The stores come from compose, as `contract-java` gets them, and each image
+  # joins compose's network to reach them.
+  gateway-images:
+    name: gateway images (build and boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: stack env
+        run: cp .env.example .env
+      - name: start the stores the gateways read
+        run: docker compose up -d --wait redis nats
+      - run: npm run images:boot-gateways
+
   # ------------------------------------------------------------------ unit
   #
   # No infrastructure, by design — `test/system/jest.config.ts` states the

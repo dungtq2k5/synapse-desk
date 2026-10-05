@@ -223,6 +223,10 @@ describe('the CI contract', () => {
         script: 'openapi:check',
         why: 'the committed OpenAPI document is what the gateway serves, and valid OpenAPI 3.1; unrun, the published contract drifts from the code',
       },
+      {
+        script: 'images:boot-gateways',
+        why: 'both gateway images build and answer /health; unrun, an image that cannot start is first found by a deploy',
+      },
     ];
 
     /**
