@@ -2,7 +2,7 @@
 
 The read surface for the SPA. Twenty queries, four mutations, no subscriptions.
 
-Written for the front-end teams building against it. Everything here was read off `apps/api-gateway/src/schema.gql` and the resolvers behind it; where a number matters it is named with the constant that owns it, so a change to the constant is a change to this document.
+Written for the front-end teams building against it. Everything here was read off `docs/reference/schema.gql` and the resolvers behind it; where a number matters it is named with the constant that owns it, so a change to the constant is a change to this document.
 
 ---
 
