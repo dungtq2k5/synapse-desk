@@ -7,11 +7,10 @@ import org.springframework.validation.annotation.Validated;
 /**
  * The `/socket.io` listener's OWN port — separate from {@code server.port}.
  *
- * <p>Node's socket.io shares one {@code http.Server} with everything else;
- * netty-socketio is a standalone Netty server and cannot bind the port
+ * <p>netty-socketio is a standalone Netty server and cannot bind the port
  * Tomcat already holds. The Ingress routes the `/socket.io` path prefix to
- * this port instead, so the client still sees one host — only the routing
- * moved from "one process" to "one rule". Node never reads this key.
+ * this port, so the client still sees one host. Node serves Socket.IO on the
+ * same key, so either gateway answers behind the same rule.
  *
  * @param port the netty-socketio listener's port
  */
