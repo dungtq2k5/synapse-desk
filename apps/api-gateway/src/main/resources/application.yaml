@@ -71,6 +71,13 @@ runtime:
   build-sha: ${BUILD_SHA}
   build-time: ${BUILD_TIME}
 
+# The OpenAPI document at `/v3/api-docs`, served only where `SWAGGER_ENABLED`
+# says so. Off when unset, the same default `runtime.swagger-enabled` documents:
+# an environment that never considered the question is closed rather than open.
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+
 metrics:
   port: ${METRICS_PORT}
   host: ${METRICS_HOST:127.0.0.1}

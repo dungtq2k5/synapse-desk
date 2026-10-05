@@ -27,7 +27,8 @@ import org.springframework.test.context.ContextConfiguration;
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = "management.server.port=0"
+  // The document is served only where `SWAGGER_ENABLED` turns it on.
+  properties = { "management.server.port=0", "SWAGGER_ENABLED=true" }
 )
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
