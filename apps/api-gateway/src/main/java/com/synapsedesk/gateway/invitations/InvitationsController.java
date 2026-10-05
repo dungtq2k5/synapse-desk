@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
+import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
@@ -111,17 +112,20 @@ public class InvitationsController {
   private final CurrentUser currentUser;
   private final GuestCheck guestCheck;
   private final CookieWriter cookies;
+  private final CacheService cache;
 
   public InvitationsController(
     InvitationServiceGrpc.InvitationServiceBlockingStub stub,
     CurrentUser currentUser,
     GuestCheck guestCheck,
-    CookieWriter cookies
+    CookieWriter cookies,
+    CacheService cache
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.guestCheck = guestCheck;
     this.cookies = cookies;
+    this.cache = cache;
   }
 
   @PostMapping(
@@ -390,6 +394,15 @@ public class InvitationsController {
     AcceptInvitationResponse response = withOriginMetadata(
       request
     ).acceptInvitation(wire.build());
+
+    // The invitee now holds the invitation's roles and departments, which the
+    // cached lists count. No session names the tenant here (`@EvictsCache`
+    // needs one), so the tenant is the one the peer accepted the user into.
+    if (response.getUser().hasOrganizationId()) {
+      String organizationId = response.getUser().getOrganizationId();
+      cache.invalidateScope(organizationId, "roles");
+      cache.invalidateScope(organizationId, "departments");
+    }
 
     cookies.setAccessToken(
       CurrentRequest.response(),

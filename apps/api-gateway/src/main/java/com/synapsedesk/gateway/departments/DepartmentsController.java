@@ -5,6 +5,7 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.UserMapper;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.cache.EvictsCache;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.model.AddDepartmentMembersDto;
@@ -256,6 +257,7 @@ public class DepartmentsController {
     return okDepartment(response, "OK", 200);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/departments",
     produces = { "application/json" },
@@ -286,6 +288,7 @@ public class DepartmentsController {
     return okDepartment(response, "OK", 201);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PatchMapping(
     value = "/departments/{id}",
     produces = { "application/json" },
@@ -317,6 +320,7 @@ public class DepartmentsController {
     return okDepartment(response, "OK", 200);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(value = "/departments/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_DELETE)
@@ -332,6 +336,7 @@ public class DepartmentsController {
     return ResponseEntity.ok(ApiResponse.of(200, "Department deleted", null));
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/departments/{id}/restore",
     produces = { "application/json" }
@@ -421,6 +426,7 @@ public class DepartmentsController {
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/departments/{id}/members",
     produces = { "application/json" },
@@ -462,6 +468,7 @@ public class DepartmentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(
     value = "/departments/{id}/members/{userId}",
     produces = { "application/json" }

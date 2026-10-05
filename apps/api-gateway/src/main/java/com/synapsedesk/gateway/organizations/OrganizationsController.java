@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.cache.EvictsCache;
 import com.synapsedesk.gateway.config.InboundEmailProperties;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
@@ -187,6 +188,7 @@ public class OrganizationsController {
     return ResponseEntity.ok(envelope);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/organizations/current/inbound-token",
     produces = { "application/json" }
@@ -219,6 +221,7 @@ public class OrganizationsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(
     value = "/organizations/current/inbound-token",
     produces = { "application/json" }
@@ -236,6 +239,7 @@ public class OrganizationsController {
     return ResponseEntity.noContent().build();
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PatchMapping(
     value = "/organizations/current",
     produces = { "application/json" },
@@ -289,6 +293,7 @@ public class OrganizationsController {
     return ResponseEntity.ok(toSettingsEnvelope("OK", response, null));
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PatchMapping(
     value = "/organizations/current/settings",
     produces = { "application/json" },
@@ -442,6 +447,7 @@ public class OrganizationsController {
 
   // Completing onboarding.
   @OrgAccessKind(OrgAccess.ONBOARDING)
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/organizations/current/onboarding/complete",
     produces = { "application/json" }
@@ -462,6 +468,7 @@ public class OrganizationsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(
     value = "/organizations/current",
     produces = { "application/json" },

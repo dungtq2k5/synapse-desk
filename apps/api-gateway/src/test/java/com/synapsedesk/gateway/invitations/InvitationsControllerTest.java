@@ -64,7 +64,8 @@ class InvitationsControllerTest {
       stub,
       currentUser,
       guestCheck,
-      cookies
+      cookies,
+      mock(com.synapsedesk.gateway.cache.CacheService.class)
     );
   }
 

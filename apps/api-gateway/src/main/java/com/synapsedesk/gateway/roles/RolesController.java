@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.cache.EvictsCache;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.AssignRoleUsersDto;
 import com.synapsedesk.gateway.model.CreateRoleDto;
@@ -239,6 +240,7 @@ public class RolesController {
    * WEAKEN the gate to "either one". The escalation risk is closed in
    * auth-service instead: an actor cannot grant what they do not hold.
    */
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/roles",
     produces = { "application/json" },
@@ -270,6 +272,7 @@ public class RolesController {
     return okRole(response, "OK", 201);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PatchMapping(
     value = "/roles/{id}",
     produces = { "application/json" },
@@ -296,6 +299,7 @@ public class RolesController {
     return okRole(response, "OK", 200);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(value = "/roles/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ROLE_DELETE)
@@ -311,6 +315,7 @@ public class RolesController {
     return ResponseEntity.ok(ApiResponse.of(200, "Role deleted", null));
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PutMapping(
     value = "/roles/{id}/permissions",
     produces = { "application/json" },
@@ -342,6 +347,7 @@ public class RolesController {
     return okRole(response, "Permissions updated", 200);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/roles/{id}/users",
     produces = { "application/json" },
@@ -369,6 +375,7 @@ public class RolesController {
     return okRole(response, "Role assigned", 200);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(
     value = "/roles/{id}/users/{userId}",
     produces = { "application/json" }

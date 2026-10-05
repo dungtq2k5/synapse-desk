@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.cache.EvictsCache;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.ingestionjobs.IngestionJobMapper;
 import com.synapsedesk.gateway.model.ConfirmDocumentDto;
@@ -415,6 +416,7 @@ public class DocumentsController {
     return okFlag(response, "OK");
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/flags/{flagId}/dismiss",
     produces = { "application/json" },
@@ -436,6 +438,7 @@ public class DocumentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/flags/{flagId}/fixed",
     produces = { "application/json" },
@@ -457,6 +460,7 @@ public class DocumentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/flags/{flagId}/replaced",
     produces = { "application/json" },
@@ -508,6 +512,7 @@ public class DocumentsController {
     return ResponseEntity.ok(ApiResponse.of(200, message, toFlagDto(response)));
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(
     value = "/documents/flags/{flagId}",
     produces = { "application/json" }
@@ -529,6 +534,7 @@ public class DocumentsController {
     return ResponseEntity.noContent().build();
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/presign",
     produces = { "application/json" },
@@ -564,6 +570,7 @@ public class DocumentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/confirm",
     produces = { "application/json" },
@@ -628,6 +635,7 @@ public class DocumentsController {
     return okDocument(response, "OK", HttpStatus.OK);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PatchMapping(
     value = "/documents/{id}",
     produces = { "application/json" },
@@ -659,6 +667,7 @@ public class DocumentsController {
     return okDocument(response, "Document updated", HttpStatus.OK);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @DeleteMapping(value = "/documents/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -675,6 +684,7 @@ public class DocumentsController {
     return ResponseEntity.noContent().build();
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/{id}/restore",
     produces = { "application/json" }
@@ -693,6 +703,7 @@ public class DocumentsController {
     return okDocument(response, "Document restored", HttpStatus.OK);
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/{id}/reindex",
     produces = { "application/json" }
@@ -714,6 +725,7 @@ public class DocumentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PostMapping(
     value = "/documents/{id}/replace",
     produces = { "application/json" },
@@ -822,6 +834,7 @@ public class DocumentsController {
     );
   }
 
+  @EvictsCache(CACHE_SCOPE)
   @PutMapping(
     value = "/documents/{id}/departments",
     produces = { "application/json" },

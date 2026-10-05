@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.UserMapper;
+import com.synapsedesk.gateway.cache.EvictsCache;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.CreateUserDto;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
@@ -333,6 +334,9 @@ public class UserAdminController {
     return okSummary(response, "OK", HttpStatus.OK);
   }
 
+  // Removing a user releases the roles and departments they held, which the
+  // cached lists count (`userAssigned`, `memberCount`).
+  @EvictsCache({ "roles", "departments" })
   @DeleteMapping(value = "/users/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
@@ -442,6 +446,7 @@ public class UserAdminController {
     );
   }
 
+  @EvictsCache("roles")
   @PutMapping(
     value = "/users/{id}/roles",
     produces = { "application/json" },
@@ -466,6 +471,7 @@ public class UserAdminController {
     return okSummary(response, "Roles updated", HttpStatus.OK);
   }
 
+  @EvictsCache("departments")
   @PutMapping(
     value = "/users/{id}/departments",
     produces = { "application/json" },
