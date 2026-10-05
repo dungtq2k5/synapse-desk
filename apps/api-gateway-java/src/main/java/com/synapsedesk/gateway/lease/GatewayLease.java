@@ -30,16 +30,20 @@ public final class GatewayLease {
   /** How long an entry outlives its last refresh. */
   public static final Duration TTL = Duration.ofSeconds(30);
 
-  /** How often a holder refreshes, comfortably inside {@link #TTL}. */
-  public static final Duration REFRESH = Duration.ofSeconds(10);
+  /**
+   * How often a holder refreshes and a standby polls. The poll is what bounds a
+   * planned handover: a standby claims at most this long after the holder
+   * releases.
+   */
+  public static final Duration REFRESH = Duration.ofSeconds(2);
 
   /**
    * How long a holder may go without a successful refresh before stepping
    * down — BEFORE the TTL, not at it.
    *
    * <p>At the TTL the other implementation may claim, so a holder that waited
-   * for it would still be consuming when the new owner started. Two missed
-   * refreshes is the deadline, and the gap to the TTL bounds any overlap.
+   * for it would still be consuming when the new owner started. The gap to
+   * the TTL bounds any overlap.
    */
   public static final Duration FENCE = Duration.ofSeconds(20);
 

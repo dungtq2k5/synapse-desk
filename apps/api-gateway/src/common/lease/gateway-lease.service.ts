@@ -26,16 +26,19 @@ export const holdersKey = (implementation: GatewayImplementation): string =>
 /** How long an entry outlives its last refresh. */
 export const LEASE_TTL_MS = 30_000;
 
-/** How often a holder refreshes, comfortably inside {@link LEASE_TTL_MS}. */
-export const LEASE_REFRESH_MS = 10_000;
+/**
+ * How often a holder refreshes and a standby polls. The poll is what bounds a
+ * planned handover: a standby claims at most this long after the holder
+ * releases.
+ */
+export const LEASE_REFRESH_MS = 2_000;
 
 /**
  * How long a holder may go without a successful refresh before it steps down.
  *
  * **Before the TTL, not at it.** At the TTL another implementation may claim,
  * so a holder that waited for it would still be consuming when the new owner
- * started. Two missed refreshes is the deadline; the gap to the TTL is the
- * bound on an overlap, and a timing bound is enough here: the consequence is
+ * started. The gap to the TTL is the bound on an overlap, and a timing bound is enough here: the consequence is
  * duplicate frames, not lost data.
  */
 export const LEASE_FENCE_MS = 20_000;
@@ -150,7 +153,7 @@ export class GatewayLeaseService implements BeforeApplicationShutdown {
    * refresh has not succeeded for {@link LEASE_FENCE_MS}.
    *
    * Public because it is also how a test drives the lease. The alternative is
-   * a suite that waits {@link LEASE_REFRESH_MS} per assertion, and a ten-second
+   * a suite that waits {@link LEASE_REFRESH_MS} per assertion, and a slow
    * row is a row that gets deleted rather than fixed. Nothing else calls it.
    */
   async beat(): Promise<void> {
