@@ -105,6 +105,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The committed OpenAPI document equals what this build exports. After
+      # the build, so its turbo build is a cache hit; no stack, the gateway is
+      # created and never started.
+      - run: npm run openapi:check
 
   # -------------------------------------------------------------- contract
   #
@@ -145,7 +149,7 @@ jobs:
   # would.
   #
   # A sibling of `contract`, not a matrix leg of it: this arm needs a JDK,
-  # needs Redis and NATS on their default ports for `openapi:check`'s IT,
+  # needs Redis and NATS on their default ports for the Maven ITs,
   # and runs two checks the Node arm has no counterpart for.
   #
   # **`npm run build` is for the OTHER gateway.** The lease row in
@@ -185,7 +189,7 @@ jobs:
         run: npm run keys:generate -- --force
 
       # The contract harness starts its own Redis and NATS on ephemeral ports.
-      # The ITs `openapi:check` runs do not: they read `.env.example`'s
+      # The Maven ITs do not: they read `.env.example`'s
       # `localhost:6379` / `localhost:4222`, so those two — and only those two,
       # as the rag job does for its stores — come from compose.
       - name: stack env
@@ -196,9 +200,6 @@ jobs:
       - run: npm run test:contract:java
         env:
           GATEWAY_IMPL: java
-      # The committed OpenAPI document is what this gateway serves, and a
-      # valid OpenAPI 3.1 document.
-      - run: npm run openapi:check
 
       # **Surefire's unit rows AND failsafe's ITs** — the suites that, before
       # this, only ran on a laptop. The ITs read the compose-provided Redis and

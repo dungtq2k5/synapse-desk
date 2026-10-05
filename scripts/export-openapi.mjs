@@ -5,83 +5,155 @@
  *   node scripts/export-openapi.mjs            # rewrite the file
  *   node scripts/export-openapi.mjs --check    # compare, write nothing, exit 1 on drift
  *
- * **Reads the document the gateway SERVES**, which `OpenApiDocumentExportIT` saves
- * to `apps/api-gateway-java/target/openapi-java.json`. Run it through `npm run
- * openapi:export` / `npm run openapi:check`, which delete that file and produce it
- * again in the same command: run bare, this refuses only a file that is absent,
- * because a stale one cannot be told apart by its age.
+ * **Reads the BUILT gateway**, as `generate-job-alerts.mjs` reads the built lib,
+ * and the built gateway `require`s each library's own `dist/`. So run it through
+ * `npm run openapi:export` / `npm run openapi:check`, which build the gateway
+ * with its dependencies first; run bare, it refuses only an output that is
+ * absent, because a stale one cannot be told apart by mtime.
  *
- * **The output is canonical**: the served text, Prettier-formatted with the repo's
- * config. Nothing is reordered or rewritten; the served document has no value that
- * varies run to run (its `servers` list is empty), so the committed file is exactly
- * what a client fetching `/v3/api-docs` reads.
+ * **Creates the application, never starts it.** No `listen`, no microservice
+ * transport, no stack: `NestFactory.create`, the same `applyApiRouting` every
+ * other composition root calls, the same `buildOpenApiDocument` the served page
+ * uses, then `close`.
  *
- * **Validated before the write AND before the comparison** against OpenAPI 3.1, and
- * for a schema that both allows and refuses null (`openapiViolations`): such a
- * document must not reach the file, and must not pass CI if it is already in it.
+ * **`apps/api-gateway/.env.test` is authoritative.** Its values are ASSIGNED
+ * over `process.env`, so a cookie name exported in a shell or in CI cannot reach
+ * the published file. A key the document reads that is NOT in that file would
+ * still come from the root `.env`; every key it reads today is Joi-required, so
+ * it is in the file.
+ *
+ * **The output is canonical**: `info.version` is the gateway package's version,
+ * primitive `enum` arrays are sorted by `canonicalizeEnums` (an `enum` is a set,
+ * and the compiler orders a union's members differently in `nest build` and in
+ * ts-jest), and the text is Prettier-formatted with the repo's config. Object
+ * keys are never reordered.
  *
  * **`--check` never writes.** A check that repairs what it reports passes on its
  * second run.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
 import {
+  BUILD_COMMAND,
   EXPORT_COMMAND,
+  EXPORT_ENV_FILE,
   OPENAPI_OUTPUT,
+  assignEnvFileAt,
   firstDifferingLine,
   openapiViolations,
+  missingOutputs,
 } from './lib/openapi-export.cjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
-const SERVED = join(ROOT, 'apps/api-gateway-java/target/openapi-java.json');
+const GATEWAY_DIST = join(ROOT, 'apps/api-gateway/dist/apps/api-gateway/src');
 const OUTPUT = join(ROOT, OPENAPI_OUTPUT);
 
-if (!existsSync(SERVED)) {
+const missing = missingOutputs(ROOT);
+if (missing.length > 0) {
   console.error(
-    `The export reads the served document, and ${SERVED} does not exist.\nProduce it: ${EXPORT_COMMAND}`,
+    `The export reads build outputs that do not exist:\n${missing.map((output) => `  ${output}`).join('\n')}\nBuild them: ${BUILD_COMMAND}`,
   );
   process.exit(1);
 }
 
-const document = JSON.parse(readFileSync(SERVED, 'utf8'));
-const options = await prettier.resolveConfig(OUTPUT);
-const actual = await prettier.format(JSON.stringify(document, null, 2), {
-  ...options,
-  parser: 'json',
-});
+// Before anything under the gateway's dist is required: config is read at boot.
+assignEnvFileAt(join(ROOT, EXPORT_ENV_FILE), process.env);
 
-const violations = openapiViolations(document);
-if (violations.length) {
-  console.error(
-    `${OPENAPI_OUTPUT} fails OpenAPI 3.1 validation (${violations.length} problems):\n` +
-      `${violations.slice(0, 10).join('\n')}` +
-      (violations.length > 10 ? `\n…and ${violations.length - 10} more` : ''),
-  );
-  process.exit(1);
+// Resolved from the gateway's dist, so the script uses the gateway's own Nest.
+const gatewayRequire = createRequire(join(GATEWAY_DIST, 'main.js'));
+const { NestFactory } = gatewayRequire('@nestjs/core');
+const { ConfigService } = gatewayRequire('@nestjs/config');
+const { AppModule } = gatewayRequire('./app.module');
+const { buildOpenApiDocument } = gatewayRequire(
+  './common/config/swagger.config',
+);
+const { applyApiRouting, resolveGlobalPrefix } = gatewayRequire(
+  './modules/health/ops-routes',
+);
+// The built lib the gateway itself requires, so both apply one canonicalization.
+const { canonicalizeEnums } = gatewayRequire('@synapsedesk/common');
+
+/** The canonical document text, exactly as it is committed. */
+async function exportDocument() {
+  const app = await NestFactory.create(AppModule, {
+    logger: false,
+    abortOnError: false,
+  });
+
+  try {
+    const configService = app.get(ConfigService);
+    applyApiRouting(
+      app,
+      resolveGlobalPrefix(configService.getOrThrow('GLOBAL_PREFIX')),
+    );
+
+    const document = buildOpenApiDocument(app, configService);
+    document.info.version = JSON.parse(
+      readFileSync(join(ROOT, 'apps/api-gateway/package.json'), 'utf8'),
+    ).version;
+    canonicalizeEnums(document);
+
+    const options = await prettier.resolveConfig(OUTPUT);
+    const actual = await prettier.format(JSON.stringify(document, null, 2), {
+      ...options,
+      parser: 'json',
+    });
+
+    // The formatted text AND the object: the text is what is compared and
+    // written, the object is what is validated. Re-parsing the text here
+    // would validate a different value from the one just built.
+    return { actual, document };
+  } finally {
+    await app.close();
+  }
 }
 
-if (!CHECK) {
-  writeFileSync(OUTPUT, actual);
-  console.log(`Wrote ${OPENAPI_OUTPUT}`);
-  process.exit(0);
-}
-
-let committed = '';
 try {
-  committed = readFileSync(OUTPUT, 'utf8');
-} catch {
-  // Absent is drift at line 1.
-}
+  const { actual, document } = await exportDocument();
 
-const line = firstDifferingLine(committed, actual);
-if (line !== null) {
-  console.error(
-    `${OPENAPI_OUTPUT} has drifted from what the gateway serves, first at line ${line}.\nRegenerate it: ${EXPORT_COMMAND}`,
-  );
+  // **Before the write AND before the drift comparison.** An invalid document
+  // must not reach the file, and must not pass CI if it is already in the
+  // file — the second is the half that was missing, and the half that let an
+  // invalid document be the published contract.
+  const violations = openapiViolations(document);
+  if (violations.length) {
+    console.error(
+      `${OPENAPI_OUTPUT} is not a valid OpenAPI 3 document (${violations.length} problems):\n` +
+        `${violations.slice(0, 10).join('\n')}` +
+        (violations.length > 10 ? `\n…and ${violations.length - 10} more` : ''),
+    );
+    process.exit(1);
+  }
+
+  if (!CHECK) {
+    writeFileSync(OUTPUT, actual);
+    console.log(`Wrote ${OPENAPI_OUTPUT}`);
+    process.exit(0);
+  }
+
+  let committed = '';
+  try {
+    committed = readFileSync(OUTPUT, 'utf8');
+  } catch {
+    // Absent is drift at line 1.
+  }
+
+  const line = firstDifferingLine(committed, actual);
+  if (line !== null) {
+    console.error(
+      `${OPENAPI_OUTPUT} has drifted from the gateway source, first at line ${line}.\nRegenerate it: ${EXPORT_COMMAND}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`${OPENAPI_OUTPUT} is up to date`);
+  process.exit(0);
+} catch (error) {
+  console.error('The OpenAPI export failed to boot the gateway:');
+  console.error(error);
   process.exit(1);
 }
-
-console.log(`${OPENAPI_OUTPUT} is up to date`);

@@ -20,7 +20,7 @@ import {
 import { timestamp } from '../fixtures/wire';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { canonicalizeEnums, compareAlphabetically } from '@synapsedesk/common';
 import { RESEND_SIGNATURE_HEADERS } from '../../src/modules/inbound-email/resend-inbound.service';
 
 describe('The OpenAPI document', () => {
@@ -305,10 +305,15 @@ describe('The OpenAPI document', () => {
       expect(bodies).toBeGreaterThanOrEqual(80);
     });
 
-    // **Validity is not asserted here.** The published document is the Java
-    // gateway's, and `openapi:check` validates that one; these rows own "does
-    // this gateway's own document agree with its code about what is optional",
-    // which is the half no validator can see anyway.
+    // **Validity itself is asserted in the export script, not here.** This
+    // suite cannot reach `scripts/lib/`: `image-contract.spec.ts` refuses a
+    // workspace importing across a workspace boundary, which is why
+    // `canonicalizeEnums` lives in `@synapsedesk/common` rather than being
+    // importing it out of `scripts/`. The validator would have to move too,
+    // and it is a devDependency of the root, used by one script. So
+    // `openapi:check` owns "is this a valid document" and these rows own "does
+    // it agree with the code about what is optional" — which is the half no
+    // validator can see anyway.
   });
 
   describe('A body in the wrong content type is refused', () => {
@@ -1160,6 +1165,31 @@ describe('The OpenAPI document', () => {
         ttlSeconds: 60,
         varyBy: 'caller',
       });
+    });
+
+    it('**the served document IS the committed `docs/reference/openapi.json`**', async () => {
+      // The export boots the built gateway; this suite boots through ts-jest.
+      // Equal after the export's own canonicalization — its version, sorted
+      // primitive enums — is what proves both composition roots produce one
+      // contract. Read, never regenerated: on a failure, run
+      // `npm run openapi:export` and review the diff it leaves.
+      const response = await request(fx.app.getHttpServer())
+        .get(`${API}/docs-json`)
+        .expect(200);
+      const served = response.body as OpenAPIObject;
+      const { version } = JSON.parse(
+        readFileSync(join(__dirname, '../../package.json'), 'utf8'),
+      ) as { version: string };
+      const committed = JSON.parse(
+        readFileSync(
+          join(__dirname, '../../../../docs/reference/openapi.json'),
+          'utf8',
+        ),
+      ) as OpenAPIObject;
+
+      expect(
+        canonicalizeEnums({ ...served, info: { ...served.info, version } }),
+      ).toEqual(committed);
     });
 
     it('mounts `/docs` and `/docs-json` under the SAME prefix', () => {
