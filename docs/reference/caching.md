@@ -72,7 +72,7 @@ paths hit that branch:
 
 ## Cross-service invalidation
 
-The gateway caches data three services own, so eviction arrives as events rather than as method calls — `cache-invalidation.consumer.ts` subscribes to every `TICKET_PATTERNS` subject, three `DOCUMENT_PATTERNS` (indexed, ingestionFailed, scopeChanged) and `BILLING_PATTERNS.entitlementsChanged`.
+The gateway caches data three services own, so eviction arrives as events rather than as method calls — `CacheInvalidationConsumer.java` subscribes to every `TICKET_PATTERNS` subject, three `DOCUMENT_PATTERNS` (indexed, ingestionFailed, scopeChanged) and `BILLING_PATTERNS.entitlementsChanged`.
 
 **These are core NATS, not durable.** A lost invalidation costs a stale entry until its TTL, which is the trade [ADR 0041](../decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md) draws: the cache can be reconstructed from the source of truth, so there is nothing to reconcile against.
 

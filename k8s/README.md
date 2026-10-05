@@ -124,25 +124,21 @@ Getting this backwards is how a schema and its history stop agreeing — and not
 
 ## Inbound email — the cluster side
 
-[`docs/reference/flows/inbound-email.md`](../docs/reference/flows/inbound-email.md) owns the Resend sequence (receiving domain, `npm run resend:provision`, per-tenant `organizations.inbound_token`, **MX last**). Three things have to be true here first.
+[`docs/reference/flows/inbound-email.md`](../docs/reference/flows/inbound-email.md) owns the Resend sequence (receiving domain, `npm run resend:provision`, per-tenant `organizations.inbound_token`, **MX last**). Five things have to be true here first.
 
 **1. `INBOUND_EMAIL_SECRET` is one value in two places.** It is a key in the `api-gateway` and `notification-service` Secrets. `manifest-contract.spec.ts` asserts both carry it, and derives the list of holders from the services whose Joi schema names it — so a third consumer fails there rather than shipping without one. A mismatch is **silent**: `parseTicketReplyToken` returns `null` and every reply opens a **new ticket**. Rotate both at once; a partial rotation is worse than a wrong one, because half of it keeps working.
 
 **2. The gateway Secret carries two more values, and neither is the sending key.** `RESEND_WEBHOOK_SECRET` is what `scripts/provision-resend.mjs` printed when it created the webhook (readable back with `--print-secret`); `RESEND_GATEWAY_API_KEY` is the key the gateway fetches inbound mail with — separate from notification-service's `RESEND_API_KEY` by name and by scope. `RESEND_WEBHOOK_URL` in the root `.env` must be the real Ingress host plus `/api/v1/webhooks/email/resend` before the webhook is created, because the webhook holds a URL.
 
-**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`ResendInboundService.java`), and it is rate-limited like every other route — a delivery burst above the limit answers 429, which Resend redelivers. Nothing to add.
+**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the Ingress's `/` rule. It authenticates with the Standard Webhooks signature rather than a JWT (`ResendInboundService.java`), and it is rate-limited like every other route — a delivery burst above the limit answers 429, which Resend redelivers. Nothing to add.
 
-**4. The gateway has two Deployments and one Service.** `api-gateway`
-(Node) and `api-gateway-java` both carry the `app.kubernetes.io/name:
-api-gateway` label the Service selects, and both read the **same ConfigMap and
-Secret** — asserted by `manifest-contract.spec.ts`, because the Redis lease
-that keeps one of them standby only excludes within one keyspace, so two
-`REDIS_URL` values would let both claim. Exactly one Deployment is `active`
-(annotation on the Deployment's metadata, `RollingUpdate`, replicas above
-zero); the other is `standby` (`Recreate`, replicas 0). **Switching is two
-commits** — bring the new one up as a standby, then scale the old one down
-and flip the roles — and `cd.yml`'s rollout wait skips a standby, which is
-never Ready by design.
+**4. Socket.IO has its own port and its own Ingress rule.** The gateway
+serves Socket.IO on `WS_PORT` (3001), not on its HTTP port, so the Service
+carries a second port, `ws`, and the Ingress routes the `/socket.io` prefix to
+it ahead of the `/` rule. `manifest-contract.spec.ts` asserts the `ws` port
+resolves to a container port of that name — a Service port with no matching
+container port leaves realtime with no endpoint while every HTTP route still
+answers.
 
 **5. Attachments make storage-service an egress pod.** It fetches each inbound attachment from a signed URL Resend chose, so `policy/storage-egress.yaml` constrains it the way notification's policy constrains webhooks — same `except` list, asserted identical by `manifest-contract.spec.ts`. Its `REPLACE_ME` CIDR is the managed Redis; `PendingUploadStore` lives there, so fill it before the first apply (the `REPLACE_ME` bullet above says what happens if you do not).
 

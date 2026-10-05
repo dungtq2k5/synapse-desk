@@ -23,8 +23,7 @@ A Turborepo monorepo. The npm workspaces are `apps/*` and `libs/*`; everything e
 
 | Service | Port | Speaks | Owns |
 | :--- | :--- | :--- | :--- |
-| [`api-gateway`](apps/api-gateway/) | `3000` | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out |
-| [`api-gateway-java`](apps/api-gateway-java/) | `3000` | the same | **A second implementation of the same gateway**, in Spring Boot. Exactly one of the two serves at a time — see below |
+| [`api-gateway`](apps/api-gateway/) | `3000`, Socket.IO on `3001` | HTTP, GraphQL, WebSocket | The only public surface, in Spring Boot. Auth, cache, rate limits, fan-out |
 | [`auth-service`](apps/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
 | [`ticket-service`](apps/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
 | [`storage-service`](apps/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
@@ -65,6 +64,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 | npm | **11.9.0** — pinned by `packageManager` | Workspaces |
 | Docker + Compose | any current | The eight backing services |
 | Python | **3.12** | `rag-service`; matches the image base |
+| JDK | **21** | `api-gateway`; Maven itself comes from the module's `./mvnw` |
 
 Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on your PATH. `OcrService` probes for both at boot and degrades with a warning rather than failing, so skip them until you need OCR.
 
@@ -73,17 +73,6 @@ Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on 
 ```sh
 npm ci
 ```
-
-**Two gateways, one at a time.** `apps/api-gateway-java/` is a Spring Boot
-implementation of the same contract — the same routes from
-`docs/reference/openapi.json`, the same GraphQL schema, the same cookies and
-envelope. `GATEWAY_IMPL` in the root `.env` (`node` by default) decides which
-one `npm run dev` starts; the other's `dev` script exits saying so. At
-runtime a lease in Redis enforces it: the implementation that does not hold
-it stays a standby — `/health` 200, `/health/ready` 503, no NATS
-subscription, no socket accepted. In Kubernetes both Deployments sit behind
-the one `api-gateway` Service and exactly one is scaled above zero, so
-switching implementations, and switching back, is two commits.
 
 ### 2. The root `.env` — read by Compose, and by nothing else
 
@@ -204,7 +193,7 @@ The nightly chunk-usage projection adds to counters from a cursor and refuses to
 npm run dev
 ```
 
-`turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `libs/` during a session needs a rebuild to propagate.
+`turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `libs/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
 
 On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in.
 
@@ -255,12 +244,17 @@ Several of the specs under `libs/common/src/configs/` are contract guards rather
 
 ## Docker images
 
-Two Dockerfiles, eleven images. The Node services build from one file with a `SERVICE` build arg; ingestion adds OCR, and the four schema-owning services also build a `migrate` target for their init container.
+Three Dockerfiles, eleven images. The Node services build from one file with a `SERVICE` build arg; ingestion adds OCR, and the four schema-owning services also build a `migrate` target for their init container. The gateway builds from `docker/java-service.Dockerfile`, a Maven build and a JRE runtime, with the repository root as its context — it reads the protos and the published GraphQL schema.
 
 ```sh
 docker build -f docker/node-service.Dockerfile \
   --target runtime \
-  --build-arg SERVICE=api-gateway \
+  --build-arg SERVICE=auth-service \
+  --build-arg GIT_SHA="$(git rev-parse HEAD)" \
+  --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -t auth-service .
+
+docker build -f docker/java-service.Dockerfile \
   --build-arg GIT_SHA="$(git rev-parse HEAD)" \
   --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -t api-gateway .
@@ -268,11 +262,11 @@ docker build -f docker/node-service.Dockerfile \
 
 | Target | Used by |
 | :--- | :--- |
-| `runtime` | api-gateway, auth, ticket, notification, storage |
+| `runtime` | auth, ticket, notification, storage |
 | `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry |
 | `migrate` | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
 
-rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds everything and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change.
+rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds every Node and rag image and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change. `npm run images:boot-gateway` builds the gateway's image, starts it and waits for `/health`.
 
 To run a locally built image against the Compose stack, generate the per-service container env first — it rewrites host addresses to Compose service names:
 

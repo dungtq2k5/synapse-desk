@@ -50,7 +50,7 @@ sequenceDiagram
 | :--- | :--- | :--- |
 | Resend receiving | the `INBOUND_EMAIL_DOMAIN` | MX record, the mailbox, the `email.received` webhook and its retries |
 | gateway — the webhook | `ResendInboundService.java` | signature, the fetch, the explicit validation, the counter |
-| gateway — the mapper | `ResendInboundMapper.java` | Resend's two objects → one `InboundEmailDto`; the three-way attachment split |
+| gateway — the mapper | `ResendInboundMapper.java` | Resend's two objects → one `InboundEmail`; the three-way attachment split |
 | gateway — routing | `InboundEmailService.java` | tenant, sender, thread, idempotency; which attachments are eligible, and the note |
 | gateway — loop guards | same, step 0 | refusing mail that would loop |
 | ticket-service | create/append; `IngestAttachment` | the ticket, the message, the thread; authorising a write under a ticket's prefix |

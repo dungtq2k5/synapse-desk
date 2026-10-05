@@ -4,7 +4,8 @@
 
 The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 
-- **TypeScript (Node.js)** drives core business logic, API gateways, authentication, real-time client communication, and helpdesk operations.
+- **Java (Spring Boot)** is the API gateway: the one public surface — REST, GraphQL and WebSocket — with authentication at the edge, caching, rate limits and real-time client communication.
+- **TypeScript (Node.js)** drives core business logic, authentication and helpdesk operations, as gRPC services behind the gateway.
 - **Python** powers the RAG (Retrieval-Augmented Generation) microservice: embedding, hybrid retrieval, reranking and every LLM call. **It does not parse documents** — extraction and chunking are TypeScript, in `ingestion-service` (§4a), and `rag-service` is read-only against `postgres_ingestion`.
 - **Synchronous IPC:** gRPC (via Protocol Buffers) for sub-millisecond cross-language function calls.
 - **Asynchronous IPC:** NATS JetStream for persistent domain event streams across microservices.
@@ -24,11 +25,21 @@ The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 
 | Layer / Subsystem | Primary Technology | Core Libraries / Tooling | Justification |
 | :--- | :--- | :--- | :--- |
-| **Framework** | **NestJS (v10+)** | @nestjs/core, @nestjs/microservices | Enterprise-grade modular structure, native support for gRPC, NATS, GraphQL, and WebSockets. |
+| **Framework** | **NestJS (v10+)** | @nestjs/core, @nestjs/microservices | Enterprise-grade modular structure, native support for gRPC and NATS. |
 | **Compiler** | **SWC (@swc/core)** | @swc/jest | Sub-second TypeScript compilation and ultra-fast build/test cycles compared to tsc or ts-node. |
-| **API Protocols** | **GraphQL & REST** | @nestjs/graphql, @apollo/server, @nestjs/swagger | GraphQL for flexible UI data fetching; REST/Swagger for file uploads and external webhooks. |
-| **Real-time Engine** | **Socket.IO** | @socket.io/redis-adapter | Token-by-token LLM output streaming and multi-instance WebSocket state synchronization via Redis. |
 | **ORM** | **Prisma ORM** | @prisma/client | Auto-generated, end-to-end type safety with declarative PostgreSQL schema management. |
+
+## **3b. Gateway Tier (Java 21 / Spring Boot)**
+
+| Layer / Subsystem | Primary Technology | Core Libraries / Tooling | Justification |
+| :--- | :--- | :--- | :--- |
+| **Framework** | **Spring Boot 4.1** (Web MVC) | `spring-boot-starter-web`, `-validation`, `-actuator` | One servlet application serving REST and GraphQL, with health and readiness from Actuator. |
+| **API Protocols** | **GraphQL & REST** | `spring-boot-starter-graphql`, `springdoc-openapi-starter-webmvc-api` | GraphQL for flexible UI data fetching; REST for file uploads and external webhooks. springdoc produces `docs/reference/openapi.json`; no documentation UI is served. |
+| **Real-time Engine** | **Socket.IO** | `netty-socketio`, `redisson` | Token-by-token LLM output streaming, on its own listener (`WS_PORT`), with broadcasts reaching every replica through Redis (`RedissonStoreFactory`). |
+| **Peers & Events** | **gRPC & NATS** | `grpc-java`, `jnats` | gRPC to every TypeScript service; NATS for the events the gateway relays to sockets and the cache it evicts. |
+| **Cache & Limits** | **Redis** | `spring-boot-starter-data-redis` (Lettuce) | Entity cache, rate-limit counters and presence, in the one managed Redis. |
+| **Auth** | **JWT verification** | `nimbus-jose-jwt` | Verifies the auth service's tokens with its public keys; it never mints one. |
+| **Metrics** | **Prometheus** | `micrometer-registry-prometheus` | The published series, on the metrics port. |
 
 ## **4. AI & RAG Microservice Tier (Python 3.11+)**
 
@@ -62,7 +73,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 |                                 INTER-SERVICE LAYER                               |
 |                                                                                   |
 |  +------------------------+   Sync gRPC (Protobuf)   +-------------------------+  |
-|  | Node.js / TS Services  | <----------------------> |   Python RAG Service    |  |
+|  | Java gateway, TS svcs  | <----------------------> |   Python RAG Service    |  |
 |  +------------------------+                          +-------------------------+  |
 |              |                                                    |               |
 |              |         Async NATS JetStream Event Bus             |               |
@@ -72,7 +83,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 
 | Communication Pattern | Technology | Implementation Detail |
 | :--- | :--- | :--- |
-| **Sync RPC (Cross-Language)** | **gRPC + Protocol Buffers (.proto)** | Shared binary protocol specs between TS and Python services for immediate direct queries. |
+| **Sync RPC (Cross-Language)** | **gRPC + Protocol Buffers (.proto)** | Shared binary protocol specs between the Java gateway, the TypeScript services and Python, for immediate direct queries. |
 | **Async Domain Events** | **NATS + NATS JetStream** | Ultra-lightweight Go-based messaging engine. Stores and replays events (`ticket.created`, `document.indexed`). |
 | **Background Work Queues** | **BullMQ + Redis** | Handles heavy, asynchronous processing jobs (e.g., file chunking, bulk embedding pipelines) with retries and concurrency limits. |
 
@@ -90,11 +101,11 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 
 | Layer | Technology | Usage |
 | :--- | :--- | :--- |
-| **Ingress & Proxy** | **`ingress-nginx`** + **`helmet`** | Reverse proxy and SSL termination are the Ingress's ([ADR 0043](./decisions/0043-the-cluster-shape.md) — `k8s/ingress.yaml`, one controller and one `Ingress`, not a hand-written `nginx.conf`). **Response-security headers are the application's**, not the proxy's: `helmet` in `main.ts`, reading `security-headers.config.ts`, with a CSP written against the one HTML page this gateway serves (Swagger UI) — versioned with the code that decides what that page may load, and surviving a change of ingress controller. Every other response is JSON, including errors, so there are no error pages to style. |
+| **Ingress & Proxy** | **`ingress-nginx`** + **`SecurityHeadersFilter`** | Reverse proxy and SSL termination are the Ingress's ([ADR 0043](./decisions/0043-the-cluster-shape.md) — `k8s/ingress.yaml`, one controller and one `Ingress`, not a hand-written `nginx.conf`). **Response-security headers are the application's**, not the proxy's: `SecurityHeadersFilter.java` sets them on every response — versioned with the code, and surviving a change of ingress controller. The gateway serves no HTML page, so its CSP guards nothing it renders today; every response is JSON, including errors, so there are no error pages to style. |
 | **Authentication** | **OAuth 2.0 / OIDC + 2FA** | Social login (Google/GitHub) alongside TOTP authenticator app support. |
 | **Rate Limiting** | **ThrottlerStorageRedisService** | Distributed rate limiting across REST, GraphQL, and WebSocket protocols via Redis. |
 | **Billing** | **Stripe** (`stripe@22`) | Subscriptions and the plan catalogue. **Stripe owns what a plan costs; this system owns what it grants** (RDM Tables 40–41) — mirroring an amount would be two sources of truth diverging silently. Webhook idempotency is a UNIQUE constraint, not a check ([ADR 0026](./decisions/0026-stripe-webhook-idempotency.md)). |
-| **Email delivery** | **`resend`** (Node SDK) | Domain E's email channel in both directions: notification-service sends through the Resend API with an idempotency key per send, and the gateway receives inbound mail as a Resend `email.received` webhook. Driven off NATS rather than gRPC — a caller never waits for a provider round trip. |
+| **Email delivery** | **`resend`** (Node SDK) | Domain E's email channel in both directions: notification-service sends through the Resend API with an idempotency key per send, and the gateway receives inbound mail as a Resend `email.received` webhook, fetching each message over plain HTTP (`ResendInboundClient.java`) rather than through the SDK. Driven off NATS rather than gRPC — a caller never waits for a provider round trip. |
 | **SMS delivery** | **`twilio`** | Domain E's SMS channel, same fire-and-forget shape. |
 | **2FA** | **`otplib` + `qrcode`** | TOTP secrets and the enrolment QR. |
 | **Metrics** | **`prom-client`** | RED metrics per route, exposed on a **separate internal listener** rather than a route, so "unreachable from the internet" is a property of the process. |
@@ -103,7 +114,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 
 ## **8. Development, Testing & CI/CD Tooling**
 
-- **Monorepo Manager:** Turborepo / NestJS CLI Workspace.
-- **Testing:** **Jest** configured with `@swc/jest` for high-speed serial unit and integration testing.
-- **Code Formatting & Linting:** ESLint (`eslint.config.mjs`), Prettier (`.prettierrc`) and `markdownlint-cli2` (`.markdownlint-cli2.jsonc`). **Enforced in CI, not by local Git hooks** — there is no Husky and no pre-commit hook; CI's `static` job runs `lint`, `format:check`, `typecheck` and `proto:lint` on every pull request, and a failure there blocks the merge. The pre-PR checklist in §14.0 of [development-conventions.md](./development-conventions.md) lists the same commands to run locally.
+- **Monorepo Manager:** Turborepo / NestJS CLI Workspace for the TypeScript services; Maven (`./mvnw`) builds and tests the gateway.
+- **Testing:** **Jest** configured with `@swc/jest` for high-speed serial unit and integration testing; **JUnit** through Maven for the gateway — Surefire for unit tests, Failsafe for integration tests against a real Redis and NATS.
+- **Code Formatting & Linting:** ESLint (`eslint.config.mjs`), Prettier (`.prettierrc`) and `markdownlint-cli2` (`.markdownlint-cli2.jsonc`). **Enforced in CI, and on commit** — a `simple-git-hooks` pre-commit hook runs `lint-staged` on the staged files; CI's `static` job runs `lint`, `format:check`, `typecheck` and `proto:lint` on every pull request, and a failure there blocks the merge. The pre-PR checklist in §14.0 of [development-conventions.md](./development-conventions.md) lists the same commands to run locally.
 - **CI/CD:** GitHub Actions, in two workflows that answer different questions. **`ci.yml`** runs on every pull request and on push to `main`: format, lint, typecheck, proto lint, build, unit tests, the e2e suites against a real stack, and the Python checks. License declarations are checked by a unit test (`publish-safety.spec.ts`), not a separate step. **`cd.yml`** runs only on push to `main` (never on a pull request): it builds the multi-stage Docker images, pushes them to Artifact Registry, and applies the Kubernetes manifests. There is no release tagging or CHANGELOG generation.

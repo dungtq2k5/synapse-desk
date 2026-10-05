@@ -2,7 +2,7 @@
 
 Real-time in SynapseDesk is one Socket.IO namespace on the API gateway. This document is the contract: what to connect to, what you are subscribed to without asking, what you may send, what arrives, and the handful of behaviours that will cost you an afternoon if you assume the obvious thing.
 
-Everything here is generated from the declarations themselves — `libs/common/src/contracts/realtime.contract.ts` holds the event names and the room shapes (shared, because the contract harness and a second gateway implementation read them too), `realtime.config.ts` holds the gateway's own limits and timings, and `realtime.gateway.ts` holds the handshake. **If this document and those files disagree, they are right and this is stale**; please report it.
+Everything here is generated from the declarations themselves — `libs/common/src/contracts/realtime.contract.ts` holds the event names and the room shapes (shared: the contract harness reads them, and the gateway's `RealtimeEvents.java` is generated from them), `RealtimeServerConfig.java` and `WsEventLimits.java` hold the gateway's own limits and timings, and `SocketHandshakes.java` holds the handshake. **If this document and those files disagree, they are right and this is stale**; please report it.
 
 ---
 
@@ -116,7 +116,7 @@ Every one of these is rate-limited per socket. Exceeding a limit is a refusal, n
 
 **Exactly three events acknowledge**: `message:send`, `presence:update` and `ai:stream:cancel`. `emitWithAck` on any of the others waits for a callback the server never invokes — the same trap this section warns about for `message:send`, in the opposite direction. Confirm a join by listening for `ticket:joined` (§6).
 
-**`presence:update` takes `state`, not `status`.** The payload is validated with `forbidNonWhitelisted`, so `{ status: 'away' }` is refused twice over — an unknown property *and* a missing required one.
+**`presence:update` takes `state`, not `status`.** `{ status: 'away' }` carries no `state`, so it is refused — and the refusal arrives in the ack, like every refusal of an acknowledged event.
 
 `message:send` reaches the same service as `POST /tickets/:id/messages` and is metered to match it. **Read its ack**: a refusal arrives there, and a client that only listens for an `exception` frame will leave its spinner running forever.
 
@@ -223,6 +223,6 @@ Socket.IO reconnects on its own. Your responsibilities on each reconnect:
 - **Ignoring the `message:send` ack** (§5). A refusal you never read is a message the user believes was sent.
 - **Awaiting an ack from `ticket:join`** (§5). Three events acknowledge; that is not one of them, and `emitWithAck` will wait forever.
 - **Destructuring `({ data })` off a relayed event** (§3). On `notification:new` this returns the notification's own `data` blob rather than failing — the one case where the wrong shape yields a plausible value.
-- **Sending `{ status }` to `presence:update`** (§5). The field is `state`, and `forbidNonWhitelisted` refuses the frame rather than ignoring the extra key.
+- **Sending `{ status }` to `presence:update`** (§5). The field is `state`; a frame without it is refused in the ack.
 - **Reconciling an AI stream on `messageId`** (§6). It is null on the cap path, where `escalated: true` and **no `message:new` follows** — so the reconciliation fails in exactly the case it exists for. Branch on `escalated` first.
 - **Waiting for `typing:stop`** (§7).

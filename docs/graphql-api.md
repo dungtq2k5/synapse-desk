@@ -14,9 +14,9 @@ Authorization: Bearer <access token>
 Content-Type: application/json
 ```
 
-**`/graphql`, not `/api/v1/graphql`.** REST's `/api/v1` is the global prefix `api` plus URI versioning at `v1` ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)), and both apply to controller routes only; the Apollo driver mounts its own handler outside them, so GraphQL carries no version segment. REST lives under the prefix, GraphQL does not, and the two are permanent siblings rather than one replacing the other.
+**`/graphql`, not `/api/v1/graphql`.** REST's `/api/v1` is the global prefix `api` plus URI versioning at `v1` ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)), and both apply to controller routes only; Spring GraphQL serves its own handler outside them, so GraphQL carries no version segment. REST lives under the prefix, GraphQL does not, and the two are permanent siblings rather than one replacing the other.
 
-**One public field, `version`; everything else is authenticated.** `version.resolver.ts` carries no guard and says so — *"PUBLIC, like `GET /version` — no guard"* — and the e2e sends no cookie and no header and gets `200` with real data. Every other resolver class carries `@UseGuards(JwtAuthGuard, PermissionGuard)`.
+**One public field, `version`; everything else is authenticated.** GraphQL is authorised per field: every resolver method carries `@RequirePermission`, enforced by `GraphqlPermissionAspect.java`, except `VersionResolver.java` — the GraphQL twin of `GET /version`, with no permission and no peer.
 
 **A rejected request is HTTP `200`, not `401`.** The guards run **per field, inside execution**, so the response carries `data` *and* `errors` together:
 
@@ -28,7 +28,7 @@ That is GraphQL's convention rather than a quirk of this gateway, and it is the 
 
 **Introspection** is on outside production and off in it, so a schema-aware IDE works locally and against staging and stops working in prod. The playground is off everywhere.
 
-**`POST` is the supported transport.** The Apollo config sets no `csrfPrevention`, so Apollo Server 5's default applies and a `GET` query would need a preflight-safe header; nothing in this repository exercises that path and nothing here should be read as a promise about it.
+**`POST` is the supported transport.** Nothing in this repository exercises a `GET` query, and nothing here should be read as a promise about it.
 
 ---
 
@@ -285,21 +285,19 @@ So a list that only needs to know *which* agent, not their name, should ask for 
 
 ```json
 { "errors": [{
-  "message": "Query is nested 9 levels deep, exceeding the maximum of 7.",
-  "extensions": { "code": "QUERY_TOO_DEEP", "depth": 9, "maxDepth": 7 }
+  "message": "Query is nested 9 levels deep, exceeding the maximum of 7."
 }]}
 ```
 
 ```json
 { "errors": [{
-  "message": "Query is too complex: 3400 exceeds the maximum of 2000. Request fewer items, or fewer fields that resolve across services.",
-  "extensions": { "code": "QUERY_TOO_COMPLEX", "cost": 3400, "maxComplexity": 2000 }
+  "message": "Query is too complex: 3400 exceeds the maximum of 2000. Request fewer items, or fewer fields that resolve across services."
 }]}
 ```
 
-Both arrive as **HTTP 400** with no `data` — a query refused during validation never became an operation, and no peer was called. Note that Apollo stamps every validation failure as `GRAPHQL_VALIDATION_FAILED` in the top-level code; the specific code above survives in `extensions` for a client that reads it.
+Both arrive as **HTTP 200** with the error in `errors` and no `data`: the query is refused after validation and before any resolver runs, so no peer was called. **There is no machine-readable code** — `extensions` carries none, so the message is the only thing that tells the two apart (known gap 57). A client that branches on the status code sees a success.
 
-**What to do about each:** `QUERY_TOO_DEEP` means restructure — you almost certainly want a second query rather than a deeper one. `QUERY_TOO_COMPLEX` means ask for fewer items or drop a cross-service edge; the numbers in `extensions` tell you how far over you are.
+**What to do about each:** too deep means restructure — you almost certainly want a second query rather than a deeper one. Too complex means ask for fewer items or drop a cross-service edge; the numbers in the message tell you how far over you are.
 
 ---
 

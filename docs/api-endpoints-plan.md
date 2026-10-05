@@ -2,7 +2,7 @@
 
 **Scope:** every HTTP endpoint the `api-gateway` (BFF) must expose, plus the gRPC methods and NATS/WebSocket events each one is backed by.
 
-**Base path:** `/api/v1` — the global prefix `api` (`GLOBAL_PREFIX`, and it must be that word) plus Nest URI versioning at `v1` ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)). Paths below omit both. A breaking change to a route is a `@Version('2')` on its controller, served beside `v1`, never an edit in place. `/health`, `/health/ready` and `/version` sit outside the prefix **and** are version-neutral.
+**Base path:** `/api/v1` — the global prefix `api` (`GLOBAL_PREFIX`, and it must be that word) plus the version segment `v1`, a path constant (`ApiPaths.V1`) ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)). Paths below omit both. A breaking change to a route is a `@Version('2')` on its controller, served beside `v1`, never an edit in place. `/health`, `/health/ready` and `/version` sit outside the prefix **and** are version-neutral.
 
 ---
 
@@ -546,7 +546,7 @@ _Audit actions:_ none. Reading your own inbox is not an auditable security event
 
 ## 5. WebSocket Namespace (Socket.IO)
 
-Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStorageRedisService`, fanned out across instances by `@socket.io/redis-adapter`. Rooms: `org:{organizationId}`, `ticket:{ticketId}`, `user:{userId}`, `dept:{departmentId}`, and `ticket:{ticketId}:internal` for agent-only fan-out.
+Namespace `/ws`, JWT-authenticated on handshake, rate-limited in Redis (`WsThrottlerService.java`), fanned out across instances through Redis (`RedissonStoreFactory`). Rooms: `org:{organizationId}`, `ticket:{ticketId}`, `user:{userId}`, `dept:{departmentId}`, and `ticket:{ticketId}:internal` for agent-only fan-out.
 
 **[ADR 0011](./decisions/0011-websocket-is-a-transport.md).** All seven client→server events now have handlers — `ticket:join`/`leave`, `message:send`, `typing:start`/`stop`, `presence:update` and `ai:stream:cancel` — alongside the AI stream relay and every notification event. The decision came out of a **live disclosure in the shipped `message:new` fan-out**: the ticket room contains the requester, so internal notes reached them, which is why the `:internal` room above exists.
 
@@ -631,7 +631,7 @@ REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the
 | `/knowledge/*`, `/tickets/:id/ai/*`, `/tickets/:id/similar` | `rag-service` (Python) | gRPC `rag.proto` |
 | `/billing/*`, `/webhooks/stripe` | `auth-service` | gRPC `auth.proto` — it owns `organizations`, and entitlements are columns on that row. A separate billing service would need write access to another service's table, which is the thing service-per-database exists to prevent |
 | `/analytics/*` | fan-out (`ticket` + `ingestion` + `auth`) | gRPC, Redis-cached |
-| `/ws` | `api-gateway` | Socket.IO + Redis adapter |
+| `/ws` | `api-gateway` | Socket.IO (`netty-socketio`) + Redis store, on `WS_PORT` |
 | _(no gateway route — internal only)_ | `storage-service` | gRPC `storage.proto` + NATS in. Never called by the gateway directly; called server-to-server by whichever service owns the row a file belongs to ([ADR 0024](./decisions/0024-one-upload-mechanism.md)). |
 
 ### 8.1 NATS domain events
