@@ -19,4 +19,4 @@ The ops routes — `/health`, `/health/ready`, `/version` — are mapped without
 
 - `GLOBAL_PREFIX` is `api` in every environment file and in the generated ConfigMap. The word, not a path.
 - The served document is at `/v3/api-docs`, outside the version; the tracked copy is `docs/reference/openapi.json`, and that is the one client SDKs generate from.
-- ADR 0032's rule about *counting* remains true of its era and is not edited; its sentence *"API versioning is not enabled"* is superseded by this decision. `docs/development-conventions.md` §5 (REST) gains the versioning rule: a breaking route change is a second version, never an edit in place.
+- ADR 0032's rule about *counting* remains true of its era and is not edited; its sentence *"API versioning is not enabled"* is superseded by this decision. A breaking route change is a second version, never an edit in place.

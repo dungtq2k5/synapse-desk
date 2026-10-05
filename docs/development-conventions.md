@@ -1,7 +1,7 @@
 # Development Conventions
 
 **Audience:** every developer writing code in this repository.
-**Scope:** rules and examples only. Current state lives in [`reference/`](./reference/), reasoning lives in [`decisions/`](./decisions/). See [README.md](./README.md).
+**Scope:** the TypeScript services and `libs/`, and the gateway's contract suite (§13.4b). The gateway itself is the Spring Boot application in `apps/api-gateway/`; its source is held by the specs that scan it, not by rules written here. Rules and examples only. Current state lives in [`reference/`](./reference/), reasoning lives in [`decisions/`](./decisions/). See [README.md](./README.md).
 
 Read §1 and §2 before your first commit. Use §14 as a pre-PR checklist.
 
@@ -18,17 +18,15 @@ Every rule here exists because getting it wrong produces a failure that is *sile
 ## 1. The Golden Rules
 
 1. **Search `libs/` before you write a helper.** If two services need it, it belongs in `libs/common` or `libs/grpc-proto` — not copied. (§3)
-2. **Never trust the client for identity or tenancy.** `user_id`, `organization_id`, `department_ids` and `permission_codes` come from the JWT via `@CurrentUser()`, never from a path, body or query. (§4)
+2. **Never trust the client for identity or tenancy.** `user_id`, `organization_id`, `department_ids` and `permission_codes` come from the verified JWT, which the gateway forwards as gRPC metadata — never from a path, body or query. (§4)
 3. **Never trust the client for provenance either.** `ip` / `userAgent` are *observed* by the gateway (`RequestOrigin`), never claimed by the caller. (§4.3)
 4. **Every Prisma query on a soft-deletable table filters `deletedAt: null`.** Prisma cannot do this for you. (§7.1)
 5. **Every unique constraint on a soft-deletable table is enforced in code, not in the schema.** (§7.2)
 6. **Never declare an `enum` in `schema.prisma`.** Enumerated columns are `String`; the values live in `@synapsedesk/common`. (§7.3, [ADR 0001](./decisions/0001-no-prisma-enums.md))
-7. **Controllers return raw data.** `TransformInterceptor` owns the envelope. (§5.1)
-8. **Every gRPC call goes through `BaseGrpcClient.call()`** — that is what supplies the deadline and packs the metadata. (§6.3)
-9. **Choose the hash by how the value is looked up**, not by habit. (§8.1)
-10. **Production must be silent.** No internals, no stack traces, no "requires permission X" hints past the gateway boundary. (§8.4)
-11. **gRPC for reads, NATS for side effects.** A mail outage must never fail a registration. (§6, §9)
-12. **Reset test state in `beforeEach`, and match the strategy to whether the service has seeded rows to preserve.** (§13.3)
+7. **Choose the hash by how the value is looked up**, not by habit. (§8.1)
+8. **Production must be silent.** No internals, no stack traces, no "requires permission X" hints past the gateway boundary. (§8.4)
+9. **gRPC for reads, NATS for side effects.** A mail outage must never fail a registration. (§6, §9)
+10. **Reset test state in `beforeEach`, and match the strategy to whether the service has seeded rows to preserve.** (§13.3)
 
 ---
 
@@ -39,23 +37,16 @@ Every rule here exists because getting it wrong produces a failure that is *sile
 ### 2.1 Layering inside a service
 
 ```txt
-gateway:   Controller ──> *-grpc.client.ts ──> (wire)
-              │                  │
-           DTOs +            extends BaseGrpcClient
-           guards            mapper: proto -> DTO
-
 service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
                                         │
                                     mapper: Prisma row -> proto
 ```
 
-- A gateway **controller MUST NOT** contain business logic, build a gRPC `Metadata` object, or touch Prisma (it has no database).
-- A gateway **`*-grpc.client.ts` MUST return proto types only** — it never imports a DTO or a mapper. Conversion is the **mapper's** job and the **service's** to invoke (§6.3).
 - A service **`*-grpc.controller.ts` MUST be a thin adapter**: unpack metadata, delegate, return the proto message. No queries, no branching.
 - A service **`*.service.ts` MUST NOT know about HTTP.** It throws `RpcException` with a gRPC `status`, never `BadRequestException`. (§6.4)
 - **`libs/` MUST NOT import from `apps/`.** Ever.
 - `libs/common` **MUST NOT** import `@grpc/grpc-js` types into domain declarations — `libs/grpc-proto` is where the wire lives.
-- **A provider that holds a connection MUST be an `@Injectable` class implementing `OnModuleDestroy`, registered with `useClass`.** Nest calls lifecycle hooks only on providers it instantiated from a class; a value returned by `useFactory` is just a value, so implementing the interface on it does nothing and no warning is issued. The connection is then never closed on `app.close()` — one leak per restart in production, and a test run that passes and then hangs with no output. `common/redis/redis.service.ts` is the reference.
+- **A provider that holds a connection MUST be an `@Injectable` class implementing `OnModuleDestroy`, registered with `useClass`.** Nest calls lifecycle hooks only on providers it instantiated from a class; a value returned by `useFactory` is just a value, so implementing the interface on it does nothing and no warning is issued. The connection is then never closed on `app.close()` — one leak per restart in production, and a test run that passes and then hangs with no output. `PendingUploadStore` in `apps/storage-service/src/modules/storage/pending-upload.store.ts` is the reference.
 
 ### 2.2 Where a new file goes
 
@@ -66,9 +57,6 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 | A proto enum ↔ domain enum bridge | `libs/grpc-proto/src/mappers/` |
 | A gRPC DI token / path / channel option | `libs/grpc-proto/src/constants.ts` |
 | A pure function used by one service only | `apps/<svc>/src/common/utils/utils.ts` |
-| A gateway guard / interceptor / decorator | `apps/api-gateway/src/common/<kind>/` |
-| A REST request/response shape | `apps/api-gateway/src/modules/<mod>/dto/rest/` |
-| A GraphQL request/response shape | `apps/api-gateway/src/modules/<mod>/dto/graphql/` — **independent of the REST DTO** (§12.2) |
 
 ---
 
@@ -111,21 +99,6 @@ Same rule for a scalar: `const CHEAP_MODEL: AiModel = '…'` when the union exis
 
 ## 4. Multi-Tenancy, Identity & Request Scoping
 
-### 4.1 Reading the caller
-
-```ts
-@Get()
-@UseGuards(JwtAuthGuard)
-findAll(@CurrentUser() ctx: RequestContext) { … }
-
-// or one field
-findOne(@CurrentUser('organizationId') orgId: string | null) { … }
-```
-
-- `@CurrentUser()` requires an authenticating guard. Without one it throws a 500 that *names the missing guard*.
-- A caller mid-2FA-challenge has **no** permissions and **no** organization. Use `@Current2faUser` + `Jwt2faGuard` there. Never `@CurrentUser`.
-- `req.user` is typed `MaybeJwtPayload`. **MUST** narrow with `isFullJwtPayload()`; **MUST NOT** cast to `JwtPayload` — that cast reads a half-authenticated request as a complete one with silently empty permissions.
-
 ### 4.2 Tenant isolation
 
 - `organizationId === null` means **platform Super Admin** (`is_super_admin = true`), kept in lockstep by a DB CHECK constraint. It does *not* mean "no tenant".
@@ -138,10 +111,7 @@ findOne(@CurrentUser('organizationId') orgId: string | null) { … }
 
 `RequestOrigin` (`{ ip, userAgent }`) is what the gateway *observed*. It is written to `device_sessions`, `password_reset_tokens` and `audit_logs`.
 
-- **Read it with `@CurrentOrigin()`** — it needs no guard, which is the point: provenance exists for anonymous callers. An authenticated handler taking `@CurrentUser()` needs neither; `RequestContext` extends `RequestOrigin`. **Never** add `@Req() request: Request` just to reach `req.ip`.
-- Pass it into every gRPC call — `BaseGrpcClient.call(invoke, origin)` requires it.
 - For a background job with no real request, use the frozen shared `UNKNOWN_ORIGIN`, not an inline `{ ip: '', userAgent: '' }`.
-- `app.set('trust proxy', N)` — **N is a hop count.** Behind both an ALB and Nginx it must be `2`, or every provenance column records Nginx's address.
 
 ### 4.4 Entitlements and limits — every layer narrows, no layer widens
 
@@ -154,95 +124,6 @@ Four things can bound one operation: a **platform ceiling** (a code constant), t
 - **Denormalize the grant onto the tenant row.** Enforcement paths read one row; joining the catalogue on every presign puts it in the hot path of the highest-volume route in the system.
 - **The direction of dial-out is fixed: `ingestion-service` calls `auth-service`, never the reverse.** Auth owns the limits, ingestion owns storage and document counts, and neither can produce a whole verdict — the **gateway** composes the legs and reports **which dimensions each run actually covered**. An unevaluated dimension and an evaluated-and-clear one are different answers; collapsing them lets a downgrade through on a timeout.
 - **Adding a dimension is five edits, not one:** the plan column, the denormalized tenant column, the `min()` at every read, the composer's coverage list, and [rdm-spec.md](./rdm-spec.md). A dimension added to only the first two enforces nothing.
-
----
-
-## 5. REST API Conventions (gateway)
-
-### 5.1 The response envelope
-
-```json
-// success — built by TransformInterceptor
-{ "success": true, "statusCode": 200, "message": "OK", "warning": null, "data": {} }
-
-// failure — built by AllHttpExceptionFilter
-{ "success": false, "statusCode": 404, "path": "/api/v1/users/x", "timestamp": "…", "error": "User not found!" }
-```
-
-`success` is the single discriminant a client branches on. Therefore:
-
-- Handlers **MUST** return raw data. Returning `{ data, message }` yields a double-wrapped response.
-- Static message → `@ResponseMessage('User created')`.
-- Runtime message/warning → `@Res({ passthrough: true })` then `res.locals.message = …`. Dynamic wins over static.
-- A `void` handler still emits `data: null` — never `undefined`, which `JSON.stringify` drops.
-- **GraphQL bypasses the envelope.** Any new global interceptor **MUST** branch on `getType<GqlContextType>() === 'graphql'`, as the existing interceptor and filter already do.
-
-### 5.2 DTOs
-
-- One class per direction: `dto/rest/create-user.dto.ts`, `dto/rest/user-response.dto.ts`. **No shared base class, no `dto/base/`** (§12.2).
-- The global `ValidationPipe` runs `whitelist: true, forbidNonWhitelisted: true, transform: true`. An undeclared body field is a **400**, so a DTO missing a field silently rejects valid traffic.
-- Primitives from query/param need `@Type(() => Number)` — everything arrives as a string.
-- **`@IsNullable()` ≠ `@IsOptional()`.** `@IsNullable()` permits an explicit `null` while still requiring the key; `@IsOptional()` permits the key to be absent. Response DTOs use the former (§6.5).
-- List endpoints **MUST** extend `SearchPaginationDto` (`common/dto/rest/search-pagination.dto.ts`, defaults from `DEFAULT_SEARCH`) and return `PaginationResponseDto<T>`.
-
-#### `?` on a request field, and when to replace it with a default
-
-A `?` costs every layer below a branch on `undefined`. Prefer a real default plus an explicit **`@ApiPropertyOptional()`** — the Swagger plugin derives `required` from **TypeScript** optionality, not from `@IsOptional()`, so dropping the `?` without the decorator documents the field as required and a generated client refuses to send the request without it.
-
-**Three cases where the `?` is load-bearing and MUST stay:**
-
-- **The proto field has explicit presence.** `optional int32 max_agent_seats` distinguishes absent from `0`; a plain `int32` cannot. A default on a DTO feeding an `optional` field either invents a value the owning service meant to choose (`CreatePlatformOrganization` — the proto says "absent takes the schema default rather than zero") or, on a PATCH, **resets the column on every unrelated update**. Read the `.proto` before removing the `?`.
-- **The route SETS a collection.** `SetUserRolesDto.roleIds` is required on purpose: defaulted to `[]`, an omitted body reads as "strip every role" instead of "change nothing".
-- **The absent value is not expressible.** If no value in the type means "the caller said nothing", `undefined` is the only honest answer.
-
-Where absent and empty are indistinguishable on the wire — every `repeated` field, and any implicit-presence scalar — the `?` buys nothing and the default is strictly better.
-
-**A default is only a DEFAULT once the downstream branch is deleted.** Adding `= []` to the DTO while `dto.field ?? []` survives in the mapper gets the ceremony and none of the benefit: the value is supplied twice, and nothing says which one is doing the work. Removing the `?` is half the change — the other half is deleting every `??` the `?` was paying for, which is the cost the rule above is written to recover.
-
-**No runtime test can see the difference**, because both arrangements put the same bytes on the wire. Measured: with the DTO default removed AND the mapper branch restored, every assertion about the outgoing message still passes. The guard is therefore a scan — `default-branch-pairing.spec.ts` fails when a mapper branches on a field its DTO already defaults. A field whose DTO carries NO default is none of that check's business: `clearStripeProductId` resolves its absent case at the mapper precisely because a default at the DTO would clear the column on every unrelated PATCH.
-
-**A constant spread into a `create` MUST be typed to the shape it is spread INTO, not the shape it came from.** Object literals get excess-property checks; **spreads do not**. So `{ ...SOME_CONSTANT }` passed to a Prisma `create` is unchecked for extra fields, it compiles, and the failure surfaces at the database rather than at the compiler. Measured: spreading a nine-field entitlement constant — one field of which is a PLAN's label with no column on `organizations` — into an organization create broke 359 tests at runtime with a clean build. Derive the narrower shape (`Omit<…>`) and `satisfies` it, so a field added to the wider type still has to be answered on both paths.
-
-**A default is VALIDATED, so it must satisfy the field's own bounds.** `@IsOptional()` skips only `undefined` and `null`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
-
-### 5.3 Guard matrix
-
-Order matters — Nest runs guards left to right.
-
-| Guard | Purpose | Put it on | **Never** put it on |
-| :--- | :--- | :--- | :--- |
-| `JwtAuthGuard` | Requires a valid access token | everything authenticated | `/auth/login`, `/auth/register`, `/auth/refresh` |
-| `Jwt2faGuard` | Authorizes the 2FA challenge leg only | `/auth/login/2fa` | anything else |
-| `GuestGuard` | Rejects callers who already hold a live session | `/auth/login`, `/auth/register` | any authenticated route — it would reject 100% of traffic |
-| `EmailVerifiedGuard` | Requires a proven email | routes that **send mail on the tenant's behalf** — invitations today | `/auth/*`, and **especially** `/auth/email/verify*` — that deadlocks the account permanently. Also anything a new user needs before they are verified, e.g. `GET /knowledge/articles*` |
-| `PermissionGuard` | RBAC via `@RequirePermission` | after `JwtAuthGuard` | before it |
-
-- **Unverified is not unauthenticated.** An unverified user has a real session and a real identity; they are *limited*. That limit belongs on the routes below, not on the verification endpoints.
-- **`EmailVerifiedGuard` guards OUTBOUND MAIL, not spend.** This row used to read *"anything spending quota or sending mail"*, and five controllers disagreed with it in silence — tickets, documents, chat, and both `/knowledge` AI routes all spend and none carries the guard. The narrow rule is the one the code already argues: `departments.controller.ts` says it is ungated because *"unlike invitations, nothing here sends mail on the tenant's behalf"*, and `otp.controller.ts` says the guard would deadlock the account. Spend is bounded by the AI cap per tenant and by `ROUTE_THROTTLE` per user; verification adds nothing those two do not already enforce, and it would lock a brand-new user out of the self-service path before they ever open a ticket.
-- **The help centre is explicitly ungated.** `GET /knowledge/articles*` spends nothing and is what someone reads *instead of* raising a ticket. Gating deflection behind a verification mail is the wrong end of the funnel.
-- `GuestGuard` checks **only the access token**, on purpose. It is a UX guard, not a security control — failing open is correct.
-
-### 5.4 Permissions
-
-- `@RequirePermission(...)` is **ANY**, not ALL. For a route needing two distinct grants, stack the guard twice.
-- The tuple type makes `@RequirePermission()` a compile error — empty metadata would read as "no permission required".
-- `isSuperAdmin` bypasses `PermissionGuard` entirely.
-- **`PERMISSION_CODES` in `libs/common` is the single source of truth**: it derives the `PermissionCode` union *and* seeds the `permissions` table. Adding one means editing that array, `PERMISSION_NAMES`, the relevant `SYSTEM_ROLE_PERMISSIONS`, and [api-endpoints-plan.md §9](./api-endpoints-plan.md).
-
-### 5.5 Cookies
-
-- Tokens ride in cookies named by env var (`JWT_ACCESS_NAME`, `JWT_REFRESH_NAME`, `JWT_2FA_NAME`, `TENANT_SELECTION_NAME`, `DEVICE_TOKEN_NAME`). **Never hardcode a cookie name**, and never read one outside `JwtCookieService`. All are HTTP-only with `SameSite` from `COOKIE_SAMESITE`.
-- **Response bodies carry no tokens.** `settleLogin()` in `auth.controller.ts` is the reference — it sets cookies and returns `{ user }` or a challenge flag.
-- Login is a **three-way** outcome (tokens · `requiresTenantSelection` · `requiresTwoFactor`), and **tenant selection is resolved before 2FA** — `enforce_two_factor` is per-tenant and unanswerable until the tenant is known. Any new entry point that issues a session routes through the same helper.
-- The gateway **verifies, never mints**: it holds only *public* JWT keys. Do not add a private key to the gateway.
-
-### 5.6 Versioning
-
-Routes are `/api/v1/…` because the global prefix is `api` and Nest URI versioning supplies `v1` as the default ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)). `GLOBAL_PREFIX` is the word `api`; the Joi rule refuses anything carrying a version, because a prefix of `/api/v1` under versioning serves `/api/v1/v1/…` while the probes stay green.
-
-- **A breaking change to a route is `@Version('2')` on its controller**, served beside `v1` — never an edit to the `v1` shape. ADR 0032's count was for the era before versioning existed; it is closed, not continued.
-- **Ops routes are version-neutral as well as prefix-excluded.** `HealthController` and `VersionController` declare `version: VERSION_NEUTRAL`; the two mechanisms are separate and a probe must escape both. `/v1/health` is a 404 and a test says so.
-- **One options object, three bootstraps.** `API_VERSIONING` in `ops-routes.ts` is called from `main.ts` and both e2e bootstraps; the `versioning-contract` sweep pins that, because a bootstrap that forgets it is green in e2e and 404 in production.
 
 ---
 
@@ -266,37 +147,6 @@ The package is deliberately **unversioned** (no `.v1`), so there is no v2-beside
 ### 6.2 Bootstrap
 
 Server (`main.ts`) and client (`ClientsModule.register`) **MUST** both pass `GRPC_LOADER_OPTIONS` and spread `GRPC_CHANNEL_OPTIONS`, using `AUTH_PACKAGE_NAME` / `AUTH_PROTO_PATHS` from the lib.
-
-### 6.3 Client adapters
-
-Every gateway client **MUST** `extends BaseGrpcClient`, declare `serviceName`, resolve the stub in `onModuleInit()`, and route calls through `this.call(invoke, origin)`. That method supplies the deadline, translates `TimeoutError` → `GatewayTimeoutException` (504, naming the peer), and packs the metadata.
-
-**MUST NOT** copy a bespoke `firstValueFrom(...)` into a client. Reuse an existing peer connection rather than opening a second one to the same service (`OtpModule` imports `AuthModule` for `AUTH_GRPC_CLIENT`).
-
-#### Each layer owns one type vocabulary
-
-A client speaks **proto**. A mapper turns proto into **DTO**. A service composes and returns **DTO**. The restriction is what makes each layer readable on its own, and it is enforced by imports rather than by discipline: a client that cannot import a DTO cannot drift into shaping a response.
-
-| Layer | Returns | May import |
-| :--- | :--- | :--- |
-| `*-grpc.client.ts` | the generated proto message | `@synapsedesk/grpc-proto` — **never** `dto/`, **never** a mapper |
-| `*.mapper.ts` | a REST/GraphQL DTO | proto types, DTOs, `libs/` bridges |
-| `*.service.ts` | a DTO | the client and the mapper |
-| `*.controller.ts` | whatever the service returned | the service — **never** a client, **never** a mapper |
-
-**MUST** — a client method's signature names proto types on both sides. Its parameter is the request message and its return type is the response message; unwrapping one field (`response.backupCodes`) or accepting a request DTO is still coupling transport to REST.
-
-**MUST** — every `*-grpc.client.ts` has a `*.service.ts` beside it, and the service is the only thing that calls it. A client with no service is a client whose consumer has to do the mapping.
-
-**MUST NOT** — call a mapper from a controller. A controller routes: it binds the request, delegates once, and returns. A `toXDto(await this.client.x())` in a handler is the mapping layer leaking upward, and it is how two routes over the same RPC end up shaping the response differently.
-
-**A pass-through service is acceptable and expected.** Most modules have nothing to compose, so their service reads as one-line delegations — that is the layer doing its job, not an empty one. It is also where the first piece of orchestration lands, and having it already there is what stops that logic appearing in a controller instead.
-
-**A DataLoader answers the edge type, not the wire message.** A loader is the batching equivalent of a service, so `loaders.users.load(id)` returns the `…GqlDto` the schema declares and the mapping happens inside `createXLoader`. A loader that returns proto pushes the mapping into every `@ResolveField` that reads it — six of them for `UserSummary` alone — which is the same leak this section forbids, arriving through the one door the table does not name.
-
-**Binding a request is not mapping a response.** A resolver may call `toPageQuery(args)`, which is why that function lives in `common/graphql/` and not in `common/mappers/`: turning arguments into a query is what a REST controller does with a query DTO. The prohibition is on shaping what comes *back*.
-
-**A value that is not a response shape is not a DTO.** Tokens the controller needs for cookies (`accessToken`, `deviceToken`) belong in a service-layer result type named for what it is — `TwoFactorAuthenticateResult`, not `...Dto` — so a secret cannot reach a REST body by inheriting the wrong name.
 
 ### 6.4 Errors across the boundary
 
@@ -520,7 +370,7 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 - One `Logger` per class: `private readonly logger = new Logger(Foo.name)`.
 - Levels: `debug` = dev aid; `warn` = suspicious but handled; `error` = a bug or failed dependency, with the stack.
 - Security-relevant events **MUST** be logged at `warn` or above *and* written to `audit_logs`.
-- **MUST NOT** swallow an error to satisfy a type. If it is genuinely ignorable, comment why (`GuestGuard`'s `catch` is the reference).
+- **MUST NOT** swallow an error to satisfy a type. If it is genuinely ignorable, comment why.
 
 ---
 
@@ -528,28 +378,21 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 
 | Thing | Convention | Example |
 | :--- | :--- | :--- |
-| File | `kebab-case.<role>.ts` | `jwt-auth.guard.ts`, `user.mapper.ts` |
-| Gateway gRPC adapter | `<peer>-grpc.client.ts` | `otp-grpc.client.ts` |
-| Service gRPC entry | `<domain>-grpc.controller.ts` | `users-grpc.controller.ts` |
+| File | `kebab-case.<role>.ts` | `pending-upload.store.ts`, `user.mapper.ts` |
+| Service gRPC entry | `<domain>-grpc.controller.ts` | `auth-grpc.controller.ts` |
 | Scheduled job | `<subject>-<verb>.job.ts` | `invitations-expiry.job.ts` |
 | Seeder | `<scope>.seeder.ts` | `database.seeder.ts` |
 | Wire ↔ domain mapper | `<entity>.mapper.ts` | `user.mapper.ts` |
-| **Mapper, outbound** | **`to<ReturnTypeName>`** — destination type's name verbatim, suffix included | `toTicketResponseDto`, `toProtoTimestamp` |
+| **Mapper, outbound** | **`to<ReturnTypeName>`** — destination type's name verbatim, suffix included | `toDepartmentResponse`, `toProtoTimestamp` |
 | **Mapper, inbound** | **`from<InputTypeName>`** — the *source* type's name, verbatim | `fromProtoGender`, `fromProtoOrgStatus` |
 | Mapper, inbound + required | `require<InputTypeName>` — throws where `from*` would return `undefined` | `requireProtoTimestamp` |
-| REST DTO | `dto/rest/<name>.dto.ts` → `<Name>Dto` | `ticket-response.dto.ts` → `TicketResponseDto` |
-| GraphQL DTO | `dto/graphql/<name>.gql-dto.ts` → `<Name>GqlDto` | `ticket-response.gql-dto.ts` → `TicketResponseGqlDto` |
-| GraphQL schema type | Class name **minus** `ResponseGqlDto`, set explicitly in `@ObjectType('…')` | `TicketResponseGqlDto` → `Ticket` |
-| Resolver | `<module>.resolver.ts`, at the module root beside the controller | `tickets.resolver.ts` |
-| DataLoader | `common/graphql/loaders/<entity>.loader.ts` | `user-summary.loader.ts` |
 | NATS payload types | `*.contract.ts` | `notification.contract.ts` |
 | `.proto` file | `lower_snake_case.proto` — **underscores, not hyphens** | `two_factor.proto` |
 | proto package | `synapsedesk.<service>`, no version suffix (§6.1) | `synapsedesk.auth` |
 | proto directory | Mirrors the package, dots → slashes | `proto/synapsedesk/auth/` |
 | proto enum member | `<ENUM_NAME>_<VALUE>` — **required** | `GENDER_MALE`, `OTP_PURPOSE_UNSPECIFIED` |
-| Class | `PascalCase` + role suffix | `PermissionGuard` |
+| Class | `PascalCase` + role suffix | `PendingUploadStore` |
 | DI token | `SCREAMING_SNAKE` `Symbol` | `AUTH_GRPC_CLIENT` |
-| Metadata key const | `SCREAMING_SNAKE_KEY` | `PERMISSION_KEY` |
 | Permission code | `target.action` | `ticket.assign.self` |
 | DB table / column | `snake_case` via `@map` | `refresh_token_hash` |
 | Prisma field | `camelCase` | `refreshTokenHash` |
@@ -560,37 +403,12 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 
 **Proto enum members are prefixed because protobuf uses C++ scoping** — enum values are *siblings* of their type, so they must be unique across the whole **package**. Two enums both declaring a bare `UNSPECIFIED` is a hard compile error. `buf lint`'s `STANDARD` ruleset catches it before protoc does.
 
-### 12.1 Two protocols, one module
+### 12.1 Mappers
 
-```txt
-modules/<module>/
-├── <module>.controller.ts        REST
-├── <module>.resolver.ts          GraphQL — same level, not under a graphql/ subtree
-├── <entity>.mapper.ts            BOTH protocols' mappers, one file
-├── <x>-grpc.client.ts
-└── dto/
-    ├── rest/     <name>.dto.ts
-    └── graphql/  <name>.gql-dto.ts
-```
-
-- **In `dto/graphql/`, the DECORATOR decides the name.** An `@ObjectType` is an output shape: it ends `ResponseGqlDto` and lives in `<entity>-response.gql-dto.ts`. An `@InputType` or `@ArgsType` is an input: it never carries `Response` and never lives in a `-response` file. The decorator is the only reliable signal — a class named `…Page` or `…Payload` is still an output, and GraphQL will not let one class be both.
-- **Requests and responses live in different files.** `<entity>.dto.ts` holds what a route ACCEPTS; `<entity>-response.dto.ts` holds what it RETURNS, and every class in it ends `ResponseDto`. The split is what makes "does this class get validated?" answerable from the import line: a `ValidationPipe` runs on request DTOs and never on response ones, so the two need opposite things from their decorators (§5.2), and a response class sitting in the request file invites both mistakes — validators nobody runs, and a request field nobody validates. `dto-naming.spec.ts` enforces BOTH halves — the suffix, and the file a response class is filed in.
-- **The suffix carries the protocol, not just the folder.** Two files with one name in two folders are ambiguous in an import line and in editor search.
-- **Both protocols' mappers live in one `<entity>.mapper.ts`** — putting the wire→REST and wire→GraphQL conversions side by side is what makes a divergence between them visible.
 - **`to<ReturnTypeName>` / `from<InputTypeName>` always name the FOREIGN side.** `toUser` is the version this rule exists to prevent. Full reasoning: [ADR 0004](./decisions/0004-mappers-name-the-foreign-side.md).
-- **A GENERIC wrapper return type does not resolve, and `to<Entity>PageDto` is the convention that grew in its place.** `PaginationResponseDto<DocumentResponseDto>` has no single name to carry verbatim, so the rule above has no answer for it — and thirteen files independently reached the same one. Written down because a scan applying the rule literally reports every one of them, and a guard that reports thirteen false positives is a guard somebody switches off. `mapper-naming.spec.ts` exempts a return type containing `<` for exactly this reason.
-- **An ARRAY return pluralizes the type's name, not the suffix**: `SimilarTicketResponseDto[]` is `toSimilarTicketResponseDtos`, never `toSimilarTicketDtos`. Dropping `Response` is the common way this rule fails, because the shorter name reads perfectly well and stops identifying what it returns.
+- **A GENERIC wrapper return type has no single name to carry verbatim**, so the rule above has no answer for it, and `mapper-naming.spec.ts` exempts a return type containing `<`.
+- **An ARRAY return pluralizes the type's name, not the suffix**: a mapper returning `<Type>[]` is `to<Type>s`, with the type's suffix intact. Dropping the suffix is the common way this rule fails, because the shorter name reads perfectly well and stops identifying what it returns.
 - **`mapper-naming.spec.ts` enforces all of this**, scanning `*.mapper.ts` from the CODE toward the rule. Six violations reached `main` before it existed and every one was found by somebody happening to open the file — a reviewer sees the mapper in their diff and nothing reads the rest.
-
-### 12.2 REST and GraphQL DTOs share nothing
-
-**No inheritance, no shared parent, no `base/` folder.**
-
-`@Field()` is not inherited from an undecorated property. A field added to a REST parent is inherited, typed, and **absent from the GraphQL schema**, with the compiler silent and every test passing.
-
-Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) that compares field names and checks `@Field({ nullable })` against the REST DTO's `| null`. A divergence becomes a test failure naming the field, instead of a schema that quietly lacks it.
-
-**One import to get right:** `PickType` / `OmitType` / `PartialType` exist in **both** `@nestjs/swagger` and `@nestjs/graphql`. Building a GraphQL type with the Swagger version produces a class with **zero fields** in the schema, and nothing errors at build time.
 
 ### 12.3 Docblocks vs comments — they are different tools
 
@@ -611,7 +429,6 @@ Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) t
 
 **MUST NOT** — write a `/** */` where POSITION makes it attach to something other than what it describes. A docblock binds to whatever declaration follows it, and the failure is always the same shape: the text looks attached, is not, and the file reads as thoroughly documented while the symbol has nothing. Three instances, one rule:
 
-- **Between a DTO property's decorators and its name.** The Swagger plugin runs with `introspectComments` and takes the LEADING comment, so a block below the decorators never reaches the published spec. `AcceptInvitationDto.deviceName` shipped with no description at all this way. A note about why a decorator is present or absent is a trap, so it belongs at that decorator as `//`; what the FIELD is belongs above them all. `dto-docblock.spec.ts` enforces this one.
 - **Above a GROUP of enum members.** It attaches on hover to the first member alone — quietly documenting one while claiming four. Describe the group in `//`, and give any member that needs its own contract its own block.
 - **Above a section banner rather than the declaration below it.** Inserting a `// ---- Section ----` header between a docblock and its method orphans the block and leaves the method undocumented; both halves still look right in the diff. Put the banner above the docblock, never between it and what it documents.
 
@@ -782,47 +599,6 @@ export function buildUser(overrides: Partial<CreateUserInput> = {}): CreateUserI
 - **Every field is overridable.**
 - **The uniqueness counter is mandatory** wherever the entity has a `@unique` or partial-unique column.
 
-### 13.4 E2E (api-gateway) — the gateway's stack, with the peer stubbed
-
-Register the **exact same** global filters/interceptors/pipes `main.ts` does. A suite that skips `ValidationPipe` and asserts a 400 is asserting on code that never runs in production.
-
-```ts
-export async function bootstrapE2eTest(overrides?: (b: TestingModuleBuilder) => void) {
-  const builder = Test.createTestingModule({ imports: [AppModule] });
-  overrides?.(builder);
-
-  const app = (await builder.compile()).createNestApplication();
-  app.use(cookieParser());
-  app.useGlobalFilters(new AllHttpExceptionFilter(false));
-  app.useGlobalInterceptors(new LoggingInterceptor(false), new TransformInterceptor(app.get(Reflector)));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-
-  await app.init();
-  return { app };
-}
-```
-
-**Override the gRPC client provider, not the network call** — never require a live `auth-service` process:
-
-```ts
-const { app } = await bootstrapE2eTest((builder) =>
-  builder.overrideProvider(AUTH_GRPC_CLIENT).useValue({ getService: () => authGrpcStub }),
-);
-```
-
-**Use a `supertest` agent to carry cookies across a multi-step flow**, and assert the FLAGS, not just the status — a 200 with the wrong branch of `settleLogin()` taken is a passing test hiding a broken login:
-
-```ts
-const agent = request.agent(app.getHttpServer());
-const loginRes = await agent.post('/api/v1/auth/login').send(loginDto).expect(200);
-
-const cookies = loginRes.get('Set-Cookie') ?? [];
-expect(cookies.some((c) => c.startsWith(`${accessCookieName}=`) && c.includes('HttpOnly'))).toBe(true);
-expect(cookies.some((c) => c.startsWith(`${twoFaCookieName}=`))).toBe(false);
-```
-
-**Assert on the envelope**, not the raw body (§5.1). A test reaching into `res.body.data` without checking `res.body.success` will pass on an error response that happens to carry a `data` key.
-
 ### 13.4b The contract harness — the gateway as a process
 
 `test/gateway-contract/` starts the **built** gateway as a separate process,
@@ -835,22 +611,22 @@ cookies, socket frames, published NATS messages, the metrics port.
 | The behaviour is about | Suite |
 | :--- | :--- |
 | a wire fact — a header, a cookie flag, an envelope field, a frame, a metric name | `test/gateway-contract/` |
-| routing, guards composing, DI wiring, a mapper's shape | `apps/api-gateway/test/` (13.4) |
+| routing, interceptors composing, Spring wiring, a mapper's shape | the gateway's JUnit tests, `apps/api-gateway/src/test/java/` |
 | several real services together | `test/system/` |
 
 Two things follow from "as a process". It boots the build, so
 `npm run test:contract` builds first — a source edit tested against the
 previous build passes for the wrong reason. And it has no handle inside the
 gateway: a peer is programmed by answering its RPC, never by
-`overrideProvider`, and an assertion about an outgoing call reads the peer's
+replacing a bean inside the gateway, and an assertion about an outgoing call reads the peer's
 **recording** of the request and its metadata.
 
 **A cookie is asserted as an attribute set, never as a header string.**
 `parseSetCookie` in `client.ts` is what a cookie row reads: the name, the
 value and the attributes a value we authored — `Max-Age`, `Path`, `HttpOnly`,
 `Secure` — exactly, `SameSite`'s casing loosely, and attribute order and the
-`Expires` date not at all. Those three are the serializer's, and Express and
-Spring spell them differently for the same cookie. A clear is the semantic
+`Expires` date not at all. Those three are the serializer's to choose, so a
+row that pins them pins the library rather than the contract. A clear is the semantic
 form: empty value **and** (`Max-Age=0` **or** a past `Expires`) **and** the
 `Path`, `HttpOnly` and `SameSite` it was set with, since a browser only
 replaces a cookie whose path matches.
@@ -858,20 +634,16 @@ replaces a cookie whose path matches.
 **A cached lookup hides its own absence from any row that does not use a cold
 key.** The lifecycle gate's status read is cached in Redis for 30 seconds, so a
 row reusing an organization id another suite has already touched cannot tell
-whether the gateway asked at all — which is how an entire implementation
-shipped without the gate and passed thirty-five rows that programmed its
-answer. A row that means to prove a lookup happens needs an id nothing else has
+whether the gateway asked at all: a gateway with no gate would pass every such
+row that programs the peer's answer. A row that means to prove a lookup happens needs an id nothing else has
 warmed, and an assertion that the peer was called.
 
 **A row that sends a valid request cannot see a guard that runs late.** Every
 contract row sends an otherwise-valid call, so an ordering defect — a body
-validated before the session is checked, a 415 where the other implementation
-serves a bodyless action, a permission refused after the body is read — is
-invisible to all of them. The complement is a sweep: **send an invalid request
-as the weakest caller a route allows, to every route, and compare statuses
-across implementations.** It found six behaviour gaps nothing else had,
-including 21 routes answering 415 to a bodyless `POST` the other implementation
-serves. Run it with a fresh subject and a fresh tenant per call — a cached
+validated before the session is checked, a permission refused after the body is
+read — is invisible to all of them. The complement is a sweep: **send an invalid
+request as the weakest caller a route allows, to every route, and require the
+refusal to be the guard's** — the 401 or 403, never the body's 400. Run it with a fresh subject and a fresh tenant per call — a cached
 tenant status or a spent quota decides the answer otherwise, and the sweep
 measures the cache instead of the route.
 
@@ -885,16 +657,12 @@ is the fix for all three. Where a limit is keyed by address rather than
 subject, a row cannot vary it — say so in the spec's header rather than
 leaving the dependence unstated.
 
-**Which rows run for Java is read from one place.** Under
-`GATEWAY_IMPL=java` a row is skipped only when its title is named in
-`SKIPPED_FOR_JAVA` in `test/gateway-contract/pending.ts` — the route exists,
-the behaviour does not yet — and each entry names what it waits for. A row
-declares the API tag it exercises, and `declared-tags.contract-spec.ts` proves
-every published API has one.
+**A row declares the API tag it exercises**, and
+`declared-tags.contract-spec.ts` proves every published API has one.
 
-**A row here is the one the Java gateway must also pass**, so a
-wire behaviour that only the in-process suite pins is a behaviour the second
-implementation is free to get wrong.
+**A wire behaviour belongs in a row here**, not only in the gateway's JUnit
+tests: this suite reads the gateway the way a client does, from outside the
+process.
 
 ### 13.5 What never gets mocked, and what always does
 
@@ -918,7 +686,7 @@ One suite, run in CI, that boots the **real** auth-service gRPC server (in-proce
 
 ### 13.8 Source scans — what they can prove, and when they are the only option
 
-A **source scan** is a test that reads the tree — the shape used by `limit-comparison.spec.ts`, `default-branch-pairing.spec.ts`, `mapper-naming.spec.ts` and `analytics-window.spec.ts`. It proves that text **exists**, never that it **runs**. That single limit decides where it belongs.
+A **source scan** is a test that reads the tree — the shape used by `limit-comparison.spec.ts`, `mapper-naming.spec.ts` and `analytics-window.spec.ts`. It proves that text **exists**, never that it **runs**. That single limit decides where it belongs.
 
 Before writing one, ask **what the property actually is**:
 
@@ -1002,7 +770,7 @@ Two failure modes this ordering exists to prevent:
 
 ### Security & tenancy
 
-- [ ] Identity from `@CurrentUser()`, never from client input.
+- [ ] Identity from the caller's verified context, never from client input.
 - [ ] Every query on a tenant table filters `organizationId` (or the caller is `isSuperAdmin`).
 - [ ] Every query on a soft-deletable table filters `deletedAt: null`.
 - [ ] Unique-field checks handled in the service layer, soft-delete aware.
@@ -1017,7 +785,6 @@ Two failure modes this ordering exists to prevent:
 
 - [ ] `.proto` changed → `npm run proto:generate` → both ends updated.
 - [ ] `npm run proto:lint` clean; `npm run proto:breaking` reviewed (no version escape hatch — §6.1).
-- [ ] gRPC calls go through `BaseGrpcClient.call()` with an origin.
 - [ ] `RpcException` carries a deliberate `status` from the §6.4 table.
 - [ ] `undefined` → `null` normalized in the mapper; `requireProtoTimestamp` for non-optional fields.
 - [ ] New NATS payload is a typed union arm in a `*.contract.ts`, and its subject is in a `*_PATTERNS` constant — **that constant is the registry**, and a subject absent from one does not exist.
@@ -1036,14 +803,9 @@ Two failure modes this ordering exists to prevent:
 
 ### Surface
 
-- [ ] Handler returns raw data; message via `@ResponseMessage` or `res.locals`.
-- [ ] DTOs cover every accepted field (`forbidNonWhitelisted` 400s otherwise).
-- [ ] Request DTOs live in `<entity>.dto.ts`, response DTOs in `<entity>-response.dto.ts`, and every response class ends `ResponseDto` (§12.1).
-- [ ] A `?` dropped in favour of a default carries `@ApiPropertyOptional()`, the default satisfies the field's own validators, and the proto field it feeds is **not** `optional` (§5.2).
-- [ ] List endpoint extends `SearchPaginationDto` and returns `PaginationResponseDto<T>`.
 - [ ] New env var added to the Joi schema **and** `env.example`.
 - [ ] New permission code added to `PERMISSION_CODES` + `PERMISSION_NAMES` + role grants + [api-endpoints-plan.md §9](./api-endpoints-plan.md).
-- [ ] Route, DTO or Swagger decorator changed → `npm run openapi:export`, and the diff on `docs/reference/openapi.json` is in the PR. CI's `build` job runs `openapi:check` and fails on drift.
+- [ ] A gateway route or its request or response model changed → `npm run openapi:export`, and the diff on `docs/reference/openapi.json` is in the PR. CI's `build` job runs `openapi:check` and fails on drift.
 - [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-spec.md](./rdm-spec.md) — **columns, types, nullability, defaults and the enum's full value list.** A widened enum whose doc still lists the old members is the most common drift and the least visible.
 - [ ] New cross-service behaviour — an ordering constraint, a dial-out direction, a consistency sweep — recorded in [reference/sys-flows.md](./reference/sys-flows.md). Anything visible inside one service does **not** go there.
 - [ ] `npm run lint` clean.
@@ -1058,9 +820,9 @@ Two failure modes this ordering exists to prevent:
 
 - [ ] Unit tests mock `PrismaService` and every collaborator; nothing touches a real database.
 - [ ] A new Prisma query with tenant or soft-delete filtering has an **e2e** test against a real test database (§13.3).
-- [ ] Test database reset runs in `beforeEach` and uses the right strategy for the service (§13.3, Golden Rule 12).
+- [ ] Test database reset runs in `beforeEach` and uses the right strategy for the service (§13.3, Golden Rule 10).
 - [ ] New factory functions carry the uniqueness counter for every `@unique`/partial-unique field.
-- [ ] New gateway endpoint has an e2e test asserting the **envelope**, not just the HTTP status.
+- [ ] New gateway endpoint has a contract row in `test/gateway-contract/` asserting the **envelope**, not just the HTTP status (§13.4b).
 - [ ] `describe`/`it` titles follow §13.1.
 - [ ] `jest.clearAllMocks()` in `afterEach`.
 - [ ] Any RPC this PR adds is executed by a test in the service that **owns** it (§13.6).

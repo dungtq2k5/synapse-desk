@@ -11,7 +11,7 @@
 - **A permission is a union member, not a row.** `PermissionCode` is `(typeof PERMISSION_CODES)[number]`, so `@RequirePermission('x')` is a compile error unless `x` is in the array. That is what makes the guard matrix checkable at all — a permission the compiler has never seen cannot appear on a route.
 - **The row exists to be joined, not to be authoritative.** `_role_permissions` needs something to point at; the table is that and nothing more.
 - **A runtime-created code would be inert.** No route could require it, no guard could enforce it, and `assertGrantable` refuses to grant any code outside the array — `INVALID_ARGUMENT`, *"Unknown permission code(s)"*. It would be a permission that exists, appears in the role editor, and does nothing. Worse than absent, because absent is legible.
-- **A new permission ships with a deploy**, and the four-place edit that entails — `PERMISSION_CODES`, `PERMISSION_NAMES`, `SYSTEM_ROLE_PERMISSIONS`, the endpoints plan — is recorded in `development-conventions.md` §5.4.
+- **A new permission ships with a deploy**, and the four-place edit that entails — `PERMISSION_CODES`, `PERMISSION_NAMES`, `SYSTEM_ROLE_PERMISSIONS`, the endpoints plan — is the permission item of the pre-PR checklist in `development-conventions.md` §14.
 
 ## Consequences
 

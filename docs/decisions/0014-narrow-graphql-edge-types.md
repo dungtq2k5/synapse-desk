@@ -15,5 +15,5 @@ An edge exposes a narrow type carrying only what every caller may see. Field gua
 
 - **`schema.gql` is committed** with `sortSchema: true`, so a breaking schema change is a reviewable diff rather than a client failing in staging.
 - **`@Field()` always names its GraphQL type explicitly** — `() => ID`, `() => Int`. TypeScript's `number` cannot distinguish `Int` from `Float`, nor `string` an `ID` from a `String`, and both serialise identically until a client generates types from the SDL.
-- `nullable` mirrors the REST DTO's `| null`, enforced by the contract spec (§12.2) rather than by inheritance.
+- `nullable` mirrors the REST model's nullability field by field, rather than by inheritance.
 - A read belongs in GraphQL when its rows carry entity ids something can traverse to; several analytics reads deliberately have no GraphQL query for that reason.
