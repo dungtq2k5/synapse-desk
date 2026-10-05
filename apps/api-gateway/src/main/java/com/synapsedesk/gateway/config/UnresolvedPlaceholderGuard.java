@@ -48,7 +48,7 @@ public class UnresolvedPlaceholderGuard
           value.endsWith("}")
         ) {
           throw new IllegalStateException(
-            "%s is unset: nothing resolved %s. Set it in the environment — both gateways read %s.".formatted(
+            "%s is unset: nothing resolved %s. Set it in the environment — every variable is documented in %s.".formatted(
               name,
               value,
               "apps/api-gateway/.env.example"

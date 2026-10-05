@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
-import { withOwnEnvironment } from '../testing/service-workspaces';
 
 /**
  * The environment contract: the schema is the code, `.env.example` is the
@@ -59,17 +58,15 @@ describe('the environment contract', () => {
    */
   const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
     'api-gateway':
-      'JUnit: apps/api-gateway-java/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
+      'JUnit: apps/api-gateway/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
     'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
   };
 
   /** apps/<service> for every workspace under apps/. */
   const services = (): string[] =>
-    // `withOwnEnvironment` reads `api-gateway-java` as `api-gateway`, whose
-    // `.env.example` and ConfigMap it uses rather than owning a second copy.
-    withOwnEnvironment(
-      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
-    ).sort();
+    gitFiles('apps/*/package.json')
+      .map((file) => file.split('/')[1])
+      .sort();
 
   /** service → its env.validation.ts path, from git rather than a guess. */
   const schemaFiles = (): Map<string, string> => {

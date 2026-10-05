@@ -12,12 +12,11 @@ import java.util.regex.Pattern;
  * The environment these tests boot with: {@code apps/api-gateway/.env.example},
  * read from where it lives.
  *
- * <p><b>The shared file, never a copy.</b> Both gateways read one environment,
- * so a fixture listing its own 46 values would be a second source of truth
- * that drifts silently — and the drift would surface at a switch, on whichever
- * implementation was standing by. Booting from the documented example also
- * makes these rows say something stronger than "binding works": they say the
- * example a developer is handed actually starts this gateway.
+ * <p><b>The documented file, never a copy.</b> A fixture listing its own 46
+ * values would be a second source of truth that drifts silently. Booting from
+ * the documented example also makes these rows say something stronger than
+ * "binding works": they say the example a developer is handed actually starts
+ * this gateway.
  *
  * <p>Only ACTIVE lines are returned. A commented key is a documented DEFAULT
  * (`# SWAGGER_ENABLED = false`), and supplying it here would mean the default
@@ -25,8 +24,8 @@ import java.util.regex.Pattern;
  */
 public final class SharedEnvironment {
 
-  /** From `apps/api-gateway-java/`, where Maven runs, to the shared file. */
-  public static final Path ENV_EXAMPLE = Path.of("../api-gateway/.env.example");
+  /** Relative to `apps/api-gateway/`, where Maven runs. */
+  public static final Path ENV_EXAMPLE = Path.of(".env.example");
 
   private static final Pattern ACTIVE = Pattern.compile(
     "^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*(.*?)\\s*$"

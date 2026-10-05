@@ -121,34 +121,18 @@ public class JwtVerifier {
   static final JWSAlgorithm ALGORITHM = JWSAlgorithm.RS256;
 
   /**
-   * The configured path, as given — or, failing that, as it resolves from
-   * one of two OTHER working directories a test can be run from.
+   * The configured path, as given — or, failing that, as it resolves from the
+   * repository root.
    *
-   * <p>In a real deployment `WORKDIR` is `/app` and `./secrets/jwt-access.pub`
-   * resolves directly. Under `./mvnw test`, Maven's working directory is this
-   * MODULE (`apps/api-gateway-java`), and the two `.env` files that can supply
-   * this path disagree about what THEY are relative to, because each was
-   * written for a different runner:
-   *
-   * <ul>
-   *   <li>`.env.example`'s `./secrets/…` — measured — is relative to the
-   *       NODE MODULE (`apps/api-gateway`, where the file actually lives),
-   *       matching that gateway's own `WORKDIR`.
-   *   <li>`.env.test`'s `./test/fixtures/…` is relative to
-   *       the REPO ROOT — the harness's own spawn `cwd` — the same
-   *       convention `SharedEnvironment.ENV_EXAMPLE` already works around for
-   *       that one file.
-   * </ul>
-   *
-   * <p>So both siblings are tried, in addition to the path as given, before
-   * giving up. This is dead code once every environment source normalizes on
-   * one convention — `.env.test` is the harness's own file, not one this
-   * module should have to accommodate forever.
+   * <p>In a real deployment `WORKDIR` is `/app`, and under `./mvnw` the working
+   * directory is this module, `apps/api-gateway`; `.env.example`'s
+   * `./secrets/…` resolves directly in both. The contract harness's
+   * `gateway.env` writes `./test/fixtures/…`, relative to the REPO ROOT, its
+   * own spawn `cwd`; that is the one other place a path is tried.
    */
   private static Path resolve(String path) {
     List<Path> candidates = List.of(
       Path.of(path),
-      Path.of("../api-gateway").resolve(path).normalize(),
       Path.of("../..").resolve(path).normalize()
     );
 

@@ -18,6 +18,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { REPO_ROOT } from './services';
 import {
   assertPortsFree,
@@ -55,6 +56,13 @@ export default async function globalSetup(): Promise<void> {
   // run script is `nest start --watch`, and a watcher under a system test
   // restarts the service under test when an editor saves.
   run('npm', ['run', 'build']);
+  // The gateway is Maven, so `npm run build` skips it: its manifest declares no
+  // `build`, which keeps `npm test` runnable without a JDK. Its `start:prod`
+  // runs the jar, so the jar is built here.
+  execFileSync('./mvnw', ['-q', 'package', '-DskipTests'], {
+    cwd: join(REPO_ROOT, 'apps/api-gateway'),
+    stdio: 'inherit',
+  });
 
   // **The spawn itself is inside the guard**, because jest does NOT run
   // `globalTeardown` when `globalSetup` throws. An earlier version guarded only

@@ -197,7 +197,7 @@ describe('GraphQL permission coverage — every root field is gated as the table
         else if (entry.name.endsWith('.java')) files.push(path);
       }
     };
-    walk(join(REPO_ROOT, 'apps/api-gateway-java/src/main/java'));
+    walk(join(REPO_ROOT, 'apps/api-gateway/src/main/java'));
 
     return files.map((file) => readFileSync(file, 'utf8')).join('\n');
   })();

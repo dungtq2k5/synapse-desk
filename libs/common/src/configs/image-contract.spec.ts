@@ -116,7 +116,7 @@ describe('the image contract (static half)', () => {
         'Python — pip has no workspace hoisting to hide an undeclared ' +
         'import, and requirements.txt was audited for exactly that (its ' +
         'google-genai and flashrank docblocks are that audit)',
-      'apps/api-gateway-java':
+      'apps/api-gateway':
         'Maven — dependencies are declared in pom.xml, and Maven has no ' +
         'hoisting to hide an undeclared one: a missing <dependency> is a ' +
         'compile error, which is the same guarantee this scan buys for npm',

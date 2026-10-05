@@ -28,7 +28,7 @@ package-lock.json
 # models, protobuf and grpc stubs) plus surefire's XML reports, every one of
 # them rewritten by `./mvnw`. `**/generated/` above does NOT cover them — the
 # path component is `generated-sources`, not `generated` — and prettier does not
-# read `.gitignore`, so `apps/api-gateway-java/.gitignore` does not reach here.
+# read `.gitignore`, so `apps/api-gateway/.gitignore` does not reach here.
 target/
 
 # pytest's JUnit report, written by `npm run test:py -- --junitxml=pytest.xml`.

@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
-import { withOwnEnvironment } from '../testing/service-workspaces';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -92,11 +91,9 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    // `withOwnEnvironment` reads `api-gateway-java` as `api-gateway`, whose
-    // `.env.example` and ConfigMap it uses rather than owning a second copy.
-    withOwnEnvironment(
-      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
-    ).sort();
+    gitFiles('apps/*/package.json')
+      .map((file) => file.split('/')[1])
+      .sort();
 
   const documented = (service: string): Set<string> =>
     envDocumentedKeys(read(`apps/${service}/.env.example`));
@@ -136,16 +133,7 @@ describe('the manifest contract', () => {
         .sort(),
     ).toEqual(['notification-service-egress', 'storage-service-egress']);
     expect(byKind('ConfigMap')).toHaveLength(7);
-    // The services, PLUS the workspaces that share one of their
-    // environments — `api-gateway-java` is a second Deployment of the same
-    // gateway, so it has no environment of its own and is not a `service()`,
-    // but it is very much a Deployment. Derived from the same registry the
-    // env guards use, so a third implementation needs no edit here.
-    expect([...deployments().keys()].sort()).toEqual(
-      gitFiles('apps/*/package.json')
-        .map((file) => file.split('/')[1])
-        .sort(),
-    );
+    expect([...deployments().keys()].sort()).toEqual(services());
   });
 
   it('**both egress policies refuse the SAME private ranges**', () => {
@@ -212,7 +200,7 @@ describe('the manifest contract', () => {
       ]).toEqual([service, port, port, port]);
     });
 
-    it.each([['api-gateway-java']])(
+    it.each([['api-gateway']])(
       '%s probes HTTP on its own PORT, and never the metrics port, and serves Socket.IO on WS_PORT',
       (name) => {
         // The one service with an HTTP listener, and the one whose metrics sit on
@@ -426,7 +414,7 @@ describe('the manifest contract', () => {
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
       'api-gateway':
-        'JUnit: apps/api-gateway-java/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
+        'JUnit: apps/api-gateway/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
       'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
     };
 
@@ -555,14 +543,14 @@ describe('the manifest contract', () => {
     // schema, or Spring binding, NAMES the variable are the services that must
     // hold it, so a third consumer added later fails here instead of shipping
     // with no Secret.
-    const declaring = withOwnEnvironment([
+    const declaring = [
       ...gitFiles('apps/*/src/**/env.validation.ts')
         .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
         .map((file) => file.split('/')[1]),
       ...gitFiles('apps/*/src/main/resources/application.yaml')
         .filter((file) => read(file).includes(`\${${KEY}`))
         .map((file) => file.split('/')[1]),
-    ]).sort();
+    ].sort();
 
     expect(declaring).toEqual(HOLDERS);
   });

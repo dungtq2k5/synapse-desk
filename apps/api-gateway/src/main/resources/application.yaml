@@ -1,8 +1,7 @@
-# The Java gateway's static configuration.
+# The gateway's static configuration.
 #
 # **Values come from the environment, never from this file.** Every entry below
-# is a reference to a variable the Node gateway already reads, so the two
-# implementations are configured by one `apps/api-gateway/.env.example` and one
+# is a reference to a variable in `apps/api-gateway/.env.example` and its
 # ConfigMap. A literal spelled here would be a second source of truth, and the
 # one that wins silently.
 #
@@ -20,7 +19,7 @@
 # which step 2 measured on `server.port`.
 spring:
   application:
-    name: api-gateway-java
+    name: api-gateway
   data:
     redis:
       # The same instance the Node gateway uses, and it must be: the

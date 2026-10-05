@@ -145,12 +145,12 @@ jobs:
             -t "$IMAGE_PREFIX/rag-service:$GITHUB_SHA" .
           docker push "$IMAGE_PREFIX/rag-service:$GITHUB_SHA"
 
-  # api-gateway-java builds from its own Dockerfile too, and for the same
+  # api-gateway builds from its own Dockerfile too, and for the same
   # reason rag-service does: a Maven build and a JRE runtime share nothing
   # with the node stages. The matrix step hardcodes
   # `-f docker/node-service.Dockerfile`, so a matrix ROW could not express it.
-  build-java-gateway:
-    name: build and push (api-gateway-java)
+  build-gateway:
+    name: build and push (api-gateway)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -167,13 +167,13 @@ jobs:
           docker build -f docker/java-service.Dockerfile \
             --build-arg GIT_SHA="$GITHUB_SHA" \
             --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            -t "$IMAGE_PREFIX/api-gateway-java:$GITHUB_SHA" .
-          docker push "$IMAGE_PREFIX/api-gateway-java:$GITHUB_SHA"
+            -t "$IMAGE_PREFIX/api-gateway:$GITHUB_SHA" .
+          docker push "$IMAGE_PREFIX/api-gateway:$GITHUB_SHA"
 
   # ----------------------------------------------------------------- deploy
   deploy:
     name: apply and wait
-    needs: [build, build-rag, build-java-gateway]
+    needs: [build, build-rag, build-gateway]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -221,7 +221,7 @@ jobs:
       - name: set images
         run: |
           set -euo pipefail
-          for service in api-gateway-java auth-service ticket-service \
+          for service in api-gateway auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl set image "deployment/$service" \
@@ -242,7 +242,7 @@ jobs:
       - name: wait for every rollout
         run: |
           set -euo pipefail
-          for service in api-gateway-java auth-service ticket-service \
+          for service in api-gateway auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl rollout status "deployment/$service" --timeout=5m

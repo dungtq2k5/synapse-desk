@@ -135,7 +135,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: apps/api-gateway-java/pom.xml
+          cache-dependency-path: apps/api-gateway/pom.xml
       - run: npm ci
       - run: npm run build
 

@@ -37,7 +37,7 @@ class GatewayApplicationTest {
   @Test
   void bootsWithTheEnvironmentItIsGiven() {
     assertThat(environment.getProperty("spring.application.name")).isEqualTo(
-      "api-gateway-java"
+      "api-gateway"
     );
   }
 

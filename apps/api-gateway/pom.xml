@@ -32,10 +32,10 @@
   </parent>
 
   <groupId>com.synapsedesk</groupId>
-  <artifactId>api-gateway-java</artifactId>
+  <artifactId>api-gateway</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
-  <name>api-gateway-java</name>
+  <name>api-gateway</name>
   <description
   >The Java implementation of the SynapseDesk API gateway</description>
 

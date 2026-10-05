@@ -23,7 +23,7 @@ const read = (path: string) =>
   JSON.parse(readFileSync(join(ROOT, path), 'utf8')) as Record<string, any>;
 
 const overlay = read(
-  'apps/api-gateway-java/src/main/resources/openapi/prose-overlay.json',
+  'apps/api-gateway/src/main/resources/openapi/prose-overlay.json',
 );
 const document = read('docs/reference/openapi.json');
 

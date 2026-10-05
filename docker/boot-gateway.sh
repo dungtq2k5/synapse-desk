@@ -56,11 +56,11 @@ boot() { # image
   fail "$1 did not answer /health within 180s"
 }
 
-echo "building api-gateway-java…"
+echo "building api-gateway…"
 docker build -f docker/java-service.Dockerfile \
   --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
-  -t synapsedesk/api-gateway-java:boot-check . >/dev/null
+  -t synapsedesk/api-gateway:boot-check . >/dev/null
 
-boot synapsedesk/api-gateway-java:boot-check
+boot synapsedesk/api-gateway:boot-check
 
 echo "The gateway image boots."

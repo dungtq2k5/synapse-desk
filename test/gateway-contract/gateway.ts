@@ -146,7 +146,7 @@ function environmentFor(overrides: Record<string, string>): NodeJS.ProcessEnv {
  * is lying around, and picking either is a coin toss about which code runs.
  */
 function javaJar(): string {
-  const target = join(REPO_ROOT, 'apps/api-gateway-java/target');
+  const target = join(REPO_ROOT, 'apps/api-gateway/target');
   const jars = existsSync(target)
     ? readdirSync(target).filter(
         (name) => name.endsWith('.jar') && !name.endsWith('-sources.jar'),
@@ -155,7 +155,7 @@ function javaJar(): string {
 
   if (jars.length !== 1) {
     throw new Error(
-      `Expected exactly one jar in apps/api-gateway-java/target, found ${jars.length}` +
+      `Expected exactly one jar in apps/api-gateway/target, found ${jars.length}` +
         `${jars.length ? `: ${jars.join(', ')}` : ''}.\n` +
         'Build it: npm run test:contract:java (which builds the jar first).',
     );

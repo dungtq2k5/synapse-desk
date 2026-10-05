@@ -42,7 +42,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // `./mvnw verify`'s, and running them here would make every contract run pay for
 // them twice.
 const build = spawnSync('./mvnw', ['-q', 'package', '-DskipTests'], {
-  cwd: join(ROOT, 'apps/api-gateway-java'),
+  cwd: join(ROOT, 'apps/api-gateway'),
   stdio: 'inherit',
   env: process.env,
 });

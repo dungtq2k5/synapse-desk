@@ -21,7 +21,7 @@ describe('InboundLimits.java against libs/common', () => {
   const java = readFileSync(
     join(
       ROOT,
-      'apps/api-gateway-java/src/main/java/com/synapsedesk/gateway/inbound/InboundLimits.java',
+      'apps/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/InboundLimits.java',
     ),
     'utf8',
   );
