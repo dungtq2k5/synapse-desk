@@ -38,7 +38,7 @@ no-op CREATE INDEX IF NOT EXISTS, table held by an 8-second writer
 
 **3. `ingress-nginx` answers the proxying half of the ingress requirement. `helmet` is the other half and belongs in the application.**
 
-One controller plus one `Ingress` routing `/` to the api-gateway Service. Not a hand-written `nginx.conf` in front of the cluster: that is a second reverse proxy doing what the Ingress already does, and two places to configure CORS, timeouts and upgrade headers is the same "two lists is two chances" hazard `secure-gateway.decorator.ts` names about its own CORS.
+One controller plus one `Ingress`, routing `/socket.io` to the api-gateway Service's `ws` port and `/` to its `http` port. Not a hand-written `nginx.conf` in front of the cluster: that is a second reverse proxy doing what the Ingress already does, and two places to configure CORS, timeouts and upgrade headers is the same "two lists is two chances" hazard as two CORS policies — the gateway's own is `CorsFilter.java`, and it is the only one.
 
 ## Why
 

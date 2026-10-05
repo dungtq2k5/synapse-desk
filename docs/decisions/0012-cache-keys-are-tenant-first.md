@@ -1,14 +1,14 @@
-# 0012 — Cache keys start with the tenant id, and not via `@nestjs/cache-manager`
+# 0012 — Cache keys start with the tenant id
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/cache/`
+**Status:** accepted · **Code:** `apps/api-gateway/src/main/java/com/synapsedesk/gateway/cache/CacheService.java`
 
 ## Decision
 
-The tenant id is the first segment of every cache key. The cache is built on the shape `AnalyticsCacheService` already proved, not on `CacheModule`.
+The tenant id is the first segment of every cache key: `CacheService.buildKey` writes `cache:{org}|{scope}|{params}`, with the parameters sorted.
 
 ## Why
 
-- **`CacheInterceptor`'s default key is the request URL, which contains no tenant.** `GET /tickets` is one key for every tenant on the platform, so the second tenant to ask receives the first tenant's tickets. No error, no trace.
+- **A key derived from the request URL contains no tenant.** `GET /tickets` is one key for every tenant on the platform, so the second tenant to ask receives the first tenant's tickets. No error, no trace.
 - **Parameters must be sorted.** `?from=A&to=B` and `?to=B&from=A` are the same query; two spellings halves the hit rate invisibly, and the severe version is a mutation invalidating one spelling and not the other.
 - **Absent and empty collapse.** `undefined`, `null` and `''` are dropped rather than serialised, so "filter not supplied" is one entry.
 

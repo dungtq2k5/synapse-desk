@@ -1,6 +1,6 @@
 # 0013 — A batch RPC result maps from the requested keys, never from response order
 
-**Status:** accepted · **Code:** `libs/grpc-proto/`, `apps/api-gateway/src/common/graphql/loaders/`
+**Status:** accepted · **Code:** `libs/grpc-proto/`, `apps/api-gateway/src/main/java/com/synapsedesk/gateway/graphql/` (the `*LoaderConfig.java` classes)
 
 ## Decision
 

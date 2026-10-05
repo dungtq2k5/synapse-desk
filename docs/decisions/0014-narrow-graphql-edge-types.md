@@ -1,6 +1,6 @@
 # 0014 — Narrow GraphQL edge types, not field guards
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/modules/*/dto/graphql/`
+**Status:** accepted · **Code:** the `*GqlDto.java` classes under `apps/api-gateway/src/main/java/com/synapsedesk/gateway/`
 
 ## Decision
 

@@ -1,6 +1,6 @@
-# 0033 — One Redis instance, `noeviction`, and three connections that stay separate
+# 0033 — One Redis instance, and `noeviction`
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/redis/redis.service.ts`, `docker-compose.yml`
+**Status:** accepted · **Code:** `docker-compose.yml`, `apps/api-gateway/src/main/java/com/synapsedesk/gateway/realtime/RealtimeServerConfig.java` (the second client)
 
 ## Decision
 
@@ -19,8 +19,5 @@
 ## Consequences
 
 - **This bounds nothing; it only makes the failure loud.** A second Redis instance for cache keys is the thorough fix and stays deferred — `maxmemory` is not per-database, so a separate logical DB would be a blast-radius boundary, not a limit.
-- **Errors are logged, never thrown.** Every consumer degrades: a cache falls through to its origin, presence reports nobody online, the org-status check fails open. An unhandled `error` event on an ioredis client is an unhandled rejection, which takes the process down — the listener is not decoration.
-- **Three sites keep their own connection**, pinned by `redis-clients.spec.ts` so a fourth cannot appear quietly:
-  - The **Socket.IO adapter** holds a pub/sub pair — a client in subscriber mode may issue no other commands, and `createAdapter` wants a matched pair with the adapter's lifetime.
-  - The **throttler** is handed a URL, not an instance: `ThrottlerStorageRedisService` closes only the connection it built, so passing an instance leaks it past shutdown.
-  - The **health probe** needs the opposite options — one attempt, a command timeout, `enableOfflineQueue: false`. Sharing this client would let the probe buffer its command through an outage and report UP the moment Redis returned, having reported nothing while it was down. A probe that cannot lie is the goal.
+- **Errors are logged, never thrown.** A cache read or write that fails falls through to the origin (`CacheService.wrap`), and the WebSocket rate limiter fails open (`WsThrottlerService`): a full instance degrades the gateway rather than stopping it.
+- **Two clients, kept separate.** Spring Data Redis (Lettuce) serves everything except Socket.IO; Socket.IO's cross-replica store is a Redisson client of its own (`RealtimeServerConfig.java`), because that is the store netty-socketio speaks.

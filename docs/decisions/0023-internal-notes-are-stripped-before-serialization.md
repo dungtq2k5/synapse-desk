@@ -1,6 +1,6 @@
 # 0023 — Internal notes are stripped at read time, before serialization
 
-**Status:** accepted · **Code:** `apps/ticket-service/`, `apps/api-gateway/src/modules/realtime/`
+**Status:** accepted · **Code:** `apps/ticket-service/`, `apps/api-gateway/src/main/java/com/synapsedesk/gateway/realtime/`
 
 ## Decision
 

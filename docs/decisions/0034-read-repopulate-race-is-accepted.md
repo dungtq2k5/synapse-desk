@@ -1,6 +1,6 @@
 # 0034 — The cache read-repopulate race is accepted, not fixed
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/cache/cache.service.ts` (`wrap`)
+**Status:** accepted · **Code:** `apps/api-gateway/src/main/java/com/synapsedesk/gateway/cache/CacheService.java` (`wrap`)
 
 ## Decision
 
@@ -15,7 +15,7 @@ An invalidation landing between `produce()` and `set` is overwritten by the valu
 
 - **Every fix costs more than the bug.** Double-delete, versioned keys and a distributed lock each add a failure mode larger than the one they close — a lock adds an outage path to a component whose entire contract is failing open.
 - **The worst case is one entry stale for one TTL.** The window is a single gRPC round trip, and a mutation has to land inside it.
-- What keeps it a narrow window rather than the common case is that `CacheInvalidationInterceptor` evicts **after** the handler resolves (`concatMap`, asserted in `cache-invalidation.spec.ts`). Evicting before the write would make that interleaving the normal ordering rather than a race.
+- **On this gateway the window is wider than a round trip.** Nothing evicts at write time: the only eviction is `CacheInvalidationConsumer`, on the NATS event the owning service publishes, so a read that lands before that event is consumed repopulates the old value. Departments, roles and organizations have no such event at all, so for them the window is the cache's TTL ([known gap 60](../reference/known-gaps.md)).
 
 ## Consequences
 
