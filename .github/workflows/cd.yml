@@ -254,13 +254,20 @@ jobs:
           # fails every deploy, five minutes at a time. The annotation is on
           # the Deployment's metadata (`manifest-contract` row 9 asserts
           # that), so reading it changes no pod and starts no rollout.
+          #
+          # **A standby is gated instead of skipped.** Readiness cannot tell
+          # "running, not ready" from "dying", so a crash-looping standby was
+          # invisible until the commit that switched traffic onto it: the
+          # cutover rehearsal's first run was a total outage that way.
+          # `standby-gate.sh` requires every standby pod started and never
+          # restarted, through a hold, and passes a standby at zero replicas.
           for service in api-gateway api-gateway-java; do
             role=$(kubectl get "deployment/$service" \
               -o jsonpath='{.metadata.annotations.synapsedesk\.io/gateway-role}')
             if [ "$role" = "active" ]; then
               kubectl rollout status "deployment/$service" --timeout=5m
             else
-              echo "skipping rollout wait for $service (role=$role)"
+              scripts/standby-gate.sh "$service" 300 30
             fi
           done
 
