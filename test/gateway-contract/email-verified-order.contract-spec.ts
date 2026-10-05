@@ -2,18 +2,15 @@
  * @file **A caller whose email address is not verified is refused with 403 on the routes
  * that send mail on the tenant's behalf, before the body is read.**
  *
- * Node puts `EmailVerifiedGuard` on two routes, creating an invitation and resending
- * one, because an unverified inviter could spray invitations from an unproven address.
- * It runs after the session and ahead of the validation pipe, so an unverified caller who
- * also sends an invalid body is told to verify, not what is wrong with the body. Java
- * checked the claim inside the handler, after the body was bound, so the creating route
- * answered 400 where Node answers 403 (found by sending `{}` as an unverified member to
- * every secured route that takes a required body field: 51 routes, 1 differed).
+ * `EmailVerifiedGuard` sits on two routes, creating an invitation and resending one,
+ * because an unverified inviter could spray invitations from an unproven address. It
+ * runs after the session and ahead of the validation pipe, so an unverified caller who
+ * also sends an invalid body is told to verify, not what is wrong with the body. A check
+ * inside the handler would run after the body was bound and answer 400 instead.
  *
- * **The route set is found in the Java gateway's source, then named.** A scan of its
- * sources for a method annotated `@RequireVerifiedEmail` (the interceptor reads it from
- * the method, never the class) must find exactly the two routes named here, so a third
- * guarded route fails until it is given rows.
+ * **The route set is found in the source, then named.** A scan of the controllers for
+ * `EmailVerifiedGuard` in a `@UseGuards(...)` list must find exactly the two routes named
+ * here, so a third guarded route fails until it is given rows.
  *
  * **Controls make each refusal mean something.** The creating route is also sent the same
  * invalid body by a VERIFIED caller, which must be a 400: that shows the body really is
@@ -41,12 +38,18 @@ const RESEND = 'POST /api/v1/users/invitations/{id}/resend';
 
 describe('the routes that need a verified email', () => {
   it('are exactly the two named here', () => {
-    const guarded = globSync('apps/api-gateway-java/src/main/java/**/*.java', {
-      cwd: REPO_ROOT,
-    }).flatMap((file) =>
+    const guarded = globSync(
+      'apps/api-gateway/src/modules/**/*.controller.ts',
+      {
+        cwd: REPO_ROOT,
+      },
+    ).flatMap((file) =>
       readFileSync(join(REPO_ROOT, file), 'utf8')
         .split('\n')
-        .filter((line) => /^\s*@RequireVerifiedEmail\s*$/u.test(line)),
+        .filter(
+          (line) =>
+            line.includes('@UseGuards(') && line.includes('EmailVerifiedGuard'),
+        ),
     );
 
     expect(guarded).toHaveLength(2);

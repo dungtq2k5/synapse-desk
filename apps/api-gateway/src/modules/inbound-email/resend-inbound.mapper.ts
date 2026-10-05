@@ -120,8 +120,7 @@ export function toMappedInboundEmail(
  *
  * Never splits a surrogate pair: a cut that lands between the two halves of an
  * astral character is moved one unit earlier, so the result is always well
- * formed. The Java gateway cuts the same way, and the key it hashes from the body
- * is the same in both.
+ * formed.
  *
  * @example capBody('a'.repeat(50001)).truncated // true
  */

@@ -1,17 +1,13 @@
 /**
  * @file **A request that arrives with no body, and no Content-Type, is treated as an empty
- * JSON object, as Node's body parser treats it.**
+ * JSON object.**
  *
- * Node never asks a bodiless request for a Content-Type: its parser leaves the body as
+ * The body parser never asks a bodiless request for a Content-Type: it leaves the body as
  * `{}`. So a route whose body is all-optional is SERVED a bare `POST` (resolve a ticket,
  * mark one read, close it, patch a record with nothing to change), and a route with a
- * required field answers 400 for the field. Spring matches a route's `consumes` condition
- * at routing time and answers 415 to a request with no Content-Type, before any guard
- * runs, so Java refused every one of these. Measured by sending each body route a bare
- * request as a fully permitted caller on both gateways: 80 routes, and the two gateways
- * disagreed on every one. 21 routes Node serves were refused with 415 (a client that calls
- * them without a body works against Node and breaks against Java), and 59 whose body has a
- * required field answered 400 on Node and 415 on Java.
+ * required field answers 400 for the field. A server that matched a route's content type
+ * at routing time would answer 415 to all of them, before any guard runs, and break every
+ * client that calls an all-optional route without a body.
  *
  * **Generated from the document: every operation that takes a body.** Required fields
  * decide which rule a route follows, and both are rows:

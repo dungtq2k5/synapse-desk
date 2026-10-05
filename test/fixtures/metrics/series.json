@@ -1,9 +1,0 @@
-{
-  "http_requests_total": ["method", "route", "status"],
-  "http_request_duration_seconds": ["method", "route", "status"],
-  "grpc_client_duration_seconds": ["code", "peer"],
-  "websocket_connections": [],
-  "websocket_events_total": ["event"],
-  "inbound_email_webhook_total": ["outcome"],
-  "job_last_success_timestamp_seconds": ["owner_service", "scheduled_job"]
-}

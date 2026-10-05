@@ -31,15 +31,9 @@
     "test:e2e:notification": "dotenv -e apps/notification-service/.env.test.local -e apps/notification-service/.env.test -- jest --config apps/notification-service/jest.e2e.config.ts --runInBand",
     "test:e2e:ingestion": "dotenv -e apps/ingestion-service/.env.test.local -e apps/ingestion-service/.env.test -- jest --config apps/ingestion-service/jest.e2e.config.ts --runInBand",
     "test:e2e:storage": "dotenv -e apps/storage-service/.env.test.local -e apps/storage-service/.env.test -- jest --config apps/storage-service/jest.e2e.config.ts --runInBand",
-    "//test:contract": "The gateway CONTRACT harness: it starts the gateway as a PROCESS and asserts what a client sees, so one suite can serve either implementation (plan 78). Not a `npm test` project — it pulls two containers and starts a process, and `npm test` must stay runnable on a machine with nothing started. `GATEWAY_IMPL=node|java` picks what is started, and `run-contract-suite.mjs` BUILDS that one first: the harness starts a built gateway, and a built-output check can see an absent build but never a stale one (plan 80 departure 1).",
+    "//test:contract": "The gateway CONTRACT harness: it starts the gateway as a PROCESS and asserts what a client sees. Not a `npm test` project — it pulls two containers and starts a process, and `npm test` must stay runnable on a machine with nothing started. `run-contract-suite.mjs` BUILDS the gateway first: the harness starts a built gateway, and a built-output check can see an absent build but never a stale one (plan 80 departure 1).",
     "test:contract": "node scripts/run-contract-suite.mjs",
-    "test:contract:java": "GATEWAY_IMPL=java node scripts/run-contract-suite.mjs",
-    "test:contract:java:sharded": "CONTRACT_SHARDS=6 GATEWAY_IMPL=java node scripts/run-contract-suite.mjs",
-    "//test:gateway-java": "surefire, the `*Test` rows — nothing started. The Maven equivalent of `test`, reachable from the root the way the Node gateway already is; before this the only path was `cd apps/api-gateway-java && ./mvnw test`.",
-    "test:gateway-java": "cd apps/api-gateway-java && ./mvnw test",
-    "//test:e2e:gateway-java": "failsafe, the `*IT` rows — needs Redis, like `test:e2e:gateway`. The lease's claim is a Lua script; a fake that \"runs\" it would be a reimplementation of Redis, which is the one thing it must not be — see `pom.xml`'s own comment on the failsafe plugin.",
-    "test:e2e:gateway-java": "cd apps/api-gateway-java && ./mvnw verify",
-    "images:boot-gateways": "./docker/boot-gateways.sh",
+    "images:boot-gateway": "./docker/boot-gateway.sh",
     "test:e2e": "npm run test:e2e:gateway && npm run test:e2e:auth && npm run test:e2e:ticket && npm run test:e2e:notification && npm run test:e2e:ingestion && npm run test:e2e:storage",
     "//test:system": "DESTRUCTIVE to three stores on every run, in setup AND teardown: flushes the entire dev Redis (BullMQ schedules, throttler counters, AI quota counters, socket channels, alert levels), drops the Qdrant collection, and resets the JetStream streams. Postgres alone is spared — wipe it first with `node scripts/reset-databases.mjs --dev-only`; seeding happens inside the run, after the stack is up, because both seeders depend on rows a service writes at boot.",
     "test:system": "jest --config test/system/jest.config.ts",
@@ -64,9 +58,6 @@
     "build:libs": "turbo run build --filter=./libs/*",
     "openapi:export": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs",
     "openapi:check": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs --check",
-    "//java:contracts": "The Java gateway's shared vocabulary, generated from the BUILT `libs/common` — the same artifact the services load, so what it publishes is what runs. Tracked output: the Java build compiles these files, so a drifted one is a compile error or a wrong string, never a missing file. It builds the library first for the reason `openapi:export` does: absence is detectable, staleness is not.",
-    "java:contracts": "npm run build:libs && node scripts/export-java-contracts.mjs",
-    "java:contracts:check": "npm run build:libs && node scripts/export-java-contracts.mjs --check",
     "dev:py": "npm run dev -w @synapsedesk/rag-service",
     "dev": "turbo run dev",
     "//lint": "turbo lints WORKSPACES, and `scripts/seed-demo/` and `test/system/` are not workspaces — both were invisible to this command until the trailing eslint call, the same shape as the root tsconfig include gap. The loose `.mjs` scripts stay outside: they are plain JS no lint project parses, which is the status quo this line inherits rather than a decision it makes. `lint:md` is chained here rather than left as its own CI step so that a developer running `npm run lint` cannot pass locally and fail in CI on a doc — which is the whole failure a lint command exists to prevent. CI therefore has no separate markdown step; `npm run lint` is the one that runs it, and `ci-contract.spec.ts` REQUIRES that invocation.",
@@ -77,9 +68,9 @@
     "lint:md:fix": "markdownlint-cli2 --fix",
     "lint:py": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval && .venv/bin/python scripts/check-imports.py",
     "lint:py:fix": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval --fix",
-    "format": "prettier --write \"{apps,libs,scripts,test,docker,.vscode}/**/*.{ts,mjs,json,java,xml}\" \"*.{ts,mjs,json,jsonc,yaml}\" \"docs/**/*.json\" \"k8s/**/*.yaml\"",
+    "format": "prettier --write \"{apps,libs,scripts,test,docker,.vscode}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,jsonc,yaml}\" \"docs/**/*.json\" \"k8s/**/*.yaml\"",
     "//format": "`.vscode` is in the directory list because the repo TRACKS `.vscode/settings.json` — a shared, hand-written config, so prettier owns its formatting exactly as it owns `docker/firebase/firebase.json`. It is a dot-directory in a list of source directories and reads like editor cruft; it is not. Deleting it turns `ci-contract.spec.ts`'s prettier-coverage row red, which is how this entry arrived. An editor file that should NOT be formatted belongs in `.prettierignore` instead, beside the lockfile entry that states that rule.",
-    "format:check": "prettier --check \"{apps,libs,scripts,test,docker,.vscode}/**/*.{ts,mjs,json,java,xml}\" \"*.{ts,mjs,json,jsonc,yaml}\" \"docs/**/*.json\" \"k8s/**/*.yaml\"",
+    "format:check": "prettier --check \"{apps,libs,scripts,test,docker,.vscode}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,jsonc,yaml}\" \"docs/**/*.json\" \"k8s/**/*.yaml\"",
     "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo",
     "typecheck:py": "cd apps/rag-service && .venv/bin/pyrefly check",
     "clean": "turbo run clean",
@@ -103,7 +94,6 @@
     "proto:lint": "npm run proto:lint -w @synapsedesk/grpc-proto",
     "proto:breaking": "npm run proto:breaking -w @synapsedesk/grpc-proto"
   },
-  "//simple-git-hooks": "`*.java` goes through `prettier --write` here too — this repo already formats Java with `prettier-plugin-java` (see `format`/`format:check` above), not Spotless, so the hook uses the tool this repo already has rather than one it doesn't.",
   "//simple-git-hooks.heap": "`NODE_OPTIONS` raises Node's heap for this one command. `eslint --fix` type-checks, and measured on a commit touching 13 TypeScript files across four projects it peaks at 4.2 GB against Node's 4 GB default — an out-of-memory crash that `lint-staged` reports only as a failed task and then reverts to the original state.",
   "simple-git-hooks": {
     "pre-commit": "NODE_OPTIONS=--max-old-space-size=6144 npx lint-staged"
@@ -113,7 +103,7 @@
     "{apps,libs,scripts/seed-demo,test/system,test/gateway-contract}/**/*.ts": [
       "eslint --fix"
     ],
-    "*.{ts,tsx,js,mjs,cjs,json,java,xml}": [
+    "*.{ts,tsx,js,mjs,cjs,json}": [
       "prettier --write"
     ],
     "*.md": [
@@ -124,7 +114,6 @@
     "@bufbuild/buf": "^1.72.0",
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
-    "@prettier/plugin-xml": "^3.4.2",
     "@prisma/adapter-pg": "^7.10.0",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.47",
@@ -138,7 +127,6 @@
     "markdownlint-cli2": "^0.23.2",
     "openapi-schema-validator": "^12.1.3",
     "prettier": "^3.9.6",
-    "prettier-plugin-java": "^2.11.0",
     "prisma-erd-generator": "^2.4.4",
     "rimraf": "^6.1.3",
     "simple-git-hooks": "^2.14.0",

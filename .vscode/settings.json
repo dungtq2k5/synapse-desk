@@ -14,18 +14,7 @@
   "python.testing.pytestEnabled": true,
   "python.testing.cwd": "${workspaceFolder}/apps/rag-service",
   "markdown.validate.enabled": true,
-  "java.compile.nullAnalysis.mode": "automatic",
-  "java.configuration.updateBuildConfiguration": "automatic",
   "liveServer.settings.port": 5501,
-  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
-  "[java]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-    "editor.formatOnSave": false,
-    "editor.formatOnType": false,
-    "editor.formatOnPaste": false
-  },
-  "prettier.documentSelectors": ["**/*.java", "**/*.xml"],
-  "java.format.enabled": false,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true
 }

@@ -4,8 +4,8 @@
  *
  * **Cookies are the whole session mechanism here** — the access token is
  * `HttpOnly`, so a row that authenticated with a header would exercise a path
- * no browser takes. Each flag is asserted because each is a decision the Java
- * gateway has to reproduce exactly: a missing `HttpOnly` is an XSS-readable
+ * no browser takes. Each flag is asserted because each is a decision a
+ * client depends on: a missing `HttpOnly` is an XSS-readable
  * session, and `Max-Age` is a unit trap — the env carries milliseconds and the
  * wire carries SECONDS.
  */
@@ -172,7 +172,7 @@ describe('authentication', () => {
       expect(String(access!.attributes.samesite).toLowerCase()).toBe('lax');
 
       // **Seconds on the wire, milliseconds in the environment.** The conversion
-      // is the one the Java binding has to get right, and the refresh cookie's
+      // is the one to get right, and the refresh cookie's
       // two-hour bug came from exactly this slip.
       expect(access!.attributes['max-age']).toBe(
         String(Number(GATEWAY_ENV.COOKIE_ACCESS_MAX_AGE) / 1000),
@@ -216,7 +216,7 @@ describe('authentication', () => {
     async () => {
       // What `expect(stubs.user.getCurrentUser).toHaveBeenCalledWith(…)` checked
       // in-process, checked at the network instead — the eight metadata keys are
-      // the contract every peer reads, and a Java gateway that packed seven
+      // the contract every peer reads, and a gateway that packed seven
       // would look correct until a peer applied the wrong tenant filter.
       peers.auth.on('UserService/GetCurrentUser').reply({
         user: wireUser(),
@@ -313,8 +313,8 @@ describe('authentication', () => {
       expect(access).not.toBeNull();
 
       // A clear is an empty value AND an expiry that has already passed —
-      // Express writes `Max-Age=0`, Spring's `ResponseCookie` may instead
-      // write only a past `Expires`; either is a clear, so both are accepted.
+      // Express writes `Max-Age=0`, and a past `Expires` alone would be a clear
+      // too, so both are accepted.
       expect(access!.value).toBe('');
       const maxAgeIsZero = access!.attributes['max-age'] === '0';
       const expiresIsPast =

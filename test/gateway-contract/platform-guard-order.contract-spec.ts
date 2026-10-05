@@ -2,16 +2,13 @@
  * @file **A caller who is not a super admin is refused a `/platform` route with 403 BEFORE
  * the body is read, however invalid the body is.**
  *
- * Node guards the whole `/platform` surface with `SuperAdminGuard`, which runs ahead of
- * the validation pipe. A tenant member who sends an invalid body to one of these routes
- * is told they are not allowed, not what is wrong with a body they have no right to send.
- * Java checked the claim inline in each handler, AFTER Spring had bound and validated the
- * body, so the same caller got a 400 naming the missing fields on 7 of the 25 routes
- * (measured by sending `{}` as a member to every secured route with a required body field
- * on both gateways: 58 routes, 51 agreed, and these were the 7 that did not).
+ * `SuperAdminGuard` guards the whole `/platform` surface, ahead of the validation pipe.
+ * A tenant member who sends an invalid body to one of these routes is told they are not
+ * allowed, not what is wrong with a body they have no right to send. A check inside each
+ * handler would run after the body was bound and answer 400 naming the missing fields.
  *
- * **The route set is Node's own.** The 25 `superAdminOnly` rows of the route table
- * `OrgAccessRoutesTest` already holds against Node are exactly the routes under
+ * **The route set is the gateway's own.** The 25 `superAdminOnly` rows of the route table
+ * `org-access-routes.spec.ts` recomputes from the controllers are exactly the routes under
  * `/platform`; the rows are that set intersected with the document's operations that take a
  * body with a required field, so a route that is all-optional is not a row it could pass
  * for the wrong reason.

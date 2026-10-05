@@ -4,8 +4,8 @@
  * Every gateway -> peer call is timed under the PEER it reached and the status it
  * ended with. The `code` label is Node's, quirks included: `OK`, or the numeric
  * status as a string (`5`, `14`), and no `method` label. A dashboard reads these
- * values, so a Java gateway that named them differently would break the panel on
- * the day of cutover and nothing else would notice.
+ * values, so a change to how they are named would break the panel and nothing
+ * else would notice.
  *
  * Each row measures a DELTA against the peer's own call record: "recorded once
  * per call" is only checkable against what the peer actually saw.

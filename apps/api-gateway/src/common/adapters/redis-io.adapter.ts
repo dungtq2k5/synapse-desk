@@ -79,10 +79,9 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   /**
-   * On `WS_PORT`, whatever port a gateway decorator names: the Java gateway serves
-   * Socket.IO on its own listener at `WS_PORT`, and the two implementations must
-   * answer on the same port for one Service port and one Ingress path to reach
-   * whichever holds the lease. Read here rather than in the decorator, which is
+   * On `WS_PORT`, whatever port a gateway decorator names: Socket.IO's own
+   * listener, which one Service port and one Ingress path reach. Read here rather
+   * than in the decorator, which is
    * evaluated before `ConfigModule` has loaded the environment. `0` attaches to
    * the HTTP server instead.
    */

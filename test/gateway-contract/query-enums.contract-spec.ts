@@ -47,7 +47,7 @@ const SOME_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 /**
  * A value that satisfies a REQUIRED, non-enum query parameter, so that what a row
  * refuses is the enum and not a missing date. Without it the analytics
- * `granularity` rows passed on both gateways for the wrong reason: `from` and `to`
+ * `granularity` rows passed for the wrong reason: `from` and `to`
  * are required, and their absence is a 400 whatever `granularity` says.
  */
 const REQUIRED_VALUE: Record<string, string> = {

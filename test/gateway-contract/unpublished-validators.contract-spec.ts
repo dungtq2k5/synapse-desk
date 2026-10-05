@@ -20,9 +20,9 @@
  * name the field, and each invalid sample is chosen to break only the validator under
  * test, but nothing checks that mechanically, so a sample that broke two at once would
  * still pass. The mechanical fix, asserting the refusal's message mentions the
- * constraint, is not available: that wording is class-validator's on one side and the
- * Java gateway's on the other, and the parity rule holds two implementations equal only
- * on text this repository writes. Careful samples and this note are the trade.
+ * constraint, is not available: that wording is class-validator's, not this
+ * repository's, and a row pinned to a library's text breaks on its next release.
+ * Careful samples and this note are the trade.
  *
  * **Throttling.** An authenticated caller is throttled per user and the export routes
  * allow 5 a minute, so every row acts as its own fresh subject ({@link freshSubject}).
@@ -257,8 +257,7 @@ describe('a constraint the document does not publish', () => {
     () => peers,
   );
 
-  // One row per field and route, each with a LITERAL title, so a row Java does not enforce
-  // can be named in `SKIPPED_FOR_JAVA`.
+  // One row per field and route, each with a LITERAL title, so a failure names both.
   for (const row of rows) {
     rowFor('Ops')(
       `**\`${row.request.method} ${row.request.path}\` refuses a \`${row.item.property}\` that breaks \`@${row.item.kind}\`, before any peer is called**`,

@@ -13,10 +13,10 @@
  * skips the call and answers 403 for some other reason, or skips it and lets
  * everything through, fails here for the right reason.
  *
- * What is pinned is what Node DOES: the access table, the category each route
+ * What is pinned is what the gateway DOES: the access table, the category each route
  * resolves to, the three requests that are never gated, the thirty-second cache in
- * Redis under `org-status:<id>` (shared with the Java gateway, so the value is read
- * by whichever replica asks next), failing CLOSED, and that a platform change
+ * Redis under `org-status:<id>` (shared by every replica, so the value is read by
+ * whichever replica asks next), failing CLOSED, and that a platform change
  * invalidates the cached decision. The category of EVERY route is held by the table
  * `org-access-routes.json`; these rows prove the behaviour end to end.
  */

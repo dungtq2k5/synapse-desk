@@ -3,13 +3,12 @@ import { join } from 'node:path';
 import { stripQuotedHtml, toStoredBody } from './quoted-reply';
 
 /**
- * A randomized corpus the Java HTML stripping is held to, recomputed from the
- * real functions on every run.
+ * A randomized corpus for the HTML stripping, recomputed from the real functions
+ * on every run.
  *
  * The hand-written rows in `quoted-reply-parity.json` pin the cases somebody
- * thought of; this holds the Java implementation — written as scanners, not
- * regular expressions, so it is linear — to the same answers on 900 sequences of
- * the tokens the patterns care about (openers that are never closed, tags that
+ * thought of; this holds the stripping to its answers on 900 sequences of the
+ * tokens the patterns care about (openers that are never closed, tags that
  * almost match, upper and lower case, the case folds that differ between ASCII
  * and Unicode comparison). The corpus is seeded, so it is the same every run, and
  * a mismatch names the input.

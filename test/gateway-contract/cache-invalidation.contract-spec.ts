@@ -1,20 +1,16 @@
 /**
- * @file The NATS cache-invalidation consumer. Closes known gap 42: the Java
- * gateway used to write the shared `cache:` keyspace and evict nothing.
+ * @file The NATS cache-invalidation consumer.
  *
  * Warmed and verified through Redis DIRECTLY, via `ioredis` — not through an
  * HTTP round trip. Two of the four scopes this consumer drops
- * (`tickets`, `settings`) have no real cached ROUTE in either gateway today
- * (`CacheServiceIT`'s own precedent: "Neither gateway caches a real route
- * yet" for several scopes), so a route-shaped proof would only work for two
- * of the four. Redis is exactly as external as the NATS broker this file
- * also connects to directly — reaching into shared infrastructure, not into
- * either gateway's process.
+ * (`tickets`, `settings`) have no real cached ROUTE today, so a route-shaped
+ * proof would only work for two of the four. Redis is exactly as external as
+ * the NATS broker this file also connects to directly — reaching into shared
+ * infrastructure, not into the gateway's process.
  */
 
 import { connect, JSONCodec, type NatsConnection } from 'nats';
 import Redis from 'ioredis';
-import { sign } from 'jsonwebtoken';
 import {
   BILLING_PATTERNS,
   DOCUMENT_PATTERNS,
@@ -22,11 +18,9 @@ import {
   TICKET_PATTERNS,
 } from '@synapsedesk/common';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
-import { API, Session } from './client';
-import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
-import { type Peers, startPeers, TEST_KEYS } from './peers';
+import { type Gateway, startGateway } from './gateway';
+import { type Peers, startPeers } from './peers';
 import { readRunState } from './run-state';
-import { IMPL } from './pending';
 
 const ORGANIZATION = '99999999-9999-4999-8999-999999999999';
 const SETTLE_MS = 800;
@@ -34,41 +28,6 @@ const SETTLE_MS = 800;
 const cacheKey = (scope: string) => `cache:${ORGANIZATION}|${scope}|`;
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-
-const headers = () => ({
-  cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
-    {
-      sub: '88888888-8888-4888-8888-888888888888',
-      organizationId: ORGANIZATION,
-      isSuperAdmin: false,
-      departmentIds: [],
-      permissionCodes: [],
-      isEmailVerified: true,
-    },
-    TEST_KEYS.access(),
-    { algorithm: 'RS256', expiresIn: '15m' },
-  )}`,
-});
-
-const wireOrganization = () => ({
-  id: ORGANIZATION,
-  name: 'Acme',
-  slug: 'acme',
-  status: toProtoOrgStatus(OrgStatus.ACTIVE),
-  enforceTwoFactor: false,
-  allowedEmailDomains: [],
-  maxAgentSeats: 10,
-  maxStorageBytes: '1000000000',
-  monthlyAiTokenBudget: '5000000',
-  aiModelTier: 'AI_MODEL_TIER_FAST',
-  billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
-  maxDocumentBytes: '104857600',
-  maxAttachmentBytes: '10485760',
-  maxDocumentUploads: 100,
-  maxAnalyticsRangeDays: 90,
-  createdAt: { seconds: 1_756_684_800, nanos: 0 },
-  updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-});
 
 describe('cache invalidation — one gateway, the four scope-drop rules', () => {
   let peers: Peers;
@@ -203,85 +162,5 @@ describe('cache invalidation — one gateway, the four scope-drop rules', () => 
     await settle();
 
     expect(await isWarm('tickets')).toBe(false);
-  });
-});
-
-describe('cache invalidation — active vs. standby, cross-implementation', () => {
-  const OTHER_IMPL = IMPL === 'java' ? 'node' : 'java';
-
-  let peers: Peers;
-  let active: Gateway;
-  let standby: Gateway;
-  let nats: NatsConnection;
-  let redis: Redis;
-
-  beforeAll(async () => {
-    const { redisUrl, natsUrl } = readRunState();
-    peers = await startPeers();
-    peers.auth.on('OrganizationService/GetOrganizationStatus').always({
-      status: toProtoOrgStatus(OrgStatus.ACTIVE),
-      deleted: false,
-    });
-    peers.auth
-      .on('OrganizationService/GetCurrentOrganization')
-      .always(wireOrganization());
-
-    const env = { ...peers.env, REDIS_URL: redisUrl, NATS_URL: natsUrl };
-
-    // The OTHER implementation, started FIRST so it claims the lease alone —
-    // it becomes the ACTIVE side, `startGateway`'s default readiness probe
-    // proves it (the lease's own claim is what `/health/ready` gates on).
-    active = await startGateway(env, { impl: OTHER_IMPL });
-
-    // THIS arm, started second: the lease is already held by the other
-    // implementation, so this one can only ever answer 503 on `/health/ready`
-    // — `probe: 'live'` is what lets `startGateway` return without waiting
-    // for a readiness that will not come while `active` holds the lease.
-    standby = await startGateway(env, { impl: IMPL, probe: 'live' });
-
-    nats = await connect({ servers: natsUrl });
-    redis = new Redis(redisUrl);
-  }, 120_000);
-
-  afterAll(async () => {
-    await nats?.drain();
-    redis?.disconnect();
-    await standby?.stop();
-    await active?.stop();
-    await peers?.stop();
-  });
-
-  it('**a standby holds no subscription — its own `/health/ready` proves it, structurally**', async () => {
-    const response = await fetch(`${standby.baseUrl}/health/ready`);
-
-    expect(response.status).toBe(503);
-  });
-
-  it(`**cross-implementation: the ACTIVE (${OTHER_IMPL}) side evicts what the STANDBY (${IMPL}) cached**`, async () => {
-    await redis.del(cacheKey('organizations'));
-
-    // Warmed through THIS arm's own HTTP surface — a standby still answers
-    // ordinary requests; only its NATS consumer and its readiness are gated.
-    const response = await new Session(standby.baseUrl).get(
-      `${API}/organizations/current`,
-      headers(),
-    );
-    expect(response.status).toBe(200);
-    expect(await redis.exists(cacheKey('organizations'))).toBe(1);
-
-    nats.publish(
-      BILLING_PATTERNS.entitlementsChanged,
-      JSONCodec().encode({
-        pattern: BILLING_PATTERNS.entitlementsChanged,
-        data: { organizationId: ORGANIZATION },
-      }),
-    );
-    await nats.flush();
-    await settle();
-
-    // Only `active` (the OTHER implementation) has a live consumer — this
-    // eviction cannot be attributed to `standby`, which row above proves has
-    // none.
-    expect(await redis.exists(cacheKey('organizations'))).toBe(0);
   });
 });

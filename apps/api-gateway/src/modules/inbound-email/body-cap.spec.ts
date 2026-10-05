@@ -15,9 +15,7 @@ type Row = [
  * property it exists for.
  *
  * The cap is applied where the fetched mail enters, because the patterns that
- * strip quoted history and HTML are quadratic on a body of unclosed tags. Java
- * cuts the same way (`body-cap-parity.json` is read by `InboundBodyCapParityTest`),
- * and the key it hashes from the body is the same in both.
+ * strip quoted history and HTML are quadratic on a body of unclosed tags.
  */
 describe('the inbound body cap', () => {
   const table = JSON.parse(

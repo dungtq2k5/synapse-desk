@@ -108,8 +108,8 @@ describe('pagination, GraphQL and the webhooks', () => {
       });
 
       const [call] = peers.auth.calls('RoleService/ListRoles');
-      // The query DTO travels as the proto's own `page` message — the shape a
-      // Java gateway has to build too, not a flattened pair.
+      // The query DTO travels as the proto's own `page` message, not a
+      // flattened pair.
       expect(call.request).toMatchObject({ page: { page: 2, limit: 10 } });
     },
   );
@@ -171,9 +171,9 @@ describe('pagination, GraphQL and the webhooks', () => {
 
       // **Status not asserted, same reasoning as Cost, Introspection and
       // Depth.** Apollo answers a validation failure (an unknown field
-      // included) with 400; Spring for GraphQL answers 200 with the error
+      // included) with 400, and another server may answer 200 with the error
       // inside, its own convention for a request that reached the
-      // `/graphql` endpoint at all. The property both implementations
+      // `/graphql` endpoint at all. The property either
       // share — and the one this row's own title asks for — is that it is
       // a GraphQL error and not a 404, which `toHaveProperty('errors')`
       // already proves regardless of the status code either side chose.

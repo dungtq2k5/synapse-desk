@@ -163,18 +163,15 @@ export const MAX_DATE_HEADER_LENGTH = 255;
  * unclosed tags costs time proportional to the SQUARE of its length. Measured on
  * the worst shape (`<div ` repeated, no `>`), through `toStoredBody`:
  *
- * | Length | Node (regular expressions) | Java (scanners) |
- * | ---: | ---: | ---: |
- * | 20 000 | ~90 ms | under 10 ms |
- * | 50 000 | 540 ms | ~10 ms |
- * | 100 000 | 2 132 ms | ~15 ms |
- * | 800 000 | ~two minutes | ~90 ms |
+ * | Length | Time |
+ * | ---: | ---: |
+ * | 20 000 | ~90 ms |
+ * | 50 000 | 540 ms |
+ * | 100 000 | 2 132 ms |
+ * | 800 000 | ~two minutes |
  *
- * Java's patterns are scanners and linear (its regular expressions took 4.3 s at
- * 50 000 and about ten minutes at 800 000, which was a divergence the port
- * introduced), so the number that bounds the cost is Node's: at 50 000 one
- * hostile mail costs a request thread about half a second, where uncapped it was
- * unbounded.
+ * So at 50 000 one hostile mail costs a request thread about half a second, where
+ * uncapped it was unbounded.
  *
  * **Why not lower.** HTML from some clients carries a large `<style>` head
  * before the message, and a cut that lands before the message loses what the
@@ -184,8 +181,8 @@ export const MAX_DATE_HEADER_LENGTH = 255;
  * what the sender wrote last is at the top, which survives the cut. The ticket
  * says the body was shortened ({@link InboundEmailDto.bodyTruncated}).
  *
- * Counted in code units because that is `String.length` in both gateways: a byte
- * cap would depend on how each encodes a lone surrogate.
+ * Counted in code units because that is `String.length`: a byte cap would depend
+ * on how a lone surrogate is encoded.
  */
 export const MAX_INBOUND_BODY_LENGTH = 50000;
 

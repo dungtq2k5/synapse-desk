@@ -15,7 +15,6 @@ import { Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
-import { rowForField } from './pending';
 
 describe('documents, ingestion jobs and notifications', () => {
   let gateway: Gateway;
@@ -93,311 +92,283 @@ describe('documents, ingestion jobs and notifications', () => {
   });
 
   describe('Documents', () => {
-    rowForField('Query.document')(
-      '**`Query.document` resolves one document**',
-      async () => {
-        const id = '55555555-5555-4555-8555-555555555555';
-        peers.ingestion
-          .on('DocumentService/GetDocument')
-          .reply(wireDocument(id));
+    it('**`Query.document` resolves one document**', async () => {
+      const id = '55555555-5555-4555-8555-555555555555';
+      peers.ingestion.on('DocumentService/GetDocument').reply(wireDocument(id));
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: { document: { id: string; title: string; fileType: string } };
-        }>(
-          '/graphql',
-          { query: `{ document(id: "${id}") { id title fileType } }` },
-          headers(['document.read']),
-        );
+      const response = await new Session(gateway.baseUrl).post<{
+        data: { document: { id: string; title: string; fileType: string } };
+      }>(
+        '/graphql',
+        { query: `{ document(id: "${id}") { id title fileType } }` },
+        headers(['document.read']),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.document).toEqual({
-          id,
-          title: 'Employee Handbook',
-          fileType: 'pdf',
-        });
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.document).toEqual({
+        id,
+        title: 'Employee Handbook',
+        fileType: 'pdf',
+      });
+    });
 
-    rowForField('Query.documents')(
-      '**`Query.documents` resolves a page, and `createdBy` batches through the users loader**',
-      async () => {
-        const id = '66666666-6666-4666-8666-666666666666';
-        peers.ingestion.on('DocumentService/ListDocuments').reply({
-          items: [wireDocument(id)],
-          meta: page(1),
-        });
-        peers.auth.on('UserService/ListUsersByIds').reply({
-          items: [],
-          summaries: [
-            { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
-          ],
-        });
+    it('**`Query.documents` resolves a page, and `createdBy` batches through the users loader**', async () => {
+      const id = '66666666-6666-4666-8666-666666666666';
+      peers.ingestion.on('DocumentService/ListDocuments').reply({
+        items: [wireDocument(id)],
+        meta: page(1),
+      });
+      peers.auth.on('UserService/ListUsersByIds').reply({
+        items: [],
+        summaries: [
+          { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
+        ],
+      });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: {
-            documents: {
-              items: { id: string; createdBy: { fullName: string } }[];
-            };
+      const response = await new Session(gateway.baseUrl).post<{
+        data: {
+          documents: {
+            items: { id: string; createdBy: { fullName: string } }[];
           };
-        }>(
-          '/graphql',
-          {
-            query:
-              '{ documents(first: 10, page: 1) { items { id createdBy { fullName } } } }',
-          },
-          headers(['document.read']),
-        );
+        };
+      }>(
+        '/graphql',
+        {
+          query:
+            '{ documents(first: 10, page: 1) { items { id createdBy { fullName } } } }',
+        },
+        headers(['document.read']),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.documents.items[0].createdBy).toEqual({
-          fullName: 'Ada Lovelace',
-        });
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.documents.items[0].createdBy).toEqual({
+        fullName: 'Ada Lovelace',
+      });
+    });
 
-    rowForField('Query.document')(
-      '**`Document.departments` truncates at MAX_EDGE_LIST, `departmentCount` reports the true total**',
-      async () => {
-        const id = '77777777-7777-4777-8777-777777777777';
-        const departmentIds = Array.from(
-          { length: 251 },
-          (_, index) =>
-            `88888888-8888-4888-8888-${String(index).padStart(12, '0')}`,
-        );
-        peers.ingestion
-          .on('DocumentService/GetDocument')
-          .reply(wireDocument(id, { departmentIds }));
-        // Sliced BEFORE the batch, so the peer receives exactly the first 50.
-        peers.auth.on('DepartmentService/ListDepartmentsByIds').reply({
-          items: departmentIds.slice(0, MAX_EDGE_LIST).map((deptId) => ({
-            id: deptId,
-            name: `Department ${deptId.slice(0, 8)}`,
-            description: undefined,
-          })),
-        });
+    it('**`Document.departments` truncates at MAX_EDGE_LIST, `departmentCount` reports the true total**', async () => {
+      const id = '77777777-7777-4777-8777-777777777777';
+      const departmentIds = Array.from(
+        { length: 251 },
+        (_, index) =>
+          `88888888-8888-4888-8888-${String(index).padStart(12, '0')}`,
+      );
+      peers.ingestion
+        .on('DocumentService/GetDocument')
+        .reply(wireDocument(id, { departmentIds }));
+      // Sliced BEFORE the batch, so the peer receives exactly the first 50.
+      peers.auth.on('DepartmentService/ListDepartmentsByIds').reply({
+        items: departmentIds.slice(0, MAX_EDGE_LIST).map((deptId) => ({
+          id: deptId,
+          name: `Department ${deptId.slice(0, 8)}`,
+          description: undefined,
+        })),
+      });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: {
-            document: {
-              departments: { id: string }[];
-              departmentCount: number;
-            };
+      const response = await new Session(gateway.baseUrl).post<{
+        data: {
+          document: {
+            departments: { id: string }[];
+            departmentCount: number;
           };
-        }>(
-          '/graphql',
-          {
-            query: `{ document(id: "${id}") { departments { id } departmentCount } }`,
-          },
-          headers(['document.read']),
-        );
+        };
+      }>(
+        '/graphql',
+        {
+          query: `{ document(id: "${id}") { departments { id } departmentCount } }`,
+        },
+        headers(['document.read']),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.document.departments).toHaveLength(
-          MAX_EDGE_LIST,
-        );
-        expect(response.body.data.document.departmentCount).toBe(251);
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.document.departments).toHaveLength(
+        MAX_EDGE_LIST,
+      );
+      expect(response.body.data.document.departmentCount).toBe(251);
 
-        const [call] = peers.auth.calls(
-          'DepartmentService/ListDepartmentsByIds',
-        );
-        expect(
-          (call.request as { departmentIds: string[] }).departmentIds,
-        ).toHaveLength(MAX_EDGE_LIST);
-      },
-    );
+      const [call] = peers.auth.calls('DepartmentService/ListDepartmentsByIds');
+      expect(
+        (call.request as { departmentIds: string[] }).departmentIds,
+      ).toHaveLength(MAX_EDGE_LIST);
+    });
   });
 
   describe('Ingestion jobs', () => {
-    rowForField('Query.ingestionJob')(
-      '**`Query.ingestionJob` resolves one attempt**',
-      async () => {
-        const id = '99999999-9999-4999-8999-999999999999';
-        const documentId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
-        peers.ingestion.on('DocumentService/GetIngestionJob').reply({
-          id,
+    it('**`Query.ingestionJob` resolves one attempt**', async () => {
+      const id = '99999999-9999-4999-8999-999999999999';
+      const documentId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      peers.ingestion.on('DocumentService/GetIngestionJob').reply({
+        id,
+        documentId,
+        bullmqJobId: 'bull-1',
+        status: 5, // INGESTION_JOB_STATUS_COMPLETED
+        errorLog: '',
+        processedAt: { seconds: 1_756_684_800, nanos: 0 },
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
+
+      const response = await new Session(gateway.baseUrl).post<{
+        data: { ingestionJob: { id: string; status: string } };
+      }>(
+        '/graphql',
+        { query: `{ ingestionJob(id: "${id}") { id status } }` },
+        headers(['document.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.ingestionJob).toEqual({
+        id,
+        status: 'COMPLETED',
+      });
+    });
+
+    it('**25 jobs resolving `document` make exactly ONE batched call**', async () => {
+      const documentIds = Array.from(
+        { length: 25 },
+        (_, index) =>
+          `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`,
+      );
+      peers.ingestion.on('DocumentService/ListIngestionJobs').reply({
+        items: documentIds.map((documentId, index) => ({
+          id: `job-${index}`,
           documentId,
-          bullmqJobId: 'bull-1',
-          status: 5, // INGESTION_JOB_STATUS_COMPLETED
+          bullmqJobId: `bull-${index}`,
+          status: 3,
           errorLog: '',
           processedAt: { seconds: 1_756_684_800, nanos: 0 },
           createdAt: { seconds: 1_756_684_800, nanos: 0 },
-        });
+        })),
+        meta: page(25),
+      });
+      peers.ingestion.on('DocumentService/ListDocumentsByIds').reply({
+        items: documentIds.map((id) =>
+          wireDocument(id, { title: `Doc ${id.slice(0, 8)}` }),
+        ),
+      });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: { ingestionJob: { id: string; status: string } };
-        }>(
-          '/graphql',
-          { query: `{ ingestionJob(id: "${id}") { id status } }` },
-          headers(['document.read']),
-        );
-
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.ingestionJob).toEqual({
-          id,
-          status: 'COMPLETED',
-        });
-      },
-    );
-
-    rowForField('Query.ingestionJobs')(
-      '**25 jobs resolving `document` make exactly ONE batched call**',
-      async () => {
-        const documentIds = Array.from(
-          { length: 25 },
-          (_, index) =>
-            `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`,
-        );
-        peers.ingestion.on('DocumentService/ListIngestionJobs').reply({
-          items: documentIds.map((documentId, index) => ({
-            id: `job-${index}`,
-            documentId,
-            bullmqJobId: `bull-${index}`,
-            status: 3,
-            errorLog: '',
-            processedAt: { seconds: 1_756_684_800, nanos: 0 },
-            createdAt: { seconds: 1_756_684_800, nanos: 0 },
-          })),
-          meta: page(25),
-        });
-        peers.ingestion.on('DocumentService/ListDocumentsByIds').reply({
-          items: documentIds.map((id) =>
-            wireDocument(id, { title: `Doc ${id.slice(0, 8)}` }),
-          ),
-        });
-
-        const response = await new Session(gateway.baseUrl).post<{
-          data: {
-            ingestionJobs: {
-              items: { id: string; document: { title: string } }[];
-            };
+      const response = await new Session(gateway.baseUrl).post<{
+        data: {
+          ingestionJobs: {
+            items: { id: string; document: { title: string } }[];
           };
-        }>(
-          '/graphql',
-          {
-            query:
-              '{ ingestionJobs(first: 25) { items { id documentId document { title } } } }',
-          },
-          headers(['document.read']),
-        );
+        };
+      }>(
+        '/graphql',
+        {
+          query:
+            '{ ingestionJobs(first: 25) { items { id documentId document { title } } } }',
+        },
+        headers(['document.read']),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.ingestionJobs.items).toHaveLength(25);
-        expect(
-          peers.ingestion.calls('DocumentService/ListDocumentsByIds'),
-        ).toHaveLength(1);
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.ingestionJobs.items).toHaveLength(25);
+      expect(
+        peers.ingestion.calls('DocumentService/ListDocumentsByIds'),
+      ).toHaveLength(1);
+    });
   });
 
   describe('Notifications', () => {
-    rowForField('Query.notifications')(
-      '**`Query.notifications` resolves the feed, and `actor` batches through the users loader**',
-      async () => {
-        peers.notification.on('NotificationService/ListNotifications').reply({
-          items: [
-            {
-              id: 'cccccccc-1111-4111-8111-cccccccccccc',
-              organizationId: ORGANIZATION,
-              type: 1,
-              priority: 1,
-              title: 'Ticket assigned',
-              body: undefined,
-              data: '',
-              actionUrl: undefined,
-              actorId: USER,
-              resourceType: 1,
-              resourceId: undefined,
-              groupKey: undefined,
-              groupCount: 1,
-              readAt: undefined,
-              archivedAt: undefined,
-              createdAt: { seconds: 1_756_684_800, nanos: 0 },
-            },
-          ],
-          nextCursor: undefined,
-          hasMore: false,
-        });
-        peers.auth.on('UserService/ListUsersByIds').reply({
-          items: [],
-          summaries: [
-            { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
-          ],
-        });
+    it('**`Query.notifications` resolves the feed, and `actor` batches through the users loader**', async () => {
+      peers.notification.on('NotificationService/ListNotifications').reply({
+        items: [
+          {
+            id: 'cccccccc-1111-4111-8111-cccccccccccc',
+            organizationId: ORGANIZATION,
+            type: 1,
+            priority: 1,
+            title: 'Ticket assigned',
+            body: undefined,
+            data: '',
+            actionUrl: undefined,
+            actorId: USER,
+            resourceType: 1,
+            resourceId: undefined,
+            groupKey: undefined,
+            groupCount: 1,
+            readAt: undefined,
+            archivedAt: undefined,
+            createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          },
+        ],
+        nextCursor: undefined,
+        hasMore: false,
+      });
+      peers.auth.on('UserService/ListUsersByIds').reply({
+        items: [],
+        summaries: [
+          { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
+        ],
+      });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: {
-            notifications: {
-              items: {
-                id: string;
-                title: string;
-                actor: { fullName: string };
-              }[];
-              hasMore: boolean;
-            };
+      const response = await new Session(gateway.baseUrl).post<{
+        data: {
+          notifications: {
+            items: {
+              id: string;
+              title: string;
+              actor: { fullName: string };
+            }[];
+            hasMore: boolean;
           };
-        }>(
-          '/graphql',
-          {
-            query:
-              '{ notifications(first: 20) { items { id title actor { fullName } } hasMore } }',
-          },
-          headers(),
-        );
+        };
+      }>(
+        '/graphql',
+        {
+          query:
+            '{ notifications(first: 20) { items { id title actor { fullName } } hasMore } }',
+        },
+        headers(),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.notifications.items[0].actor).toEqual({
-          fullName: 'Ada Lovelace',
-        });
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('errors');
+      expect(response.body.data.notifications.items[0].actor).toEqual({
+        fullName: 'Ada Lovelace',
+      });
+    });
 
-    rowForField('Query.unreadNotificationCount')(
-      '**`Query.unreadNotificationCount` resolves a number, not a list**',
-      async () => {
-        peers.notification
-          .on('NotificationService/GetUnreadCount')
-          .reply({ count: 4 });
+    it('**`Query.unreadNotificationCount` resolves a number, not a list**', async () => {
+      peers.notification
+        .on('NotificationService/GetUnreadCount')
+        .reply({ count: 4 });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: { unreadNotificationCount: number };
-        }>('/graphql', { query: '{ unreadNotificationCount }' }, headers());
+      const response = await new Session(gateway.baseUrl).post<{
+        data: { unreadNotificationCount: number };
+      }>('/graphql', { query: '{ unreadNotificationCount }' }, headers());
 
-        expect(response.status).toBe(200);
-        expect(response.body.data.unreadNotificationCount).toBe(4);
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body.data.unreadNotificationCount).toBe(4);
+    });
 
-    rowForField('Mutation.markNotificationRead')(
-      '**`Mutation.markNotificationRead` returns the new badge, idempotently**',
-      async () => {
-        peers.notification.on('NotificationService/MarkRead').reply({
-          updated: 1,
-          unreadCount: 3,
-        });
+    it('**`Mutation.markNotificationRead` returns the new badge, idempotently**', async () => {
+      peers.notification.on('NotificationService/MarkRead').reply({
+        updated: 1,
+        unreadCount: 3,
+      });
 
-        const response = await new Session(gateway.baseUrl).post<{
-          data: { markNotificationRead: { id: string; unreadCount: number } };
-        }>(
-          '/graphql',
-          {
-            query:
-              'mutation { markNotificationRead(id: "cccccccc-1111-4111-8111-cccccccccccc") { id unreadCount } }',
-          },
-          headers(),
-        );
+      const response = await new Session(gateway.baseUrl).post<{
+        data: { markNotificationRead: { id: string; unreadCount: number } };
+      }>(
+        '/graphql',
+        {
+          query:
+            'mutation { markNotificationRead(id: "cccccccc-1111-4111-8111-cccccccccccc") { id unreadCount } }',
+        },
+        headers(),
+      );
 
-        expect(response.status).toBe(200);
-        expect(response.body.data.markNotificationRead).toEqual({
-          id: 'cccccccc-1111-4111-8111-cccccccccccc',
-          unreadCount: 3,
-        });
-      },
-    );
+      expect(response.status).toBe(200);
+      expect(response.body.data.markNotificationRead).toEqual({
+        id: 'cccccccc-1111-4111-8111-cccccccccccc',
+        unreadCount: 3,
+      });
+    });
   });
 });

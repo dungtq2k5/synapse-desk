@@ -6,8 +6,7 @@
  * consumer need the same strings: the gateway itself, its test suites, and the
  * contract harness that drives a gateway as a black box from outside every
  * workspace — a relative import out of `apps/api-gateway` is what
- * `image-contract.spec.ts` refuses. It is also the single input the Java
- * constants generator reads, so one edit reaches both implementations.
+ * `image-contract.spec.ts` refuses.
  *
  * Everything that is the gateway's own MECHANISM — presence states, the typing
  * TTL, the per-event rate limits — stays in

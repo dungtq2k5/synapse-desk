@@ -5,8 +5,8 @@
  * once whatever the relay does, which is why 965 in-process tests never saw
  * gap 36 and why this row exists: the property is "one frame per client,
  * however many gateways run", and it only has an expression with more than one
- * of them. The Java gateway inherits the same rule, so this is the row that
- * will catch a Java relay that broadcasts cluster-wide.
+ * of them, so this is the row that catches a relay that broadcasts
+ * cluster-wide.
  *
  * The cache rows use the peer RECORDING rather than a header: nothing on the
  * wire marks a cached read (the `x-cache` extension is in the OpenAPI

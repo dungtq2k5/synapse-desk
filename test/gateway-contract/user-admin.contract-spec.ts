@@ -166,12 +166,9 @@ describe('user admin', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.data.user.isLocked).toBe(true);
-      // Not an exact string match: Java's default `OffsetDateTime`
-      // serialization drops the fractional seconds when they're zero
-      // (`...T00:00:00Z`), where Node's `toISOString()` always keeps
-      // `.000` — a harmless cross-implementation formatting difference, not
-      // a value difference, so parse-and-compare rather than couple this
-      // row (about the value surviving at all) to it.
+      // Parsed and compared rather than matched as a string: this row is
+      // about the value surviving at all, not about how many fractional
+      // digits a serializer writes.
       expect(new Date(response.body.data.user.lockedUntil).toISOString()).toBe(
         '2026-09-02T00:00:00.000Z',
       );

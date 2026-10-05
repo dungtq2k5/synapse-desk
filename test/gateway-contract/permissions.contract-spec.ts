@@ -1,9 +1,8 @@
 /**
  * @file `PermissionsApi` — the smallest REST interface in Phase A's
  * remaining batch: one cached, read-only route. Its cache key is shared
- * with the GraphQL permission-catalogue loader (`permission-catalogue.loader.ts`
- * on the Node side, `PermissionCatalogueLoaderConfig` on the Java side), so
- * this row exists mainly to prove Java writes that key the same way.
+ * with the GraphQL permission-catalogue loader (`permission-catalogue.loader.ts`),
+ * so this row proves the REST route writes and reads that key.
  */
 
 import { sign } from 'jsonwebtoken';

@@ -952,7 +952,7 @@ export class RealtimeGateway
    * disconnect packet, and a client told `io server disconnect` does not
    * reconnect on its own: measured in the cutover rehearsal, every client stayed
    * offline after a deploy. A closed transport reads as `transport close`, which
-   * the client retries, as the Java gateway's `server.stop()` does. And only this
+   * the client retries. And only this
    * process's own sockets: the namespace-wide call goes through the Redis
    * adapter and can reach every replica's.
    */

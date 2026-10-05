@@ -1,6 +1,6 @@
 /**
  * @file Signs a body the way Resend does, independent of the gateway's own
- * verifier — so a signing bug in either gateway cannot be hidden by a test that
+ * verifier — so a signing bug in the gateway cannot be hidden by a test that
  * shares its implementation.
  */
 

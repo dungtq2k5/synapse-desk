@@ -11,15 +11,13 @@ import {
 import { IsFutureDate } from '../../common/decorators/is-future-date.decorator';
 
 /**
- * The shared table the Java gateway's validators are held to.
+ * A table of inputs and answers for the validators the gateway's DTOs use.
  *
  * `InboundEmailDto` checks `from` with `@IsEmail()` and `receivedAt` with
- * `@IsISO8601({ strict: true })`, and the Java gateway has no equivalent that
- * agrees with them by construction: Jakarta's `@Email` accepts `ada@acme`, which
- * `validator.js` refuses. So the two are ported from the library's own source
- * and held to ONE table of inputs and answers, checked here against the real
- * functions and in Java against the port. If either side moves, one of the two
- * checks goes red.
+ * `@IsISO8601({ strict: true })`, and the other columns are the password, phone,
+ * numeric-code and lock-date rules. Their answers come from `validator.js` and
+ * `libphonenumber`, so a dependency upgrade that changes what a field accepts is
+ * a red row here rather than a silent change at the door.
  *
  * **This spec is what keeps the table honest.** A table of answers that nobody
  * recomputed is a fixture that agrees with whatever was written down; here every

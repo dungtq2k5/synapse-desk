@@ -7,7 +7,7 @@
  * doc review caught it (`FeedbackRating` is a numeric literal union the
  * Swagger plugin cannot map, the same trap `SubmitFeedbackDto.rating`'s own
  * comment already named) — an undocumented REQUIRED-in-practice field that a
- * generated client, Java's included, had no property to put it in at all.
+ * generated client had no property to put it in at all.
  * `-1`, not `1`, is asserted below: the generated `RatingEnum`'s first member
  * is whichever proto integer sorts first, and `1` alone would not catch the
  * two members swapped.

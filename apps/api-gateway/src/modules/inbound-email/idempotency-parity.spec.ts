@@ -12,14 +12,13 @@ type Row = {
 };
 
 /**
- * The shared table the Java gateway's idempotency key is held to.
+ * A table of inputs and idempotency keys.
  *
- * The key is a digest, so any difference in how the two gateways see a string —
- * a lone surrogate, a combining mark, a no-break space — is a different key, and
- * a different key means a redelivery landing on the OTHER gateway during a
- * cutover creates a duplicate ticket instead of being recognised as the same
- * mail. Every row is recomputed here from the real private method on every run;
- * Java is checked against the same rows.
+ * The key is a digest, so any change in how the gateway reads a string — a lone
+ * surrogate, a combining mark, a no-break space — is a different key, and a
+ * different key means a redelivery after a deploy creates a duplicate ticket
+ * instead of being recognised as the same mail. Every row is recomputed from the
+ * real private method on every run.
  */
 describe('the idempotency-key parity table', () => {
   const table = JSON.parse(

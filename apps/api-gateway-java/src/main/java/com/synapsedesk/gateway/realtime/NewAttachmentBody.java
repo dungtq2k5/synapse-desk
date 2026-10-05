@@ -1,4 +1,0 @@
-package com.synapsedesk.gateway.realtime;
-
-/** `NewAttachmentDto` — an already-uploaded object, bound as the message is created. */
-public record NewAttachmentBody(String objectPath, String fileName) {}

@@ -2,13 +2,12 @@
  * @file **A request field the document gives a `default` behaves as that default when it
  * is left out.**
  *
- * Node's published document gives 21 optional request properties a `default`: six
+ * The published document gives 21 optional request properties a `default`: six
  * booleans (`isPrimary` false, `isActive` true), thirteen lists (`[]`), a search `limit`
  * of 0. A client generated from it fills the value in, and a client that reads the
  * document believes that leaving the field out and sending the default are the same
- * request. The Java document published none of them, so nothing told a client that, and
- * nothing held it either: every other row sends a minimal body, so no row ever compared
- * "absent" with "the default".
+ * request. Nothing else holds that: every other row sends a minimal body, so no row
+ * compares "absent" with "the default".
  *
  * **One rule, one row per field, generated from the document.** For each optional
  * property with a `default`, the request with the field ABSENT and the request with the

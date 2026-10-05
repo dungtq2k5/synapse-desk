@@ -288,7 +288,7 @@ describe('organizations', () => {
       });
 
       // Deliberately touches ONLY `enforceTwoFactor`, alongside an empty
-      // `allowedEmailDomains` — proof that Java does not confuse "sent
+      // `allowedEmailDomains` — proof that the gateway does not confuse "sent
       // empty" with "not sent", which would otherwise wipe the tenant's
       // self-signup allowlist on an update that never meant to touch it.
       const response = await new Session(gateway.baseUrl).request(

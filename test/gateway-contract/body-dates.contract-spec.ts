@@ -3,13 +3,11 @@
  * date Node's `@IsISO8601({ strict: true })` accepts, and accepted when it is.**
  *
  * Four POST routes take a `from` and `to` in the body (the analytics, ticket and audit
- * exports, and the platform job backfill). Node validates all four with the same rule
- * (see `date-rules.ts`). Java checked three of them with a hand-written approximation of
- * it, which accepted a calendar date and a timestamp WITH an offset and refused every
- * other form validator.js accepts: an offset-less timestamp, the basic form, a space
- * for the `T`, `+0700`, a week date, an ordinal date. A client that sent one worked on
- * Node and got a 400 here. Found by probing both gateways with the same 13 values
- * (24 of 104 answers differed), on the two export routes.
+ * exports, and the platform job backfill). All four are validated with the same rule
+ * (see `date-rules.ts`), and it accepts more than a calendar date and a timestamp with an
+ * offset: an offset-less timestamp, the basic form, a space for the `T`, `+0700`, a week
+ * date, an ordinal date. Each form is a row, because a hand-written approximation of the
+ * rule refuses exactly these, and a client that sends one would get a 400.
  *
  * **Both directions are rows.** A refusal row alone would pass a gateway that refused
  * everything; each accepted form is its own row and must not be a 400.

@@ -231,8 +231,8 @@ describe('The GraphQL surface (e2e)', () => {
 
   describe('The committed schema', () => {
     it('**matches the generated one**', () => {
-      // The committed contract is `docs/reference/schema.gql`, which the Java
-      // gateway is built from. The fixture has already booted the app, which
+      // The committed contract is `docs/reference/schema.gql`. The fixture has
+      // already booted the app, which
       // rewrote the generated copy at `SCHEMA_PATH`, so a difference here means
       // someone changed a type and did not copy the result to the contract.
       const committed = join(

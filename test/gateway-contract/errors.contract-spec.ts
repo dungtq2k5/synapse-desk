@@ -2,7 +2,7 @@
  * @file The error envelope, the guards, CORS, rate limiting, and the ops surface.
  *
  * Every row asserts the WHOLE envelope or the whole header set rather than a
- * status: the shape is the contract, and a Java gateway that answered 404 with
+ * status: the shape is the contract, and a gateway that answered 404 with
  * a different body would pass a status-only assertion while breaking every
  * client. Three rows pin behaviour this repository fixed only days ago —
  * a transport failure's fixed message (gap 38), the per-tier

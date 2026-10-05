@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
-import { withOwnEnvironment } from '../testing/service-workspaces';
 
 /**
  * The environment contract: the schema is the code, `.env.example` is the
@@ -42,9 +41,8 @@ describe('the environment contract', () => {
     'APP_VERSION',
     'BUILD_SHA',
     'BUILD_TIME',
-    // The stock Resend SDK reads this itself, so the Node gateway has no code
-    // to validate it; the Java gateway binds it, and the contract suite points
-    // both at a fake with it.
+    // The stock Resend SDK reads this itself, so the gateway has no code to
+    // validate it; the contract suite points it at a fake with it.
     'RESEND_BASE_URL',
   ]);
 
@@ -64,12 +62,9 @@ describe('the environment contract', () => {
 
   /** apps/<service> for every workspace under apps/. */
   const services = (): string[] =>
-    // `withOwnEnvironment` drops `api-gateway-java`, which shares
-    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
-    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
-    withOwnEnvironment(
-      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
-    ).sort();
+    gitFiles('apps/*/package.json')
+      .map((file) => file.split('/')[1])
+      .sort();
 
   /** service → its env.validation.ts path, from git rather than a guess. */
   const schemaFiles = (): Map<string, string> => {

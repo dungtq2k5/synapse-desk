@@ -83,9 +83,8 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-            # Socket.IO's own listener, `WS_PORT`, at the SAME port as the Java
-            # gateway's: one Service port and one Ingress path reach whichever
-            # implementation holds the lease.
+            # Socket.IO's own listener, `WS_PORT`, which the Service's `ws` port
+            # and the Ingress `/socket.io` path reach by name.
             - name: ws
               containerPort: 3001
             # Its OWN listener, which is what makes "not reachable from the

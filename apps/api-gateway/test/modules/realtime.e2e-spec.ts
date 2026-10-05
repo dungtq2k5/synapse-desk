@@ -2288,7 +2288,7 @@ describe('the real-time relay (e2e)', () => {
   });
 
   describe('A lease step-down', () => {
-    it('**drops every socket in a way the client RECONNECTS from**, as the Java gateway does', async () => {
+    it('**drops every socket in a way the client RECONNECTS from**', async () => {
       // `disconnectSockets(true)` sends Socket.IO's disconnect packet, and a client
       // told `io server disconnect` does not reconnect on its own: measured in the
       // cutover rehearsal, every client stayed offline after a deploy. A step-down

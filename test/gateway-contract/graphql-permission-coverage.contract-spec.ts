@@ -1,6 +1,6 @@
 /**
  * @file **The permission registry for GraphQL**: every `Query`/`Mutation` root field the
- * published schema declares is gated in the Java gateway exactly as
+ * published schema declares is gated in the gateway exactly as
  * `test/fixtures/permissions/graphql-fields.json` says, and that table names exactly
  * the root fields `docs/reference/schema.gql` declares.
  *
@@ -10,26 +10,22 @@
  * - **A registry, checked from both sides.** A field added to the schema is missing
  *   from the table until someone writes down what it requires; an entry for a field
  *   that no longer exists names nothing. Both fail.
- * - **Frozen from the Node gateway.** Generated once from its resolvers'
- *   `@RequirePermission` decorators (24 fields, 16 gated), when the Java gateway
- *   matched it on every field.
- * - **An open field is checked too.** `[]` requires the Java resolver to carry no
+ * - **The table is what the code must match.** Changing a field's permission is an
+ *   edit to it.
+ * - **An open field is checked too.** `[]` requires the resolver to carry no
  *   `@RequirePermission`, and the resolver must be found. Two of them are open by
  *   decision rather than by omission: `Query.me` is the caller's own record ("Requires
  *   no permission." in the schema's own description), and `Mutation.escalateTicket`
  *   matches its REST route, which carries no guard either.
  *
- * A field on `pending-graphql-fields.txt` (one the Java gateway does not serve yet)
- * still needs its entry, and is not looked for in Java.
- *
- * `ponytail:` a targeted regex reader of Java and of SDL, not a parser — the same
+ * `ponytail:` a targeted regex reader of TypeScript and of SDL, not a parser — the same
  * caveat `permission-coverage.contract-spec.ts` states for its own style.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
-import { pendingGraphqlFields } from './pending';
 
 const TABLE = JSON.parse(
   readFileSync(
@@ -38,47 +34,62 @@ const TABLE = JSON.parse(
   ),
 ) as Record<string, string[]>;
 
+const REQUIRE_PERMISSION = /@RequirePermission\(([^)]*)\)/u;
+
+/** The string-literal codes a decorator's argument list names. */
+const codesIn = (decoratorArgs: string): string[] =>
+  [...decoratorArgs.matchAll(/'([^']+)'/gu)].map((match) => match[1]);
+
 /**
- * What Java requires for one root field's `@QueryMapping`/`@MutationMapping`
- * method, or `null`.
+ * What one ROOT field (`Query.foo` / `Mutation.bar`) requires: `[]` when its resolver
+ * carries no `@RequirePermission`, and `undefined` when no resolver for it is found at
+ * all, which is never read as open.
  *
- * **Line-anchored AND disambiguated by `@QueryMapping`/`@MutationMapping`,
- * not a free scan.** A first version allowed the "return type" segment to
- * contain `\s` — which crosses newlines — with no anchor forcing the match
- * to start at a real declaration. Measured: for `Query.documents` it matched
- * `"> documents("`, a fragment from unrelated text elsewhere in the 500-file
- * concatenation. Line-anchoring fixed that, and immediately surfaced the
- * NEXT failure mode: this codebase has more than one Java method literally
- * named `documents` — a private REST mapper among them — so the first
- * textual match is not necessarily the resolver's own. Every match is
- * walked, and the one THIS scan trusts is whichever decorator block
- * actually carries `@QueryMapping`/`@MutationMapping` — a REST helper never
- * does.
+ * The decorator names the field either via `{ name: 'foo' }` or, absent that option,
+ * via the method name itself — so both forms are checked. The span searched for
+ * `@RequirePermission` is everything between the `@Query`/`@Mutation` and the method.
+ *
+ * **The decorator's arguments are bracket-matched, not `[^)]*`.**
+ * `@Query(() => DepartmentPageResponseGqlDto, { name: 'departments' })` nests the arrow
+ * function's own `()` inside the argument list, and a `[^)]*` scan stops there, never
+ * reaching `name:` — measured: a sabotaged permission code passed clean that way.
  */
-function javaRootFieldCodes(
-  javaSources: string,
+export function rootFieldCodes(
+  sources: string,
+  kind: 'Query' | 'Mutation',
   fieldName: string,
 ): string[] | undefined {
-  const pattern = new RegExp(
-    String.raw`\n([ \t]*(?:@[^\n]*\n[ \t]*)*)(?:public\s+)?[^\n(]*?\b${fieldName}\s*\(`,
-    'gu',
-  );
+  const decorator = kind === 'Query' ? '@Query' : '@Mutation';
+  let searchFrom = 0;
 
-  let decorators: string | undefined;
-  for (const match of javaSources.matchAll(pattern)) {
-    if (/@(?:Query|Mutation)Mapping/u.test(match[1])) {
-      decorators = match[1];
-      break;
-    }
+  for (;;) {
+    const start = sources.indexOf(`${decorator}(`, searchFrom);
+    if (start < 0) return undefined;
+
+    const openParen = start + decorator.length;
+    const closeParen = matchingBracketIndex(sources, openParen, '(', ')');
+    if (closeParen < 0) return undefined;
+
+    const args = sources.slice(openParen + 1, closeParen);
+    searchFrom = closeParen + 1;
+
+    const rest = sources.slice(closeParen + 1, closeParen + 401);
+    const signature = /\n(?:\s*@[^\n]*\n)*\s*(?:async\s+)?(\w+)\s*\(/u.exec(
+      rest,
+    );
+    if (!signature) continue;
+
+    const named = new RegExp(String.raw`name:\s*'${fieldName}'`, 'u').test(
+      args,
+    );
+    if (!named && signature[1] !== fieldName) continue;
+
+    const found = REQUIRE_PERMISSION.exec(
+      rest.slice(0, signature.index + signature[0].length),
+    );
+
+    return found ? codesIn(found[1]) : [];
   }
-  if (decorators === undefined) return undefined;
-
-  const found = /@RequirePermission\(([^)]*)\)/u.exec(decorators);
-  if (!found) return [];
-
-  return [...found[1].matchAll(/PermissionCodesEnum\.(\w+)/gu)].map((m) =>
-    m[1].toLowerCase().replaceAll('_', '.'),
-  );
 }
 
 /**
@@ -86,7 +97,7 @@ function javaRootFieldCodes(
  * `"""..."""` block comment as opaque.
  *
  * **{@link matchingBracketIndex} is not enough here.** That helper assumes
- * every closing character is balanced by a real opening one — true of Java
+ * every closing character is balanced by a real opening one — true of
  * generics and decorator parens, where the LANGUAGE guarantees it. GraphQL
  * SDL's `"""..."""` description is free text, and free text can contain an
  * UNBALANCED `}` with no matching `{` at all — depth-counting hits it,
@@ -189,20 +200,19 @@ function schemaRootFields(): { kind: 'Query' | 'Mutation'; name: string }[] {
 }
 
 describe('GraphQL permission coverage — every root field is gated as the table says', () => {
-  const pending = pendingGraphqlFields();
   const declared = new Set(
     schemaRootFields().map((field) => `${field.kind}.${field.name}`),
   );
-  const javaSources = (() => {
+  const resolverSources = (() => {
     const files: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const path = join(dir, entry.name);
         if (entry.isDirectory()) walk(path);
-        else if (entry.name.endsWith('.java')) files.push(path);
+        else if (entry.name.endsWith('.resolver.ts')) files.push(path);
       }
     };
-    walk(join(REPO_ROOT, 'apps/api-gateway-java/src/main/java'));
+    walk(join(REPO_ROOT, 'apps/api-gateway/src/modules'));
 
     return files.map((file) => readFileSync(file, 'utf8')).join('\n');
   })();
@@ -221,31 +231,33 @@ describe('GraphQL permission coverage — every root field is gated as the table
   });
 
   for (const [key, codes] of Object.entries(TABLE)) {
-    if (pending.has(key)) continue;
+    it(`${key} requires ${codes.length ? codes.join(', ') : 'no permission'}`, () => {
+      const [kind, field] = key.split('.') as ['Query' | 'Mutation', string];
+      const required = rootFieldCodes(resolverSources, kind, field);
 
-    it(`${key} requires ${codes.length ? codes.join(', ') : 'no permission'} in Java`, () => {
-      const java = javaRootFieldCodes(javaSources, key.split('.')[1]);
-
-      expect(java).toBeDefined();
-      expect(new Set(java)).toEqual(new Set(codes));
+      expect(required).toBeDefined();
+      expect(new Set(required)).toEqual(new Set(codes));
     });
   }
 
-  it('javaRootFieldCodes tells an open resolver from a missing one', () => {
+  it('rootFieldCodes reads a named decorator, tells an open resolver from a missing one', () => {
     const sources = `
 class Resolvers {
-  @QueryMapping
-  @RequirePermission(PermissionCodesEnum.TICKET_READ)
-  public Page tickets() {}
+  @Query(() => Page, { name: 'tickets', description: 'All of them.' })
+  @RequirePermission('ticket.read')
+  async list() {}
 
-  @QueryMapping
-  public User me() {}
+  @Query(() => User)
+  async me() {}
 }
 `;
 
-    expect(javaRootFieldCodes(sources, 'tickets')).toEqual(['ticket.read']);
-    expect(javaRootFieldCodes(sources, 'me')).toEqual([]);
-    expect(javaRootFieldCodes(sources, 'renamed')).toBeUndefined();
+    expect(rootFieldCodes(sources, 'Query', 'tickets')).toEqual([
+      'ticket.read',
+    ]);
+    expect(rootFieldCodes(sources, 'Query', 'me')).toEqual([]);
+    expect(rootFieldCodes(sources, 'Query', 'renamed')).toBeUndefined();
+    expect(rootFieldCodes(sources, 'Mutation', 'me')).toBeUndefined();
   });
 
   it('schemaFieldsIn survives a doc comment containing a bare `}` line', () => {

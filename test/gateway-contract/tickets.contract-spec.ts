@@ -3,8 +3,7 @@
  * bulk ops, the assignment quadruple, read-state/history, export, and the
  * AI-similar lookup. This is the interface the 3-group port structure was
  * built for: the sibling permission-code risk on `assign`/`reassign`/
- * `assignToSelf`/`unassign` is pinned here at the HTTP level, not just in
- * the Java unit tests, and the bulk partial-success envelope is pinned at
+ * `assignToSelf`/`unassign` is pinned here at the HTTP level, and the bulk partial-success envelope is pinned at
  * the item level per the user's explicit instruction.
  */
 

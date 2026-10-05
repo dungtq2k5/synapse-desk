@@ -91,10 +91,6 @@ const MEANINGS: Record<
 };
 
 /**
- * Node answers 500 to an explicit `null` here. A defect, not a behaviour to keep: the
- * Java gateway accepts it as absent, and these die with Node.
- */
-/**
  * Routes this arrangement cannot reach the peer on, by operation, with why. Named,
  * never dropped: a route here is one the rows do NOT cover.
  */
@@ -107,7 +103,11 @@ const UNREACHABLE: Record<string, string> = {
     'asks its peer only when a refresh cookie is present, and answers 200 without it',
 };
 
-const NODE_REJECTS = new Set([
+/**
+ * The gateway answers 500 to an explicit `null` here. A defect (known gaps), not a
+ * behaviour to keep, so these are named rather than asserted either way.
+ */
+const ANSWERS_500 = new Set([
   'PATCH /api/v1/webhook-endpoints/{id} eventTypes',
   'POST /api/v1/platform/plans prices',
 ]);
@@ -179,7 +179,7 @@ describe('an explicit null for an optional request field', () => {
 
   const isGeneric = (field: Field) =>
     !(field.key in MEANINGS) &&
-    !NODE_REJECTS.has(field.key) &&
+    !ANSWERS_500.has(field.key) &&
     !(`${field.method} ${field.path}` in UNREACHABLE);
 
   rowFor('Ops').each(fields.filter(isGeneric).map((f) => [f.key] as const))(

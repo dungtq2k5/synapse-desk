@@ -500,8 +500,7 @@ describe('the inbound-email webhook', () => {
 
         expect(response.status).toBe(200);
         expect(response.body?.data.outcome).toBe('TICKET_CREATED');
-        // About 0.5 s in Node at the cap (Java's scanners are linear, ~10 ms);
-        // uncapped Node is ~35 s here. A bound on the ORDER, not a benchmark.
+        // About 0.5 s at the cap; uncapped it is ~35 s here. A bound on the ORDER, not a benchmark.
 
         expect(Date.now() - started).toBeLessThan(30_000);
       },

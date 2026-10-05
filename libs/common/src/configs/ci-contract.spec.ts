@@ -212,20 +212,16 @@ describe('the CI contract', () => {
         why: 'the unit suites, including every contract spec in this directory',
       },
       {
-        script: 'test:contract:java',
-        why: 'the Java gateway against the shared contract suite, on a clean runner — the only place it is ever proved off a laptop',
-      },
-      {
-        script: 'test:e2e:gateway-java',
-        why: '`mvnw verify` — surefire’s unit rows and failsafe’s ITs against a real Redis and NATS; unrun, the Java gateway’s own suites are laptop-only',
+        script: 'test:contract',
+        why: 'the built gateway against the contract suite, as a client sees it; unrun, the harness is laptop-only',
       },
       {
         script: 'openapi:check',
         why: 'the committed OpenAPI document equals what the gateway exports, and is a valid OpenAPI document; unrun, the published contract drifts from the code',
       },
       {
-        script: 'images:boot-gateways',
-        why: 'both gateway images build and answer /health; unrun, an image that cannot start is first found by a deploy',
+        script: 'images:boot-gateway',
+        why: 'the gateway image builds and answers /health; unrun, an image that cannot start is first found by a deploy',
       },
     ];
 
@@ -378,8 +374,6 @@ describe('the CI contract', () => {
       ...gitFiles('*.ts'),
       ...gitFiles('*.mjs'),
       ...gitFiles('*.json'),
-      ...gitFiles('*.java'),
-      ...gitFiles('*.xml'),
     ].filter((file) => !isIgnored(file));
 
     expect(corpus.length).toBeGreaterThanOrEqual(200);

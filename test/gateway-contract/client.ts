@@ -61,7 +61,7 @@ export function parseSetCookie(line: string): {
  * Built here rather than imported: `apiBasePath` lives in the gateway's own
  * `ops-routes.ts`, and a harness that reached into `apps/api-gateway/src` for
  * it would be reading the implementation it is supposed to treat as a black
- * box — and could not do it at all for the Java one. `API_VERSION` is a
+ * box. `API_VERSION` is a
  * constant of the contract, so a bump is a deliberate edit in both places, and
  * the ops rows below assert the unprefixed routes that prove the split.
  */

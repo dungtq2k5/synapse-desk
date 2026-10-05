@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Both gateway images build, start, and answer `/health`. Nothing is pushed.
+# The gateway image builds, starts, and answers `/health`. Nothing is pushed.
 #
-#     ./docker/boot-gateways.sh
+#     ./docker/boot-gateway.sh
 #
-# Every other gateway check runs the code from a checkout: `dist/`, or the jar
-# under `target/`. The image is the thing that ships, and until this ran per PR
+# Every other gateway check runs the code from a checkout, from `dist/`. The image is the thing that ships, and until this ran per PR
 # an image that could not start was first found by a deploy.
 #
 # Needs compose's `redis` and `nats` up. Each container joins the compose
@@ -12,11 +11,8 @@
 # configuration the contract rows already prove, except for three things: the
 # stores are reached by their compose names, the key paths move to where the
 # fixtures are mounted, and NODE_ENV is production, as every deployment sets it.
-# Under `test` the Node image writes `schema.gql` beside its compiled sources,
+# Under `test` the image writes `schema.gql` beside its compiled sources,
 # which its user cannot do, so the check would fail on a path that never ships.
-#
-# One gateway at a time: the second would only stand by on the lease, which
-# `/health` does not see, but nothing is gained by sharing the port.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -66,12 +62,7 @@ docker build -f docker/node-service.Dockerfile --target runtime \
   --build-arg SERVICE=api-gateway \
   --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
   -t synapsedesk/api-gateway:boot-check . >/dev/null
-echo "building api-gateway-java…"
-docker build -f docker/java-service.Dockerfile \
-  --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
-  -t synapsedesk/api-gateway-java:boot-check . >/dev/null
 
 boot synapsedesk/api-gateway:boot-check
-boot synapsedesk/api-gateway-java:boot-check
 
-echo "Both gateway images boot."
+echo "The gateway image boots."

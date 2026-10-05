@@ -7,14 +7,12 @@ import {
 } from './quoted-reply';
 
 /**
- * The shared table the Java gateway's quoted-reply port is held to.
+ * A table of inputs and answers for the quoted-reply stripping.
  *
- * A JavaScript regex and a Java one that read alike are not alike — `^`, `$`,
- * `.` and `\s` cover different characters, and `\r\n` is one terminator to Java
- * and two to JS — so the port spells those out and is checked against ONE table
- * of inputs and answers. Every row is recomputed here from the real functions on
- * every run; in Java the port is checked against the same rows. A table nobody
- * recomputed would agree with whatever was written down.
+ * The patterns turn on characters that are easy to misread — what `^`, `$`, `.`
+ * and `\s` cover, and whether `\r\n` is one terminator or two — so the cases are
+ * written down once and every row is recomputed from the real functions on every
+ * run. A table nobody recomputed would agree with whatever was written down.
  */
 describe('the quoted-reply parity table', () => {
   const table = JSON.parse(

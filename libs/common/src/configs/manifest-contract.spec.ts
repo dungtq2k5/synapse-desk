@@ -4,10 +4,6 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
-import {
-  SHARES_ENVIRONMENT_WITH,
-  withOwnEnvironment,
-} from '../testing/service-workspaces';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -95,12 +91,9 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    // `withOwnEnvironment` drops `api-gateway-java`, which shares
-    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
-    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
-    withOwnEnvironment(
-      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
-    ).sort();
+    gitFiles('apps/*/package.json')
+      .map((file) => file.split('/')[1])
+      .sort();
 
   const documented = (service: string): Set<string> =>
     envDocumentedKeys(read(`apps/${service}/.env.example`));
@@ -115,15 +108,12 @@ describe('the manifest contract', () => {
 
   // -------------------------------------------------------------- the floors
 
-  it('**the corpus is not empty** — eight Deployments, seven Services, one Ingress', () => {
+  it('**the corpus is not empty** — seven Deployments, nine Services, one Ingress', () => {
     // The pattern-fires floor every scan in this repo carries. Checks 1–6 all
     // iterate over this corpus, so a glob that matched nothing would make all
     // six vacuously green — the failure mode a check exists to prevent,
     // arriving through the check.
-    // EIGHT, not seven: the gateway has two Deployments, one per
-    // implementation, sharing one Service. That asymmetry is the whole switch
-    // mechanism, so the count is stated rather than derived from `services()`.
-    expect(byKind('Deployment')).toHaveLength(8);
+    expect(byKind('Deployment')).toHaveLength(7);
     // Nine: the seven application Services, plus `nats` and `qdrant`, which are
     // StatefulSets and need a Service each to be addressable.
     expect(byKind('Service')).toHaveLength(9);
@@ -143,14 +133,7 @@ describe('the manifest contract', () => {
         .sort(),
     ).toEqual(['notification-service-egress', 'storage-service-egress']);
     expect(byKind('ConfigMap')).toHaveLength(7);
-    // The services, PLUS the workspaces that share one of their
-    // environments — `api-gateway-java` is a second Deployment of the same
-    // gateway, so it has no environment of its own and is not a `service()`,
-    // but it is very much a Deployment. Derived from the same registry the
-    // env guards use, so a third implementation needs no edit here.
-    expect([...deployments().keys()].sort()).toEqual(
-      [...services(), ...Object.keys(SHARES_ENVIRONMENT_WITH)].sort(),
-    );
+    expect([...deployments().keys()].sort()).toEqual(services());
   });
 
   it('**both egress policies refuse the SAME private ranges**', () => {
@@ -217,14 +200,14 @@ describe('the manifest contract', () => {
       ]).toEqual([service, port, port, port]);
     });
 
-    it.each([['api-gateway'], ['api-gateway-java']])(
+    it.each([['api-gateway']])(
       '%s probes HTTP on its own PORT, and never the metrics port, and serves Socket.IO on WS_PORT',
       (name) => {
         // The one service with an HTTP listener, and the one whose metrics sit on
         // a SECOND port deliberately — `.env.example` calls that "what makes 'not
         // reachable from the internet' structural rather than an Nginx rule". A
         // probe pointed at 9464 would be checking the wrong listener. Socket.IO is
-        // a third listener in both implementations, and the Service and Ingress
+        // a third listener, and the Service and Ingress
         // reach it by this port's name: a Deployment without it is a gateway whose
         // realtime traffic has nowhere to go.
         const container = containersOf(deployments().get(name) as Doc)[0] as {
@@ -721,7 +704,7 @@ describe('the manifest contract', () => {
       (doc.metadata?.name ?? '').startsWith('api-gateway'),
     );
 
-    // A floor, not a fixture: today Node alone, later Node and Java. Zero would
+    // A floor, not a fixture. Zero would
     // mean the name changed and every assertion below ran over nothing.
     expect(gateways.length).toBeGreaterThanOrEqual(1);
 
@@ -780,46 +763,5 @@ describe('the manifest contract', () => {
 
     expect(findings).toEqual([]);
     expect(active).toBe(1);
-  });
-
-  it('10. **both gateways read the SAME ConfigMap and Secret**', () => {
-    // The lease excludes within ONE Redis keyspace. Two gateway Deployments
-    // given different `REDIS_URL` values both claim, neither sees the other,
-    // and both serve — which is the single outcome the lease exists to
-    // prevent, arriving through an `envFrom` list rather than through the
-    // lease. Measured on the way in: the first run of the two-process test
-    // had the two implementations on Redis databases 15 and 0, and the
-    // symptom read as "the other side never claimed".
-    //
-    // Names rather than values, because the values are one indirection away
-    // and only equal at runtime — the realistic drift is a second ConfigMap.
-    const gateways = byKind('Deployment').filter(({ doc }) =>
-      (doc.metadata?.name ?? '').startsWith('api-gateway'),
-    );
-
-    expect(gateways.length).toBeGreaterThanOrEqual(2);
-
-    const sources = gateways.map(({ doc }) => {
-      const containers = containersOf(doc) as {
-        envFrom?: {
-          configMapRef?: { name?: string };
-          secretRef?: { name?: string };
-        }[];
-      }[];
-
-      return containers
-        .flatMap((container) => container.envFrom ?? [])
-        .map(
-          (source) => source.configMapRef?.name ?? source.secretRef?.name ?? '',
-        )
-        .sort();
-    });
-
-    // Every gateway's set, identical to the first one's.
-    for (const source of sources) {
-      expect(source).toEqual(sources[0]);
-    }
-    // And not empty: two Deployments with no `envFrom` at all would agree.
-    expect(sources[0].length).toBeGreaterThanOrEqual(2);
   });
 });

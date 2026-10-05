@@ -6,13 +6,13 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * The shared table the Java gateway's address and reply-token parsers are held to.
+ * A table of inputs and answers for the inbound address and reply-token parsers.
  *
- * Both are `libs/common`'s, and notification-service writes the same format, so
- * the Java port reproduces them byte for byte — including the lenient hex decode
- * of the MAC, which accepts `<mac>zz`. The table is checked here against the real
- * functions on every run and in Java against the port: a table nobody recomputed
- * would agree with whatever was written down.
+ * Both are `libs/common`'s, and notification-service writes the same format, so a
+ * change to either is a change to what mail reaches a ticket — including the
+ * lenient hex decode of the MAC, which accepts `<mac>zz`. The table is checked
+ * against the real functions on every run, so a change in behaviour is a red row
+ * and a deliberate one is an edit to the table.
  */
 describe('the inbound address parity table', () => {
   const table = JSON.parse(

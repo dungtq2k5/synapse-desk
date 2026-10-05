@@ -5,13 +5,12 @@
  *
  * Each is a 400 before any peer is asked: that is what distinguishes "refused at the
  * door" from "refused somewhere downstream", so every row asserts that NO peer was
- * called, not only the status. The message must name the field and must not name a
- * Java type: the parser's own text for these does (`java.lang.String`,
- * `JsonToken.START_OBJECT`), and that is an implementation detail leaking to a caller.
- * The rest of the wording is each gateway's own and is not asserted.
+ * called, not only the status. The message must name the field and must not name an
+ * implementation type, which would be a detail leaking to a caller. The rest of the
+ * wording is the gateway's own and is not asserted.
  *
- * **Only what both gateways do uniformly.** A string where the shape declares a number,
- * a boolean or a date is NOT covered: Node decides that per field (a `@Type(() =>
+ * **Only what the gateway does uniformly.** A string where the shape declares a number,
+ * a boolean or a date is NOT covered: the gateway decides that per field (a `@Type(() =>
  * Number)` accepts `"5"`, and turns `true` into `1`), so there is no one rule to hold.
  *
  * **Generated from the document**, from the minimal valid body `request-bodies.ts`
@@ -64,8 +63,7 @@ const UNREACHABLE: Record<string, string> = {
 const UNKNOWN = 'zzUnknown';
 
 /** Text naming an implementation type rather than anything the caller sent. */
-const JAVA_TYPE_NAME =
-  /\b(java|javax|jakarta|com\.synapsedesk)\.|tools\.jackson|JsonToken|START_OBJECT|VALUE_(TRUE|FALSE|NUMBER_\w+|STRING)/u;
+const TYPE_NAME = /\bcom\.synapsedesk\.|\b[A-Z]\w*(Dto|Exception)\b/u;
 
 /**
  * A field read from a JSON string: a plain string of any format but a date, or a string
@@ -215,7 +213,7 @@ describe('a body that does not fit its declared shape', () => {
       asked: [],
     });
     expect(error).toContain(testCase.field);
-    expect(error).not.toMatch(JAVA_TYPE_NAME);
+    expect(error).not.toMatch(TYPE_NAME);
   };
 
   rowFor('Ops').each(unknownKeys.map((c) => [c.key] as const))(
@@ -246,12 +244,12 @@ describe('a body that does not fit its declared shape', () => {
         asked: [],
       });
       expect(error).toContain(UNKNOWN);
-      expect(error).not.toMatch(JAVA_TYPE_NAME);
+      expect(error).not.toMatch(TYPE_NAME);
     },
   );
 
   rowFor('Auth')(
-    '**login refuses a password that is not a string, naming the field and no Java type**',
+    '**login refuses a password that is not a string, naming the field and no implementation type**',
     async () => {
       const outcome = await send(
         { method: 'POST', path: '/api/v1/auth/login', public: true },
@@ -264,7 +262,7 @@ describe('a body that does not fit its declared shape', () => {
         asked: [],
       });
       expect(error).toContain('password');
-      expect(error).not.toMatch(JAVA_TYPE_NAME);
+      expect(error).not.toMatch(TYPE_NAME);
     },
   );
 });

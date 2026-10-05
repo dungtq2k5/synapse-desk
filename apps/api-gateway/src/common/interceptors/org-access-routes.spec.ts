@@ -7,19 +7,19 @@ import { OPS_ROUTES } from '../../modules/health/ops-routes';
 
 /**
  * Which tenant-lifecycle category every route has, and whether `JwtAuthGuard`
- * authenticates it — the table the Java gateway's gate is held to.
+ * authenticates it — the table the contract suite's lifecycle rows read.
  *
  * The gate's decision for a request is a function of its route: the declared
  * `@OrgAccessKind`, else READ for a GET or HEAD and WRITE for anything else, and
- * only where `JwtAuthGuard` ran (Node gates on `request.user`, which that guard
- * populates). Java has no guard layer and declares the kind on its handlers, so a
- * route Java reads as WRITE where Node reads AUTH locks a frozen tenant's members
- * out of signing in, and the reverse lets a frozen tenant write. A handful of
- * contract rows cannot show that every route agrees; this table lists them all.
+ * only where `JwtAuthGuard` ran (the gate reads `request.user`, which that guard
+ * populates). A route read as WRITE where it should be AUTH locks a frozen
+ * tenant's members out of signing in, and the reverse lets a frozen tenant
+ * write; this table lists every route's answer.
  *
  * It is RECOMPUTED from the controllers' own metadata on every run, so it cannot
- * drift from the code it describes; the committed copy exists for the Java side to
- * read. Written only when `UPDATE_ORG_ACCESS_FIXTURE=1`, never silently.
+ * drift from the code it describes; the committed copy exists for the contract
+ * suite, which drives the gateway from outside and cannot read that metadata.
+ * Written only when `UPDATE_ORG_ACCESS_FIXTURE=1`, never silently.
  */
 describe('the tenant-lifecycle category of every route', () => {
   const FIXTURE = join(
@@ -62,9 +62,7 @@ describe('the tenant-lifecycle category of every route', () => {
 
   /**
    * Refused by `SuperAdminGuard` before the gate runs, unless the caller is a super
-   * admin, whom the gate exempts. Either way the gate never decides on this route,
-   * which is what lets Java (whose super-admin check is inline, in the handler,
-   * AFTER its gate) exempt the route outright and still answer as Node does.
+   * admin, whom the gate exempts. Either way the gate never decides on this route.
    */
   const isSuperAdminOnly = (target: object): boolean =>
     hasGuard(target, 'SuperAdminGuard');
@@ -150,7 +148,7 @@ describe('the tenant-lifecycle category of every route', () => {
     // A walk that found nothing would report a perfectly satisfied contract.
     expect(routes.length).toBeGreaterThan(200);
     // Every route this table lists is a documented operation, so a wrong prefix
-    // or a mangled path shows up here and not as a quiet Java mismatch.
+    // or a mangled path shows up here and not as a quiet contract-row mismatch.
     expect(
       routes
         .filter(([method, path]) => !documented.has(`${method} ${path}`))
@@ -164,7 +162,7 @@ describe('the tenant-lifecycle category of every route', () => {
     );
   });
 
-  it('is the committed fixture the Java gateway is held to', () => {
+  it('is the committed fixture the contract suite reads', () => {
     if (process.env.UPDATE_ORG_ACCESS_FIXTURE === '1') {
       writeFileSync(FIXTURE, JSON.stringify(routes, null, 1) + '\n');
     }

@@ -3,25 +3,23 @@
  *
  * The published document says which routes need a session (`security`) and which are
  * public (`security: []`). A gateway generated from, or described by, that document
- * is only as safe as the two agree with what the routes DO, and the Java gateway
- * publishes no `security` at all today: its document describes the whole API as open.
- * Before that is published, the behaviour it will describe has to be held.
+ * is only as safe as the two agree with what the routes DO, so the behaviour the
+ * document describes is held here route by route.
  *
  * **Every operation, anonymous.** A secured route must refuse a caller with no session,
  * with 401, before any peer is asked. A public route must not refuse for lack of one.
- * The expectation is Node's guard truth, not the document alone: a route is secured
- * when Node's `JwtAuthGuard` runs on it (the route table `OrgAccessRoutesTest` already
- * holds against Node) OR the document names a scheme, so the routes Node's document
- * forgets to mark are still expected to refuse.
+ * The expectation is the guard's truth, not the document alone: a route is secured
+ * when `JwtAuthGuard` runs on it (the route table `org-access-routes.spec.ts`
+ * recomputes from the controllers) OR the document names a scheme, so the routes the
+ * document forgets to mark are still expected to refuse.
  *
  * Each request is otherwise VALID (a minimal body, every required query parameter), so
  * a 400 for a malformed body cannot stand in for the 401 a guard would have given first.
  *
  * **And the order, held separately.** A caller with no session who also sends an INVALID
- * body is told to sign in, not what is wrong with the body: Node's guard runs before its
+ * body is told to sign in, not what is wrong with the body: the guard runs before the
  * validation pipe. A second row per secured route whose body requires something sends `{}`
- * and expects the same 401, so a gateway that validates first (Java did, on 28 of 80 such
- * routes, until a session interceptor ran ahead of the binding) fails here.
+ * and expects the same 401, so a gateway that validates first fails here.
  */
 
 import { readFileSync } from 'node:fs';
