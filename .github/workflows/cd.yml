@@ -19,13 +19,15 @@
 #                         mount it fail at boot with no obvious cause.
 #   anything on pull_request
 #                         a deploy triggered by a fork's PR is a deploy an
-#                         outsider chose. The trigger below is `push` to `main`
-#                         and `workflow_dispatch` only.
+#                         outsider chose. The trigger below is
+#                         `workflow_dispatch` only.
 name: CD
 
+# **Manual only until a cluster exists.** No GCP secrets or GKE variables are
+# configured, so a push-triggered run fails at its first `auth` step on every
+# commit. Restore `push: branches: [main]` once `GCP_WORKLOAD_IDENTITY_PROVIDER`,
+# `GCP_DEPLOY_SERVICE_ACCOUNT`, `GKE_CLUSTER` and `GKE_LOCATION` are set.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # **Never cancel a deploy in progress.** `ci.yml` cancels superseded PR runs
