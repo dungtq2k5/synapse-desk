@@ -10,6 +10,7 @@ import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import com.synapsedesk.gateway.openapi.WebhookIntake;
+import com.synapsedesk.gateway.throttle.SkipThrottle;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
@@ -85,7 +86,8 @@ public class WebhooksController {
 
   @RouteSecurity(RouteSecurity.Scheme.NONE)
   @PostMapping(value = "/webhooks/stripe", produces = { "application/json" })
-  @ApiErrors({ "400" })
+  @SkipThrottle
+  @ApiErrors(value = { "400" }, throttled = false)
   public ResponseEntity<
     ApiResponse<StripeWebhookAcknowledgementDto>
   > webhooksControllerStripeV1(
@@ -138,7 +140,8 @@ public class WebhooksController {
     value = "/webhooks/email/resend",
     produces = { "application/json" }
   )
-  @ApiErrors({ "401", "503" })
+  @SkipThrottle
+  @ApiErrors(value = { "401", "503" }, throttled = false)
   public ResponseEntity<
     ApiResponse<ResendWebhookAcknowledgementDto>
   > inboundEmailControllerResendV1() {

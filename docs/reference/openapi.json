@@ -1572,44 +1572,6 @@
               }
             }
           },
-          "429": {
-            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 429
-                    },
-                    "path": {
-                      "type": "string",
-                      "example": "/api/v1/tickets"
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "path",
-                    "statusCode",
-                    "success",
-                    "timestamp"
-                  ]
-                }
-              }
-            }
-          },
           "500": {
             "description": "Unexpected server error. The response body carries no internals.",
             "content": {
@@ -1683,44 +1645,6 @@
                     "statusCode": {
                       "type": "number",
                       "example": 401
-                    },
-                    "path": {
-                      "type": "string",
-                      "example": "/api/v1/tickets"
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "path",
-                    "statusCode",
-                    "success",
-                    "timestamp"
-                  ]
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": false
-                    },
-                    "statusCode": {
-                      "type": "number",
-                      "example": 429
                     },
                     "path": {
                       "type": "string",

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
@@ -68,6 +69,22 @@ class ThrottlerInterceptorTest {
   private void authRoute() {}
 
   private void generalRoute() {}
+
+  @SkipThrottle
+  private void skippedRoute() {}
+
+  @Test
+  void aSkipThrottleRouteEvaluatesNoTierAndWritesNoCounter()
+    throws NoSuchMethodException {
+    boolean proceeds = interceptor.preHandle(
+      request,
+      response,
+      handlerFor("skippedRoute")
+    );
+
+    assertThat(proceeds).isTrue();
+    verifyNoInteractions(redis);
+  }
 
   @Test
   void aGeneralRouteEvaluatesTheThreeGeneralTiersAndNeverAuthTier()

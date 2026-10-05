@@ -240,4 +240,65 @@ describe('webhooks', () => {
       },
     );
   });
+
+  describe('throttling', () => {
+    // Its own gateway, with the short tier at 3 per second, so a burst of 6
+    // breaches it on any throttled route. Its Redis counters are keyed by
+    // route, so the webhook rows and the control cannot spend each other's.
+    let tight: Gateway;
+    const BURST = 6;
+
+    beforeAll(async () => {
+      const { redisUrl, natsUrl } = readRunState();
+      tight = await startGateway({
+        ...peers.env,
+        REDIS_URL: redisUrl,
+        NATS_URL: natsUrl,
+        THROTTLER_SHORT_LIMIT: '3',
+      });
+    }, 90_000);
+
+    afterAll(async () => {
+      await tight.stop();
+    });
+
+    const burst = (path: string, init: RequestInit = {}) =>
+      Promise.all(
+        Array.from({ length: BURST }, () =>
+          fetch(`${tight.baseUrl}${path}`, init).then(
+            (response) => response.status,
+          ),
+        ),
+      );
+
+    rowFor('Ops')(
+      '**the control: a throttled route refuses the same burst with 429**',
+      async () => {
+        expect(await burst('/version')).toContain(429);
+      },
+    );
+
+    rowFor('Webhooks')(
+      '**neither webhook intake is throttled: a delivery burst gets no 429**',
+      async () => {
+        const post = {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        };
+
+        // Unsigned, so each is refused for its signature — what is asserted is
+        // that none is refused for its RATE.
+        for (const path of [
+          `${API}/webhooks/stripe`,
+          `${API}/webhooks/email/resend`,
+        ]) {
+          const statuses = await burst(path, post);
+
+          expect(statuses).toHaveLength(BURST);
+          expect(statuses).not.toContain(429);
+        }
+      },
+    );
+  });
 });

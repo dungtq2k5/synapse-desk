@@ -28,7 +28,8 @@ import tools.jackson.databind.ObjectMapper;
  * ThrottlerTiers#GENERAL} only. Evaluating both would be wrong in both
  * directions — a login also governed by the loose general tiers, or every
  * ordinary read counted against the strict auth budget — which is Node's own
- * reasoning, reproduced rather than re-derived.
+ * reasoning, reproduced rather than re-derived. A route carrying {@link
+ * SkipThrottle} evaluates none.
  *
  * <p><b>Fails OPEN, loudly.</b> Any Redis failure is caught, logged at ERROR,
  * and the request proceeds unthrottled for that tier — a Redis outage must
@@ -69,6 +70,9 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
     Object handler
   ) {
     if (!(handler instanceof HandlerMethod handlerMethod)) {
+      return true;
+    }
+    if (skipsThrottle(handlerMethod)) {
       return true;
     }
 
@@ -182,6 +186,14 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
       );
       default -> throw new IllegalStateException("Unknown tier: " + tier);
     };
+  }
+
+  /** Method or class, as {@link #hasAuthThrottle} reads its marker. */
+  static boolean skipsThrottle(HandlerMethod handlerMethod) {
+    return (
+      handlerMethod.getMethodAnnotation(SkipThrottle.class) != null ||
+      handlerMethod.getBeanType().getAnnotation(SkipThrottle.class) != null
+    );
   }
 
   private static boolean hasAuthThrottle(HandlerMethod handlerMethod) {
