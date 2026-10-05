@@ -863,6 +863,18 @@ shipped without the gate and passed thirty-five rows that programmed its
 answer. A row that means to prove a lookup happens needs an id nothing else has
 warmed, and an assertion that the peer was called.
 
+**A row that sends a valid request cannot see a guard that runs late.** Every
+contract row sends an otherwise-valid call, so an ordering defect — a body
+validated before the session is checked, a 415 where the other implementation
+serves a bodyless action, a permission refused after the body is read — is
+invisible to all of them. The complement is a sweep: **send an invalid request
+as the weakest caller a route allows, to every route, and compare statuses
+across implementations.** It found six behaviour gaps nothing else had,
+including 21 routes answering 415 to a bodyless `POST` the other implementation
+serves. Run it with a fresh subject and a fresh tenant per call — a cached
+tenant status or a spent quota decides the answer otherwise, and the sweep
+measures the cache instead of the route.
+
 **State a row writes is shared by every suite that reads it — and so is state
 it spends.** Not just cache keys but the values in them, and not just values
 but quota. A row that writes `FROZEN` into the shared status cache changes what
