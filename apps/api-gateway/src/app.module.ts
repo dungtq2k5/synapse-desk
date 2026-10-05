@@ -1,4 +1,3 @@
-import { LeaseModule } from './common/lease/lease.module';
 import { JsonBodyMiddleware } from './common/middleware/json-body.middleware';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -44,7 +43,6 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
 
 @Module({
   imports: [
-    LeaseModule,
     ConfigModule.forRoot({
       isGlobal: true, // Makes ConfigService available globally
       validationSchema: envValidationSchema,

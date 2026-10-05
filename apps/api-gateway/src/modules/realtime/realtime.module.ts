@@ -1,5 +1,4 @@
 import { RedisModule } from '../../common/redis/redis.module';
-import { LeaseModule } from '../../common/lease/lease.module';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TicketsModule } from '../tickets/tickets.module';
@@ -26,9 +25,7 @@ import { WsThrottlerService } from './ws-throttler.service';
   // `TicketsModule` for `MessagesService` — `message:send` calls the SAME
   // RPC the HTTP controller calls, so it reuses that client
   // rather than opening a second path to the same write.
-  // `LeaseModule` because a standby accepts no socket: the handshake asks the
-  // lease before it asks anything else.
-  imports: [AuthModule, TicketsModule, RedisModule, LeaseModule],
+  imports: [AuthModule, TicketsModule, RedisModule],
   controllers: [
     TicketEventsConsumer,
     NotificationEventsConsumer,

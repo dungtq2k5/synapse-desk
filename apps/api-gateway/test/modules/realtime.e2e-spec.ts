@@ -2286,29 +2286,4 @@ describe('the real-time relay (e2e)', () => {
       expect((await countEvent).count).toBe(3);
     });
   });
-
-  describe('A lease step-down', () => {
-    it('**drops every socket in a way the client RECONNECTS from**', async () => {
-      // `disconnectSockets(true)` sends Socket.IO's disconnect packet, and a client
-      // told `io server disconnect` does not reconnect on its own: measured in the
-      // cutover rehearsal, every client stayed offline after a deploy. A step-down
-      // must hand clients to the new owner, so the TRANSPORT closes instead and the
-      // client sees `transport close`, which it retries.
-      const socket = await fx.connectClient({ organizationId });
-      const reason = new Promise<string>((resolve) =>
-        socket.once('disconnect', resolve),
-      );
-      const readyAgain = new Promise<void>((resolve) =>
-        socket.once('disconnect', () =>
-          socket.once(REALTIME_EVENTS.connectionReady, () => resolve()),
-        ),
-      );
-
-      fx.app.get(RealtimeGateway).dropEverySocket();
-
-      expect(await reason).toBe('transport close');
-      await readyAgain;
-      expect(socket.connected).toBe(true);
-    }, 15_000);
-  });
 });

@@ -30,9 +30,6 @@ export const envValidationSchema = Joi.object({
     .required(),
 
   PORT: Joi.number().required(),
-  // Socket.IO's own listener, which one Service port and one Ingress path
-  // reach; `0` shares `PORT` instead (the e2e fixture's choice).
-  WS_PORT: Joi.number().port().required(),
   // The prefix ALONE. URI versioning adds `/v1`, so a value that carries the
   // version boots cleanly and serves every route at `/api/v1/v1/…` while the
   // version-neutral probes keep every pod ready — refused here, loudly.

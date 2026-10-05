@@ -36,14 +36,6 @@ spec:
   rules:
     - http:
         paths:
-          # Socket.IO listens on its own port; the longer prefix wins, so the handshake and its upgrade go there.
-          - path: /socket.io
-            pathType: Prefix
-            backend:
-              service:
-                name: api-gateway
-                port:
-                  name: ws
           - path: /
             pathType: Prefix
             backend:

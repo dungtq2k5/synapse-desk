@@ -31,11 +31,6 @@ export const REPO_ROOT = join(__dirname, '../..');
 export type Gateway = {
   /** `http://127.0.0.1:<port>` — no prefix; `client.ts` adds `/api/v1`. */
   baseUrl: string;
-  /**
-   * Where `/ws` (a Socket.IO NAMESPACE, not a path — the wire path is
-   * `/socket.io`) actually answers: `WS_PORT`, a listener of its own.
-   */
-  wsUrl: string;
   metricsUrl: string;
   stop: () => Promise<void>;
 };
@@ -154,16 +149,9 @@ function assertBuilt(): void {
  *
  * @param overrides environment on top of `gateway.env` — the peer URLs, and
  * anything a row needs to change about the gateway under test.
- * @param options.probe `'ready'` (the default) waits for `/health/ready` —
- * wrong for a process this row DELIBERATELY starts as a standby, since a
- * standby's `/health/ready` stays 503 for as long as the other implementation
- * holds the lease and the poll would time out. `'live'` waits for `/health`
- * instead, which answers 200 while standing by — the gateway's own
- * liveness-vs-readiness split, documented on `OpsController`.
  */
 export async function startGateway(
   overrides: Record<string, string> = {},
-  options: { probe?: 'ready' | 'live' } = {},
 ): Promise<Gateway> {
   assertBuilt();
 
@@ -174,7 +162,6 @@ export async function startGateway(
   for (let attempt = 1; ; attempt += 1) {
     const port = await freePort();
     const metricsPort = await freePort();
-    const wsPort = await freePort();
     const child = spawn(COMMAND.command, COMMAND.args, {
       cwd: REPO_ROOT,
       // Its own process group, so `kill(-pid)` reaches whatever it spawned.
@@ -184,7 +171,6 @@ export async function startGateway(
         PORT: String(port),
         METRICS_PORT: String(metricsPort),
         METRICS_HOST: '127.0.0.1',
-        WS_PORT: String(wsPort),
       }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -209,13 +195,12 @@ export async function startGateway(
     const baseUrl = `http://127.0.0.1:${port}`;
     const gateway: Gateway = {
       baseUrl,
-      wsUrl: `http://127.0.0.1:${wsPort}`,
       metricsUrl: `http://127.0.0.1:${metricsPort}`,
       stop: () => stop(child),
     };
 
     try {
-      await waitUntilReady(baseUrl, child, output, options.probe ?? 'ready');
+      await waitUntilReady(baseUrl, child, output);
 
       return gateway;
     } catch (failure) {
@@ -223,7 +208,7 @@ export async function startGateway(
         // Said out loud, so a run's log shows how often the window bites, instead of
         // the retry absorbing it unseen.
         process.stderr.write(
-          `gateway launch ${attempt}/${LAUNCH_ATTEMPTS}: a port was taken before the gateway bound it (ports ${port}, ${metricsPort}, ${wsPort}; the gateway said: ${failure.message}); retrying with fresh ports\n` +
+          `gateway launch ${attempt}/${LAUNCH_ATTEMPTS}: a port was taken before the gateway bound it (ports ${port}, ${metricsPort}; the gateway said: ${failure.message}); retrying with fresh ports\n` +
             // The whole launch, indented: rare, and the only record of what collided.
             failure.output.replace(/^/gmu, '    | ') +
             '\n',
@@ -239,9 +224,8 @@ async function waitUntilReady(
   baseUrl: string,
   child: ChildProcess,
   output: string[],
-  probe: 'ready' | 'live',
 ): Promise<void> {
-  const path = probe === 'live' ? '/health' : '/health/ready';
+  const path = '/health/ready';
   const deadline = Date.now() + READY_TIMEOUT_MS;
 
   while (Date.now() < deadline) {

@@ -200,44 +200,36 @@ describe('the manifest contract', () => {
       ]).toEqual([service, port, port, port]);
     });
 
-    it.each([['api-gateway']])(
-      '%s probes HTTP on its own PORT, and never the metrics port, and serves Socket.IO on WS_PORT',
-      (name) => {
-        // The one service with an HTTP listener, and the one whose metrics sit on
-        // a SECOND port deliberately — `.env.example` calls that "what makes 'not
-        // reachable from the internet' structural rather than an Nginx rule". A
-        // probe pointed at 9464 would be checking the wrong listener. Socket.IO is
-        // a third listener, and the Service and Ingress
-        // reach it by this port's name: a Deployment without it is a gateway whose
-        // realtime traffic has nowhere to go.
-        const container = containersOf(deployments().get(name) as Doc)[0] as {
-          ports?: { name?: string; containerPort?: number }[];
-          livenessProbe?: { httpGet?: { path?: string; port?: string } };
-          readinessProbe?: { httpGet?: { path?: string; port?: string } };
-        };
+    it('api-gateway probes HTTP on its own PORT, and never the metrics port', () => {
+      // The one service with an HTTP listener, and the one whose metrics sit on
+      // a SECOND port deliberately — `.env.example` calls that "what makes 'not
+      // reachable from the internet' structural rather than an Nginx rule". A
+      // probe pointed at 9464 would be checking the wrong listener.
+      const container = containersOf(
+        deployments().get('api-gateway') as Doc,
+      )[0] as {
+        ports?: { name?: string; containerPort?: number }[];
+        livenessProbe?: { httpGet?: { path?: string; port?: string } };
+        readinessProbe?: { httpGet?: { path?: string; port?: string } };
+      };
 
-        const named = Object.fromEntries(
-          (container.ports ?? []).map((port) => [
-            port.name,
-            port.containerPort,
-          ]),
-        );
+      const named = Object.fromEntries(
+        (container.ports ?? []).map((port) => [port.name, port.containerPort]),
+      );
 
-        expect(named).toEqual({
-          http: Number(envValue('api-gateway', 'PORT')),
-          ws: Number(envValue('api-gateway', 'WS_PORT')),
-          metrics: Number(envValue('api-gateway', 'METRICS_PORT')),
-        });
-        expect(container.livenessProbe?.httpGet).toEqual({
-          path: '/health',
-          port: 'http',
-        });
-        expect(container.readinessProbe?.httpGet).toEqual({
-          path: '/health/ready',
-          port: 'http',
-        });
-      },
-    );
+      expect(named).toEqual({
+        http: Number(envValue('api-gateway', 'PORT')),
+        metrics: Number(envValue('api-gateway', 'METRICS_PORT')),
+      });
+      expect(container.livenessProbe?.httpGet).toEqual({
+        path: '/health',
+        port: 'http',
+      });
+      expect(container.readinessProbe?.httpGet).toEqual({
+        path: '/health/ready',
+        port: 'http',
+      });
+    });
   });
 
   // --------------------------------------------------- 2. the probe SERVICE names
@@ -690,78 +682,35 @@ describe('the manifest contract', () => {
     expect([...withInit].sort()).toEqual([...withSchema].sort());
   });
 
-  // ------------------------------------------- 9. exactly one gateway serves
+  // ---------------------------------------------- 9. one gateway Deployment
 
-  it('9. **exactly one gateway Deployment is `active`**, and a standby cannot roll', () => {
-    // The annotation does not grant the role — `GatewayLeaseService`
-    // does, through Redis — so this row guards the RECORD: the thing a human
-    // reads before a switch and the thing CD's rollout-wait branches on. Two
-    // Deployments annotated `active` would not break the exclusion; they would
-    // make CD wait for a Deployment that is standing by, which fails every
-    // deploy five minutes at a time.
-    const ROLE = 'synapsedesk.io/gateway-role';
-    const gateways = byKind('Deployment').filter(({ doc }) =>
-      (doc.metadata?.name ?? '').startsWith('api-gateway'),
-    );
+  it('9. **one gateway Deployment, and it rolls rather than recreates**', () => {
+    type Metadata = {
+      name?: string;
+      labels?: Record<string, string>;
+      annotations?: Record<string, string>;
+    };
+    const gateways = byKind('Deployment').filter(({ doc }) => {
+      const metadata: Metadata | undefined = doc.metadata;
 
-    // A floor, not a fixture. Zero would
-    // mean the name changed and every assertion below ran over nothing.
-    expect(gateways.length).toBeGreaterThanOrEqual(1);
+      return metadata?.labels?.['app.kubernetes.io/name'] === 'api-gateway';
+    });
 
-    const findings: string[] = [];
-    let active = 0;
+    // A second Deployment carrying the label would be a second set of pods
+    // behind the one Service, serving whatever image it was last given.
+    expect(gateways.map(({ doc }) => doc.metadata?.name)).toEqual([
+      'api-gateway',
+    ]);
 
-    for (const { file, doc } of gateways) {
-      const metadata = doc.metadata as {
-        name?: string;
-        labels?: Record<string, string>;
-        annotations?: Record<string, string>;
-      };
-      const spec = doc.spec as {
-        replicas?: number;
-        strategy?: { type?: string };
-        template?: { metadata?: { annotations?: Record<string, string> } };
-      };
-      const role = metadata.annotations?.[ROLE];
-      const name = metadata.name ?? file;
-
-      // On the Deployment, never the pod template: an annotation in the pod
-      // template is part of the pod spec, so a role flip would roll every pod.
-      if (spec.template?.metadata?.annotations?.[ROLE] !== undefined) {
-        findings.push(`${name}: ${ROLE} is on the pod template`);
-      }
-
-      // Both halves answer on the same Service, which is what makes the switch
-      // invisible to a client.
-      if (metadata.labels?.['app.kubernetes.io/name'] !== 'api-gateway') {
-        findings.push(
-          `${name}: not labelled app.kubernetes.io/name=api-gateway`,
-        );
-      }
-
-      if (role === 'active') {
-        active += 1;
-        if (!(spec.replicas && spec.replicas > 0)) {
-          findings.push(`${name}: active with replicas=${spec.replicas}`);
-        }
-        if (spec.strategy?.type !== 'RollingUpdate') {
-          findings.push(`${name}: active with strategy=${spec.strategy?.type}`);
-        }
-      } else if (role === 'standby') {
-        // Measured on minikube: the default RollingUpdate cannot
-        // replace pods that are never Ready, so a standby left on it takes a
-        // new image only halfway and holds the rest until it becomes active.
-        if (spec.strategy?.type !== 'Recreate') {
-          findings.push(
-            `${name}: standby with strategy=${spec.strategy?.type}`,
-          );
-        }
-      } else {
-        findings.push(`${name}: ${ROLE} is ${role ?? 'absent'}`);
-      }
-    }
-
-    expect(findings).toEqual([]);
-    expect(active).toBe(1);
+    const { doc } = gateways[0];
+    const spec = doc.spec as { strategy?: { type?: string } };
+    // `Recreate` stops every pod before starting any, so each deploy would be
+    // a full outage of the only surface a user reaches. Absent means the
+    // server default, which is `RollingUpdate`.
+    expect(spec.strategy?.type ?? 'RollingUpdate').toBe('RollingUpdate');
+    // No role: there is nothing to switch between.
+    expect(
+      (doc.metadata as Metadata).annotations?.['synapsedesk.io/gateway-role'],
+    ).toBeUndefined();
   });
 });

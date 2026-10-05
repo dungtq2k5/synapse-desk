@@ -46,9 +46,10 @@ export class RedisService implements OnApplicationShutdown {
   }
 
   /**
-   * The last hook Nest runs, so every provider that releases something in Redis on
-   * its way out (the gateway lease, in `beforeApplicationShutdown`) still has an
-   * open client. Quit in `onModuleDestroy`, it ran before them all.
+   * The last hook Nest runs. Nest closes the HTTP server between the destroy hooks
+   * and this one, so a request still in flight while it closes — a throttle count,
+   * a cache read — still finds an open client. Quit in `onModuleDestroy`, it would
+   * not.
    */
   async onApplicationShutdown(): Promise<void> {
     // `.catch()` because a quit against an already-broken connection rejects,

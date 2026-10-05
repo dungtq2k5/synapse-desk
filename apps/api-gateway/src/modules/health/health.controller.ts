@@ -17,7 +17,6 @@ import {
 import type { Response } from 'express';
 import { RedisHealthService } from './redis-health.service';
 import { DrainState } from './drain-state.service';
-import { GatewayLeaseService } from '../../common/lease/gateway-lease.service';
 import {
   LivenessResponseDto,
   ReadinessResponseDto,
@@ -37,7 +36,6 @@ export class HealthController {
     private readonly serviceRegistry: ServiceRegistry,
     private readonly redis: RedisHealthService,
     private readonly drain: DrainState,
-    private readonly lease: GatewayLeaseService,
   ) {}
 
   /**
@@ -101,9 +99,7 @@ export class HealthController {
   @ApiOperation({
     summary: 'Readiness — should traffic reach THIS instance?',
     description:
-      '`ready` gates on Redis, on whether this instance is draining, and on this ' +
-      'instance holding the implementation lease — a warm STANDBY answers 503 ' +
-      'here and 200 on `/health`. Peer gRPC ' +
+      '`ready` gates on Redis and on whether this instance is draining. Peer gRPC ' +
       'health is REPORTED under `peers` and deliberately does not gate: every ' +
       'instance sees the same peer down, so gating would remove all of them and ' +
       'turn one service outage into a total one. A partial outage should look ' +
@@ -125,12 +121,7 @@ export class HealthController {
 
     const draining = this.drain.isDraining();
     const redis: ServiceHealth = (await redisReachable) ? 'UP' : 'DOWN';
-    // **A standby is deliberately NOT ready.** It is booted, warm and
-    // answering `/health` so the kubelet leaves it alone, while the Service
-    // sends it nothing — which is what makes a switch cost the old pods
-    // draining rather than a cold start. The payload shape does not change:
-    // `ready` is the field that already says whether to route here.
-    const ready = redis === 'UP' && !draining && this.lease.isActive();
+    const ready = redis === 'UP' && !draining;
 
     if (!ready) response.status(HttpStatus.SERVICE_UNAVAILABLE);
 

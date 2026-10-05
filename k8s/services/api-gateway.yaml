@@ -13,27 +13,8 @@ metadata:
   name: api-gateway
   labels:
     app.kubernetes.io/name: api-gateway
-  # Which implementation is serving. On the DEPLOYMENT's metadata, never the
-  # pod template: a pod-template annotation is part of the pod spec, so
-  # flipping the role would roll every pod for a change no container reads.
-  # Here it changes nothing but the record, and the record is what CD's
-  # rollout-wait and `manifest-contract.spec.ts` read.
-  #
-  # It does not GRANT the role — `GatewayLeaseService` does, through Redis, and
-  # two Deployments both annotated `active` would still leave one standing by.
-  # It is how a human and CD know which one that is meant to be, and switching
-  # it is a commit because every deploy re-applies this file.
-  annotations:
-    synapsedesk.io/gateway-role: active
 spec:
   replicas: 2
-  # Spelled out rather than left to the server default, because the standby
-  # side must say `Recreate` and a default on one side of a pair that has to
-  # differ reads as an oversight. A rolling update waits for Ready, which is
-  # correct for the implementation that holds the lease and impossible for the
-  # one that does not.
-  strategy:
-    type: RollingUpdate
   selector:
     matchLabels:
       app.kubernetes.io/name: api-gateway
@@ -83,10 +64,6 @@ spec:
           ports:
             - name: http
               containerPort: 3000
-            # Socket.IO's own listener, `WS_PORT`, which the Service's `ws` port
-            # and the Ingress `/socket.io` path reach by name.
-            - name: ws
-              containerPort: 3001
             # Its OWN listener, which is what makes "not reachable from the
             # internet" structural rather than an ingress rule. The Ingress
             # below routes to `http` only.
@@ -146,9 +123,6 @@ spec:
     - name: http
       port: 3000
       targetPort: http
-    - name: ws
-      port: 3001
-      targetPort: ws
     - name: metrics
       port: 9464
       targetPort: metrics

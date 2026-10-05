@@ -28,8 +28,6 @@ import {
 } from '../../src/modules/health/ops-routes';
 import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
-import { leaseSwitch, type LeaseSwitch } from './bootstrap';
-import { GatewayLeaseService } from '../../src/common/lease/gateway-lease.service';
 import { ACCESS_COOKIE, buildJwtPayload } from './auth';
 import { signAccessToken } from './tokens';
 import { VALIDATION_PIPE_OPTIONS } from '../../src/common/config/validation.config';
@@ -88,8 +86,6 @@ export type RealtimeFixture = {
    * seconds, and not to call a method the production path never calls.
    */
   redis: Redis;
-  /** Flips this instance between holding the lease and standing by. */
-  lease: LeaseSwitch;
   close: () => Promise<void>;
 };
 
@@ -112,14 +108,7 @@ export async function bootstrapRealtimeTest(
 ): Promise<RealtimeFixture> {
   const { stubs, clientGrpc } = stubGrpcServices();
 
-  const lease = leaseSwitch();
-
   const builder = Test.createTestingModule({ imports: [AppModule] })
-    // Steady rather than real — see `leaseSwitch`. A standby accepts no
-    // socket, so every row in this fixture depends on the answer holding
-    // still for the length of the suite.
-    .overrideProvider(GatewayLeaseService)
-    .useValue(lease)
     .overrideProvider(AUTH_GRPC_CLIENT)
     .useValue(clientGrpc)
     .overrideProvider(TICKET_GRPC_CLIENT)
@@ -157,13 +146,7 @@ export async function bootstrapRealtimeTest(
   // The SAME adapter main.ts installs. Using the default in-memory one here
   // would leave the Redis path — the part that only fails across replicas —
   // untested by every suite that uses this fixture.
-  // `WS_PORT = 0`: Socket.IO on the HTTP server's own ephemeral port, so the
-  // fixture keeps one free port per app. The separate listener is held by the
-  // contract suite, which starts the gateway as a process.
-  const redisIoAdapter = new RedisIoAdapter(app, {
-    getOrThrow: <T>(key: string): T =>
-      (key === 'WS_PORT' ? 0 : configService.getOrThrow<T>(key)) as T,
-  } as ConfigService);
+  const redisIoAdapter = new RedisIoAdapter(app, configService);
   await redisIoAdapter.connect();
   app.useWebSocketAdapter(redisIoAdapter);
 
@@ -305,7 +288,6 @@ export async function bootstrapRealtimeTest(
     connectRaw,
     connectWithTransports,
     redis,
-    lease,
     close,
   };
 }

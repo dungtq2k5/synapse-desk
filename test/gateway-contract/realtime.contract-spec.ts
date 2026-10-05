@@ -59,7 +59,7 @@ describe('realtime across replicas, and the cache', () => {
 
   /** A connected client, as a browser connects: websocket, cookie, `/ws`. */
   const connectClient = async (gateway: Gateway, sub: string) => {
-    const socket = io(`${gateway.wsUrl}/ws`, {
+    const socket = io(`${gateway.baseUrl}/ws`, {
       transports: ['websocket'],
       reconnection: false,
       forceNew: true,
