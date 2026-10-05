@@ -191,7 +191,7 @@ A drop is a decision, not a failure, and answering it with a non-2xx would turn 
 2. `RESEND_PROVISION_KEY` (full access — webhooks are not a sending endpoint) and `RESEND_WEBHOOK_URL` (the public gateway origin plus `/api/v1/webhooks/email/resend`) in the root `.env`; `npm run resend:provision` to see what would happen, `-- --apply` to create the webhook. It prints the signing secret on create and reads it back on request; it is never once-only.
 3. `RESEND_WEBHOOK_SECRET`, `RESEND_GATEWAY_API_KEY` and `INBOUND_EMAIL_DOMAIN` in the gateway's `.env`; `INBOUND_EMAIL_SECRET` in the gateway's and notification-service's, byte-identical.
 
-The route needs nothing special from the Ingress: `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and authenticates with the signature rather than a JWT. **It is rate-limited like every other route** — the throttler has no per-route exemption — so a delivery burst above the limit answers 429. Resend redelivers a non-2xx, so a throttled mail arrives late rather than not at all, unless the burst outlasts the redelivery schedule.
+The route needs nothing special from the Ingress: `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and authenticates with the signature rather than a JWT. **It is exempt from rate limiting** (`@SkipThrottle`): a delivery burst is Resend doing its job, and a throttled delivery would only arrive late, as a redelivery.
 
 Storage-service's egress is constrained by `k8s/policy/storage-egress.yaml`, notification's twin: private space refused at the kernel behind the guard, with a `REPLACE_ME` CIDR for the managed Redis that **must be filled before the first apply** — unfilled, the API server refuses the policy and the deploy stops there (`k8s/README.md`).
 
