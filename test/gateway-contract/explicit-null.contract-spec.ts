@@ -207,8 +207,7 @@ describe('an explicit null for an optional request field', () => {
     },
   );
 
-  // One row per field, each with a LITERAL title: `SKIPPED_FOR_JAVA` matches the
-  // title a row is declared with, and a `%s` template would hide which field is skipped.
+  // One row per field, each with a LITERAL title, so a failure names the field.
   for (const [key, meaning] of Object.entries(MEANINGS)) {
     rowFor('Ops')(
       `**\`${key}\`: an explicit \`null\` ${meaning.reason}, and the peer is asked for exactly that**`,
