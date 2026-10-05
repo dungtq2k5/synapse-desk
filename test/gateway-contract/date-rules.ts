@@ -1,6 +1,6 @@
 /**
- * What Node's two date validators do with a value, measured on Node and shared by the
- * specs that hold a date field to one of them.
+ * What the gateway's two date rules do with a value, shared by the specs that hold a
+ * date field to one of them.
  */
 
 export type Rule = { accepted: string[]; refused: string[] };

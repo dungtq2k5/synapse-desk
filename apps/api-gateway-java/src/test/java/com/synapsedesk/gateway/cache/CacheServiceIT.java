@@ -21,16 +21,10 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * The `cache:` keyspace, against a REAL Redis.
  *
- * <p>Neither gateway caches a real route yet (grep confirms Node's
- * `apps/api-gateway/src/modules/users` never calls `CacheService`/`cache.wrap`,
- * so "GET /users/me, which is a cacheable route" is aspirational).
- * Wiring caching into just one side to make this row pass would be a worse
- * bug than the one it is meant to catch — the two implementations would then
- * answer a repeated request differently. So this proves the KEYSPACE is
- * shared without going through either gateway's HTTP surface: Java's real
- * {@link CacheService} on one side, Node's exact wire format (hand-written
- * here, since `encode`/`decode`/`DATE_TAG` in `cache.service.ts` are private
- * module functions, not exported) on the other.
+ * <p>The gateway caches no real route yet, so "GET /users/me, which is a
+ * cacheable route" is aspirational. So this proves the KEYSPACE without going
+ * through the HTTP surface: the real {@link CacheService} on one side, and the
+ * keyspace's exact wire format, hand-written here, on the other.
  *
  * <p>An `IT`, connected the same way {@code GatewayLeaseIT} is: a real Redis
  * via `REDIS_URL`, started outside this process and outliving it — the

@@ -3,19 +3,14 @@ package com.synapsedesk.gateway.lease;
 import java.time.Duration;
 
 /**
- * The lease's shared vocabulary — the same keys, scripts and timings the Node
- * gateway uses.
+ * The lease's vocabulary — its keys, scripts and timings.
  *
- * <p><b>These values are a CONTRACT between the two implementations, not a
- * setting.</b> Both read one Redis, and a Java pod with a different TTL or a
- * different key would not exclude the Node one — it would simply serve beside
- * it, which is the single outcome the lease exists to prevent. They are
- * written here rather than bound from configuration for that reason: there is
- * no deployment in which they should differ.
- *
- * <p>The scripts are byte-identical in behaviour to
- * `apps/api-gateway/src/common/lease/gateway-lease.service.ts`, and
- * `LeaseParityTest` asserts that by reading the TypeScript.
+ * <p><b>These values are a contract, not a setting.</b> Every pod reads one
+ * Redis, and a pod with a different TTL or a different key would not be
+ * excluded — it would simply serve beside the others, which is the single
+ * outcome the lease exists to prevent. They are written here rather than bound
+ * from configuration for that reason: there is no deployment in which they
+ * should differ.
  */
 public final class GatewayLease {
 

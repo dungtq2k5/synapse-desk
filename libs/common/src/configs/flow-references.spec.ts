@@ -56,6 +56,7 @@ describe('every symbol the flow documents cite exists', () => {
    */
   const CITED_EXTENSIONS = [
     'ts',
+    'java',
     'py',
     'mjs',
     'yml',

@@ -130,7 +130,7 @@ Getting this backwards is how a schema and its history stop agreeing — and not
 
 **2. The gateway Secret carries two more values, and neither is the sending key.** `RESEND_WEBHOOK_SECRET` is what `scripts/provision-resend.mjs` printed when it created the webhook (readable back with `--print-secret`); `RESEND_GATEWAY_API_KEY` is the key the gateway fetches inbound mail with — separate from notification-service's `RESEND_API_KEY` by name and by scope. `RESEND_WEBHOOK_URL` in the root `.env` must be the real Ingress host plus `/api/v1/webhooks/email/resend` before the webhook is created, because the webhook holds a URL.
 
-**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`resend-inbound.service.ts`), and the controller carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail. Nothing to add.
+**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`ResendInboundService.java`), and it is rate-limited like every other route — a delivery burst above the limit answers 429, which Resend redelivers. Nothing to add.
 
 **4. The gateway has two Deployments and one Service.** `api-gateway`
 (Node) and `api-gateway-java` both carry the `app.kubernetes.io/name:

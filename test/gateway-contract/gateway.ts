@@ -1,10 +1,8 @@
 /**
- * @file The implementation under test, as a PROCESS.
+ * @file The gateway under test, as a PROCESS.
  *
- * `GATEWAY_IMPL` picks it: `node` runs the built gateway exactly as
- * `start:prod` does, `java` will run the jar. Nothing here may reach inside
- * the process — that is the whole point of this harness, and the reason the
- * existing 965 in-process tests cannot serve the Java implementation.
+ * It runs the built jar exactly as `start:prod` does. Nothing here may reach
+ * inside the process — that is the whole point of this harness.
  *
  * Three things this file exists to get right:
  *
@@ -27,10 +25,6 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
-import {
-  BUILD_COMMAND,
-  missingOutputs,
-} from '../../scripts/lib/openapi-export.cjs';
 
 export const REPO_ROOT = join(__dirname, '../..');
 
@@ -40,10 +34,8 @@ export type Gateway = {
   baseUrl: string;
   /**
    * Where `/ws` (a Socket.IO NAMESPACE, not a path — the wire path is
-   * `/socket.io`) actually answers: `WS_PORT`, a listener of its own, for BOTH
-   * implementations. One URL for both on purpose: a deployment exposes one
-   * Socket.IO port, and a harness that handed each implementation its own URL
-   * could not see that the cluster's Service exposed only the HTTP one.
+   * `/socket.io`) actually answers: `WS_PORT`, a listener of its own, since
+   * netty-socketio cannot share Tomcat's port.
    */
   wsUrl: string;
   metricsUrl: string;
@@ -54,11 +46,11 @@ const READY_TIMEOUT_MS = 60_000;
 const LAUNCH_ATTEMPTS = 3;
 
 /**
- * What a gateway prints when a port it was given is already taken: Spring's Tomcat, the
- * Java realtime listener (netty-socketio), and Node's own `EADDRINUSE`.
+ * What the gateway prints when a port it was given is already taken: Spring's Tomcat,
+ * and the realtime listener (netty-socketio).
  */
 const PORT_TAKEN =
-  /was already in use|Address already in use|EADDRINUSE|SocketIO server start failed at port/u;
+  /was already in use|Address already in use|SocketIO server start failed at port/u;
 
 /** A launch that failed only because a port was taken in the window `freePort` leaves. */
 class PortTaken extends Error {
@@ -104,7 +96,7 @@ function isFree(port: number): Promise<boolean> {
  * Asked for and released, so there is a window before the gateway binds it.
  * The alternative — letting the gateway bind port 0 and reading the port back
  * — would mean parsing its log line, which is a contract this harness must not
- * depend on and which the Java implementation would not share.
+ * depend on.
  */
 async function freePort(): Promise<number> {
   if (SHARD > 0) {
@@ -130,8 +122,8 @@ async function freePort(): Promise<number> {
 }
 
 /**
- * `gateway.env`, the harness's own file, as the base for EITHER implementation, and
- * the per-launch values ASSIGNED over it.
+ * `gateway.env`, the harness's own file, as the base, and the per-launch values
+ * ASSIGNED over it.
  *
  * Assigned rather than loaded: `loadEnvFile` leaves a variable
  * already in the environment alone, so a developer's exported `REDIS_URL`
@@ -143,27 +135,6 @@ export const GATEWAY_ENV = parseEnv(
 
 function environmentFor(overrides: Record<string, string>): NodeJS.ProcessEnv {
   return { ...process.env, ...GATEWAY_ENV, ...overrides };
-}
-
-/** The command for the implementation under test, and what builds it. */
-function commandFor(impl: string): { command: string; args: string[] } {
-  if (impl === 'node') {
-    return {
-      command: process.execPath,
-      args: [
-        join(REPO_ROOT, 'apps/api-gateway/dist/apps/api-gateway/src/main.js'),
-      ],
-    };
-  }
-
-  if (impl === 'java') {
-    return { command: 'java', args: ['-jar', javaJar()] };
-  }
-
-  throw new Error(
-    `GATEWAY_IMPL=${impl} is unknown. 'node' and 'java' are the two there ` +
-      'will ever be — see `GATEWAY_IMPLEMENTATIONS`.',
-  );
 }
 
 /**
@@ -186,52 +157,25 @@ function javaJar(): string {
     throw new Error(
       `Expected exactly one jar in apps/api-gateway-java/target, found ${jars.length}` +
         `${jars.length ? `: ${jars.join(', ')}` : ''}.\n` +
-        'Build it: npm run test:contract (which builds the selected implementation).',
+        'Build it: npm run test:contract:java (which builds the jar first).',
     );
   }
 
   return join(target, jars[0]);
 }
 
-/** Refuses to start against a build that does not exist. */
-function assertBuilt(impl: string): void {
-  // The jar's absence is checked by `javaJar()` when the command is built,
-  // with the same message shape. Staleness is not checked for either
-  // implementation — `run-contract-suite.mjs` builds first, which is the only
-  // answer that works (absence is detectable, staleness is not).
-  if (impl !== 'node') return;
-
-  const missing = missingOutputs(REPO_ROOT);
-  if (missing.length > 0) {
-    throw new Error(
-      `The gateway is not built:\n${missing.map((output: string) => `  ${output}`).join('\n')}\n` +
-        `Build it: ${BUILD_COMMAND}`,
-    );
-  }
-}
-
 /**
  * Starts one gateway and waits until it reports ready.
  *
  * @param overrides environment on top of `gateway.env` — the peer URLs, and
- * anything a row needs to change about the implementation under test.
- * @param options.impl forces a specific implementation rather than reading
- * `GATEWAY_IMPL` — only for the cross-implementation cache-invalidation row,
- * which needs ONE Node and ONE Java process in the same test. Every other
- * caller leaves this unset and gets the arm the suite is running.
- * @param options.probe `'ready'` (the default) waits for `/health/ready` —
- * wrong for a process this row DELIBERATELY starts as a standby, since a
- * standby's `/health/ready` stays 503 for as long as the other implementation
- * holds the lease and the poll would time out. `'live'` waits for `/health`
- * instead, which answers 200 while standing by — the gateway's own
- * liveness-vs-readiness split, documented on `OpsController`.
+ * anything a row needs to change about the gateway under test.
  */
 export async function startGateway(
   overrides: Record<string, string> = {},
-  options: { impl?: string; probe?: 'ready' | 'live' } = {},
 ): Promise<Gateway> {
-  const impl = options.impl ?? process.env.GATEWAY_IMPL ?? 'node';
-  assertBuilt(impl);
+  // Resolved once, before any port is asked for: an absent jar is a build
+  // problem, never a reason to retry a launch.
+  const jar = javaJar();
 
   // A port is asked for and released, so another process can take it before the
   // gateway binds it (see `freePort`). Rare when one suite runs alone, routine when
@@ -241,9 +185,7 @@ export async function startGateway(
     const port = await freePort();
     const metricsPort = await freePort();
     const wsPort = await freePort();
-    const { command, args } = commandFor(impl);
-
-    const child = spawn(command, args, {
+    const child = spawn('java', ['-jar', jar], {
       cwd: REPO_ROOT,
       // Its own process group, so `kill(-pid)` reaches whatever it spawned.
       detached: true,
@@ -252,8 +194,6 @@ export async function startGateway(
         PORT: String(port),
         METRICS_PORT: String(metricsPort),
         METRICS_HOST: '127.0.0.1',
-        // Node ignores this (its env schema allows unknown keys) — only the
-        // Java implementation's netty-socketio listener binds it.
         WS_PORT: String(wsPort),
       }),
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -265,7 +205,7 @@ export async function startGateway(
     // otherwise leaves nothing to read, since its output is printed only on failure.
     const log = process.env.CONTRACT_LOG_DIR
       ? createWriteStream(
-          join(process.env.CONTRACT_LOG_DIR, `gateway-${impl}-${port}.log`),
+          join(process.env.CONTRACT_LOG_DIR, `gateway-${port}.log`),
         )
       : undefined;
     const keep = (chunk: Buffer) => {
@@ -285,7 +225,7 @@ export async function startGateway(
     };
 
     try {
-      await waitUntilReady(baseUrl, child, output, options.probe ?? 'ready');
+      await waitUntilReady(baseUrl, child, output);
 
       return gateway;
     } catch (failure) {
@@ -309,9 +249,8 @@ async function waitUntilReady(
   baseUrl: string,
   child: ChildProcess,
   output: string[],
-  probe: 'ready' | 'live',
 ): Promise<void> {
-  const path = probe === 'live' ? '/health' : '/health/ready';
+  const path = '/health/ready';
   const deadline = Date.now() + READY_TIMEOUT_MS;
 
   while (Date.now() < deadline) {

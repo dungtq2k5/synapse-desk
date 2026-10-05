@@ -1,16 +1,8 @@
 /**
- * @file Which rows run for which implementation.
+ * @file What API each row exercises.
  *
- * **Every route is implemented in both**, so no row is skipped for being
- * unserved; the only rows skipped for Java are the ones NAMED in
- * {@link SKIPPED_FOR_JAVA}, each with what it waits for. A row declares the API
- * TAG it exercises — not to be gated by it, but so
+ * A row declares the API TAG it exercises — not to be gated by it, but so
  * `declared-tags.contract-spec.ts` can prove every published API has a row.
- *
- * **Skipped means REPORTED skipped.** `rowFor(...)` returns jest's `it.skip`,
- * so the runner prints the row and its name. A conditional `return` inside a
- * test body reports a PASS, which is the one outcome worse than a failure —
- * it says the Java gateway satisfies a contract nothing checked.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -19,42 +11,9 @@ import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 import { compareAlphabetically } from '@synapsedesk/common';
 
-/** The implementation under test. */
-export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
-
 /**
- * Rows the Java gateway cannot pass yet, by NAME, with what each waits for.
- *
- * **A BEHAVIOUR, never a route.** A row can exercise an API the Java gateway
- * serves and still fail on something it has not grown — a metric that only
- * exists once its labels are first used, an exact Node phrasing, a
- * distinction a project-wide setting erases. Each is recorded here by the
- * row's own title, with the reason beside it.
- *
- * **This list is the progress bar, and it must be EMPTY before the cutover
- * rehearsal.** Each entry names what it waits for, so that emptying it is a
- * checklist rather than an argument. A row skipped here and green for `node`
- * is the honest state; a row that quietly passes both because it asserts
- * nothing is the failure this harness exists to prevent.
- */
-export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {};
-
-/** True when this row's NAME is on the explicit list. */
-function skippedByName(title: string): boolean {
-  return Object.keys(SKIPPED_FOR_JAVA).some((fragment) =>
-    title.includes(fragment),
-  );
-}
-
-/**
- * `it` or `it.skip`, by whether this row is named in {@link SKIPPED_FOR_JAVA}.
- *
- * For `node` it is always `it`: the Node gateway does everything, and a row
- * skipped for it would be a row nothing runs.
- *
- * **The tags are not consulted.** They name the API the row exercises, and
- * are read by `declaredTags()` — never here, because nothing is gated by API
- * any more.
+ * `it`, declaring the API tags the row exercises. The tags are read by
+ * `declaredTags()` from the source, never here.
  *
  * @example
  * rowFor('Tickets')('creates a ticket', async () => { … });
@@ -63,46 +22,7 @@ export function rowFor(...tags: string[]): jest.It {
   // Declared for `declaredTags()`, deliberately not consulted here.
   void tags;
 
-  if (IMPL === 'node') return it;
-
-  return gate(skippedByName, it);
-}
-
-/**
- * Wraps `base` so a row is `skip`ped when `skipped` says its title is.
- *
- * **`each` is gated too, by its TEMPLATE.** The title an `each` row is declared
- * with — `'a retryable %i is 503'` — is what the explicit list is matched
- * against, since the formatted names do not exist until jest expands the table.
- * Copying `base` over the wrapper would put the ungated `each` back, and a row
- * declared with `each` could then never be skipped by name.
- *
- * Pure, so the gating is testable against a recording stand-in for `it`.
- */
-export function gate(
-  skipped: (title: string) => boolean,
-  base: jest.It,
-): jest.It {
-  const choose = (title: string): jest.It =>
-    skipped(title) ? base.skip : base;
-
-  // The name is not known until the row declares it, so the explicit list is
-  // applied by wrapping `it` rather than by choosing it up front.
-  const gated = ((title: string, ...rest: unknown[]) =>
-    (choose(title) as unknown as (...args: unknown[]) => void)(
-      title,
-      ...rest,
-    )) as unknown as jest.It;
-
-  const each = ((table: unknown) =>
-    (title: string, ...rest: unknown[]) =>
-      (
-        choose(title).each as unknown as (
-          rows: unknown,
-        ) => (...args: unknown[]) => void
-      )(table)(title, ...rest)) as unknown as jest.Each;
-
-  return Object.assign(gated, base, { each });
+  return it;
 }
 
 /**
@@ -167,45 +87,4 @@ export function declaredTags(): string[] {
   }
 
   return [...tags].sort(compareAlphabetically);
-}
-
-/**
- * The root `Query`/`Mutation` fields the Java gateway does not resolve yet.
- * `schema.gql` generates no interface a missing field could fail to
- * implement, so the list is how an unresolved field is told from a forgotten
- * one. `GraphqlFieldCoverageTest` reads the same file and asserts it only ever
- * shrinks.
- */
-export const PENDING_GRAPHQL_FIELDS = join(
-  REPO_ROOT,
-  'apps/api-gateway-java/src/test/resources/pending-graphql-fields.txt',
-);
-
-/** Every root `Query`/`Mutation` field the Java gateway does NOT resolve yet. */
-export function pendingGraphqlFields(): Set<string> {
-  const lines = readFileSync(PENDING_GRAPHQL_FIELDS, 'utf8').split('\n');
-
-  return new Set(
-    lines
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0 && !line.startsWith('#')),
-  );
-}
-
-/**
- * `it` or `it.skip`, by whether this implementation resolves these ROOT
- * FIELDS yet — `rowFor`'s counterpart for GraphQL, keyed by the exact
- * `Query.foo` / `Mutation.bar` name rather than by REST tag, since a field
- * name needs no capitalization dance the way a published tag does.
- *
- * @example
- * rowForField('Query.tickets')('a query at depth 7 passes', async () => { … });
- */
-export function rowForField(...fields: string[]): jest.It {
-  if (IMPL === 'node') return it;
-
-  const pending = pendingGraphqlFields();
-  const blocked = fields.some((field) => pending.has(field));
-
-  return blocked ? it.skip : it;
 }

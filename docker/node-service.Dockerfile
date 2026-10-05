@@ -255,11 +255,9 @@ COPY --from=build /app/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
 
 # **One entrypoint name for two compiler layouts**, resolved at BUILD time.
 #
-# Every service compiles with SWC and emits `dist/src/main.js`. api-gateway
-# cannot: the Swagger CLI plugin is a TypeScript AST transformer, and SWC does
-# not run it — so the gateway stays on `tsc`, whose path aliases pull
-# `libs/*/src` into the program, move the common source root, and emit
-# `dist/apps/api-gateway/src/main.js` instead.
+# A service compiled with SWC emits `dist/src/main.js`. One compiled with `tsc`
+# and path aliases into `libs/*/src` has its common source root moved, and
+# emits `dist/apps/<service>/src/main.js` instead.
 #
 # A single hardcoded ENTRY served one of those and silently broke the other. A
 # second build-arg would work and is a footgun: the wrong default builds a

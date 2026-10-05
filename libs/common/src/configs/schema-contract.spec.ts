@@ -93,8 +93,9 @@ describe('the schema contract', () => {
     // points at the file rather than at the rule that stopped mattering.
     expect(read('.dockerignore')).toMatch(/^\*\*\/\.env\.\*$/m);
 
+    // Five: one per Node service. The gateway is Maven and has none.
     const buildConfigs = gitFiles('apps/*/tsconfig.build.json');
-    expect(buildConfigs.length).toBeGreaterThanOrEqual(6);
+    expect(buildConfigs.length).toBeGreaterThanOrEqual(5);
 
     for (const file of buildConfigs) {
       const parsed = JSON.parse(stripComments(read(file))) as {

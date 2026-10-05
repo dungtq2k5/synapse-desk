@@ -4,10 +4,7 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
-import {
-  SHARES_ENVIRONMENT_WITH,
-  withOwnEnvironment,
-} from '../testing/service-workspaces';
+import { withOwnEnvironment } from '../testing/service-workspaces';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -95,9 +92,8 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    // `withOwnEnvironment` drops `api-gateway-java`, which shares
-    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
-    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
+    // `withOwnEnvironment` reads `api-gateway-java` as `api-gateway`, whose
+    // `.env.example` and ConfigMap it uses rather than owning a second copy.
     withOwnEnvironment(
       gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
     ).sort();
@@ -115,15 +111,12 @@ describe('the manifest contract', () => {
 
   // -------------------------------------------------------------- the floors
 
-  it('**the corpus is not empty** — eight Deployments, seven Services, one Ingress', () => {
+  it('**the corpus is not empty** — seven Deployments, nine Services, one Ingress', () => {
     // The pattern-fires floor every scan in this repo carries. Checks 1–6 all
     // iterate over this corpus, so a glob that matched nothing would make all
     // six vacuously green — the failure mode a check exists to prevent,
     // arriving through the check.
-    // EIGHT, not seven: the gateway has two Deployments, one per
-    // implementation, sharing one Service. That asymmetry is the whole switch
-    // mechanism, so the count is stated rather than derived from `services()`.
-    expect(byKind('Deployment')).toHaveLength(8);
+    expect(byKind('Deployment')).toHaveLength(7);
     // Nine: the seven application Services, plus `nats` and `qdrant`, which are
     // StatefulSets and need a Service each to be addressable.
     expect(byKind('Service')).toHaveLength(9);
@@ -149,7 +142,9 @@ describe('the manifest contract', () => {
     // but it is very much a Deployment. Derived from the same registry the
     // env guards use, so a third implementation needs no edit here.
     expect([...deployments().keys()].sort()).toEqual(
-      [...services(), ...Object.keys(SHARES_ENVIRONMENT_WITH)].sort(),
+      gitFiles('apps/*/package.json')
+        .map((file) => file.split('/')[1])
+        .sort(),
     );
   });
 
@@ -217,14 +212,14 @@ describe('the manifest contract', () => {
       ]).toEqual([service, port, port, port]);
     });
 
-    it.each([['api-gateway'], ['api-gateway-java']])(
+    it.each([['api-gateway-java']])(
       '%s probes HTTP on its own PORT, and never the metrics port, and serves Socket.IO on WS_PORT',
       (name) => {
         // The one service with an HTTP listener, and the one whose metrics sit on
         // a SECOND port deliberately — `.env.example` calls that "what makes 'not
         // reachable from the internet' structural rather than an Nginx rule". A
         // probe pointed at 9464 would be checking the wrong listener. Socket.IO is
-        // a third listener in both implementations, and the Service and Ingress
+        // a third listener, and the Service and Ingress
         // reach it by this port's name: a Deployment without it is a gateway whose
         // realtime traffic has nowhere to go.
         const container = containersOf(deployments().get(name) as Doc)[0] as {
@@ -428,8 +423,10 @@ describe('the manifest contract', () => {
      */
     const EXCLUDED = new Set(['FIREBASE_STORAGE_EMULATOR_HOST']);
 
-    /** rag-service declares its variables in Python; its guard is pytest. */
+    /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
+      'api-gateway':
+        'JUnit: apps/api-gateway-java/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
       'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
     };
 
@@ -555,12 +552,17 @@ describe('the manifest contract', () => {
     expect(holdersInSecrets).toEqual(HOLDERS);
 
     // Derived rather than asserted from the list above: the services whose Joi
-    // schema NAMES the variable are the services that must hold it, so a third
-    // consumer added later fails here instead of shipping with no Secret.
-    const declaring = gitFiles('apps/*/src/**/env.validation.ts')
-      .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
-      .map((file) => file.split('/')[1])
-      .sort();
+    // schema, or Spring binding, NAMES the variable are the services that must
+    // hold it, so a third consumer added later fails here instead of shipping
+    // with no Secret.
+    const declaring = withOwnEnvironment([
+      ...gitFiles('apps/*/src/**/env.validation.ts')
+        .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
+        .map((file) => file.split('/')[1]),
+      ...gitFiles('apps/*/src/main/resources/application.yaml')
+        .filter((file) => read(file).includes(`\${${KEY}`))
+        .map((file) => file.split('/')[1]),
+    ]).sort();
 
     expect(declaring).toEqual(HOLDERS);
   });
@@ -617,9 +619,9 @@ describe('the manifest contract', () => {
     // `secrets/`, storage's and notification's at the package root — and the
     // first draft of the table listing them put auth's in the wrong one.
     //
-    // `WORKDIR` is `/app/apps/${SERVICE}`, so a relative `./secrets/x.key`
-    // resolves there; the mount is either that directory or that exact file via
-    // `subPath`. Derived, so a path changed in `.env.example` and not in the
+    // `WORKDIR` is `/app/apps/${SERVICE}` in the Node image and `/app` in the
+    // gateway's, so a relative `./secrets/x.key` resolves there; the mount is
+    // either that directory or that exact file via `subPath`. Derived, so a path changed in `.env.example` and not in the
     // Deployment goes red instead of failing at `readFileSync` on boot.
     const findings: string[] = [];
     let checked = 0;
@@ -631,15 +633,23 @@ describe('the manifest contract', () => {
         if (!key.endsWith('_PATH') || !value.startsWith('./')) continue;
 
         checked += 1;
-        const resolved = `/app/apps/${service}/${value.slice(2)}`;
+        const workdir =
+          service === 'api-gateway' ? '/app' : `/app/apps/${service}`;
+        const resolved = `${workdir}/${value.slice(2)}`;
         const directory = resolved.slice(0, resolved.lastIndexOf('/'));
 
-        const mounts = containersOf(deployments().get(service) as Doc).flatMap(
-          (container) =>
-            (
-              (container as { volumeMounts?: { mountPath?: string }[] })
-                .volumeMounts ?? []
-            ).map((mount) => mount.mountPath),
+        const deployment = byKind('Deployment').find(({ doc: candidate }) => {
+          const metadata:
+            { name?: string; labels?: Record<string, string> } | undefined =
+            candidate.metadata;
+
+          return metadata?.labels?.['app.kubernetes.io/name'] === service;
+        })?.doc;
+        const mounts = containersOf(deployment as Doc).flatMap((container) =>
+          (
+            (container as { volumeMounts?: { mountPath?: string }[] })
+              .volumeMounts ?? []
+          ).map((mount) => mount.mountPath),
         );
 
         if (!mounts.includes(resolved) && !mounts.includes(directory)) {
@@ -709,117 +719,57 @@ describe('the manifest contract', () => {
 
   // ------------------------------------------- 9. exactly one gateway serves
 
-  it('9. **exactly one gateway Deployment is `active`**, and a standby cannot roll', () => {
-    // The annotation does not grant the role — `GatewayLeaseService`
-    // does, through Redis — so this row guards the RECORD: the thing a human
-    // reads before a switch and the thing CD's rollout-wait branches on. Two
-    // Deployments annotated `active` would not break the exclusion; they would
-    // make CD wait for a Deployment that is standing by, which fails every
-    // deploy five minutes at a time.
-    const ROLE = 'synapsedesk.io/gateway-role';
-    const gateways = byKind('Deployment').filter(({ doc }) =>
-      (doc.metadata?.name ?? '').startsWith('api-gateway'),
-    );
+  it('9. **one gateway Deployment behind the Service, rolling, every Service port reaching a container port**', () => {
+    type Metadata = {
+      name?: string;
+      labels?: Record<string, string>;
+      annotations?: Record<string, string>;
+    };
+    const gateways = byKind('Deployment').filter(({ doc }) => {
+      const metadata: Metadata | undefined = doc.metadata;
 
-    // A floor, not a fixture: today Node alone, later Node and Java. Zero would
-    // mean the name changed and every assertion below ran over nothing.
-    expect(gateways.length).toBeGreaterThanOrEqual(1);
-
-    const findings: string[] = [];
-    let active = 0;
-
-    for (const { file, doc } of gateways) {
-      const metadata = doc.metadata as {
-        name?: string;
-        labels?: Record<string, string>;
-        annotations?: Record<string, string>;
-      };
-      const spec = doc.spec as {
-        replicas?: number;
-        strategy?: { type?: string };
-        template?: { metadata?: { annotations?: Record<string, string> } };
-      };
-      const role = metadata.annotations?.[ROLE];
-      const name = metadata.name ?? file;
-
-      // On the Deployment, never the pod template: an annotation in the pod
-      // template is part of the pod spec, so a role flip would roll every pod.
-      if (spec.template?.metadata?.annotations?.[ROLE] !== undefined) {
-        findings.push(`${name}: ${ROLE} is on the pod template`);
-      }
-
-      // Both halves answer on the same Service, which is what makes the switch
-      // invisible to a client.
-      if (metadata.labels?.['app.kubernetes.io/name'] !== 'api-gateway') {
-        findings.push(
-          `${name}: not labelled app.kubernetes.io/name=api-gateway`,
-        );
-      }
-
-      if (role === 'active') {
-        active += 1;
-        if (!(spec.replicas && spec.replicas > 0)) {
-          findings.push(`${name}: active with replicas=${spec.replicas}`);
-        }
-        if (spec.strategy?.type !== 'RollingUpdate') {
-          findings.push(`${name}: active with strategy=${spec.strategy?.type}`);
-        }
-      } else if (role === 'standby') {
-        // Measured on minikube: the default RollingUpdate cannot
-        // replace pods that are never Ready, so a standby left on it takes a
-        // new image only halfway and holds the rest until it becomes active.
-        if (spec.strategy?.type !== 'Recreate') {
-          findings.push(
-            `${name}: standby with strategy=${spec.strategy?.type}`,
-          );
-        }
-      } else {
-        findings.push(`${name}: ${ROLE} is ${role ?? 'absent'}`);
-      }
-    }
-
-    expect(findings).toEqual([]);
-    expect(active).toBe(1);
-  });
-
-  it('10. **both gateways read the SAME ConfigMap and Secret**', () => {
-    // The lease excludes within ONE Redis keyspace. Two gateway Deployments
-    // given different `REDIS_URL` values both claim, neither sees the other,
-    // and both serve — which is the single outcome the lease exists to
-    // prevent, arriving through an `envFrom` list rather than through the
-    // lease. Measured on the way in: the first run of the two-process test
-    // had the two implementations on Redis databases 15 and 0, and the
-    // symptom read as "the other side never claimed".
-    //
-    // Names rather than values, because the values are one indirection away
-    // and only equal at runtime — the realistic drift is a second ConfigMap.
-    const gateways = byKind('Deployment').filter(({ doc }) =>
-      (doc.metadata?.name ?? '').startsWith('api-gateway'),
-    );
-
-    expect(gateways.length).toBeGreaterThanOrEqual(2);
-
-    const sources = gateways.map(({ doc }) => {
-      const containers = containersOf(doc) as {
-        envFrom?: {
-          configMapRef?: { name?: string };
-          secretRef?: { name?: string };
-        }[];
-      }[];
-
-      return containers
-        .flatMap((container) => container.envFrom ?? [])
-        .map(
-          (source) => source.configMapRef?.name ?? source.secretRef?.name ?? '',
-        )
-        .sort();
+      return metadata?.labels?.['app.kubernetes.io/name'] === 'api-gateway';
     });
 
-    // Every gateway's set, identical to the first one's.
-    for (const source of sources) {
-      expect(source).toEqual(sources[0]);
-    }
-    // And not empty: two Deployments with no `envFrom` at all would agree.
-    expect(sources[0].length).toBeGreaterThanOrEqual(2);
+    // A second Deployment carrying the label would be a second set of pods
+    // behind the one Service, serving whatever image it was last given.
+    expect(gateways).toHaveLength(1);
+
+    const { doc } = gateways[0];
+    const metadata: Metadata | undefined = doc.metadata;
+    const spec = doc.spec as {
+      replicas?: number;
+      strategy?: { type?: string };
+    };
+    expect(spec.replicas).toBeGreaterThan(0);
+    // `Recreate` stops every pod before starting any, so each deploy would be
+    // a full outage of the only surface a user reaches. Absent means the
+    // server default, which is `RollingUpdate`.
+    expect(spec.strategy?.type ?? 'RollingUpdate').toBe('RollingUpdate');
+    // No role: there is nothing to switch between.
+    expect(
+      metadata?.annotations?.['synapsedesk.io/gateway-role'],
+    ).toBeUndefined();
+
+    // Every Service port names a container port that exists. A Service port
+    // with no matching container port has no endpoints, so its traffic goes
+    // nowhere — the `ws` port did exactly that once.
+    const containerPorts = new Set(
+      (containersOf(doc) as { ports?: { name?: string }[] }[]).flatMap(
+        (container) => (container.ports ?? []).map((port) => port.name),
+      ),
+    );
+    const service = byKind('Service').find(
+      ({ doc: candidate }) => candidate.metadata?.name === 'api-gateway',
+    );
+    const servicePorts = (
+      (service?.doc.spec as { ports?: { targetPort?: string }[] } | undefined)
+        ?.ports ?? []
+    ).map((port) => port.targetPort);
+
+    expect(servicePorts.length).toBeGreaterThanOrEqual(3);
+    expect(servicePorts.filter((port) => !containerPorts.has(port))).toEqual(
+      [],
+    );
   });
 });

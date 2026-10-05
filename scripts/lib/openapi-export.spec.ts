@@ -1,69 +1,14 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import {
-  RUNTIME_OUTPUTS,
-  firstDifferingLine,
-  missingOutputs,
-  openapiViolations,
-} from './openapi-export.cjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { firstDifferingLine, openapiViolations } from './openapi-export.cjs';
 
 /**
  * The OpenAPI export's decisions, without booting the gateway.
  *
  * The script itself does its work when it runs, so it is not imported here;
- * CI's `contract-java` job runs it for real as `npm run openapi:check`.
+ * CI's `contract` job runs it for real as `npm run openapi:check`.
  */
 describe('the OpenAPI export — the pure half', () => {
-  describe('missingOutputs', () => {
-    let root: string;
-
-    const touch = (relative: string) => {
-      const path = join(root, relative);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, '');
-    };
-
-    beforeEach(() => {
-      root = mkdtempSync(join(tmpdir(), 'openapi-export-'));
-    });
-    afterEach(() => rmSync(root, { recursive: true, force: true }));
-
-    it('**names the gateway AND both libraries** — the export requires all three at runtime', () => {
-      // The built gateway resolves `@synapsedesk/common` and `grpc-proto` to
-      // each library's own `dist/`; a gateway-only build is not enough.
-      expect(RUNTIME_OUTPUTS).toEqual([
-        'apps/api-gateway/dist/apps/api-gateway/src/main.js',
-        'libs/common/dist/main.js',
-        'libs/grpc-proto/dist/index.js',
-      ]);
-      expect(missingOutputs(root)).toEqual(RUNTIME_OUTPUTS);
-    });
-
-    it.each(RUNTIME_OUTPUTS.map((output) => [output]))(
-      'each output is checked on its own: only %s missing is reported',
-      (absent: string) => {
-        for (const output of RUNTIME_OUTPUTS) {
-          if (output !== absent) touch(output);
-        }
-
-        expect(missingOutputs(root)).toEqual([absent]);
-      },
-    );
-
-    it('nothing missing → nothing reported', () => {
-      RUNTIME_OUTPUTS.forEach(touch);
-
-      expect(missingOutputs(root)).toEqual([]);
-    });
-  });
-
   describe('firstDifferingLine', () => {
     it.each([
       ['a\nb\n', 'a\nb\n', null],

@@ -19,9 +19,6 @@
  *   no permission." in the schema's own description), and `Mutation.escalateTicket`
  *   matches its REST route, which carries no guard either.
  *
- * A field on `pending-graphql-fields.txt` (one the Java gateway does not serve yet)
- * still needs its entry, and is not looked for in Java.
- *
  * `ponytail:` a targeted regex reader of Java and of SDL, not a parser — the same
  * caveat `permission-coverage.contract-spec.ts` states for its own style.
  */
@@ -29,7 +26,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './gateway';
-import { pendingGraphqlFields } from './pending';
 
 const TABLE = JSON.parse(
   readFileSync(
@@ -189,7 +185,6 @@ function schemaRootFields(): { kind: 'Query' | 'Mutation'; name: string }[] {
 }
 
 describe('GraphQL permission coverage — every root field is gated as the table says', () => {
-  const pending = pendingGraphqlFields();
   const declared = new Set(
     schemaRootFields().map((field) => `${field.kind}.${field.name}`),
   );
@@ -221,8 +216,6 @@ describe('GraphQL permission coverage — every root field is gated as the table
   });
 
   for (const [key, codes] of Object.entries(TABLE)) {
-    if (pending.has(key)) continue;
-
     it(`${key} requires ${codes.length ? codes.join(', ') : 'no permission'} in Java`, () => {
       const java = javaRootFieldCodes(javaSources, key.split('.')[1]);
 

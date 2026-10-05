@@ -42,9 +42,8 @@ describe('the environment contract', () => {
     'APP_VERSION',
     'BUILD_SHA',
     'BUILD_TIME',
-    // The stock Resend SDK reads this itself, so the Node gateway has no code
-    // to validate it; the Java gateway binds it, and the contract suite points
-    // both at a fake with it.
+    // No Joi schema validates it: the gateway binds it in Spring, and the
+    // contract suite points it at a fake.
     'RESEND_BASE_URL',
   ]);
 
@@ -59,14 +58,15 @@ describe('the environment contract', () => {
    * line this repository keeps everywhere else (`lint:py`, `test:py`).
    */
   const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
+    'api-gateway':
+      'JUnit: apps/api-gateway-java/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
     'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
   };
 
   /** apps/<service> for every workspace under apps/. */
   const services = (): string[] =>
-    // `withOwnEnvironment` drops `api-gateway-java`, which shares
-    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
-    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
+    // `withOwnEnvironment` reads `api-gateway-java` as `api-gateway`, whose
+    // `.env.example` and ConfigMap it uses rather than owning a second copy.
     withOwnEnvironment(
       gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
     ).sort();
@@ -133,7 +133,7 @@ describe('the environment contract', () => {
     ].sort();
 
     expect(covered).toEqual(services());
-    expect(schemaFiles().size).toBeGreaterThanOrEqual(6);
+    expect(schemaFiles().size).toBeGreaterThanOrEqual(5);
   });
 
   describe.each([...schemaFiles().entries()])('%s', (service, schemaPath) => {

@@ -49,9 +49,9 @@ sequenceDiagram
 | Component | Where | Owns |
 | :--- | :--- | :--- |
 | Resend receiving | the `INBOUND_EMAIL_DOMAIN` | MX record, the mailbox, the `email.received` webhook and its retries |
-| gateway — the webhook | `resend-inbound.service.ts` | signature, the fetch, the explicit validation, the counter |
-| gateway — the mapper | `resend-inbound.mapper.ts` | Resend's two objects → one `InboundEmailDto`; the three-way attachment split |
-| gateway — routing | `inbound-email.service.ts` | tenant, sender, thread, idempotency; which attachments are eligible, and the note |
+| gateway — the webhook | `ResendInboundService.java` | signature, the fetch, the explicit validation, the counter |
+| gateway — the mapper | `ResendInboundMapper.java` | Resend's two objects → one `InboundEmailDto`; the three-way attachment split |
+| gateway — routing | `InboundEmailService.java` | tenant, sender, thread, idempotency; which attachments are eligible, and the note |
 | gateway — loop guards | same, step 0 | refusing mail that would loop |
 | ticket-service | create/append; `IngestAttachment` | the ticket, the message, the thread; authorising a write under a ticket's prefix |
 | storage-service | `IngestFromUrl`, `remote-source.fetcher.ts` | fetching the bytes through the SSRF guard and landing them under `pending/` |
@@ -83,11 +83,11 @@ The sending key and the receiving key are separate by name and by scope on purpo
 
 ## 4. Signing
 
-**Verify the exact bytes, then trust nothing else about the request.** Resend signs with the Standard Webhooks scheme: `svix-id`, `svix-timestamp` and `svix-signature` over `${id}.${timestamp}.${rawBody}`. The gateway hands the SDK the raw body Nest kept (`rawBody: true`), never a re-serialised object — key order, whitespace and number formatting are all free to differ between two `JSON.stringify` calls on structurally equal objects, and a signature over the wrong one verifies locally and fails in production.
+**Verify the exact bytes, then trust nothing else about the request.** Resend signs with the Standard Webhooks scheme: `svix-id`, `svix-timestamp` and `svix-signature` over `${id}.${timestamp}.${rawBody}`. `StandardWebhookSignature.java` verifies the bytes `JsonBodyFilter` captured (`CachedBodyRequest`), never a re-serialised object — key order, whitespace and number formatting are all free to differ between two serialisations of structurally equal objects, and a signature over the wrong one verifies locally and fails in production.
 
-A missing header is the same 401 as a bad signature. `verify()` throws rather than returning an error, and nothing from a rejected body is logged: an unauthenticated caller wrote every byte of it.
+A missing header is the same 401 as a bad signature, and nothing from a rejected body is logged: an unauthenticated caller wrote every byte of it.
 
-The e2e suites sign with their own implementation of the scheme (`standard-webhooks.ts` under `test/utils`) rather than the SDK's verifier, so a test cannot pass by the verifier agreeing with itself.
+The contract suite signs with its own implementation of the scheme (`standard-webhooks.ts` under `test/gateway-contract`), independent of the gateway's verifier, so a test cannot pass by the verifier agreeing with itself.
 
 ---
 
@@ -112,13 +112,13 @@ Resend redelivers any non-2xx for about seventeen hours on a growing backoff, so
 
 ### 200 after verification, unless a retry can help
 
-A drop is a decision, not a failure, and answering it with a non-2xx would turn one misconfigured mail rule into seventeen hours of redelivery. So a verified event answers 200 whenever the system has decided about it — an unknown tenant, a refused sender, a mail that fails the DTO's constraints, a fetch that fails for a reason a retry will not change. The one 503 is a **retryable** fetch failure: 429, 5xx or a network error, classified by status code in `resend-errors.ts`, the same rule the outbound side uses.
+A drop is a decision, not a failure, and answering it with a non-2xx would turn one misconfigured mail rule into seventeen hours of redelivery. So a verified event answers 200 whenever the system has decided about it — an unknown tenant, a refused sender, a mail that fails the DTO's constraints, a fetch that fails for a reason a retry will not change. The one 503 is a **retryable** fetch failure: 429, 5xx or a network error, classified by status code in `ResendInboundClient.java` — the same rule the outbound side applies through `resend-errors.ts`.
 
-**The record is a counter, not a log.** Every exit of `resend-inbound.service.ts` increments `inbound_email_webhook_total{outcome}` exactly once:
+**The record is a counter, not a log.** Every exit of `ResendInboundService.java` increments `inbound_email_webhook_total{outcome}` exactly once:
 
 | `outcome` | HTTP | Means |
 | :--- | :--- | :--- |
-| `no_raw_body` | 401 | `rawBody: true` missing from the gateway's `NestFactory` — our misconfiguration |
+| `no_raw_body` | 401 | a request declared a body that `JsonBodyFilter` did not capture — our misconfiguration |
 | `rejected_signature` | 401 | a missing `svix-*` header or a signature that does not verify — the secret is wrong |
 | `ignored_event` | 200 | a verified event that is not `email.received` |
 | `fetch_failed` | 200 or 503 | the body could not be fetched — 503 when a retry can fix it, 200 when it cannot |
@@ -191,7 +191,7 @@ A drop is a decision, not a failure, and answering it with a non-2xx would turn 
 2. `RESEND_PROVISION_KEY` (full access — webhooks are not a sending endpoint) and `RESEND_WEBHOOK_URL` (the public gateway origin plus `/api/v1/webhooks/email/resend`) in the root `.env`; `npm run resend:provision` to see what would happen, `-- --apply` to create the webhook. It prints the signing secret on create and reads it back on request; it is never once-only.
 3. `RESEND_WEBHOOK_SECRET`, `RESEND_GATEWAY_API_KEY` and `INBOUND_EMAIL_DOMAIN` in the gateway's `.env`; `INBOUND_EMAIL_SECRET` in the gateway's and notification-service's, byte-identical.
 
-The route needs nothing special from the Ingress: `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix, authenticates with the signature rather than a JWT, and carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail.
+The route needs nothing special from the Ingress: `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and authenticates with the signature rather than a JWT. **It is rate-limited like every other route** — the throttler has no per-route exemption — so a delivery burst above the limit answers 429. Resend redelivers a non-2xx, so a throttled mail arrives late rather than not at all, unless the burst outlasts the redelivery schedule.
 
 Storage-service's egress is constrained by `k8s/policy/storage-egress.yaml`, notification's twin: private space refused at the kernel behind the guard, with a `REPLACE_ME` CIDR for the managed Redis that **must be filled before the first apply** — unfilled, the API server refuses the policy and the deploy stops there (`k8s/README.md`).
 

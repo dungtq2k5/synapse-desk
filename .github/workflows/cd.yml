@@ -68,8 +68,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - service: api-gateway
-            target: runtime
           - service: auth-service
             target: runtime
           - service: ticket-service
@@ -223,13 +221,7 @@ jobs:
       - name: set images
         run: |
           set -euo pipefail
-          # **`api-gateway-java` is in THIS list and not in the wait list
-          # below**, and the asymmetry is the point. A Deployment missing
-          # here keeps whatever image it was last applied with — so a standby
-          # scaled up at commit 1 would come up on stale code — the
-          # stale-standby failure arriving through CD instead of through a
-          # stalled rollout.
-          for service in api-gateway api-gateway-java auth-service ticket-service \
+          for service in api-gateway-java auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl set image "deployment/$service" \
@@ -250,30 +242,7 @@ jobs:
       - name: wait for every rollout
         run: |
           set -euo pipefail
-          # **The gateway list is read from the ROLE, not written here.** A
-          # standby is never Ready by design — `/health/ready` answers 503
-          # while another implementation holds the lease — so waiting on one
-          # fails every deploy, five minutes at a time. The annotation is on
-          # the Deployment's metadata (`manifest-contract` row 9 asserts
-          # that), so reading it changes no pod and starts no rollout.
-          #
-          # **A standby is gated instead of skipped.** Readiness cannot tell
-          # "running, not ready" from "dying", so a crash-looping standby was
-          # invisible until the commit that switched traffic onto it: the
-          # cutover rehearsal's first run was a total outage that way.
-          # `standby-gate.sh` requires every standby pod started and never
-          # restarted, through a hold, and passes a standby at zero replicas.
-          for service in api-gateway api-gateway-java; do
-            role=$(kubectl get "deployment/$service" \
-              -o jsonpath='{.metadata.annotations.synapsedesk\.io/gateway-role}')
-            if [ "$role" = "active" ]; then
-              kubectl rollout status "deployment/$service" --timeout=5m
-            else
-              scripts/standby-gate.sh "$service" 300 30
-            fi
-          done
-
-          for service in auth-service ticket-service \
+          for service in api-gateway-java auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl rollout status "deployment/$service" --timeout=5m

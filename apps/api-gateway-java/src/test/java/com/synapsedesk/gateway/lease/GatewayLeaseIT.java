@@ -17,8 +17,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * that it is ATOMIC; a fake that "ran" it would be a reimplementation of
  * Redis, which is the one thing this must not be tested against. So these run
  * under failsafe, in `verify`, and `./mvnw test` stays runnable with nothing
- * started — the same split the Node side has between `npm test` and
- * `npm run test:e2e:gateway`.
+ * started — the same split the Node services keep between `npm test` and
+ * their e2e suites.
  *
  * <p>The rows mirror the Node suite's, from the other side: there, a foreign
  * `gateway:holders:java` entry kept Node standing by. Here a
@@ -123,8 +123,7 @@ class GatewayLeaseIT {
   @Test
   void aLiveNodeEntryKeepsJavaAStandby() {
     // What a Node pod writes — the mirror of the Node suite's fake `java`
-    // entry. This is check 5 at the Redis level; `NodeAndJavaIT` runs the
-    // real Node gateway beside this one.
+    // entry. This is check 5 at the Redis level.
     redis
       .opsForZSet()
       .add(

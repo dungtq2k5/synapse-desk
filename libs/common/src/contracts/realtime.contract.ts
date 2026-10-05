@@ -6,13 +6,13 @@
  * consumer need the same strings: the gateway itself, its test suites, and the
  * contract harness that drives a gateway as a black box from outside every
  * workspace — a relative import out of `apps/api-gateway` is what
- * `image-contract.spec.ts` refuses. It is also the single input the Java
- * constants generator reads, so one edit reaches both implementations.
+ * `image-contract.spec.ts` refuses. It is also the single input the gateway's
+ * constants generator (`scripts/export-java-contracts.mjs`) reads.
  *
  * Everything that is the gateway's own MECHANISM — presence states, the typing
- * TTL, the per-event rate limits — stays in
- * `apps/api-gateway/src/modules/realtime/realtime.config.ts`. What lives here
- * is only what travels on the wire.
+ * TTL, the per-event rate limits — stays in the gateway's `realtime` package
+ * (`RealtimeGateway.java`, `WsEventLimits.java`). What lives here is only what
+ * travels on the wire.
  */
 
 // Room names and outbound event names — the two strings a client and the server

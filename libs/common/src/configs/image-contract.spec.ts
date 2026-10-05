@@ -130,9 +130,9 @@ describe('the image contract (static half)', () => {
         .sort();
 
     it('scans at least eight packages — the corpus floor', () => {
-      // Six apps and two libs today. A `git ls-files` pattern that stops
+      // Five apps and two libs today. A `git ls-files` pattern that stops
       // matching must fail rather than report a clean tree.
-      expect(workspaces().length).toBeGreaterThanOrEqual(8);
+      expect(workspaces().length).toBeGreaterThanOrEqual(7);
     });
 
     it.each(workspaces())('%s', (workspace) => {

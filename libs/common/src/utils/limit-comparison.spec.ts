@@ -14,7 +14,6 @@ import { join } from 'node:path';
 describe('Size comparisons go through the guard', () => {
   const REPO = join(__dirname, '../../../..');
   const SERVICES = [
-    'apps/api-gateway/src',
     'apps/auth-service/src',
     'apps/ingestion-service/src',
     'apps/storage-service/src',
@@ -40,9 +39,7 @@ describe('Size comparisons go through the guard', () => {
    * that no composition can turn into `NaN`. They are listed rather than
    * pattern-matched so that adding one is a decision somebody made.
    */
-  const SANCTIONED = new Set<string>([
-    'apps/api-gateway/src/modules/ingestion-jobs/ingestion-job.mapper.ts',
-  ]);
+  const SANCTIONED = new Set<string>([]);
 
   const sources = (): string[] => {
     const out: string[] = [];

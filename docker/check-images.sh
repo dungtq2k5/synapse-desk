@@ -19,7 +19,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-NODE_SERVICES=(api-gateway auth-service ticket-service ingestion-service notification-service storage-service)
+NODE_SERVICES=(auth-service ticket-service ingestion-service notification-service storage-service)
 GIT_SHA="$(git rev-parse HEAD)"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -174,14 +174,14 @@ fi
 # The NEGATIVE build: runtime-ocr must refuse any other SERVICE. Cached
 # layers make this fail in seconds, in the ocr-args stage.
 if docker build -f docker/node-service.Dockerfile --target runtime-ocr \
-    --build-arg SERVICE=api-gateway \
+    --build-arg SERVICE=storage-service \
     --build-arg GIT_SHA="$GIT_SHA" \
     --build-arg BUILD_TIME="$BUILD_TIME" \
     -t synapsedesk/ocr-guard-probe . >/dev/null 2>&1; then
   docker rmi synapsedesk/ocr-guard-probe >/dev/null 2>&1 || true
-  fail "runtime-ocr accepted SERVICE=api-gateway — the ocr-args guard is not wired"
+  fail "runtime-ocr accepted SERVICE=storage-service — the ocr-args guard is not wired"
 fi
-echo "   ok — bound present, absent, and guard refused a gateway build"
+echo "   ok — bound present, absent, and guard refused a storage-service build"
 
 # --------------------------------------------------------------- 7. the build-args gate held
 
@@ -224,15 +224,15 @@ docker run --rm --entrypoint sh synapsedesk/auth-service-migrate \
   -c 'test -f prisma/schema.prisma && npx prisma --version >/dev/null' \
   || fail "migrate image lacks the schema or the Prisma CLI"
 
-# api-gateway owns no schema. The stage must refuse it rather than produce an
+# storage-service owns no schema. The stage must refuse it rather than produce an
 # image whose init container would hang the pod at Init:Error forever.
 if docker build -f docker/node-service.Dockerfile --target migrate \
-     --build-arg SERVICE=api-gateway \
+     --build-arg SERVICE=storage-service \
      --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
      -t synapsedesk/gateway-migrate-should-not-exist . >/dev/null 2>&1; then
-  fail "migrate target built for api-gateway, which owns no prisma/schema.prisma"
+  fail "migrate target built for storage-service, which owns no prisma/schema.prisma"
 fi
-echo "   ok — built for auth-service, refused api-gateway"
+echo "   ok — built for auth-service, refused storage-service"
 
 # --------------------------------------------------------------- 8. OCR section
 

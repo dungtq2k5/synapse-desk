@@ -224,7 +224,7 @@ describe('mapper functions name their return type verbatim', () => {
     // combination somebody believed in.
     const probe = join(
       REPO_ROOT,
-      'apps/api-gateway/src/modules/platform/unstaged-probe.mapper.ts',
+      'apps/ticket-service/src/modules/messages/unstaged-probe.mapper.ts',
     );
 
     try {
