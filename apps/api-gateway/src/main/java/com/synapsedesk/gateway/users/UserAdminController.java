@@ -334,9 +334,10 @@ public class UserAdminController {
     return okSummary(response, "OK", HttpStatus.OK);
   }
 
-  // Removing a user releases the roles and departments they held, which the
-  // cached lists count (`userAssigned`, `memberCount`).
-  @EvictsCache({ "roles", "departments" })
+  // Removing a user releases the roles they held, which the cached role list
+  // counts (`userAssigned`). Their department memberships are kept, so
+  // `memberCount` does not change.
+  @EvictsCache("roles")
   @DeleteMapping(value = "/users/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
