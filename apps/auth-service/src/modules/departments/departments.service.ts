@@ -51,7 +51,12 @@ import { Prisma } from '../../generated/prisma/client';
 
 /** The joins every DepartmentResponse needs. */
 const DEPARTMENT_INCLUDE = {
-  _count: { select: { userDepartments: true } },
+  // Active members only, as the member list counts them: a deleted user keeps
+  // their membership so a restore returns them to the department, and counting
+  // it would block deleting a department nobody active belongs to.
+  _count: {
+    select: { userDepartments: { where: { user: { deletedAt: null } } } },
+  },
   deletedBy: { select: { fullName: true } },
 } satisfies Prisma.DepartmentInclude;
 
@@ -525,6 +530,7 @@ export class DepartmentsService {
         where: {
           userId: request.userId,
           departmentId: { not: department.id },
+          department: { deletedAt: null },
         },
       });
       if (otherCount > 0) {

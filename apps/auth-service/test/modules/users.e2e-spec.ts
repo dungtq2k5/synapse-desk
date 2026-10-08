@@ -10,6 +10,7 @@ import {
   E2eFixture,
   bootstrapE2eTest,
   memberContext,
+  requestOrigin,
   superuser,
 } from '../utils';
 import {
@@ -18,12 +19,16 @@ import {
   createOrganization,
   createRole,
   createTrustedDeviceSession,
+  createUserDepartment,
   createUserWithPassword,
   findSystemRole,
   seedForeignTenant,
   seedTenantWithUser,
+  TEST_PASSWORD,
 } from '../factories';
 import { UsersService } from '../../src/modules/users/users.service';
+import { AuthService } from '../../src/modules/auth/auth.service';
+import { DepartmentsService } from '../../src/modules/departments/departments.service';
 import { flattenPermissionCodes } from '../../src/common/utils';
 import { UserProjection } from '@synapsedesk/grpc-proto';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -313,6 +318,51 @@ describe('Users (e2e)', () => {
       expect(
         await fx.prisma.deviceSession.count({ where: { userId: leaver.id } }),
       ).toBe(0);
+    });
+
+    it('**17c. a department deleted while the user was gone is not theirs on restore — not in the token either**', async () => {
+      // A deleted user keeps their memberships, so a restore returns them to
+      // their departments. Only active members count, so a department whose
+      // members have all left can be deleted — and the one membership pointing at
+      // it must not come back in the login token, where it would decide which
+      // tickets the restored user sees.
+      const t = await seedTenantWithUser(fx.prisma);
+      const leaver = await addMember(fx.prisma, t.org.id);
+      const kept = await createDepartment(fx.prisma, t.org.id);
+      const gone = await createDepartment(fx.prisma, t.org.id);
+      await createUserDepartment(fx.prisma, leaver.id, kept.id, {
+        isPrimary: true,
+      });
+      await createUserDepartment(fx.prisma, leaver.id, gone.id);
+      const departments = fx.moduleRef.get(DepartmentsService);
+      const admin = memberContext(t.user, [
+        'department.read',
+        'department.delete',
+      ]);
+
+      await users.deleteUser({ id: leaver.id }, superuser(t));
+
+      expect(
+        (await departments.getDepartment({ id: gone.id }, admin)).memberCount,
+      ).toBe(0);
+      await departments.deleteDepartment({ id: gone.id }, admin);
+
+      await users.restoreUser({ id: leaver.id }, superuser(t));
+
+      const login = await fx.moduleRef
+        .get(AuthService)
+        .login(
+          { email: leaver.email, password: TEST_PASSWORD },
+          requestOrigin(),
+        );
+      const claims = JSON.parse(
+        Buffer.from(login.accessToken!.split('.')[1], 'base64url').toString(),
+      ) as { departmentIds: string[] };
+      expect(claims.departmentIds).toEqual([kept.id]);
+
+      expect((await users.getCurrentUser(leaver.id)).departmentIds).toEqual([
+        kept.id,
+      ]);
     });
 
     // -------------------------------------------------------------------- 2FA

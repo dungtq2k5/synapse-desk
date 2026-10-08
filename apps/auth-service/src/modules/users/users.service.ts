@@ -103,7 +103,10 @@ export class UsersService {
       where: { id: userId, deletedAt: null },
       include: {
         organization: true,
-        userDepartments: { include: { department: true } },
+        userDepartments: {
+          where: { department: { deletedAt: null } },
+          include: { department: true },
+        },
         roles: { include: { permissions: true } },
       },
     });
