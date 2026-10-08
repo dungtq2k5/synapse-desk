@@ -80,7 +80,10 @@ import {
  */
 const USER_WITH_ACCESS = {
   organization: true,
-  userDepartments: true,
+  // Live departments only: a restored user keeps memberships in departments
+  // deleted while they were gone, and a deleted one in the token would widen
+  // what they can see.
+  userDepartments: { where: { department: { deletedAt: null } } },
   roles: { include: { permissions: true } },
 } satisfies Prisma.UserInclude;
 

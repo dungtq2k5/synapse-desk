@@ -93,7 +93,10 @@ export function toUserResponse(
  */
 export const USER_SUMMARY_INCLUDE = {
   roles: { select: { id: true, name: true } },
-  userDepartments: { select: { departmentId: true } },
+  userDepartments: {
+    where: { department: { deletedAt: null } },
+    select: { departmentId: true },
+  },
   deletedBy: { select: { fullName: true } },
 } satisfies Prisma.UserInclude;
 
