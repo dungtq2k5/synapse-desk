@@ -106,22 +106,28 @@ class InboundAddressParityTest {
   }
 
   @Test
-  void theTableHasBothPolaritiesAndPinsTheLenientHexDecode() {
+  void theTableHasBothPolaritiesAndPinsTheStrictMac() {
     int accepted = 0;
-    boolean lenient = false;
+    boolean refusedLonger = false;
     for (JsonNode row : table().get("token")) {
+      String[] parts = row.get(0).asString().split("-", -1);
       if (!row.get(3).isNull()) {
         accepted++;
-        String mac = row.get(0).asString().split("-")[1];
-        if (mac.length() != 12) lenient = true;
+        assertThat(parts[1]).hasSize(12);
+      } else if (
+        parts.length == 2 &&
+        parts[1].length() > 12 &&
+        parts[1].startsWith("8a0c71b37486")
+      ) {
+        refusedLonger = true;
       }
     }
 
     assertThat(table().get("address").size()).isGreaterThanOrEqualTo(30);
     assertThat(table().get("token").size()).isGreaterThanOrEqualTo(45);
     assertThat(accepted).isBetween(10, table().get("token").size() - 10);
-    assertThat(lenient)
-      .as("a row where Node accepts a MAC that is not exactly 12 hex digits")
+    assertThat(refusedLonger)
+      .as("a row refusing the right MAC with characters after it")
       .isTrue();
   }
 }

@@ -12,22 +12,23 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * The per-ticket half of a reply address: verifies the token that
  * {@code buildTicketReplyToken} in
- * {@code libs/common/src/configs/inbound-email.config.ts} mints, with the same
- * rules as {@code parseTicketReplyToken} there.
+ * {@code libs/common/src/configs/inbound-email.config.ts} mints.
  *
  * <p>{@code {base36 ticket number}-{12 hex chars of HMAC-SHA256}}: readable back
  * and unforgeable. The tenant is inside the MAC, so a token minted for one tenant
  * does not verify against another.
  *
- * <p><b>The MAC is decoded leniently</b>, the way {@code Buffer.from(mac, 'hex')}
- * decodes it: up to the first character that is not hex, an odd trailing digit
- * dropped. So {@code <mac>zz} and {@code <mac>0} verify. It forges nothing — the
- * leading 12 digits must still be the right MAC. The table
- * ({@code address-parity.json}) pins it.
+ * <p><b>The MAC is exactly 12 ASCII hex digits</b>, in either case: a mail system
+ * may change an address's case, never its characters. Anything after them
+ * ({@code <mac>zz}, {@code <mac>0}) fails. The table
+ * ({@code test/fixtures/inbound-email/address-parity.json}) pins it.
  */
 public final class TicketReplyToken {
 
   private static final int MAC_CHARS = 12;
+  private static final Pattern MAC_HEX = Pattern.compile(
+    "[0-9a-fA-F]{" + MAC_CHARS + "}"
+  );
   private static final Pattern SEPARATOR = Pattern.compile(Pattern.quote("-"));
   /** {@code Number.MAX_SAFE_INTEGER}: above it a JavaScript number is not exact. */
   private static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
@@ -57,11 +58,11 @@ public final class TicketReplyToken {
     // zero, and `12x` must not become 12 and verify against a MAC never issued.
     if (!Long.toString(ticketNumber, 36).equals(parts[0])) return null;
 
-    byte[] given = leadingHexBytes(parts[1]);
+    if (!MAC_HEX.matcher(parts[1]).matches()) return null;
+    byte[] given = HexFormat.of().parseHex(parts[1]);
     byte[] want = HexFormat.of().parseHex(
       mac(organizationId, ticketNumber, secret)
     );
-    if (given.length != want.length || given.length == 0) return null;
 
     return MessageDigest.isEqual(given, want) ? ticketNumber : null;
   }
@@ -84,36 +85,5 @@ public final class TicketReplyToken {
     } catch (NoSuchAlgorithmException | InvalidKeyException failure) {
       throw new IllegalStateException("HmacSHA256 is not available", failure);
     }
-  }
-
-  /** A lenient hex decode: whole byte pairs, stopping at the first non-hex one. */
-  private static byte[] leadingHexBytes(String hex) {
-    byte[] bytes = new byte[hex.length() / 2];
-    int count = 0;
-    while (count < bytes.length) {
-      int high = Character.digit(hex.charAt(2 * count), 16);
-      int low = Character.digit(hex.charAt(2 * count + 1), 16);
-      if (high < 0 || low < 0 || !isAsciiHex(hex, 2 * count)) break;
-      bytes[count++] = (byte) ((high << 4) | low);
-    }
-
-    return java.util.Arrays.copyOf(bytes, count);
-  }
-
-  /**
-   * {@link Character#digit} also accepts non-ASCII digits (Arabic-Indic and the
-   * like); this decoder accepts ASCII hex only.
-   */
-  private static boolean isAsciiHex(String hex, int index) {
-    for (int i = index; i < index + 2; i++) {
-      char c = hex.charAt(i);
-      boolean ascii =
-        (c >= '0' && c <= '9') ||
-        (c >= 'a' && c <= 'f') ||
-        (c >= 'A' && c <= 'F');
-      if (!ascii) return false;
-    }
-
-    return true;
   }
 }
