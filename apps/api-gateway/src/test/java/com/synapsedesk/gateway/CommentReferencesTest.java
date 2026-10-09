@@ -28,7 +28,9 @@ import org.junit.jupiter.api.Test;
  *       appear;
  *   <li>every {@code *.ts} file a comment cites exists in the repository. A rule
  *       shared with a TypeScript service cites that service's file, and this proves
- *       the file is there.
+ *       the file is there;
+ *   <li>every "gap N" a comment cites is a row of
+ *       {@code docs/reference/known-gaps.md}.
  * </ul>
  *
  * <p>Read from the code toward the tree, so a new comment is held without being
@@ -48,6 +50,12 @@ class CommentReferencesTest {
   private static final Pattern NODE = Pattern.compile("\\bNode\\b");
   private static final Pattern CITED_TS = Pattern.compile(
     "([A-Za-z0-9_.-]+)\\.ts\\b"
+  );
+  private static final Pattern CITED_GAP = Pattern.compile(
+    "(?i)\\bgap\\s+#?(\\d+)\\b"
+  );
+  private static final Pattern GAP_ROW = Pattern.compile(
+    "(?m)^\\|\\s*(\\d+)\\s*\\|"
   );
   private static final Set<String> SKIPPED = Set.of(
     "node_modules",
@@ -99,6 +107,16 @@ class CommentReferencesTest {
     return all;
   }
 
+  /** The row numbers of {@code docs/reference/known-gaps.md}. */
+  private static Set<String> gapRows() throws IOException {
+    return GAP_ROW.matcher(
+      Files.readString(REPO.resolve("docs/reference/known-gaps.md"))
+    )
+      .results()
+      .map(row -> row.group(1))
+      .collect(Collectors.toSet());
+  }
+
   /** Every {@code *.ts} file name in the repository, outside build output. */
   private static Set<String> typeScriptFiles() throws IOException {
     try (Stream<Path> files = Files.walk(REPO)) {
@@ -123,6 +141,7 @@ class CommentReferencesTest {
     // A pattern that matched nothing would agree with everything.
     assertThat(allComments()).hasSizeGreaterThan(1_000);
     assertThat(typeScriptFiles()).contains("realtime.contract.ts");
+    assertThat(gapRows()).contains("1", "38");
   }
 
   @Test
@@ -143,6 +162,21 @@ class CommentReferencesTest {
       while (cited.find()) {
         String name = cited.group(1) + ".ts";
         if (!present.contains(name)) missing.add(where(comment) + " " + name);
+      }
+    }
+    assertThat(missing).isEmpty();
+  }
+
+  @Test
+  void everyCitedGapIsARow() throws IOException {
+    Set<String> rows = gapRows();
+    List<String> missing = new ArrayList<>();
+    for (Comment comment : allComments()) {
+      Matcher cited = CITED_GAP.matcher(comment.text());
+      while (cited.find()) {
+        if (!rows.contains(cited.group(1))) {
+          missing.add(where(comment) + " gap " + cited.group(1));
+        }
       }
     }
     assertThat(missing).isEmpty();

@@ -74,9 +74,8 @@ import synapsedesk.auth.RoleServiceGrpc;
  * here (`varyBy: 'tenant'`, unlike `Documents`' `'caller'`).
  *
  * <p>
- * <b>No write here evicts the cache</b> — known gap 42: a role list read
- * through this gateway can serve a stale entry for up to the route's TTL
- * after a write, exactly as the gap describes for every other cached route.
+ * Every write evicts the caller's organization's {@code roles} scope
+ * ({@link EvictsCache}).
  *
  * <p><b>Migrated off `RolesApi`.</b> `create` answers 201 —
  * `@ResponseStatus` is what tells springdoc that. `list`'s cache now goes

@@ -99,8 +99,9 @@ import tools.jackson.databind.JsonNode;
  * presence check, for the same reason.
  *
  * <p>
- * No write here evicts the cache — known gap 42, same as every other
- * {@code @Cacheable} route ported so far.
+ * Every write evicts the caller's organization's {@code organizations} scope
+ * ({@link EvictsCache}). A platform write to the organization does not: see
+ * {@code PlatformOrganizationsService}.
  *
  * <p><b>Migrated off `OrganizationsApi`.</b> {@code get}'s cache goes
  * through {@link CacheService#wrapTyped} — a bare {@code Class<T>} would

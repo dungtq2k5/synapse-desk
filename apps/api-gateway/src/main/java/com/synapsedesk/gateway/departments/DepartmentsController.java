@@ -83,8 +83,8 @@ import synapsedesk.auth.DepartmentServiceGrpc;
  * warmed.
  *
  * <p>
- * No write here evicts the cache — known gap 42, same as every other
- * cached route.
+ * Every write evicts the caller's organization's {@code departments} scope
+ * ({@link EvictsCache}).
  *
  * <p><b>Migrated off `DepartmentsApi`.</b> `create` answers 201 —
  * {@code @ResponseStatus} is what tells springdoc that. `list`'s cache goes

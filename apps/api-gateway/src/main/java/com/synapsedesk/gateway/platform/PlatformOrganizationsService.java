@@ -62,7 +62,10 @@ import synapsedesk.auth.PlatformServiceGrpc;
  * <p><b>Every status-changing write evicts the cached tenant status.</b>
  * {@code updateOrganization}/{@code setStatus}/{@code offboard}/{@code
  * restore} call {@code OrganizationStatusService.invalidate(id)}, so the
- * lifecycle interceptor reads the new status on the next request.
+ * lifecycle interceptor reads the new status on the next request. They do
+ * NOT evict that organization's cached {@code organizations} entry, so its
+ * own {@code GET} can answer with the old values for up to that route's 60 s
+ * TTL.
  *
  * <p><b>Two validations checked by hand</b>, since the generated Java DTOs
  * carry neither the slug pattern nor the array bound. {@link #requireSlug}
@@ -248,7 +251,6 @@ public class PlatformOrganizationsService {
     ).updateOrganization(wire.build());
 
     statuses.invalidate(id);
-    // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
@@ -270,7 +272,6 @@ public class PlatformOrganizationsService {
     );
 
     statuses.invalidate(id);
-    // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
   }
 
@@ -315,7 +316,6 @@ public class PlatformOrganizationsService {
     );
 
     statuses.invalidate(id);
-    // Known gap 42 (see class docblock): no cache eviction here either.
     return ResponseEntity.ok(
       ApiResponse.of(
         200,
@@ -340,7 +340,6 @@ public class PlatformOrganizationsService {
     );
 
     statuses.invalidate(id);
-    // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(
       toPlatformOrganizationResponseDto(response),
       "Workspace restored"
