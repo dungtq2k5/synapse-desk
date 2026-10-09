@@ -133,7 +133,7 @@ public class CookieWriter {
   /**
    * A clear — empty value, expired. `Max-Age(Duration.ZERO)` is what makes
    * Spring write `Max-Age=0`, which the parity row in `auth.contract-spec.ts`
-   * accepts alongside Express's `Expires`-only form as the same thing: a clear.
+   * accepts alongside an `Expires`-only form as the same thing: a clear.
    */
   private void clear(HttpServletResponse response, String name) {
     response.addHeader(

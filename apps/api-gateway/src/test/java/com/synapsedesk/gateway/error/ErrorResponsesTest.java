@@ -246,7 +246,7 @@ class ErrorResponsesTest {
   @Test
   void anUnsupportedContentTypeIsOpaque() {
     // OPAQUE for the same reason, one layer out: the refusal is the
-    // framework's, and Express and Spring word it differently.
+    // framework's, and its wording is the framework's to change.
     HttpProbe response = HttpProbe.post(
       port,
       "/probe/validated",

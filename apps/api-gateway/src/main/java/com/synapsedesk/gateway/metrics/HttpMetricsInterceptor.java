@@ -21,7 +21,8 @@ import org.springframework.web.servlet.HandlerMapping;
  * no handler resolved is a 500, the answer the container gives it.
  *
  * <p><b>The {@code route} label is the path TEMPLATE, never the resolved path</b>,
- * written as Express writes it ({@code /api/v1/tickets/:id}): {@code
+ * with {@code :name} parameters ({@code /api/v1/tickets/:id}), the form every
+ * existing series carries: {@code
  * /tickets/<uuid>} would mint one time series per ticket, forever, in a metric that
  * looks perfectly ordinary.
  *
@@ -86,7 +87,7 @@ public class HttpMetricsInterceptor implements HandlerInterceptor {
     return ApplicationRoutes.isApplicationHandler(handler);
   }
 
-  /** {@code /api/v1/tickets/{id}} as Express labels it: {@code /api/v1/tickets/:id}. */
+  /** {@code /api/v1/tickets/{id}} as the label writes it: {@code /api/v1/tickets/:id}. */
   static String routeTemplate(String pattern) {
     return pattern.replaceAll("\\{(\\w+)(?::[^}]*)?}", ":$1");
   }

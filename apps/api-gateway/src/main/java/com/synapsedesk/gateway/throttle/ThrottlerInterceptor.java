@@ -221,8 +221,8 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
   }
 
   /**
-   * The rightmost {@code X-Forwarded-For} entry — Express's own {@code trust
-   * proxy 1} semantics (P6): exactly one hop is trusted, and it is the one
+   * The rightmost {@code X-Forwarded-For} entry: exactly one proxy hop is
+   * trusted (P6), and it is the one
    * that appended the LAST entry. Spring's {@code ForwardedHeaderFilter}
    * default (leftmost) is client-supplied and spoofable, which matters here
    * because this value keys a rate-limit bucket. Scoped to the throttler's

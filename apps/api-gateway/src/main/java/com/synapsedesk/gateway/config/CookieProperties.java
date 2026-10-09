@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
  * here, at the binding.
  *
  * <p><b>The unit differs on each side of the port.</b> The environment carries
- * MILLISECONDS, because that is what Express's {@code maxAge} takes; the wire
+ * MILLISECONDS, as the {@code .env} files write them; the wire
  * carries SECONDS, and so does {@code ResponseCookie.maxAge(Duration)}. A
  * conversion done at each call site is a conversion that will be forgotten at
  * one of them, and the symptom is not an error: it is a cookie with the wrong

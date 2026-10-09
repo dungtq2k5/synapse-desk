@@ -23,9 +23,9 @@ import org.junit.jupiter.api.Test;
  * {@code application.yaml}:
  *
  * <ul>
- *   <li>the runtime's name, as the {@code NODE} pattern spells it — case-sensitive
- *       and whole, so {@code JsonNode} and {@code NODE_ENV} do not match — does not
- *       appear;
+ *   <li>the deleted gateway's runtime and framework, as the {@code NODE} pattern
+ *       spells them — case-sensitive and whole, so {@code JsonNode} and
+ *       {@code NODE_ENV} do not match — do not appear;
  *   <li>every {@code *.ts} file a comment cites exists in the repository. A rule
  *       shared with a TypeScript service cites that service's file, and this proves
  *       the file is there;
@@ -47,7 +47,7 @@ class CommentReferencesTest {
   );
   private static final Pattern LINE = Pattern.compile("//[^\\n]*");
   private static final Pattern YAML_COMMENT = Pattern.compile("(?m)#[^\\n]*");
-  private static final Pattern NODE = Pattern.compile("\\bNode\\b");
+  private static final Pattern NODE = Pattern.compile("\\b(Node|Express)\\b");
   private static final Pattern CITED_TS = Pattern.compile(
     "([A-Za-z0-9_.-]+)\\.ts\\b"
   );
