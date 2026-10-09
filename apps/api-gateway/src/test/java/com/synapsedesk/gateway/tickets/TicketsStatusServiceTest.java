@@ -35,8 +35,9 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * bulk ops' partial-success envelope must survive at the ITEM level (an
  * operation that silently drops a `failed[]` row is indistinguishable from
  * one that succeeded: "200 with a MISSING failure"); and `escalate` must
- * stay permission-FREE, which is deliberate, not an oversight a reader might
- * "fix" by adding a guard.
+ * stay permission-FREE: escalating is the end user's one-click hand-off to a
+ * human when self-service has not helped, and a required grant would make it
+ * unreachable for exactly the person who needs it.
  */
 class TicketsStatusServiceTest {
 
