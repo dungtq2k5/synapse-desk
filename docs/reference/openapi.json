@@ -47048,50 +47048,6 @@
               "default": "ASC",
               "enum": ["ASC", "DESC"]
             }
-          },
-          {
-            "name": "searchTerm",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeDeleted",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
-            }
-          },
-          {
-            "name": "departmentId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "fileType",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": ["bin", "docx", "md", "pdf", "txt"]
-            }
           }
         ],
         "responses": {

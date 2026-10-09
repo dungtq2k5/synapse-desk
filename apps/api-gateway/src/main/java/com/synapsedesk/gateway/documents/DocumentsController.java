@@ -897,33 +897,10 @@ public class DocumentsController {
       value = "sortOrder",
       required = false,
       defaultValue = "ASC"
-    ) SortDirection sortOrder,
-    @Valid @RequestParam(
-      value = "searchTerm",
-      required = false
-    ) @Nullable String searchTerm,
-    @Valid @RequestParam(
-      value = "includeDeleted",
-      required = false,
-      defaultValue = "false"
-    ) Boolean includeDeleted,
-    @Valid @RequestParam(
-      value = "status",
-      required = false
-    ) @Nullable DocumentStatusFilter status,
-    @Valid @RequestParam(
-      value = "departmentId",
-      required = false
-    ) @Nullable UUID departmentId,
-    @Valid @RequestParam(
-      value = "fileType",
-      required = false
-    ) @Nullable DocumentFileTypeFilter fileType
+    ) SortDirection sortOrder
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    // Only the paging fields are meaningful for chunks — the route accepts the
-    // whole documents-list query (and validates it) but forwards nothing else.
     PageRequest pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
