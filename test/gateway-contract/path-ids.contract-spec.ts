@@ -2,15 +2,15 @@
  * @file **A path parameter that names an id refuses a value that is not a UUID**,
  * before any peer is called.
  *
- * Node parses these with `ParseUUIDPipe` (166 uses), so `GET /departments/nope`
- * is a 400. A gateway that takes the id as a plain string forwards `nope` to the
- * peer and returns whatever the peer makes of it (a 404, a 500, or, with nothing
+ * The gateway parses these as UUIDs, so `GET /departments/nope` is a 400. A
+ * gateway that takes the id as a plain string forwards `nope` to the peer and
+ * returns whatever the peer makes of it (a 404, a 500, or, with nothing
  * programmed, a 501), and no other row notices: every other row sends a real id.
  *
  * **Generated from the document**: every operation with a path parameter named
  * `id` or `<something>Id`. The document types them as bare strings, so the
- * selection is by name and the rows say what Node does with each; a parameter
- * Node deliberately does not parse as a UUID is listed in {@link NOT_A_UUID}
+ * selection is by name and the rows say what the gateway does with each; a parameter
+ * it deliberately does not parse as a UUID is listed in {@link NOT_A_UUID}
  * with the reason, never silently skipped.
  */
 
@@ -27,7 +27,7 @@ import { rowFor } from './pending';
 
 type Row = [method: string, path: string, parameter: string];
 
-/** Path parameters named like an id that Node does NOT parse as a UUID, by `METHOD path name`. */
+/** Path parameters named like an id that are NOT parsed as a UUID, by `METHOD path name`. */
 const NOT_A_UUID = new Set<string>([]);
 
 const SOME_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
@@ -163,7 +163,7 @@ describe('path parameters that name an id', () => {
   );
 
   rowFor('Ops')(
-    '**a malformed id is a counted request, under its route template: Node refuses it inside its metrics interceptor**',
+    '**a malformed id is a counted request, under its route template: it is refused after the metrics recorder has started**',
     async () => {
       const total = async (): Promise<number> =>
         (await (await fetch(`${gateway.metricsUrl}/metrics`)).text())

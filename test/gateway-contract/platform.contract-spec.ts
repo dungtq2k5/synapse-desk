@@ -1,13 +1,13 @@
 /**
  * @file `PlatformApi` — 20 Super Admin operations across organizations,
  * cross-tenant users/roles, metrics, finance, and the plan catalogue.
- * `SuperAdminGuard`-only, no permission code, class-level in Node — the
+ * Super-admin only, no permission code, for the whole surface — the
  * same door `PlatformJobsApi`/`PlatformAuditLogsApi` already use.
  *
  * The first row exercises the guard once for the whole surface; the rest
  * assume it and focus on the properties unique to each group: the
  * lifecycle machine's custom response messages, `listGlobalRoles`
- * forwarding only `page` (a wire-level truth, not a Node oversight —
+ * forwarding only `page` (a wire-level truth, not an oversight —
  * `ListGlobalRolesRequest` genuinely has no other field), the finance
  * revenue section's degrade-with-a-reason shape, and `applyPlan`'s usage
  * leg degrading rather than refusing when ingestion-service is

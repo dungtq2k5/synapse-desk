@@ -1,18 +1,17 @@
 /**
  * @file `http_requests_total` and `http_request_duration_seconds` on `/metrics`.
  *
- * Both are read by alert rules and dashboards tuned to the Node gateway's numbers,
- * so what is pinned here is what Node DOES, including the parts that look like
- * defects: a gateway that "improved" any of them would step the series at cutover
- * by exactly the volume of the difference, which reads as a traffic event and not
- * as a change of meaning.
+ * Both are read by alert rules and dashboards, so what is pinned here is what the
+ * gateway DOES, including the parts that look like defects: "improving" any of them
+ * would step the series by exactly the volume of the difference, which reads as a
+ * traffic event and not as a change of meaning.
  *
- * - **Counted only once a request reaches a handler.** Node's interceptor runs after
- *   its guards, so a request a guard refuses, a request that matches no route and a
+ * - **Counted only once a request reaches a handler.** The recorder runs after the
+ *   guards, so a request a guard refuses, a request that matches no route and a
  *   preflight are not counted. A handler's OWN refusal is.
- * - **`status` is the route's DECLARED success status, never the outcome.** Nest
- *   applies the real status and runs the exception filter after the interceptor
- *   reads `res.statusCode`, so a request the client sees as 404, 503 or 400 is
+ * - **`status` is the route's DECLARED success status, never the outcome.** The
+ *   recorder reads the status before an error response sets the real one, so a
+ *   request the client sees as 404, 503 or 400 is
  *   counted as 200 (a GET) or 201 (a POST). The label cannot show an error rate;
  *   whether it SHOULD is a separate metrics decision, made deliberately with the
  *   dashboards updated in the same change.

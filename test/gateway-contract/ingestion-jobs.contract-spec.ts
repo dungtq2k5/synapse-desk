@@ -237,8 +237,8 @@ describe('ingestion-jobs', () => {
   rowFor('Ingestion Jobs')(
     "**a document's ingestion history answers a PAGE (`data.items` and `data.meta`), as the worklist does, not a bare list**",
     async () => {
-      // Both gateways ask the same RPC, which returns `{ items, meta }`. Node passes both
-      // on; a gateway that kept only the items answered `data: [...]`, a different body
+      // The RPC returns `{ items, meta }`, and both are passed on; a gateway that kept
+      // only the items answered `data: [...]`, a different body
       // shape for the same route, which no row exercised until this one.
       peers.ingestion
         .on('DocumentService/ListDocumentIngestionJobs')
