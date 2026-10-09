@@ -55681,8 +55681,8 @@
           },
           "lockedUntil": {
             "type": ["string", "null"],
-            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.\n\nMust be a date in the future.",
-            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+            "format": "date-time",
+            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.\n\nMust be a date in the future."
           }
         },
         "required": ["reason"]

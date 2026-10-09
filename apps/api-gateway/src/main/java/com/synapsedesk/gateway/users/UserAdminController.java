@@ -390,7 +390,7 @@ public class UserAdminController {
       .setId(id)
       .setReason(lockUserDto.getReason());
     if (lockUserDto.getLockedUntil() != null) {
-      Instant instant = Instant.parse(lockUserDto.getLockedUntil());
+      Instant instant = lockUserDto.getLockedUntil().toInstant();
       wire.setLockedUntil(
         com.google.protobuf.Timestamp.newBuilder()
           .setSeconds(instant.getEpochSecond())

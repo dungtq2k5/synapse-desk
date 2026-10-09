@@ -95,8 +95,8 @@ describe('the constraints the Java document publishes', () => {
     }
   });
 
-  it('LockUserDto.lockedUntil: the published ISO pattern accepts every date the library does, and refuses some', () => {
-    const pattern = new RegExp(patternOf('LockUserDto', 'lockedUntil'));
+  it('CreateExportDto.from: the published ISO pattern accepts every date the library does, and refuses some', () => {
+    const pattern = new RegExp(patternOf('CreateExportDto', 'from'));
     const rows = table.iso8601;
 
     for (const [input, accepted] of rows.filter(([, ok]) => ok)) {

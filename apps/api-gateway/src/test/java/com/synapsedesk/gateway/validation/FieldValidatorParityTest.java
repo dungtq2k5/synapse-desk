@@ -10,9 +10,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * The Java ports of {@code @IsStrongPassword()}, {@code @IsPhoneNumber()},
- * {@code @IsNumberString()} and the lock date's pair ({@code @IsISO8601({ strict: true })}
- * with {@code @IsFutureDate()}), held to the table Node recomputes from the real
+ * The Java ports of {@code @IsStrongPassword()}, {@code @IsPhoneNumber()} and
+ * {@code @IsNumberString()}, held to the table Node recomputes from the real
  * functions on every run. A table row is the contract; a port that disagrees with one
  * is wrong, not the row.
  */
@@ -28,10 +27,6 @@ class FieldValidatorParityTest {
 
   static Stream<Arguments> numbers() {
     return ParityTable.rows("numeric");
-  }
-
-  static Stream<Arguments> lockDates() {
-    return ParityTable.rows("lockDate");
   }
 
   @ParameterizedTest(name = "isStrongPassword({0}) is {1}")
@@ -52,21 +47,9 @@ class FieldValidatorParityTest {
     assertThat(NumberString.Validator.accepts(input)).isEqualTo(expected);
   }
 
-  @ParameterizedTest(name = "a lock date {0} is {1}")
-  @MethodSource("lockDates")
-  void lockDateAgreesWithTheTwoDecoratorsOnTheField(
-    String input,
-    boolean expected
-  ) {
-    assertThat(
-      StrictIso8601.Validator.accepts(input) &&
-        FutureDate.Validator.accepts(input)
-    ).isEqualTo(expected);
-  }
-
   @Test
   void theTablesHaveBothPolaritiesAndEnoughRowsToMeanSomething() {
-    for (String kind : List.of("strongPassword", "phone", "lockDate")) {
+    for (String kind : List.of("strongPassword", "phone")) {
       assertThat(ParityTable.answers(kind))
         .hasSizeGreaterThanOrEqualTo(40)
         .contains(true)
