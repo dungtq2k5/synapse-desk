@@ -3,7 +3,7 @@
  *
  * Of the optional fields a minimal request can reach, `null` is accepted on every one.
  * It means
- * ABSENT on most and a specific instruction on eleven. A document that says
+ * ABSENT on most and a specific instruction on ten. A document that says
  * "optional, not nullable" understates this, and a gateway that answers 500 to a
  * `null` the other one accepts breaks a client that serialises its model with
  * explicit nulls, which is common.
@@ -14,7 +14,7 @@
  * field absent and with it `null`. "`null` means clear this value" is a per-field
  * contract that only an explicit row can hold, and a gateway that reads it as absent
  * fails SILENTLY (the client clears a date of birth and nothing happens), so each of
- * those eleven has its own row naming what the peer must be asked.
+ * those ten has its own row naming what the peer must be asked.
  *
  * **Generated from the document.** The minimal valid body comes from
  * `request-bodies.ts`, so a new optional field gets a row without anyone remembering.
@@ -59,6 +59,10 @@ const MEANINGS: Record<
     reason: 'clears the gender',
     asks: { gender: 0 },
   },
+  'PATCH /api/v1/users/{id} phoneNumber': {
+    reason: 'clears the phone number',
+    asks: { phoneNumber: '' },
+  },
   'PATCH /api/v1/organizations/current/settings allowedEmailDomains': {
     reason: 'replaces the allowed domains with none',
     asks: { replaceAllowedEmailDomains: true },
@@ -76,14 +80,6 @@ const MEANINGS: Record<
       reason: 'clears the override',
       asks: { clearMaxAttachmentsPerMessageOverride: true },
     },
-  'POST /api/v1/documents/confirm isOrganizationWide': {
-    reason: 'is false, not the default of true',
-    asks: { isOrganizationWide: false },
-  },
-  'POST /api/v1/platform/plans isActive': {
-    reason: 'is false, not the default of true',
-    asks: { isActive: false },
-  },
   'PATCH /api/v1/platform/plans/{id} aiModelTier': {
     reason: 'clears the tier',
     asks: { aiModelTier: 0 },

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * An explicit null for a list or a number leaves the DTO exactly as the key being
+ * An explicit null for a list, a number or a boolean leaves the DTO exactly as the key being
  * absent does: the default survives. Without the customizer these requests gave the
  * handler a null list and a 500.
  */
@@ -80,14 +80,13 @@ class ExplicitNullJsonCustomizerTest {
   }
 
   @Test
-  void aBooleanKeepsItsOwnReadingOfNull() throws Exception {
-    // Not covered on purpose: an explicit null `isOrganizationWide` reads as
-    // false, so the DTO must still receive the null and let the handler decide.
+  void anExplicitNullBooleanKeepsItsDefault() throws Exception {
+    // `true` by default: a null read as false would make the document private.
     com.synapsedesk.gateway.model.ConfirmDocumentDto dto = mapper.readValue(
       "{\"isOrganizationWide\":null}",
       com.synapsedesk.gateway.model.ConfirmDocumentDto.class
     );
 
-    assertThat(dto.getIsOrganizationWide()).isNull();
+    assertThat(dto.getIsOrganizationWide()).isTrue();
   }
 }

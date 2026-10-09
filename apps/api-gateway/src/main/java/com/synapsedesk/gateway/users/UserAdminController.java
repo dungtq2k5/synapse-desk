@@ -319,11 +319,12 @@ public class UserAdminController {
     } else if (rawBody.isNull("gender")) {
       wire.setGender(Gender.GENDER_UNSPECIFIED);
     }
-    // An explicit `null` `phoneNumber` is treated as "leave unchanged", the
-    // same as an absent field — so `phoneNumber` cannot be cleared through
-    // this route (unlike `dob` and `gender` above).
+    // Like `dob`: `null` clears it, as the empty string auth-service reads as
+    // "no number".
     if (updateUserDto.getPhoneNumber() != null) {
       wire.setPhoneNumber(updateUserDto.getPhoneNumber());
+    } else if (rawBody.isNull("phoneNumber")) {
+      wire.setPhoneNumber("");
     }
     UserSummaryResponse response = withMetadata(context).updateUser(
       wire.build()
