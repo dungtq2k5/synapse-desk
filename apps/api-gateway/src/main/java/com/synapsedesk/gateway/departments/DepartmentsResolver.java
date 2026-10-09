@@ -18,9 +18,8 @@ import synapsedesk.auth.Department.ListDepartmentsResponse;
 import synapsedesk.auth.DepartmentServiceGrpc;
 
 /**
- * `Query.departments` — `departments.resolver.ts`'s `departmentPage`,
- * reproduced. Never deleted departments and always sorted by name, matching
- * Node's own reasoning: a resolver is not the place to reimplement the
+ * `Query.departments` — one page of departments. Never deleted departments
+ * and always sorted by name: a resolver is not the place to reimplement the
  * `department.delete`-gated `includeDeleted` check the REST route carries.
  */
 @Controller

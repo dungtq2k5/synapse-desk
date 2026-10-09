@@ -66,10 +66,9 @@ import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
- * `ChatApi` — a thin wrapper, exactly as `chat.controller.ts` is: every route
- * forwards to the same `TicketService`/`MessageService` RPCs `TicketsApi` and
- * `MessagesApi` would use, since a "conversation" IS a ticket with
- * {@code source = CHAT}. Reuses the `ticket-service` channel the `Feedback`
+ * `ChatApi` — a thin wrapper: every route forwards to the same
+ * `TicketService`/`MessageService` RPCs `TicketsApi` and `MessagesApi` would
+ * use, since a "conversation" IS a ticket with {@code source = CHAT}. Reuses the `ticket-service` channel the `Feedback`
  * module paid for.
  *
  * <p><b>{@code isInternalNote} is forced false</b> on {@link #chatControllerSendMessageV1}
@@ -238,7 +237,7 @@ public class ChatController {
       .setAuthorId(context.sub())
       .setIncludeDeleted(false);
 
-    // Node spreads the query over its forced values, so `status` and `priority`
+    // The query is spread over the forced values, so `status` and `priority`
     // filter the caller's conversations as they filter the ticket queue; only
     // `source` and `authorId` are pinned. (`source` is accepted and checked as an
     // enum, then overridden: a chat is always source CHAT.)

@@ -12,12 +12,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * The Java ports of {@code @IsEmail()} and {@code @IsISO8601({ strict: true })},
- * held to the table the Node gateway recomputes from the real functions on every
- * run ({@code validator-parity.spec.ts}).
+ * held to the fixed table {@code test/fixtures/inbound-email/validator-parity.json}.
  *
- * <p>Neither side can drift alone: change the table and the Node spec goes red
- * unless the library agrees; change a port and this goes red unless the table
- * does. The table is the one fact; this file only reads it.
+ * <p>Change a port and this goes red unless the table agrees. The table is the
+ * one fact; this file only reads it.
  */
 class InboundValidatorParityTest {
 

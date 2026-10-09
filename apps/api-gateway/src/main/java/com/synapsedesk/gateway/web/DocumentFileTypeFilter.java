@@ -5,10 +5,10 @@ package com.synapsedesk.gateway.web;
  * published contract's enum lists it: {@code bin}, {@code docx}, {@code md},
  * {@code pdf}, {@code txt}.
  *
- * <p><b>Read in any case.</b> The stored values are lowercase, so Node lowercases
- * the parameter before validating it ({@code ?fileType=PDF} works there), and
- * {@link EnumParameterConverters} does the same here. The constants are the
- * lowercase wire values, so the document publishes them as Node does.
+ * <p><b>Read in any case.</b> The stored values are lowercase, so
+ * {@link EnumParameterConverters} lowercases the parameter before validating it
+ * ({@code ?fileType=PDF} works). The constants are the lowercase wire values, so
+ * the document publishes them in lowercase.
  */
 public enum DocumentFileTypeFilter {
   bin,

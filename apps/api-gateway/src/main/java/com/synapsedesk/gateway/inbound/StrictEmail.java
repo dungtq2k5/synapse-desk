@@ -20,9 +20,8 @@ import java.util.regex.Pattern;
  * no IP-literal domains.
  *
  * <p><b>Not Jakarta's {@code @Email}, deliberately.</b> That accepts {@code
- * ada@acme} and {@code a..b@acme.test}, which Node refuses — so a mail from either
- * would be dropped as {@code invalid_payload} by one gateway and routed by the
- * other.
+ * ada@acme} and {@code a..b@acme.test}, which {@code isEmail} refuses as
+ * {@code invalid_payload}.
  *
  * <p><b>Reproduced as written, including its edges</b>: the whole address is
  * capped at 254 characters, the local part at 64 BYTES and the domain at 254

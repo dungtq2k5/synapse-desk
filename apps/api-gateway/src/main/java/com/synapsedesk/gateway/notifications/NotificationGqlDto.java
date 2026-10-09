@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 
 /**
  * `Notification`, as the GraphQL schema serves it — `data` and `groupKey`
- * absent, matching Node's `NotificationResponseGqlDto`: `data` is an untyped
+ * absent: `data` is an untyped
  * bag with no honest GraphQL type, and `groupKey` means nothing to a client.
  */
 public record NotificationGqlDto(

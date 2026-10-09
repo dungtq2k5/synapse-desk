@@ -20,19 +20,14 @@ import org.springframework.web.method.HandlerMethod;
 
 /**
  * Adds the error-envelope responses {@link ApiErrors} declares, plus the
- * three automatic ones — the Java equivalent of Node's {@code
- * ApiFilterErrors}. See {@link ApiErrors} for what is declared versus
+ * three automatic ones. See {@link ApiErrors} for what is declared versus
  * derived, and why.
  *
- * <p><b>The schema is inlined per status, not a shared {@code $ref}</b> —
- * matching {@code errorResponse()} in Node's own
- * {@code api-response.decorator.ts} exactly, property for property,
- * including {@code path}'s fixed example value ({@code "/api/v1/tickets"}
- * on every route, not the route's own path — reproduced as-is, since the
- * document this compares against does the same). A shared component would
- * document the same shape but diff differently against that file.
+ * <p><b>The schema is inlined per status, not a shared {@code $ref}</b>,
+ * property for property, including {@code path}'s fixed example value
+ * ({@code "/api/v1/tickets"} on every route, not the route's own path).
  *
- * <p>Descriptions are Node's {@code ERROR_DESCRIPTIONS}, copied once. They
+ * <p>Descriptions are written once, in {@link #descriptions()}. They
  * already appear verbatim in every generated {@code *Api.java} interface's
  * javadoc (openapi-generator carries a response's {@code description}
  * straight into the method comment), so this is the third copy of text that
@@ -129,7 +124,7 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
     return response;
   }
 
-  /** Node's `ERROR_DESCRIPTIONS`, `api-response.decorator.ts`, copied verbatim. */
+  /** The description published for each error status. */
   private static Map<String, String> descriptions() {
     Map<String, String> map = new LinkedHashMap<>();
     map.put("400", "Validation failed, or the request is malformed.");

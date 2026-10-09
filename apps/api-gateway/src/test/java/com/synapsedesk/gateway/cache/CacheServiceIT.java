@@ -104,11 +104,9 @@ class CacheServiceIT {
     try {
       cache.wrap(key, 30, OffsetDateTime.class, () -> computedAt);
 
-      // Node's `encode()`: `JSON.stringify(value, replacer)` with no spacing,
-      // and `original.toISOString()` — always three fractional digits, `Z`.
-      // A byte comparison, not a parse — the whole point of this row is that
-      // NODE reading this exact string must not silently return `null`
-      // (`GraphQLISODateTime.serialize()` on a bare string does that).
+      // Compact JSON with no spacing, and the timestamp always with three
+      // fractional digits and `Z`. A byte comparison, not a parse: the row
+      // pins the exact stored wire format.
       assertThat(cache.raw(key)).contains(
         "{\"__cache_date__\":\"2024-01-01T00:00:00.000Z\"}"
       );
@@ -173,9 +171,9 @@ class CacheServiceIT {
       "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
 
     try {
-      // What Node's `encode()` writes for `new Date('2024-06-15T12:30:00.000Z')` —
-      // typed by hand from `cache.service.ts`, not produced by any Java code,
-      // so this half of the round trip cannot pass by both sides sharing one bug.
+      // The tagged form of 2024-06-15T12:30:00.000Z, typed by hand rather than
+      // produced by the serializer, so this half of the round trip cannot pass
+      // by the writer and the reader sharing one bug.
       cache.putRaw(
         key,
         "{\"__cache_date__\":\"2024-06-15T12:30:00.000Z\"}",

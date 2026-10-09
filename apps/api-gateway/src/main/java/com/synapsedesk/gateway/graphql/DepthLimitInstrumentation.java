@@ -15,17 +15,16 @@ import graphql.language.SelectionSet;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses a query nested deeper than {@link GraphqlLimits#MAX_QUERY_DEPTH},
- * ported from `depth-limit.rule.ts`.
+ * Refuses a query nested deeper than {@link GraphqlLimits#MAX_QUERY_DEPTH}.
  *
  * <p>
  * Runs in {@code beginExecuteOperation} — after validation, before any
  * resolver — and throws {@link AbortExecutionException} to short-circuit
- * before execution starts, the same point `depthLimitRule` refuses at during
- * validation. graphql-java's own {@code MaxQueryDepthInstrumentation} is not
- * reused: this counts the way Node counts (introspection exempt, an inline
- * fragment adds no depth, a fragment spread measured at its own node), and a
- * different counting rule is a different limit.
+ * before execution starts. graphql-java's own {@code
+ * MaxQueryDepthInstrumentation} is not reused: this counts by its own rule
+ * (introspection exempt, an inline fragment adds no depth, a fragment spread
+ * measured at its own AST node), and a different counting rule is a different
+ * limit.
  */
 @Component
 public class DepthLimitInstrumentation extends SimplePerformantInstrumentation {
@@ -76,9 +75,9 @@ public class DepthLimitInstrumentation extends SimplePerformantInstrumentation {
 
       int next = selection instanceof InlineFragment ? current : current + 1;
 
-      // A fragment SPREAD has no selection set of its own here, matching
-      // `depth-limit.rule.ts` exactly: its own fields are not walked from
-      // this call, only the `next + 1` from the spread itself.
+      // A fragment SPREAD has no selection set of its own here: its own
+      // fields are not walked from this call, only the `next + 1` from the
+      // spread itself.
       SelectionSet child =
         selection instanceof FragmentSpread
           ? null

@@ -43,16 +43,14 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
 /**
  * `Query.analyticsOverview`, `analyticsAgents`, `analyticsDocuments`,
  * `analyticsKnowledgeGaps`, and the loader-backed edges on the three list
- * findings — `analytics.resolver.ts`, reproduced.
+ * findings.
  *
  * <p>Its own cache namespace (`analytics-gql:`), separate from
- * {@code AnalyticsController}'s (`analytics:`). Node shares one cache entry
- * across both transports because both read the same TypeScript object; here
- * the two transports serialize two DIFFERENT Java types (REST's
- * `BigDecimal`-typed generated DTOs vs. these native-typed records), so
- * sharing a Redis key would bet on two independently-evolving classes
- * staying JSON-shape-identical. A departure from Node's cache TOPOLOGY, not
- * its cache POLICY — the TTLs and the partial-failure shape are unchanged.
+ * {@code AnalyticsController}'s (`analytics:`): the two transports serialize
+ * two DIFFERENT Java types (REST's `BigDecimal`-typed generated DTOs vs. these
+ * native-typed records), so sharing a Redis key would bet on two
+ * independently-evolving classes staying JSON-shape-identical. The TTLs and
+ * the partial-failure shape are the same as REST's.
  */
 @Controller
 public class AnalyticsResolver {

@@ -3,12 +3,11 @@ package com.synapsedesk.gateway.graphql;
 import java.util.Set;
 
 /**
- * The cost limits, ported field for field from `graphql-limits.config.ts`.
+ * The GraphQL depth, complexity and page-size limits, and the cost table.
  *
  * <p>
- * {@link #CROSS_SERVICE_FIELDS} is a hand-maintained set for the same
- * reason it is in Node: a directive or schema extension would put the
- * weighting out of sight of the field it prices.
+ * {@link #CROSS_SERVICE_FIELDS} is a hand-maintained set: a directive or
+ * schema extension would put the weighting out of sight of the field it prices.
  */
 public final class GraphqlLimits {
 
@@ -42,8 +41,7 @@ public final class GraphqlLimits {
    * `CROSS_SERVICE_FIELDS` — field names priced as a per-parent fan-out.
    *
    * <p>
-   * {@code permissions} is deliberately NOT here, matching
-   * `query-cost.plugin.ts`'s own `PER_PAGE_LOADER_EXEMPTIONS`: it resolves
+   * {@code permissions} is deliberately NOT here: it resolves
    * through {@link PermissionCatalogueLoaderConfig}, which is keyed by
    * TENANT and always a batch of one, so a hundred roles resolving it make
    * ONE call, not a hundred. Charging it {@link #CROSS_SERVICE_COST} would

@@ -15,10 +15,9 @@ import org.springframework.test.context.ContextConfiguration;
 /**
  * The three ops routes, over real HTTP, on the PUBLIC listener.
  *
- * <p>Each row asserts what the contract harness asserts of the Node gateway,
- * so the two implementations answer the same thing: the envelope's
- * {@code success} and {@code data}, a semver-shaped version, and a readiness
- * that flips the STATUS LINE rather than only a field.
+ * <p>Each row asserts what the contract harness asserts of the gateway: the
+ * envelope's {@code success} and {@code data}, a semver-shaped version, and a
+ * readiness that flips the STATUS LINE rather than only a field.
  */
 // **`management.server.port=0` on purpose.** The scrape listener is a CHILD
 // context, and it does not see property sources an
@@ -38,10 +37,9 @@ class OpsRoutesTest {
    *
    * <p>Without Redis this process is a STANDBY, which is correct — and it
    * makes `/health/ready` 503, which is what this row would then measure
-   * instead of what it is about. The Node side needed the same fixture for
-   * the same reason (`leaseSwitch`): the rows about routing need a steady
-   * answer, and the claim, refresh, fence and release are exercised against a
-   * real Redis in `GatewayLeaseIT`.
+   * instead of what it is about. The rows about routing need a steady answer,
+   * and the claim, refresh, fence and release are exercised against a real
+   * Redis in `GatewayLeaseIT`.
    */
   @org.springframework.test.context.bean.override.mockito.MockitoBean
   private com.synapsedesk.gateway.lease.GatewayLeaseService lease;

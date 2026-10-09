@@ -36,8 +36,8 @@ import synapsedesk.ticket.Analytics.RunRollupResponse;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
 
 /**
- * `PlatformJobsApi` — `health`'s single most important property, per Node's
- * own comment on it: a job owned by an UNREACHABLE service is excluded from
+ * `PlatformJobsApi` — `health`'s single most important property: a job
+ * owned by an UNREACHABLE service is excluded from
  * the report entirely, never reported {@code never-ran}. Reporting it would
  * page somebody about a wiring bug that does not exist. Staleness verdicts
  * and step rows are the second layer this test pins.

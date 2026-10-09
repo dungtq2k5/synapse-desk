@@ -12,9 +12,8 @@ import org.springframework.http.HttpStatus;
  * Gap 38: a peer's address never reaches a client.
  *
  * <p>The three codes grpc generates itself carry details naming the peer's
- * host and port. The Node gateway answers a fixed message for those in EVERY
- * environment, and the re-taken P3 capture is the text below — measured from
- * the built gateway with its peers down, not copied from a source file.
+ * host and port. The gateway answers a fixed message for those in EVERY
+ * environment, and that message is the text below.
  */
 class GrpcStatusMappingTest {
 

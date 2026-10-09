@@ -12,8 +12,8 @@
 # named `throttle`. Stating every mapping is shorter than the set of rules that
 # would cover those, and `EnvBindingContractTest` reads it rather than guessing.
 #
-# Only the two keys the Node schema gives a default carry one here, spelled the
-# same: `SWAGGER_ENABLED` and `METRICS_HOST`. Everything else is absent-means-
+# Only two keys carry a default here, the ones `.env.example` lists as
+# optional: `SWAGGER_ENABLED` and `METRICS_HOST`. Everything else is absent-means-
 # refuse, enforced by `@Validated` at context refresh rather than by a
 # placeholder — a bare `${…}` only refuses for keys something reads at startup,
 # which step 2 measured on `server.port`.
@@ -22,10 +22,9 @@ spring:
     name: api-gateway
   data:
     redis:
-      # The same instance the Node gateway uses, and it must be: the
-      # implementation lease is one key both sides claim against. A Java
-      # gateway pointed at a different Redis would not exclude the Node one —
-      # it would serve beside it.
+      # Every gateway pod must use the same instance: the implementation
+      # lease is held here, and a pod pointed at a different Redis would not
+      # be excluded by the others' entries — it would serve beside them.
       url: ${REDIS_URL}
   main:
     banner-mode: 'off'
@@ -45,11 +44,11 @@ server:
 # A distinct port is what makes "not reachable from the internet" structural
 # rather than a rule a reverse proxy has to keep enforcing correctly forever,
 # and the host defaults to loopback so a deployment that never thought about
-# it is closed. Node does the same with its own listener.
+# it is closed.
 #
 # The endpoint is remapped to `/metrics` — Actuator would serve it at
-# `/actuator/prometheus`, and the scrape config, the dashboards and the Node
-# gateway all say `/metrics`.
+# `/actuator/prometheus`, and the scrape config and the dashboards say
+# `/metrics`.
 management:
   server:
     port: ${METRICS_PORT}

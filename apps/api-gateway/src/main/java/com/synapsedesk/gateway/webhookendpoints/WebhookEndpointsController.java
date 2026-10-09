@@ -67,8 +67,8 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * `WebhookEndpointsApi` — outbound webhook management, against
  * notification-service. `organization.read`/`organization.update` gate it,
- * matching Node's own reasoning: this is tenant configuration, like billing
- * and settings, not a notification-specific permission.
+ * because this is tenant configuration, like billing and settings, not a
+ * notification-specific permission.
  *
  * <p>
  * <b>The secret rides ONLY on {@code create} and {@code rotateSecret}</b> —

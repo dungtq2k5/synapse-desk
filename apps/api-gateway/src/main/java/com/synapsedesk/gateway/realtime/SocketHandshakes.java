@@ -5,8 +5,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
  * The two handshake-derived values every gRPC call site needs to build a
- * {@code RequestContext} from a socket the way Node's `client.handshake`
- * does from an HTTP-flavoured object: an IP and a user agent. Extracted on
+ * {@code RequestContext} from a socket's handshake: an IP and a user agent. Extracted on
  * its second use ({@link RealtimeGateway}'s throttle key, {@link
  * TicketAccessService}'s gRPC metadata) rather than copied a third time.
  */

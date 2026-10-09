@@ -7,7 +7,7 @@ import java.net.URI;
 /**
  * Makes {@code @Size} work on a {@link URI} field — the length check runs
  * against the URI's string form, the same thing a {@code maxLength} on a
- * {@code format: uri} string schema means on the Node side.
+ * {@code format: uri} string schema means in the published document.
  *
  * <p><b>Hibernate Validator ships no {@code @Size} validator for {@link
  * URI}</b> (only {@code CharSequence}, {@code Collection}, {@code Map} and

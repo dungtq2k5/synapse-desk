@@ -12,8 +12,8 @@ import java.util.Map;
  * us is an exchange with no upper bound, and every message in it is real mail
  * somebody receives. So they are decided before anything is written.
  *
- * <p>Pure: the Node gateway's {@code isSelfAddressed} and {@code isAutomated},
- * with the configured sender passed in rather than read from configuration.
+ * <p>Pure: {@code isSelfAddressed} and {@code isAutomated}, with the configured
+ * sender passed in rather than read from configuration.
  */
 public final class LoopGuards {
 

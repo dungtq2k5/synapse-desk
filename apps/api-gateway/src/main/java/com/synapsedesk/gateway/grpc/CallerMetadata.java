@@ -7,13 +7,12 @@ import io.grpc.Metadata;
 import java.util.List;
 
 /**
- * Packs the caller's context onto outbound metadata — `packRequestContext`,
- * reproduced key for key against {@link GrpcMetadata}, the generated registry
- * both sides read.
+ * Packs the caller's context onto outbound metadata, key for key against
+ * {@link GrpcMetadata}, the generated registry both sides read; the services
+ * unpack it with `unpackCallerContext` in `libs/grpc-proto/src/metadata.ts`.
  *
- * <p>Same omission the Node side makes: `organization_id` is left OFF the
- * metadata entirely for a null tenant (a Super Admin), rather than set to
- * `""` — an empty string would unpack as a tenant whose id IS the empty
+ * <p>`organization_id` is left OFF the metadata entirely for a null tenant
+ * (a Super Admin), rather than set to `""` — an empty string would unpack as a tenant whose id IS the empty
  * string, which is not the same fact as "no tenant".
  */
 public final class CallerMetadata {

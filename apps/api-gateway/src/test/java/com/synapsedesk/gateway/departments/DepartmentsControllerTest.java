@@ -29,8 +29,8 @@ import synapsedesk.auth.DepartmentServiceGrpc;
 
 /**
  * `DepartmentsApi` — specifically `?includeDeleted=true`'s query-permission
- * gate, ported from Node's `QueryPermissionGuard`. The property under test
- * is ORDER: the gate must run before the cache read, since a `@Cacheable`
+ * gate. The property under test
+ * is ORDER: the gate must run before the cache read, since a cached
  * entry warmed by a privileged caller must never be served to one without
  * the permission.
  */
@@ -165,7 +165,7 @@ class DepartmentsControllerTest {
 
   @Test
   void includeDeletedFalseAsRawStringIsNotAnAsk() {
-    // Matches Node's `isRequested`: `?includeDeleted=false` is present but
+    // `?includeDeleted=false` is present but
     // false-ish, so it never demands the permission at all.
     RequestContextHolder.setRequestAttributes(
       new ServletRequestAttributes(requestWithQuery("false"))

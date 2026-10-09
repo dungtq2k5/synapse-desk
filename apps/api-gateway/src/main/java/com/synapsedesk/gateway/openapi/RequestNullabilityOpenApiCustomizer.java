@@ -13,15 +13,14 @@ import org.springframework.stereotype.Component;
  * Publishes what a request field really accepts about {@code null}: every OPTIONAL
  * property of a request body may be {@code null}, and no parameter in the URL may.
  *
- * <p><b>A body field.</b> Measured on both gateways by sending every optional field of
- * every JSON route absent and as an explicit {@code null}: it is accepted on all but two
- * (Node's own 500s). On most it means "absent"; on eleven it is an instruction (clear
+ * <p><b>A body field.</b> Measured by sending every optional field of every JSON route
+ * absent and as an explicit {@code null}: it is accepted. On most it means "absent"; on eleven it is an instruction (clear
  * the date of birth, replace the allowed domains with none). A client that serialises
  * its model with explicit nulls, which is common, sends one. The document used to say
  * "optional, not nullable" for most of them, because the annotation that makes springdoc
  * publish a null is the one the DTOs happen to carry, so this states the rule instead of
  * leaving it to the annotation: a property a request does not require is nullable. The
- * explicit-null contract rows hold it on both gateways.
+ * explicit-null contract rows hold it.
  *
  * <p><b>A parameter.</b> A query string cannot carry a null, so an optional parameter is
  * published as its plain type. springdoc publishes {@code ["string", "null"]} for an

@@ -18,17 +18,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The inbound fixture payloads satisfy {@link InboundEmail} — the Node gateway's
- * {@code inbound-payload-contract.spec.ts}, over the SAME six JSON files.
+ * The six inbound fixture payloads under
+ * {@code test/fixtures/inbound-email/payloads/} satisfy {@link InboundEmail}.
  *
  * <p><b>JSON only — this is not a test of the Resend adapter.</b> The routing
  * rows deliver these fixtures through the real webhook, and a fixture the DTO
  * refuses would turn them into {@code invalid_payload} drops that assert nothing
  * about routing. The adapter has its own test, {@code ResendInboundMapperTest}.
  *
- * <p>Unknown properties FAIL, as the Node pipe's {@code forbidNonWhitelisted}
- * does: a fixture field the Java record does not know is a field the two DTOs
- * disagree about.
+ * <p>Unknown properties FAIL: a fixture field the record does not know is a
+ * fixture that has drifted from the type it claims to be.
  */
 class InboundPayloadContractTest {
 

@@ -45,8 +45,7 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
 
 /**
  * `IngestionJobsApi` — the ingestion pipeline worklist, against
- * ingestion-service's `DocumentService` (`ingestion-jobs.controller.ts`
- * reproduced). Reuses the EXISTING {@code documentServiceStub} bean
+ * ingestion-service's `DocumentService`. Reuses the {@code documentServiceStub} bean
  * ({@code DocumentsController} already opened it) — no new channel or stub
  * needed.
  *

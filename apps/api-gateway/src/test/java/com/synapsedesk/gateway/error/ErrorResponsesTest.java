@@ -71,10 +71,10 @@ class ErrorResponsesTest {
     /**
      * **`@NotNull` beside `@Email` is not redundant** — measured. Bean
      * Validation's `@Email` PASSES on null, while class-validator's
-     * `@IsEmail` rejects an absent value, so a body of `{}` produced one
-     * violation here and two on the Node side. The generated models get
-     * `@NotNull` from the document's `required` array, which is what the
-     * OpenAPI document was corrected to say; this probe mirrors that.
+     * `@IsEmail` rejects an absent value, so without `@NotNull` a body of
+     * `{}` produces one violation where the published rule gives two. The
+     * generated models get `@NotNull` from the document's `required` array;
+     * this probe does the same.
      */
     record Credentials(
       @NotNull @Email String email,

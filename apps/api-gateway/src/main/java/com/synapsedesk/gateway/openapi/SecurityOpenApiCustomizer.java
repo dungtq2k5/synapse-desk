@@ -16,7 +16,7 @@ import org.springframework.web.method.HandlerMethod;
  * per operation either the default or the one named by {@link RouteSecurity}.
  *
  * <p><b>Secured by default.</b> Authentication is inline in each handler, so
- * nothing in the code says "this route is secured". Measured against Node's
+ * nothing in the code says "this route is secured". In the published
  * document, 214 of 230 operations are secured by the session cookie and 16
  * are not; so the rule is the default plus 16 markers, and a new route is
  * published as secured until someone marks it otherwise (the safe direction).

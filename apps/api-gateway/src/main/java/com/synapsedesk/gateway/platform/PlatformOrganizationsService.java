@@ -49,8 +49,8 @@ import synapsedesk.auth.PlatformServiceGrpc;
 
 /**
  * `PlatformApi`'s organizations group (8 of 20 operations) — the first of
- * three sub-passes across this interface, split because of its size
- * (~2,474 lines of Node source). Gated by {@link SuperAdminCheck}, the same
+ * three sub-passes across this interface, split because of its size.
+ * Gated by {@link SuperAdminCheck}, the same
  * door {@code PlatformJobsController} and {@code PlatformAuditLogsController}
  * already use — called first thing in every method.
  *
@@ -59,20 +59,16 @@ import synapsedesk.auth.PlatformServiceGrpc;
  * delegates to this service and its two siblings, so each group's logic is
  * unit-testable without a servlet.
  *
- * <p><b>Known gap 42, same as {@code OrganizationsController}</b>: Node
- * calls {@code organizationStatus.invalidate(id)} after {@code
- * updateOrganization}/{@code setStatus}/{@code offboard}/{@code restore} to
- * drop the cached tenant-status the lifecycle interceptor reads — no write
- * here evicts that cache either, an already-accepted, tracked gap rather
- * than a new one.
+ * <p><b>Every status-changing write evicts the cached tenant status.</b>
+ * {@code updateOrganization}/{@code setStatus}/{@code offboard}/{@code
+ * restore} call {@code OrganizationStatusService.invalidate(id)}, so the
+ * lifecycle interceptor reads the new status on the next request.
  *
- * <p><b>Two validation gaps hand-replicated</b>, same root cause as every
- * other one found this session: {@code nestjs-swagger} has no OpenAPI
- * spelling for {@code @Matches} or {@code @ArrayMaxSize}, so neither reaches
- * the generated Java DTOs at all. {@link #requireSlug} reproduces the slug
- * pattern (and Node's own order: normalize — trim, lowercase — THEN
- * validate, so `ACME-CORP` still succeeds); {@link #requireAllowedEmailDomainsWithinLimit}
- * reproduces the array bound.
+ * <p><b>Two validations checked by hand</b>, since the generated Java DTOs
+ * carry neither the slug pattern nor the array bound. {@link #requireSlug}
+ * normalizes — trim, lowercase — THEN validates the slug pattern, so
+ * `ACME-CORP` succeeds; {@link #requireAllowedEmailDomainsWithinLimit}
+ * checks the array bound.
  */
 @Component
 public class PlatformOrganizationsService {
@@ -357,7 +353,7 @@ public class PlatformOrganizationsService {
     return ResponseEntity.ok(ApiResponse.of(200, message, data));
   }
 
-  /** Node's `.trim().toLowerCase()` normalization, THEN the pattern — same order, so `ACME-CORP` still succeeds. */
+  /** `.trim().toLowerCase()` normalization, THEN the pattern — in that order, so `ACME-CORP` succeeds. */
   private static String requireSlug(String raw) {
     String slug = raw.trim().toLowerCase(Locale.ROOT);
     if (!SLUG_PATTERN.matcher(slug).matches()) {

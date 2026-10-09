@@ -57,18 +57,16 @@ import synapsedesk.auth.Role.RoleResponse;
  * <p><b>{@code listGlobalRoles} forwards only {@code page}</b> — deliberately,
  * not an oversight. {@code ListGlobalRolesRequest} on the wire has no
  * sort/search/organizationId/includeDeleted fields at all (see {@code
- * platform.proto}); Node's own {@code platform.service.ts} accepts the same
- * query DTO as {@code listUsers} (for one shared query-param shape across
- * both cross-tenant listings) and silently drops everything the wire can't
- * carry. Reproduced exactly rather than "fixed", since the wire contract —
+ * platform.proto}); the route accepts the same query DTO as {@code listUsers}
+ * (one shared query-param shape across both cross-tenant listings) and
+ * silently drops everything the wire can't carry, since the wire contract —
  * not the REST query shape — is the actual constraint.
  *
  * <p><b>{@code from}/{@code to} on {@code listBillingEvents}</b> are checked at the
- * edge, on the controller's parameters, by Node's own rule: a {@code YYYY-MM-DD}
- * SHAPE and nothing more, so a date that does not exist ({@code 2026-02-30}) passes
- * through to auth-service, as it does there. Unlike backfill, Node does NOT check
- * {@code from > to} at the gateway (the day-count ceiling is enforced in
- * auth-service), so neither does this.
+ * edge, on the controller's parameters: a {@code YYYY-MM-DD} SHAPE and nothing more,
+ * so a date that does not exist ({@code 2026-02-30}) passes through to auth-service.
+ * Unlike backfill, {@code from > to} is not checked at the gateway (the day-count
+ * ceiling is enforced in auth-service).
  */
 @Component
 public class PlatformUsersRolesFinanceService {

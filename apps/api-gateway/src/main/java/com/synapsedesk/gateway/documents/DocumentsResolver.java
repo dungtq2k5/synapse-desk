@@ -28,7 +28,7 @@ import synapsedesk.ingestion.Document.ListDocumentsRequest;
 import synapsedesk.ingestion.Document.ListDocumentsResponse;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 
-/** `Query.document`, `Query.documents`, and the document edges — `documents.resolver.ts`, reproduced. */
+/** `Query.document`, `Query.documents`, and the document edges. */
 @Controller
 public class DocumentsResolver {
 

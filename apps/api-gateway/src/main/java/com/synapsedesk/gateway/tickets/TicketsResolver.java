@@ -40,7 +40,7 @@ import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
  * `Query.ticket`, `Query.tickets`, the `Ticket` edges, and its three
- * mutations — `tickets.resolver.ts`, reproduced.
+ * mutations.
  *
  * <p>A resolver is a transport, not an implementation: every method here
  * calls the same gRPC stubs the REST surface will, with a context built from
@@ -101,10 +101,9 @@ public class TicketsResolver {
 
     PageRequest.Builder pageRequest = PageRequest.newBuilder()
       .setPage(page)
-      // Clamped, not rejected — matching Node's own reasoning: an
-      // unbounded list multiplies every nested field beneath it, but
-      // refusing `first: 500` would be a breaking change for a client
-      // that worked yesterday.
+      // Clamped, not rejected: an unbounded list multiplies every nested
+      // field beneath it, but refusing `first: 500` would break a client
+      // that sends it today.
       .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE))
       .setSortBy(sortBy != null ? sortBy : "createdAt")
       .setSortOrder(SortOrder.SORT_ORDER_DESC);

@@ -52,7 +52,7 @@ public class MetricsConfiguration {
   }
 
   /**
-   * Node's bucket boundaries, applied as service-level objectives.
+   * The published bucket boundaries, applied as service-level objectives.
    *
    * <p>A filter rather than a builder call per histogram, so the boundaries
    * live once beside the names they belong to. Without it Micrometer emits a
@@ -60,7 +60,7 @@ public class MetricsConfiguration {
    * {@code histogram_quantile()} in a dashboard silently returns nothing.
    *
    * <p><b>A Timer's objectives are NANOSECONDS, not seconds.</b> Measured, and
-   * it fails silently: Node's {@code 0.5} passed through unconverted became a
+   * it fails silently: a {@code 0.5} passed through unconverted became a
    * bucket at {@code le="5.0E-10"}, so the series, the labels and the bucket
    * COUNT all looked right and every bucket held zero. The same unit trap as
    * the cookie's {@code Max-Age}, one layer over — the boundaries are written

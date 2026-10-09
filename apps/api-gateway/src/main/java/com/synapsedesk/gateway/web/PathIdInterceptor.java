@@ -12,8 +12,8 @@ import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * Refuses a path parameter that names an id and is not a UUID, with a 400,
- * before any handler or peer runs: Node's {@code ParseUUIDPipe} on every such
- * parameter, as one rule instead of an annotation on each.
+ * before any handler or peer runs — one rule instead of an annotation on each
+ * such parameter.
  *
  * <p><b>The rule is a name:</b> a path variable called {@code id} or {@code
  * <something>Id}. The contract rows ({@code path-ids.contract-spec.ts}) select
@@ -23,12 +23,10 @@ import org.springframework.web.servlet.HandlerMapping;
  * is untouched.
  *
  * <p><b>Registered last</b>, after throttling, permissions, the lifecycle gate
- * and the metrics recorder, because Node's pipes run after its guards and inside
- * its interceptors: a caller without the permission is refused for THAT, and a
- * malformed id is a counted request, as it is there.
+ * and the metrics recorder: a caller without the permission is refused for THAT,
+ * and a malformed id is a counted request.
  *
- * <p>This is enforcement the published document does not describe on either
- * gateway (the parameters are {@code type: string} with no {@code format:
+ * <p>This is enforcement the published document does not describe (the parameters are {@code type: string} with no {@code format:
  * uuid}); saying so in the document would be a separate, deliberate change.
  */
 @Component

@@ -20,12 +20,11 @@ import synapsedesk.auth.Role.ListPermissionsResponse;
 import synapsedesk.auth.RoleServiceGrpc;
 
 /**
- * The permission catalogue loader — `permission-catalogue.loader.ts`,
- * reproduced, minus its Redis layer: none of this gateway's other three
- * loaders ({@link UsersLoaderConfig}, {@link DepartmentsLoaderConfig},
- * {@link DocumentsLoaderConfig}) implement one either, so this stays
- * consistent with that deferred-until-needed line rather than being the
- * first loader to reach for `CacheService`.
+ * The permission catalogue loader — the tenant's permission list, one
+ * `ListPermissions` call per request. No Redis layer: none of this gateway's
+ * other three loaders ({@link UsersLoaderConfig}, {@link
+ * DepartmentsLoaderConfig}, {@link DocumentsLoaderConfig}) implement one
+ * either, so this stays consistent with that deferred-until-needed line.
  *
  * <p><b>Keyed by TENANT, not by permission id, and always a batch of one.</b>
  * The catalogue is a single list per tenant; every key `Role.permissions`

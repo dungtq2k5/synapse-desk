@@ -5,8 +5,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Strips quoted history from a reply — the Node gateway's {@code quoted-reply.ts},
- * behaviour for behaviour.
+ * Strips quoted history from a reply.
  *
  * <p><b>Not cosmetic.</b> Every reply carries the entire prior thread, so without
  * this {@code ticket_messages} grows quadratically, and the RAG corpus fills with
@@ -17,27 +16,23 @@ import java.util.regex.Pattern;
  * message that silently never arrived. Every header rule is anchored to the start
  * of a line and requires a marker no ordinary prose produces.
  *
- * <p><b>Why the patterns are spelled out rather than copied.</b> A JavaScript
- * regex and a Java one that look identical are not: Java's {@code MULTILINE}
- * treats {@code \r\n} as one terminator and {@code U+0085} as a terminator, JS
- * does neither; {@code \s} and {@code .} cover different characters. So {@code ^},
- * {@code $}, {@code .} and {@code \s} are written as the exact sets JS uses —
- * and the shared table {@code quoted-reply-parity.json}, recomputed from the Node
- * functions, holds the result to the real behaviour on awkward input.
+ * <p><b>Line and character classes follow JavaScript regex rules, spelled out.</b>
+ * Java's {@code MULTILINE} treats {@code \r\n} as one terminator and {@code U+0085}
+ * as a terminator, JS does neither; {@code \s} and {@code .} cover different
+ * characters. So {@code ^}, {@code $}, {@code .} and {@code \s} are written as the
+ * exact sets JS uses, and the fixed table {@code quoted-reply-parity.json} holds
+ * the result to those rules on awkward input.
  *
- * <p><b>The {@code >} block is removed by a scan, not a regex.</b> The Node
- * pattern is a repeated group, which Java matches recursively: a long run of quoted
- * lines in a sender-controlled mail would be a {@code StackOverflowError} here
- * where it is only a slow match there.
+ * <p><b>The {@code >} block is removed by a scan, not a regex.</b> As a pattern it
+ * is a repeated group, which Java matches recursively: a long run of quoted lines
+ * in a sender-controlled mail would be a {@code StackOverflowError}.
  *
  * <p><b>The HTML patterns are scanners, not regular expressions</b>
  * ({@link HtmlScan}). {@code <[^>]+>}, {@code <script…</script>} and {@code
  * <div[^>]*class=…} rescan to the end of the input from every opener that is never
- * closed, which is quadratic, and Java's engine is about eight times slower than
- * Node's on that shape. The scanners are linear and answer exactly as the patterns
- * did; {@code quoted-reply-fuzz.json} holds them to Node's answers on 900 seeded
- * sequences. (Node's own patterns stay quadratic, which is why the inbound body is
- * capped.)
+ * closed, which is quadratic. The scanners are linear and answer exactly as the
+ * patterns do; {@code quoted-reply-fuzz.json} holds them to the patterns' answers
+ * on 900 seeded sequences.
  */
 public final class QuotedReply {
 
@@ -139,11 +134,11 @@ public final class QuotedReply {
   /**
    * Removes every run of lines that start with {@code >}.
    *
-   * <p>The Node pattern is {@code /^(?:>.*(?:\n|$))+/gm}: from a line start, a
+   * <p>The scan behaves as {@code /^(?:>.*(?:\n|$))+/gm}: from a line start, a
    * {@code >} line and its {@code \n}, repeated while the next line also starts
    * with {@code >}. A line ending in a different terminator ({@code \r},
    * {@code U+2028}) is removed but its terminator is left, because only {@code \n}
-   * is consumed — reproduced here exactly.
+   * is consumed.
    */
   private static String withoutQuotedBlocks(String text) {
     StringBuilder kept = new StringBuilder(text.length());

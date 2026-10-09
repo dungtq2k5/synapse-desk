@@ -10,8 +10,7 @@ import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 
 /**
- * `TicketMessage.sender` — `ticket-messages.resolver.ts`, reproduced.
- * Caller-scoped like `notifications`: no `@RequirePermission`, but still
+ * `TicketMessage.sender`. Caller-scoped like `notifications`: no `@RequirePermission`, but still
  * behind an authenticated caller, since the loader needs a tenant to scope
  * its batch RPC by.
  *
@@ -35,8 +34,7 @@ public class TicketMessagesResolver {
   ) {
     if (message.senderId() == null) {
       // No user wrote this message — an AI-generated one — and no loader
-      // call for it either, matching Node's own `if (!message.senderId)
-      // return null` exactly: a null key would poison the batch for every
+      // call for it either: a null key would poison the batch for every
       // other row on the page.
       return CompletableFuture.completedFuture(null);
     }

@@ -22,20 +22,21 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The tenant-lifecycle category of EVERY route, against the table the Node gateway
- * recomputes from its own controllers' metadata ({@code org-access-routes.spec.ts}).
+ * The tenant-lifecycle category of EVERY route, against the route table
+ * {@code test/fixtures/lifecycle/org-access-routes.json}: per route, its category,
+ * whether it is authenticated, and whether it is Super Admin only.
  *
- * <p>The gate's decision for a request is a function of its route, so a route Java
- * categorises differently from Node is a silent failure in one of two directions: a
- * sign-in route gated locks a frozen tenant's members out of learning why, and a
- * write route left open lets a frozen tenant keep writing. Contract rows prove the
- * behaviour for one route per category; this compares all of them.
+ * <p>The gate's decision for a request is a function of its route, so a route
+ * categorised differently from the table is a silent failure in one of two
+ * directions: a sign-in route gated locks a frozen tenant's members out of learning
+ * why, and a write route left open lets a frozen tenant keep writing. Contract rows
+ * prove the behaviour for one route per category; this compares all of them.
  *
- * <p>What is compared is the EFFECTIVE category. Node gates only where
- * {@code JwtAuthGuard} ran and never gates {@code AUTH}; Java has no guard layer and
- * declares the routes Node leaves public as {@code AUTH} to be exempt, so both are the
- * same "exempt" here. A route behind {@code SuperAdminGuard} is exempt too: Node refuses
- * a non-super-admin before the gate, and exempts a super admin in it.
+ * <p>What is compared is the EFFECTIVE category. A row the table marks as not
+ * authenticated, or as {@code AUTH}, is exempt; the gateway has no separate
+ * authentication layer and declares those public routes as {@code AUTH} to be exempt,
+ * so both are the same "exempt" here. A Super-Admin-only route is exempt too: a
+ * non-super-admin is refused before the gate, and a super admin is exempt in it.
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -160,7 +161,7 @@ class OrgAccessRoutesTest {
       "ONBOARDING",
       "BILLING"
     );
-    // The routes Node leaves public yet would otherwise gate: the ones Java must exempt by hand.
+    // The public routes the gate would otherwise ask about: the ones exempted by hand.
     assertThat(publicNonAuth).isGreaterThanOrEqualTo(5);
   }
 }

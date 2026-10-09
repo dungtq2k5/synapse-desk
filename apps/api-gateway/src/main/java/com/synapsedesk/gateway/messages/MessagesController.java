@@ -71,7 +71,7 @@ import synapsedesk.ticket.MessageServiceGrpc;
  *
  * <p>
  * <b>Almost nothing here is permission-gated, and that is deliberate</b> —
- * Node's own reasoning, reproduced exactly: the thread is how an end user
+ * the thread is how an end user
  * talks to support, so gating reads or replies would make the product's core
  * interaction staff-only. What is restricted lives one layer down, decided
  * PER ROW rather than per route (internal notes stripped in ticket-service's
@@ -79,8 +79,8 @@ import synapsedesk.ticket.MessageServiceGrpc;
  * there too). <b>Only {@code redact} carries a route permission</b>
  * ({@code ticket.message.moderate}) — the one action that is purely
  * moderation. Every other method below carries no {@code @RequirePermission}
- * at all, and none should ever gain one without the same reasoning Node's
- * controller docblock states.
+ * at all, and none should ever gain one without reasoning as strong as the
+ * above.
  *
  * <p>The two presign routes answer {@code {uploadUrl, objectPath, expiresAt}},
  * which {@link PresignAttachmentResponseDto} names. `create`/`confirmAttachment`

@@ -18,14 +18,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link InboundEmailService#idempotencyKeyFor}, held to the table the Node
- * gateway recomputes from its own private method on every run
- * ({@code idempotency-parity.spec.ts}).
+ * {@link InboundEmailService#idempotencyKeyFor}, held to the fixed table
+ * {@code test/fixtures/inbound-email/idempotency-parity.json}.
  *
- * <p>The key is a digest, so a string that JavaScript and Java see differently —
- * a lone surrogate, a combining mark, a no-break space — is a different key, and
- * a redelivery that lands on the other gateway during a cutover would create a
- * duplicate ticket instead of being recognised.
+ * <p>The key is a digest, so a string read differently — a lone surrogate, a
+ * combining mark, a no-break space — is a different key, and a redelivery would
+ * create a duplicate ticket instead of being recognised.
  */
 class InboundIdempotencyParityTest {
 

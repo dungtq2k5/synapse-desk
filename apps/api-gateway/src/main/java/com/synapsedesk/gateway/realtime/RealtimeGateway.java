@@ -28,13 +28,10 @@ import synapsedesk.ticket.Message.NewAttachment;
 import synapsedesk.ticket.MessageServiceGrpc;
 
 /**
- * The handshake, the identity rooms and the socket server's own lifecycle —
- * `RealtimeGateway.handleConnection`/`handleDisconnect`, reproduced.
+ * The handshake, the identity rooms and the socket server's own lifecycle.
  *
- * <p><b>No `lease.isActive()` guard, and that is not an omission.</b> Node's
- * socket.io server is already bound before the lease decides active-or-
- * standby, so it needs a runtime check on every connection. Here the bound
- * state IS the standby distinction: {@link #activate} is the only thing that
+ * <p><b>No `lease.isActive()` guard, and that is not an omission.</b> The
+ * bound state IS the standby distinction: {@link #activate} is the only thing that
  * starts {@link SocketIOServer#start()}, so a standby holds this bean without
  * ever opening a port, and no socket can reach {@link #onConnect} in the
  * first place.
@@ -42,14 +39,12 @@ import synapsedesk.ticket.MessageServiceGrpc;
  * <p><b>No explicit "is this a 2FA challenge token" check either.</b>
  * {@link JwtVerifier#verifyAccess} already rejects a challenge token before
  * this class ever sees it (`isChallenge` is filtered inside `verifyAccess`
- * itself) — the belt-and-braces check `verifyHandshake`'s Node twin performs
- * by hand is already the access verifier's own contract here.
+ * itself), so a hand-written check here would repeat the access verifier's
+ * own contract.
  *
  * <p><b>A refused `ticket:join`/budget check drops the frame silently</b>
- * rather than surfacing an exception frame the way Node's global exception
- * filter does. The SECURITY property is unchanged either way — the room is
- * never joined — only the client-visible error shape differs, and porting
- * that filter is out of this group's scope.
+ * rather than answering with an exception frame. The SECURITY property holds
+ * either way — the room is never joined; the client just sees no error.
  */
 @Component
 @Order(0)
@@ -74,7 +69,7 @@ public class RealtimeGateway implements LeaseParticipant {
    * Per-socket typing-relay gate: at most one `typing:start` relayed per
    * {@link #TYPING_RELAY_INTERVAL_MS} per (socket, ticket). Kept HERE rather
    * than on the socket itself because netty-socketio's client interface
-   * exposes no general attribute bag the way Node's `client.data` does — a
+   * exposes no general attribute bag — a
    * disconnect prunes its own entry in {@link #onDisconnect}, so nothing
    * outlives the connection that created it.
    */
@@ -111,7 +106,7 @@ public class RealtimeGateway implements LeaseParticipant {
     this.messages = messages;
 
     // On the `/ws` namespace specifically — `SocketIOServer.addConnectListener`
-    // attaches to the DEFAULT namespace ("/"), which Node's gateway never
+    // attaches to the DEFAULT namespace ("/"), which this gateway never
     // uses at all.
     realtimeNamespace.addConnectListener(this::onConnect);
     realtimeNamespace.addDisconnectListener(this::onDisconnect);
@@ -218,9 +213,9 @@ public class RealtimeGateway implements LeaseParticipant {
         client.getSessionId(),
         refused.getMessage()
       );
-      // Admit-then-disconnect, never a handshake-layer refusal (P1): Node
-      // accepts and hard-disconnects, `connect → disconnect(io server
-      // disconnect)`, no retry. Refusing at the transport layer instead
+      // Admit-then-disconnect, never a handshake-layer refusal: the client
+      // sees `connect → disconnect(io server disconnect)` and does not
+      // retry. Refusing at the transport layer instead
       // makes `socket.io-client` retry the handshake forever.
       client.disconnect();
     }

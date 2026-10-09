@@ -39,12 +39,11 @@ import synapsedesk.ticket.TicketServiceGrpc;
  *
  * <p><b>The sibling-code risk this whole 3-group split exists for.</b>
  * {@code assign}/{@code reassign}/{@code assignToSelf}/{@code unassign} are
- * FOUR independent string-literal permission checks in Node — no shared
- * constant forces them apart — so a copy-paste in the port could silently
- * swap {@code ticket.assign} and {@code ticket.assign.self} between {@code
- * assign} and {@code assignToSelf} without any structural check catching
- * it. Settled explicitly, per the question raised before writing this
- * file: {@code assignToSelf} needs NO handler-body check to stop it from
+ * FOUR independent permission checks — no shared constant forces them
+ * apart — so a copy-paste could silently swap {@code ticket.assign} and
+ * {@code ticket.assign.self} between {@code assign} and {@code
+ * assignToSelf} without any structural check catching it.
+ * {@code assignToSelf} needs NO handler-body check to stop it from
  * assigning to someone else — unlike {@code includeDeleted}, which genuinely
  * needs one because ONE route serves two audiences. Here the separation is
  * structural on BOTH sides: {@link AssignTicketToSelfDto} carries no {@code

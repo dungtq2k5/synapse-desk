@@ -15,9 +15,8 @@ import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
  * total one — ADR 0010. Peers are REPORTED and do not decide.
  *
  * <p>{@link #report} takes the GENERATED dependencies object rather than a
- * map, because the field set is part of the shared document: a gate that
- * wanted a new key would have to add it there first, where the Node gateway
- * would publish it too.
+ * map, because the field set is part of the published API document: a gate
+ * that wanted a new key would have to add it there first.
  */
 public interface ReadinessGate {
   /** True when this condition is satisfied. */

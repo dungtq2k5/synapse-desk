@@ -34,10 +34,9 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * properties matter more here than anywhere else in the interface: the
  * bulk ops' partial-success envelope must survive at the ITEM level (an
  * operation that silently drops a `failed[]` row is indistinguishable from
- * one that succeeded, the same "200 with more data" risk class this port
- * keeps finding — here inverted into "200 with a MISSING failure"); and
- * `escalate` must stay permission-FREE, since it is a deliberate correction
- * in Node, not an oversight a reader might "fix" by adding a guard.
+ * one that succeeded: "200 with a MISSING failure"); and `escalate` must
+ * stay permission-FREE, which is deliberate, not an oversight a reader might
+ * "fix" by adding a guard.
  */
 class TicketsStatusServiceTest {
 

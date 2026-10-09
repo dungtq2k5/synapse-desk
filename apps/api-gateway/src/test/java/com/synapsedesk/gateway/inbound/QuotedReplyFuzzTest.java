@@ -16,9 +16,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link QuotedReply}'s HTML stripping, held to the randomized corpus the Node
- * gateway recomputes from its own functions on every run
- * ({@code quoted-reply-fuzz.spec.ts}).
+ * {@link QuotedReply}'s HTML stripping, held to the fixed randomized corpus
+ * {@code test/fixtures/inbound-email/quoted-reply-fuzz.json}.
  *
  * <p>The Java implementation scans rather than matching regular expressions, so
  * its time is linear in the input; the corpus is what makes that safe — 900

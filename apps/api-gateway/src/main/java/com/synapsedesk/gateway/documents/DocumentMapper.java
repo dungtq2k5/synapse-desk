@@ -8,7 +8,7 @@ import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.ingestion.Document.DocumentResponse;
 import synapsedesk.ingestion.Document.DocumentStatus;
 
-/** Wire `DocumentResponse` -> the GraphQL DTO — `document.mapper.ts`, reproduced. */
+/** Wire `DocumentResponse` -> the GraphQL DTO. */
 public final class DocumentMapper {
 
   private DocumentMapper() {}
@@ -45,7 +45,7 @@ public final class DocumentMapper {
     );
   }
 
-  /** `UNSPECIFIED` -> `null`, matching Node's "a value this build cannot name answers null". */
+  /** `UNSPECIFIED` -> `null`: a value this build cannot name answers null. */
   private static DocumentStatusGql toStatusGql(DocumentStatus status) {
     return switch (status) {
       case DOCUMENT_STATUS_PENDING -> DocumentStatusGql.PENDING;

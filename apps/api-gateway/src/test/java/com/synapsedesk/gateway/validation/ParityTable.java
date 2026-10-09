@@ -11,9 +11,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The shared validator table the Node gateway recomputes from the real functions on
- * every run ({@code validator-parity.spec.ts}); the Java ports are held to it row for
- * row. The table is the one fact, and this only reads it.
+ * The validator table ({@code test/fixtures/inbound-email/validator-parity.json}),
+ * generated from the real class-validator functions; the validators are held to it
+ * row for row. The table is the one fact, and this only reads it.
  */
 public final class ParityTable {
 

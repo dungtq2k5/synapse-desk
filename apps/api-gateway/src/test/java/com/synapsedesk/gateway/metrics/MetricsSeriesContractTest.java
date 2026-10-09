@@ -34,10 +34,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p><b>A registry, not a list kept here.</b> Alerts and dashboards select these names,
  * so a name that differs by a suffix makes every alert selecting it match nothing, and
- * a dashboard of empty panels reads as a quiet system rather than a broken one. The
- * registry was frozen from the Node gateway's own registry, its last word, when this
- * gateway matched it; a list derived from this gateway's code would agree with itself
- * forever. Changing a series is an edit to it, made on purpose.
+ * a dashboard of empty panels reads as a quiet system rather than a broken one. A
+ * list derived from this gateway's code would agree with itself forever. Changing a
+ * series is an edit to the registry, made on purpose.
  *
  * <p>The scrape is read from the MANAGEMENT port, which is where the endpoint
  * actually is; a test that read it from the public port would pass against a
@@ -202,7 +201,7 @@ class MetricsSeriesContractTest {
         : matcher.group(3).split(",")) {
         String label = pair.split("=")[0].trim();
         // `le` is the histogram's own bucket label, not one this gateway
-        // declares — Node's registry does not list it either.
+        // declares — the registry does not list it either.
         if (!label.isEmpty() && !label.equals("le")) {
           labels.add(label);
         }
@@ -220,9 +219,9 @@ class MetricsSeriesContractTest {
    * Strips the suffixes a histogram's own samples carry.
    *
    * <p>`_bucket`, `_sum` and `_count` belong to the Prometheus histogram
-   * format; `_max` is Micrometer's extra gauge per Timer, which Node has no
-   * equivalent of — it is folded into the family here rather than treated as
-   * a ninth series. It is a known difference, not a parity break.
+   * format; `_max` is Micrometer's extra gauge per Timer, which the registry
+   * does not list — it is folded into the family here rather than treated as
+   * a series of its own.
    */
   private String family(String name) {
     for (String suffix : List.of("_bucket", "_sum", "_count", "_max")) {

@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
  * test is BOTH directions at once — the one gated method must stay gated,
  * and none of the seven ungated ones may quietly acquire a permission (which
  * would 403 ordinary users out of their own conversation) or lose it to the
- * wrong one (which {@code permission-coverage.contract-spec.ts} would also
- * catch, but a compile-time list here fails faster and names every route by
- * hand rather than trusting a regex over Node source).
+ * wrong one (which {@code test/gateway-contract/permission-coverage.contract-spec.ts}
+ * would also catch, but a compile-time list here fails faster and names every
+ * route by hand rather than trusting a regex over Java source).
  */
 class MessagesControllerTest {
 

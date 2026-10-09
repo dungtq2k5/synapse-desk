@@ -81,7 +81,7 @@ class ExplicitNullJsonCustomizerTest {
 
   @Test
   void aBooleanKeepsItsOwnReadingOfNull() throws Exception {
-    // Not covered on purpose: Node reads an explicit null `isOrganizationWide` as
+    // Not covered on purpose: an explicit null `isOrganizationWide` reads as
     // false, so the DTO must still receive the null and let the handler decide.
     com.synapsedesk.gateway.model.ConfirmDocumentDto dto = mapper.readValue(
       "{\"isOrganizationWide\":null}",

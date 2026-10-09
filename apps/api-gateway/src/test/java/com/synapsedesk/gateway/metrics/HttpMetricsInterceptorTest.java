@@ -21,9 +21,9 @@ import org.springframework.web.servlet.HandlerMapping;
 /**
  * What the HTTP metrics record, for which requests, under which labels.
  *
- * <p>The series is read by alert rules and dashboards tuned to Node's numbers, so
- * each rule here is one Node follows: counted only once a handler is reached, the
- * route as a template, the DECLARED status and never the outcome.
+ * <p>The series is read by alert rules and dashboards tuned to its current numbers,
+ * so each rule here is pinned: counted only once a handler is reached, the route as
+ * a template, the DECLARED status and never the outcome.
  */
 class HttpMetricsInterceptorTest {
 
@@ -45,7 +45,7 @@ class HttpMetricsInterceptorTest {
     public void anything() {}
   }
 
-  /** Named like Boot's container error controller, which Node has no equivalent of. */
+  /** Named like Boot's container error controller, whose dispatch is not counted. */
   static class BasicErrorController {
 
     public void error() {}
@@ -159,7 +159,7 @@ class HttpMetricsInterceptorTest {
 
   @Test
   void aHandlerThatIsNotAnMvcMethodIsNotCounted() {
-    // A router function, which is how GraphQL is served: Node skips GraphQL too.
+    // A router function, which is how GraphQL is served: GraphQL is not counted.
     serve(request("POST", "/graphql"), (Runnable) () -> {}, null);
 
     assertThat(recorded()).isZero();

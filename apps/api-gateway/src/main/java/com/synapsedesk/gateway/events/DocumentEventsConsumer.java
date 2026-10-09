@@ -141,8 +141,8 @@ public class DocumentEventsConsumer implements LeaseParticipant {
 
   /**
    * Always the uploader; then either the whole org (organization-wide) or
-   * one room per department — never both, matching the Node helper's early
-   * return once the event is marked organization-wide.
+   * one room per department — never both: an event marked organization-wide
+   * skips the department rooms.
    */
   private static List<String> audience(JsonNode event) {
     Set<String> rooms = new LinkedHashSet<>();

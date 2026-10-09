@@ -13,19 +13,19 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * {@code class-validator}'s {@code @IsPhoneNumber()} with no region: the value must
- * carry its international calling code ({@code +14155552671}) and be a valid number
- * for it. Node uses {@code libphonenumber-js}; this uses Google's
- * {@code libphonenumber}, which that library is generated from, so the two agree on
- * the numbers either is likely to meet. Any other difference is a metadata release
- * apart; the shared parity table is what shows one.
+ * {@code class-validator}'s {@code @IsPhoneNumber()} rule with no region, the rule
+ * {@code docs/reference/openapi.json} publishes: the value must carry its
+ * international calling code ({@code +14155552671}) and be a valid number for it, as
+ * Google's {@code libphonenumber} judges it. The parity table
+ * ({@code test/fixtures/inbound-email/validator-parity.json}) holds the cases.
  *
- * <p>Like the original, a value with leading or trailing whitespace is refused
- * before parsing, and a value that cannot be parsed at all is simply invalid.
+ * <p>A value with leading or trailing whitespace is refused before parsing, and a
+ * value that cannot be parsed at all is simply invalid.
  *
- * <p>One difference is reproduced on purpose: Google's library treats a fullwidth plus
- * ({@code U+FF0B}) as the leading plus, and {@code libphonenumber-js} does not, so a
- * value containing one is refused here as it is there.
+ * <p>A fullwidth plus ({@code U+FF0B}) is refused, although Google's library would
+ * read it as the leading plus: nothing normalises a phone number to E.164 before it
+ * is stored, so a fullwidth plus would be stored as a different number from the same
+ * digits behind an ASCII plus.
  */
 @Documented
 @Constraint(validatedBy = ValidPhoneNumber.Validator.class)

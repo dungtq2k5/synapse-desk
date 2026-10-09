@@ -43,16 +43,15 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * a concrete class must implement all of them before Spring registers any
  * route on it.
  *
- * <p><b>Reads are NOT permission-gated</b> — Node's own docblock: an end
- * user with no grants may list and open their own tickets, because raising
+ * <p><b>Reads are NOT permission-gated</b>: an end user with no grants may list and open their own tickets, because raising
  * one is the product's self-service entry point. The narrowing (mine vs.
  * the tenant queue) happens in ticket-service from the caller context in
  * gRPC metadata, never here.
  *
  * <p><b>{@code includeDeleted} is checked in the handler body, not by
  * {@code @RequirePermission}</b> — gating the whole {@code list} route
- * would deny every ordinary user their own ticket list. Reproduced from
- * Node's {@code assertMayIncludeDeleted}: {@code true} passes only for a
+ * would deny every ordinary user their own ticket list. In
+ * {@code requireMayIncludeDeleted}, {@code true} passes only for a
  * super admin or a caller holding {@code ticket.delete}; refused rather
  * than silently downgraded to "live tickets only", because a client that
  * asked for the recycle bin and got live rows would show an empty bin and
@@ -61,10 +60,9 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * <p><b>{@code update}'s {@code priority} field is NOT optional on the
  * wire</b> — unlike {@code title}/{@code description}. {@code
  * UpdateTicketRequest.priority} has no {@code optional} keyword in the
- * proto, so Node's generated TS type makes it non-omittable and its mapper
- * always computes and sends it (absent DTO value → {@code
- * TICKET_PRIORITY_UNSPECIFIED}). In Java that same requirement needs no
- * special-casing: an implicit-presence field left unset by the builder
+ * proto, so it is always on the wire (absent DTO value → {@code
+ * TICKET_PRIORITY_UNSPECIFIED}). That needs no special-casing: an
+ * implicit-presence field left unset by the builder
  * already serializes to its zero value, byte-identical to explicitly
  * setting {@code TICKET_PRIORITY_UNSPECIFIED} — confirmed by sabotage: an
  * unconditional ternary and the plain {@code if (priority != null)} guard
@@ -273,7 +271,7 @@ public class TicketsCrudService {
     );
   }
 
-  /** Node's `assertMayIncludeDeleted`: refused, never silently downgraded. */
+  /** `includeDeleted` without the grant: refused, never silently downgraded. */
   private static void requireMayIncludeDeleted(
     RequestContext context,
     Boolean includeDeleted

@@ -7,10 +7,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Every route of the annotated controller is for a super admin only: Node's
- * {@code SuperAdminGuard} on the {@code /platform} surface. {@link SessionInterceptor}
- * enforces it right after it has confirmed a session, so a tenant member is refused with
- * 403 BEFORE the body is bound or validated, as Node's guard runs ahead of its pipe.
+ * Every route of the annotated controller is for a super admin only (the
+ * {@code /platform} surface). {@link SessionInterceptor} enforces it right after it has
+ * confirmed a session, so a tenant member is refused with 403 BEFORE the body is bound
+ * or validated.
  *
  * <p>The handlers still call {@code SuperAdminCheck} themselves. That is not a second
  * copy of the rule so much as the second door: a service called any other way (the

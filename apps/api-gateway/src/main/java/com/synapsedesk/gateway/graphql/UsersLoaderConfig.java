@@ -18,8 +18,8 @@ import synapsedesk.auth.User.UserSummary;
 import synapsedesk.auth.UserServiceGrpc;
 
 /**
- * The users loader — `user-summary.loader.ts`, reproduced, minus the entity
- * cache (deferred as a later concern, not this one).
+ * The users loader — batches user-summary lookups by id into one
+ * `ListUsersByIds` call per request. No entity cache (deferred).
  *
  * <p><b>The loader contract, applied.</b> Spring for GraphQL's {@link
  * BatchLoaderRegistry} is reactive-only; the bridge to this gateway's

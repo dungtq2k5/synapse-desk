@@ -17,14 +17,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  * that it is ATOMIC; a fake that "ran" it would be a reimplementation of
  * Redis, which is the one thing this must not be tested against. So these run
  * under failsafe, in `verify`, and `./mvnw test` stays runnable with nothing
- * started — the same split the Node services keep between `npm test` and
- * their e2e suites.
+ * started — the same split the TypeScript services keep between `npm test`
+ * and their e2e suites.
  *
- * <p>The rows mirror the Node suite's, from the other side: there, a foreign
- * `gateway:holders:java` entry kept Node standing by. Here a
- * `gateway:holders:node` entry keeps JAVA standing by, and that symmetry is
- * the exclusion — each half proves it refuses to serve while the other is
- * live.
+ * <p>The claim adds this pod's entry to `gateway:holders:java` only while
+ * `gateway:holders:node` has no unexpired entry. These rows write that set by
+ * hand: a live entry keeps this gateway standing by, an expired one is pruned
+ * and does not.
  */
 class GatewayLeaseIT {
 
@@ -122,8 +121,8 @@ class GatewayLeaseIT {
 
   @Test
   void aLiveNodeEntryKeepsJavaAStandby() {
-    // What a Node pod writes — the mirror of the Node suite's fake `java`
-    // entry. This is check 5 at the Redis level.
+    // A live entry in the set the claim checks before adding its own. This
+    // is check 5 at the Redis level.
     redis
       .opsForZSet()
       .add(
@@ -148,9 +147,9 @@ class GatewayLeaseIT {
 
   @Test
   void anExpiredNodeEntryDoesNotKeepJavaStandingBy() {
-    // The pruning half. Without it a Node pod that was SIGKILLed — no
-    // shutdown hook, so no ZREM — would hold the Java side down until
-    // something else removed its entry.
+    // The pruning half. Without it the entry of a pod that was SIGKILLed —
+    // no shutdown hook, so no ZREM — would hold this gateway down until
+    // something else removed it.
     redis
       .opsForZSet()
       .add(

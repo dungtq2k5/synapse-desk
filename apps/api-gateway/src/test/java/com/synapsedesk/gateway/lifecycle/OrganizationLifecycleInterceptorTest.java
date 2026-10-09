@@ -106,7 +106,7 @@ class OrganizationLifecycleInterceptorTest {
   @Test
   void theSuperAdminFlagAloneExemptsEvenWithATenantOnTheToken()
     throws Exception {
-    // Node's two conditions are independent: `isSuperAdmin || !organizationId`.
+    // The two conditions are independent: `isSuperAdmin || !organizationId`.
     when(currentUser.read(any())).thenReturn(Optional.of(member(ORG, true)));
 
     assertThat(run("POST", handler(new Plain(), "read"))).isTrue();

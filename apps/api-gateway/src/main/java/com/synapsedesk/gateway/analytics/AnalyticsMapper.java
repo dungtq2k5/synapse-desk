@@ -13,10 +13,8 @@ import synapsedesk.ticket.Analytics.OverviewResponse;
 import synapsedesk.ticket.Analytics.RateValue;
 
 /**
- * Wire -> the GraphQL analytics DTOs — `analytics.mapper.ts`'s
- * `toRateResponseDto`/`toMeanResponseDto`, reproduced. No name hydration:
- * {@link AgentStatGqlDto} carries only `agentId`, matching Node's own
- * `hydrateNames: false` leg for this transport.
+ * Wire -> the GraphQL analytics DTOs: rates and means. No name hydration:
+ * {@link AgentStatGqlDto} carries only `agentId`.
  */
 public final class AnalyticsMapper {
 

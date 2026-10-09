@@ -15,24 +15,22 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * One implementation serves at a time; the other waits warm.
+ * A Redis-held lease that gates readiness and the NATS consumers: a pod is
+ * ready, and consumes, only while it holds an entry.
  *
- * <p><b>A standby, not a refusal.</b> A refusal would put the JVM's whole
- * startup inside a switch window. A standby boots, warms, answers `/health` so
- * the kubelet leaves it alone, and answers `/health/ready` with 503 so the
- * Service sends it nothing — while consuming no NATS subject and accepting no
- * socket. The window then costs only the old pods draining plus one poll.
+ * <p><b>A standby, not a refusal.</b> A pod without the lease boots, warms,
+ * answers `/health` so the kubelet leaves it alone, and answers
+ * `/health/ready` with 503 so the Service sends it nothing — while consuming
+ * no NATS subject and accepting no socket. It claims on its next beat.
  *
- * <p><b>Per pod, not per implementation.</b> With `replicas: 2` a single
- * shared key would be deleted by the first pod to exit, handing over while the
- * second is still consuming. Each pod holds its own entry, and a standby may
- * become active only when no unexpired entry of the OTHER implementation
- * remains — so replicas of one implementation join each other and the two
- * implementations still exclude.
+ * <p><b>Per pod.</b> With `replicas: 2` a single shared key would be deleted
+ * by the first pod to exit while the second is still consuming. Each pod
+ * holds its own entry in `gateway:holders:java`, and claims only while
+ * `gateway:holders:node` ({@link GatewayLease#OTHER}) has no unexpired entry.
+ * Nothing in this deployment writes that set, so every pod claims on its
+ * first beat; a pod whose entry is lost or fenced steps down and stands by.
  *
- * <p>This is the Node `GatewayLeaseService` with the sides swapped, and that
- * is the point: the exclusion only works if both run the same script against
- * the same keys. {@link GatewayLease} holds the shared half.
+ * <p>{@link GatewayLease} holds the keys, scripts and timings.
  */
 @Component
 public class GatewayLeaseService implements ReadinessGate, SmartLifecycle {
@@ -104,9 +102,9 @@ public class GatewayLeaseService implements ReadinessGate, SmartLifecycle {
     boolean ready
   ) {
     // The lease does not appear under `dependencies` — that object's fields
-    // come from the shared document, and adding one would mean publishing it
-    // on the Node side too. `ready` already says whether to route here, which
-    // is the field a Service reads.
+    // come from the published API document, and adding one would change it.
+    // `ready` already says whether to route here, which is the field a
+    // Service reads.
   }
 
   /**
@@ -115,12 +113,12 @@ public class GatewayLeaseService implements ReadinessGate, SmartLifecycle {
    * <p><b>Its own scheduler, not `@Scheduled`.</b> Measured: a
    * `fixedRateString` of `#{@gatewayLeaseService.refreshMillis}` makes the
    * bean depend on itself and Spring refuses the context with a cycle. A
-   * literal interval would put the timing contract in two places, and the
-   * interval is shared with the Node side — so the interval stays in
-   * {@link GatewayLease} and the schedule is built from it here.
+   * literal interval would put the timing contract in two places, so the
+   * interval stays in {@link GatewayLease} and the schedule is built from it
+   * here.
    *
    * <p>The thread is a DAEMON: a gateway whose only remaining work is this
-   * timer should exit, which is what `unref()` buys on the Node side.
+   * timer should exit.
    *
    * <p>A lifecycle start, in {@link #PHASE}, so it begins after the Redis
    * connection factory (phase 0) has started. Restartable: Spring stops and

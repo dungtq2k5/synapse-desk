@@ -22,25 +22,20 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * A body must be JSON, and must parse — decided BEFORE authentication.
  *
- * <p><b>The ordering is the point, not the statuses.</b> Measured on the Node
- * gateway with no cookie at all:
+ * <p><b>The ordering is the point, not the statuses.</b> With no cookie at all:
  *
  * <pre>
- * text/plain on PATCH /users/me  -> 415   (the middleware runs before the guard)
- * malformed JSON, same route     -> 400   (Express parses the body in middleware)
- * no body at all, same route     -> 401   (nothing to refuse, so the guard answers)
+ * text/plain on PATCH /users/me  -> 415   (refused here, before authentication)
+ * malformed JSON, same route     -> 400   (parsed here, before authentication)
+ * no body at all, same route     -> 401   (nothing to refuse, so authentication answers)
  * </pre>
  *
- * <p>Spring raises both of those at ARGUMENT RESOLUTION, which is after every
- * security filter — so a Java gateway without this filter answers 401 where
- * the Node one answers 415 or 400. The same request, a different status,
- * decided by which implementation happens to hold the lease. That is precisely
- * what the lease exists to make invisible.
+ * <p>Spring raises the first two at ARGUMENT RESOLUTION, which is after every
+ * security filter — so without this filter both would answer 401.
  *
- * <p><b>The messages stay opaque</b>, deliberately: the refusal
- * text belongs to Jackson here and to V8 there, and three malformed bodies
- * produced three different V8 strings. The STATUS, the envelope and the path
- * are the contract.
+ * <p><b>The messages stay opaque</b>, deliberately: the refusal text belongs
+ * to Jackson, and a parser can word three malformed bodies three different
+ * ways. The STATUS, the envelope and the path are the contract.
  */
 @Component
 // **Servlet contexts only.** It depends on `handlerExceptionResolver`, which
@@ -79,12 +74,11 @@ public class JsonBodyFilter extends OncePerRequestFilter {
       // gateway that demanded a Content-Type would break every caller that
       // correctly sends nothing.
       //
-      // And Node does not merely tolerate it: its body parser leaves `req.body`
-      // as `{}`, so a route whose body is all-optional is SERVED a bare POST and
-      // a route with a required field answers 400 for the field. Spring would
-      // refuse the same request with 415 at routing (a `consumes` condition
-      // needs a Content-Type), so the empty body is handed on as the empty JSON
-      // object it is there, whatever Content-Type came with it.
+      // The empty body is handed on as the empty JSON object `{}`, whatever
+      // Content-Type came with it, so a route whose body is all-optional is
+      // SERVED a bare POST and a route with a required field answers 400 for
+      // the field. Without this, Spring would refuse the request with 415 at
+      // routing (a `consumes` condition needs a Content-Type).
       chain.doFilter(
         carriesABody(request.getMethod())
           ? new CachedBodyRequest(request, EMPTY_OBJECT, true)
@@ -151,7 +145,7 @@ public class JsonBodyFilter extends OncePerRequestFilter {
     };
   }
 
-  /** As the Node middleware does: a parameter or a `+json` suffix is fine. */
+  /** JSON by its essence: a media-type parameter or a `+json` suffix is fine. */
   private static boolean isJson(String contentType) {
     String essence = contentType.split(";")[0].trim().toLowerCase();
 

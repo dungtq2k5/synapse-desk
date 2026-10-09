@@ -1,10 +1,9 @@
 package com.synapsedesk.gateway.realtime;
 
 /**
- * `WsResponse<T>` from `libs/common`'s `ws-response.interface.ts`, reproduced
- * — every server-to-client emit the gateway owns wraps its payload the same
- * way, `{success, message, data}`, so a client written against Node needs no
- * branch for which implementation answered it.
+ * Every server-to-client emit the gateway owns wraps its payload the same
+ * way, `{success, message, data}`, so a client reads every frame with one
+ * shape.
  */
 public record WsResponse<T>(boolean success, String message, T data) {
   public static <T> WsResponse<T> ok(String message, T data) {

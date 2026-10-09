@@ -16,11 +16,10 @@ import org.springframework.stereotype.Component;
  * lose, so tearing down in reverse means the participant that has been
  * running longest — with the most depending on it — is stopped last.
  *
- * <p>This is exactly Node's own realtime deactivation contract, generalized:
- * {@code GatewayLeaseService}'s Node callback stops the NATS consumer, THEN
- * drops sockets — one participant's own two-phase teardown. Where this
- * gateway has MULTIPLE participants (cache invalidation today; realtime
- * next), the same "later-activated, earlier-deactivated" rule is what keeps
+ * <p>It generalizes one participant's own two-phase teardown — stop the NATS
+ * consumer, THEN drop sockets — to several. With MULTIPLE participants
+ * (cache invalidation, realtime), the same "later-activated,
+ * earlier-deactivated" rule is what keeps
  * a relay-owning participant from trying to emit to sockets a
  * later-in-the-list participant is mid-way through dropping.
  */

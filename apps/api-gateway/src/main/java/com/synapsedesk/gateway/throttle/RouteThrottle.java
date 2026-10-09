@@ -1,14 +1,12 @@
 package com.synapsedesk.gateway.throttle;
 
 /**
- * {@code throttler.config.ts}'s tier names and {@code ROUTE_THROTTLE}
- * numbers, reproduced as annotation-usable constants — a Java annotation
- * argument must be a compile-time constant, so these cannot live in a
- * runtime-keyed map the way Node's object does.
+ * The per-route tier overrides, as annotation-usable constants — a Java
+ * annotation argument must be a compile-time constant, so these cannot live
+ * in a runtime-keyed map.
  *
- * <p>Only the entries the Java gateway has routes for today are ported;
- * the rest (`aiDraft`, `chatMessage`, `export`, …) arrive with the modules
- * that carry them.
+ * <p>One entry per route that replaces its tier's numbers with {@link
+ * ThrottleOverride}; a route with no entry gets its tier's defaults.
  */
 public final class RouteThrottle {
 

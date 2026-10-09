@@ -12,9 +12,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 /**
  * A request parameter that does not convert is the client's mistake: 400, naming
- * the field, and for an enum the values it may take, as class-validator does on
- * Node. Before the handler existed it fell through to the catch-all and answered
- * 500.
+ * the field, and for an enum the values it may take, in class-validator's wording.
+ * Without the handler it would fall through to the catch-all and answer 500.
  */
 class ParameterTypeMismatchTest {
 
@@ -58,7 +57,7 @@ class ParameterTypeMismatchTest {
 
   @Test
   void aCaseVariantOfAnEnumValueIsRefusedToo() {
-    // `desc` is not `DESC`: the document's enum is exact, and Node refuses it.
+    // `desc` is not `DESC`: the document's enum is exact.
     assertThat(
       answer("desc", SortDirection.class, "sortOrder").getStatusCode()
     ).isEqualTo(HttpStatus.BAD_REQUEST);

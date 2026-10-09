@@ -21,15 +21,14 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * `SmartThrottlerGuard`, reproduced — routes to ONE tier set, never all four.
+ * The rate limiter — routes to ONE tier set, never all four.
  *
  * <p>A route carrying {@link AuthThrottle} (method wins over class) evaluates
  * {@link ThrottlerTiers#AUTH} only; every other route evaluates {@link
  * ThrottlerTiers#GENERAL} only. Evaluating both would be wrong in both
  * directions — a login also governed by the loose general tiers, or every
- * ordinary read counted against the strict auth budget — which is Node's own
- * reasoning, reproduced rather than re-derived. A route carrying {@link
- * SkipThrottle} evaluates none.
+ * ordinary read counted against the strict auth budget. A route carrying
+ * {@link SkipThrottle} evaluates none.
  *
  * <p><b>Fails OPEN, loudly.</b> Any Redis failure is caught, logged at ERROR,
  * and the request proceeds unthrottled for that tier — a Redis outage must

@@ -64,23 +64,19 @@ import synapsedesk.auth.RoleServiceGrpc;
 
 /**
  * `RolesApi` — against auth-service's `RoleService`, on the same channel and
- * stub as `PermissionsApi` (`roles.controller.ts`, reproduced).
+ * stub as `PermissionsApi`.
  *
  * <p>
  * <b>`list` is the one cached route</b>, keyed the same way
  * `DocumentsController` established: the RAW query string, not the
- * bound/defaulted method arguments — Node's `@Cacheable` reads
- * `request.query` before Nest fills defaults in, so keying off Java's
- * already-defaulted parameters would write a different key for the same
- * logical request whenever a client omits one. No `__visibility` segment
+ * bound/defaulted method arguments, so an omitted param and its explicit
+ * default are cached as different entries. No `__visibility` segment
  * here (`varyBy: 'tenant'`, unlike `Documents`' `'caller'`).
  *
  * <p>
- * <b>No write here evicts the cache</b> — known gap 42. Node's
- * `@InvalidateCache(CACHE_SCOPES.roles)` has no Java equivalent yet, so a
- * role list read through this gateway can serve a stale entry for up to the
- * route's TTL after a write, exactly as the gap describes for every other
- * `@Cacheable` route ported so far.
+ * <b>No write here evicts the cache</b> — known gap 42: a role list read
+ * through this gateway can serve a stale entry for up to the route's TTL
+ * after a write, exactly as the gap describes for every other cached route.
  *
  * <p><b>Migrated off `RolesApi`.</b> `create` answers 201 —
  * `@ResponseStatus` is what tells springdoc that. `list`'s cache now goes

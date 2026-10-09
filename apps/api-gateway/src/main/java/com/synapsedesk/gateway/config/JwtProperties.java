@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
  * a challenge token must not verify where an access token is expected.
  *
  * <p>The {@link Pattern} is RFC 6265's {@code token} minus the separators,
- * and it is here for the reason the Node schema gives: an illegal cookie name
+ * and it is here because an illegal cookie name
  * does not fail at boot on its own — it throws on the first login, so the
  * symptom is a 500 on the auth path pointing at the framework rather than at
  * the environment. A trailing {@code ;} is the easy typo and the worst one.
@@ -47,6 +47,6 @@ public record JwtProperties(
   @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
   String deviceTokenName
 ) {
-  /** RFC 6265 {@code token}: the same character class the Node schema uses. */
+  /** RFC 6265 {@code token}: one or more of these characters, e.g. {@code access_token}. */
   static final String COOKIE_NAME = "^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$";
 }

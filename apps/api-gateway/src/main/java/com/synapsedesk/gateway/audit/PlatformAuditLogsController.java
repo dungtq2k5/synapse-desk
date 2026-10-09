@@ -48,11 +48,9 @@ import tools.jackson.databind.ObjectMapper;
  * platform_scope=true} on the wire.
  *
  * <p>
- * <b>Gated by {@link SuperAdminCheck}, not a permission code.</b> Node's own
- * `SuperAdminGuard` reproduced: RBAC is tenant-scoped, and a Super Admin has
- * no organization to hang a permission row off. This is the first route in
- * this port needing that door rather than {@code @RequirePermission}, so it
- * is checked inline rather than as a route annotation — there is no
+ * <b>Gated by {@link SuperAdminCheck}, not a permission code.</b> RBAC is
+ * tenant-scoped, and a Super Admin has no organization to hang a permission
+ * row off. The check runs inline rather than as a route annotation — there is no
  * framework guard layer here, the same shape as {@code GuestCheck} and
  * {@code requireEmailVerified}.
  *
@@ -65,7 +63,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Tag(name = "PlatformAuditLogs")
 @RestController
-// Refused to anyone but a super admin, as Node's guard does and before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
+// Refused to anyone but a super admin, before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
 @SuperAdminOnly
 @OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)

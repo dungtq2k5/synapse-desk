@@ -21,9 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Resend's two objects → the mail {@code accept()} takes: the Node gateway's
- * {@code resend-inbound.mapper.spec.ts}, row for row, so the two implementations
- * are held to the same examples.
+ * Resend's two objects → the mail {@code accept()} takes, example by example.
  *
  * <p><b>Hand-built, not captured</b> — no inbound mail has been received on a
  * real account yet. Replace with a recorded {@code email.received} event and

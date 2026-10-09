@@ -82,8 +82,7 @@ import synapsedesk.auth.Invitation.PreviewInvitationsResponse;
 import synapsedesk.auth.InvitationServiceGrpc;
 
 /**
- * `InvitationsApi` — against auth-service's `InvitationService`
- * (`invitations.controller.ts`, reproduced).
+ * `InvitationsApi` — against auth-service's `InvitationService`.
  *
  * <p>
  * <b>Two of the eight routes are genuinely public.</b> {@code previewByToken}

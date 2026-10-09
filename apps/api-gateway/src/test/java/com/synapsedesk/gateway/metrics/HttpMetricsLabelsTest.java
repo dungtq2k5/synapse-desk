@@ -14,7 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * The labels {@link HttpMetricsInterceptor} writes, derived from every route the
- * gateway maps: each template in the {@code :id} form Node writes, and a handler with no
+ * gateway maps: each template in the {@code :id} form the dashboards read, and a handler with no
  * declared status labelled 200.
  *
  * <p>Which status each route DECLARES is not checked here: it is what the committed
@@ -41,7 +41,7 @@ class HttpMetricsLabelsTest {
         String template = HttpMetricsInterceptor.routeTemplate(pattern);
 
         // Never a brace left in the label: `{id}` is a placeholder, `:id` is the
-        // label Node writes, and a label that kept the braces is a different series.
+        // label's form, and a label that kept the braces is a different series.
         assertThat(template)
           .as(pattern)
           .doesNotContain("{")

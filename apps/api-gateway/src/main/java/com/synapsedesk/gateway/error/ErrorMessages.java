@@ -3,24 +3,23 @@ package com.synapsedesk.gateway.error;
 import java.util.List;
 
 /**
- * One message, ending in a single `!` — the Node gateway's `formatErrorMsg`,
- * reproduced.
+ * One message, ending in a single `!`.
  *
- * <p><b>This text is OURS, so it is byte-equal across implementations.</b> The
- * rule for what the two gateways must agree on is where a string is authored:
- * the joining, the trimming and the trailing `!` are written in this
- * repository, so they are the contract. A runtime's own text — a JSON
- * parser's, a Bean Validation constraint's — is not, and is matched loosely.
+ * <p><b>This text is OURS, so it is the published contract.</b> What clients
+ * may rely on is decided by where a string is authored: the joining, the
+ * trimming and the trailing `!` are written in this repository, so they are
+ * the contract. A runtime's own text — a JSON parser's, a Bean Validation
+ * constraint's — is not, and is matched loosely.
  *
- * <p>The trimming is greedy on purpose: `formatErrorMsg` strips EVERY trailing
- * `.`, `!` or `?` before adding one `!`, so `"Nope..."` and `"Nope!"` both end
- * as `"Nope!"`. A single-character trim would leave `"Nope.."`.
+ * <p>The trimming is greedy on purpose: it strips EVERY trailing `.`, `!` or
+ * `?` before adding one `!`, so `"Nope..."` and `"Nope!"` both end as
+ * `"Nope!"`. A single-character trim would leave `"Nope.."`.
  */
 public final class ErrorMessages {
 
   private ErrorMessages() {}
 
-  /** class-validator's array joined as the Node side joins it. */
+  /** Joins several constraint messages into one sentence. */
   public static final String SEPARATOR = ", ";
 
   /**

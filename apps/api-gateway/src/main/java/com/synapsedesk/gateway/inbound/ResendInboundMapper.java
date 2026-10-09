@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  * Builds the inbound mail {@code accept()} takes from Resend's two objects: the
  * verified {@code email.received} event and the email fetched by its id.
  *
- * <p>The Node gateway's {@code toMappedInboundEmail}, behaviour for behaviour:
+ * <p>Field by field:
  *
  * <ul>
  *   <li><b>{@code to}</b> is the first {@code received_for} entry on the inbound
@@ -138,8 +138,7 @@ public final class ResendInboundMapper {
    *
    * <p>Never splits a surrogate pair: a cut that lands between the two halves of an
    * astral character is moved one unit earlier, so the result is always well
-   * formed. The Node gateway cuts the same way, and the key hashed from the body is
-   * the same in both.
+   * formed.
    */
   public static Capped capBody(String value) {
     if (
@@ -268,7 +267,7 @@ public final class ResendInboundMapper {
 
     String name = JsText.trim(from.substring(0, angle));
     // `/^"(.*)"$/`: `.` stops at a line terminator, so a quoted name that
-    // contains one keeps its quotes — the same as the Node gateway.
+    // contains one keeps its quotes.
     Matcher quoted = QUOTED.matcher(name);
     if (quoted.matches()) name = JsText.trim(quoted.group(1));
 

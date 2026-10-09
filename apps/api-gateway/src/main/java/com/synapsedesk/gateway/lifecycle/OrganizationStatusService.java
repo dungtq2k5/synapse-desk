@@ -17,17 +17,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The tenant lifecycle state, cached — Node's {@code OrganizationStatusService}.
+ * The tenant lifecycle state, cached.
  *
  * <p>Sits in front of a gRPC call because the gate runs on essentially every
  * authenticated request: uncached it would double the gateway's chattiness with
  * auth-service for a value that changes a handful of times in a tenant's life.
  *
- * <p><b>Shared with Node, not a copy of its idea.</b> The decision is cached in
- * Redis under {@code org-status:<id>} as {@code {"status":"ACTIVE","deleted":false}}
- * for thirty seconds, exactly as Node writes it, so whichever gateway asks next
- * reads what the other cached. In Redis rather than a map in this process for the
- * same reason the throttler is: a freeze must take effect across every replica, not
+ * <p><b>Shared by every replica.</b> The decision is cached in Redis under
+ * {@code org-status:<id>} as {@code {"status":"ACTIVE","deleted":false}} for thirty
+ * seconds, so whichever replica asks next reads what another cached. In Redis rather
+ * than a map in this process for the same reason the throttler is: a freeze must take effect across every replica, not
  * just the one that happened to serve the status change.
  *
  * <p><b>Thirty seconds is a deliberate trade.</b> It is the window in which a tenant
@@ -64,7 +63,8 @@ public class OrganizationStatusService {
   /**
    * What the gate needs to decide, and nothing else.
    *
-   * @param status the lifecycle state, spelled as Node spells it
+   * @param status the lifecycle state, the proto name without its prefix
+   *     ({@code SUSPENDED_PAST_DUE}); see {@code nameOf}
    * @param deleted true once offboarded: distinct from any status, so a deleted
    *     tenant is refused even while its status still reads ACTIVE
    */
@@ -142,7 +142,7 @@ public class OrganizationStatusService {
     };
   }
 
-  /** A read failure, or a value that is not the shape Node writes, is a miss and not an error. */
+  /** A read failure, or a value not shaped as {@code writeCache} writes it, is a miss and not an error. */
   private State readCache(String organizationId) {
     try {
       String raw = redis.opsForValue().get(CACHE_PREFIX + organizationId);
@@ -177,7 +177,7 @@ public class OrganizationStatusService {
     try {
       redis.opsForValue().set(
         CACHE_PREFIX + organizationId,
-        // Ordered as Node writes it: `status`, then `deleted`.
+        // Ordered `status`, then `deleted`, as the class doc shows it.
         json.writeValueAsString(valueOf(state)),
         TTL
       );

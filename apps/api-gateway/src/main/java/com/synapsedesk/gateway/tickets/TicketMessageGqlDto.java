@@ -4,8 +4,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * `TicketMessage` — one row of a ticket thread, flat, matching
- * `message-response.gql-dto.ts`. No `attachments`: the schema does not carry
+ * `TicketMessage` — one row of a ticket thread, flat. No `attachments`: the
+ * schema does not carry
  * them, since the URLs are internal object paths resolved per REST request.
  */
 public record TicketMessageGqlDto(

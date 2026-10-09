@@ -9,8 +9,8 @@ import synapsedesk.ticket.Audit.AuditAction;
 import synapsedesk.ticket.Audit.AuditResourceType;
 
 /**
- * `AuditLogsApi` — the action/resourceType filter parsers. `@IsIn`'s own
- * reasoning on the Node side, reproduced: an unrecognized value must 400,
+ * `AuditLogsApi` — the action/resourceType filter parsers. An unrecognized
+ * value must 400,
  * never silently fall through to the proto's UNSPECIFIED zero value, which
  * the service reads as "no filter" — so an unrecognized filter would return
  * EVERYTHING and read as a match.
@@ -41,7 +41,7 @@ class AuditLogsControllerTest {
   @Test
   void theLiteralUnspecifiedIsRefusedAsAFilterValue() {
     // UNSPECIFIED is the proto's "no filter" sentinel, never a value a client
-    // may request explicitly — Node's `@IsIn` excludes it from the allowed set.
+    // may request explicitly, so it is outside the allowed set.
     assertThatThrownBy(() ->
       AuditLogsController.toAuditActionFilter("UNSPECIFIED")
     ).isInstanceOf(ResponseStatusException.class);

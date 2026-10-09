@@ -14,11 +14,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * `TwoFactorEnrolmentGuard`, reproduced: a full session first, then a verified
- * 2FA-challenge cookie, and a 401 naming both doors if neither holds.
+ * The 2FA enrolment check: a full session first, then a verified 2FA-challenge
+ * cookie, and a 401 naming both doors if neither holds.
  *
  * <p>Used twice, on purpose: by {@link SessionInterceptor}, so the refusal comes
- * BEFORE the body is bound as Node's guard's does, and by the handlers, which need
+ * BEFORE the body is bound, and by the handlers, which need
  * to know WHO enrols. The full session is tried first, so an ordinary voluntary
  * enrolment keeps its own error shape.
  */

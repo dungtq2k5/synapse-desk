@@ -12,11 +12,10 @@ import org.springframework.validation.annotation.Validated;
  * Measured in step 2: a bare {@code ${PORT}} on {@code server.port} does not
  * refuse in a non-web context, because that key is read when the servlet
  * container starts. These constraints run at CONTEXT REFRESH, before anything
- * listens — which is where the Joi schema's {@code required()} runs on the
- * Node side.
+ * listens.
  *
- * @param nodeEnv which environment this is; the Node schema restricts it to a
- *     known set, and so does {@link #nodeEnv()}'s caller
+ * @param nodeEnv which environment this is ({@code NODE_ENV}); callers compare
+ *     it to {@code "production"}
  * @param port the public HTTP listener
  * @param globalPrefix the prefix ALONE — URI versioning adds the version
  * @param swaggerEnabled defaults to FALSE, so an environment that never

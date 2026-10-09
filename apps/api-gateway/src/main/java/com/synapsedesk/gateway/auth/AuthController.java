@@ -67,10 +67,9 @@ import synapsedesk.auth.Auth.ValidatePasswordResetTokenResponse;
 import synapsedesk.auth.AuthServiceGrpc;
 
 /**
- * `AuthApi`, implemented against auth-service over gRPC — the Node
- * `AuthController` + `AuthService` + `AuthServiceGrpcClient`, collapsed into
- * one class because this gateway has no equivalent three-layer split yet and
- * a thin adapter does not need one invented for it.
+ * The auth routes, implemented against auth-service over gRPC in one class:
+ * controller, service and gRPC client together, since a thin adapter does
+ * not need a three-layer split.
  *
  * <p>Every method here is a straight forward: unpack the REST DTO into a
  * proto request, pack the caller's context onto the metadata (the SAME rule
@@ -79,11 +78,9 @@ import synapsedesk.auth.AuthServiceGrpc;
  * {@code GatewayExceptionHandler}, exactly as a peer failure does on every
  * other route.
  *
- * <p><b>Migrated off `AuthApi`</b> — the OpenAPI-ownership flip's first
- * controller. `@RequestMapping` and `@Validated` used to arrive through
- * `implements AuthApi`; both are now declared here directly, since
- * springdoc (not a document Node exports) is this gateway's own document
- * producer and there is no longer an interface to inherit either from. Every
+ * <p><b>`@RequestMapping` and `@Validated` are declared here directly</b>:
+ * springdoc builds this gateway's OpenAPI document from the controllers, and
+ * there is no generated interface to inherit either from. Every
  * return type is {@link ApiResponse}, not a generated per-endpoint wrapper
  * class — see its own docblock for why one generic type replaced ~150 of
  * them.

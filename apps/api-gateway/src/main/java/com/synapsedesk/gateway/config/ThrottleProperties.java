@@ -7,8 +7,8 @@ import org.springframework.validation.annotation.Validated;
 /**
  * The four HTTP rate-limit tiers, and the WebSocket handshake limit.
  *
- * <p>TTLs are milliseconds, as the environment carries them and as the Node
- * throttler reads them — not converted here, because unlike a cookie's
+ * <p>TTLs are milliseconds, as the environment carries them and as
+ * {@code ThrottlerInterceptor} reads them — not converted here, because unlike a cookie's
  * {@code Max-Age} nothing on the wire carries these in another unit. The one
  * place a unit changes is the cookie, which is why only that class converts.
  *

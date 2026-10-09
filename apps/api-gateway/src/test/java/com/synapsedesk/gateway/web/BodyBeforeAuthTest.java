@@ -36,7 +36,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * no 401 for the body checks to beat. It is ordered immediately after
  * {@link JsonBodyFilter}, which is where the real one goes.
  *
- * <p>The statuses are the Node gateway's, measured with no cookie at all:
+ * <p>The statuses, with no cookie at all:
  * `text/plain` is 415, malformed JSON is 400, and a request with NO body
  * reaches the guard and is 401. Spring would answer 401 to all three, because
  * it resolves arguments after the security filters.
@@ -164,8 +164,8 @@ class BodyBeforeAuthTest {
   @Test
   void aRequestWithNoBodyReachesTheGuardAndIs401() {
     // The other side of the ordering: nothing to refuse, so auth answers —
-    // which is what the Node gateway does, and why the filter checks for a
-    // body before it checks anything about it.
+    // which is why the filter checks for a body before it checks anything
+    // about it.
     HttpProbe response = HttpProbe.post(port, "/probe/guarded", "");
 
     assertThat(response.status()).isEqualTo(HttpStatus.UNAUTHORIZED.value());

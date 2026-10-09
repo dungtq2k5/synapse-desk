@@ -7,11 +7,11 @@ import java.time.ZoneOffset;
 import synapsedesk.ingestion.Document.IngestionJobResponse;
 
 /**
- * `ingestion-job.mapper.ts`, reproduced — shared by {@code
+ * Wire ingestion job -> REST DTO, shared by {@code
  * IngestionJobsController} (this interface) and {@code DocumentsController}
- * (its own {@code GET /documents/:id/ingestion-jobs} row), matching Node's
- * own module boundary: one mapper, imported by both controllers, so the
- * two surfaces can never independently drift on what a job row exposes.
+ * (its own {@code GET /documents/:id/ingestion-jobs} row): one mapper,
+ * imported by both controllers, so the two surfaces can never independently
+ * drift on what a job row exposes.
  *
  * <p><b>{@code errorLog} is capped, not forwarded raw.</b> {@code fail()}
  * writes whatever the thrower said — signed storage URLs, Postgres errors

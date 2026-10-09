@@ -7,14 +7,12 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * Reads the access cookie and verifies it — the Java `@CurrentUser()` /
- * `@CurrentOrigin()` pair, and `GuestGuard`'s own read, in one place.
+ * Reads the access cookie and verifies it: the caller's identity, their request
+ * origin, and the guest check's token read, in one place.
  *
  * <p>A plain component rather than a Spring Security principal: nothing else
  * in this skeleton needs the broader authentication machinery, and a route
- * that requires a session calls {@link #require} and gets a 401 — the same
- * shape {@code @CurrentUser()} throwing gives on the Node side, just without
- * a decorator to hang it on.
+ * that requires a session calls {@link #require} and gets a 401.
  */
 @Component
 public class CurrentUser {
@@ -45,7 +43,7 @@ public class CurrentUser {
       .map(principal -> toContext(principal, origin(request)));
   }
 
-  /** Throws 401 with the Node message if the caller has no valid full session. */
+  /** Throws 401 {@code "Unauthorized"} if the caller has no valid full session. */
   public RequestContext require(HttpServletRequest request) {
     return read(request).orElseThrow(() ->
       com.synapsedesk.gateway.metrics.GuardRefusal.refused(
@@ -63,12 +61,11 @@ public class CurrentUser {
   }
 
   /**
-   * The caller's id, VERIFIED but not required to be a full session —
-   * `SmartThrottlerGuard.subjectFromToken`, reproduced. Deliberately not
-   * {@link #read}: the throttler's tracker keys a 2FA-pending caller by their
-   * token's `sub` too, same as Node does, since {@code verifyAccess} rejects a
-   * 2FA-challenge token by signature (separate key pair) without needing the
-   * {@code isFullSession} filter {@link #read} applies for route access.
+   * The caller's id, VERIFIED but not required to be a full session — the
+   * throttler's tracker key. Deliberately not {@link #read}: {@code verifyAccess}
+   * already rejects a 2FA-challenge token by signature (separate key pair), so
+   * the {@code isFullSession} filter {@link #read} applies for route access is
+   * not needed to key a caller by their token's `sub`.
    */
   public Optional<String> verifiedSubject(HttpServletRequest request) {
     return accessToken(request)

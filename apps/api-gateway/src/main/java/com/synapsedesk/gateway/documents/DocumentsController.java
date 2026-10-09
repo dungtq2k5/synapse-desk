@@ -101,21 +101,17 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
 
 /**
  * `DocumentsApi` — the knowledge base, against ingestion-service's
- * `DocumentService` (`documents-grpc.client.ts` reproduced). New stub
- * (`documentServiceStub`) on the EXISTING `ingestionServiceChannel` — the
+ * `DocumentService`. A stub (`documentServiceStub`) on the shared
+ * `ingestionServiceChannel` — the
  * gateway never speaks to storage-service directly; ingestion-service does,
  * which is what makes presign/confirm/replace ordinary RPC forwards here.
  *
- * <p><b>`list` is the one cached route.</b> Node's `@Cacheable` is a global
- * interceptor keyed on the RAW query string plus a visibility digest of the
- * caller's departments (`cacheable.interceptor.ts`); this reproduces both the
- * key shape and the cached VALUE (the full envelope, not just the DTO — that
- * is what Node's interceptor actually stores) so the two implementations'
- * entries stay interchangeable. The key is built from the request's raw query
- * parameters, not the bound/defaulted method arguments — Node's key comes from
- * `request.query` before any default-filling, so keying off Java's
- * already-defaulted parameters would produce a different key for the same
- * logical request whenever a client omits a param.
+ * <p><b>`list` is the one cached route.</b> The cache key is the RAW query
+ * string plus a visibility digest of the caller's departments, and the cached
+ * VALUE is the full envelope, not just the DTO. The key is built from the
+ * request's raw query parameters, before any default-filling, not from the
+ * bound/defaulted method arguments, so an omitted param and its explicit
+ * default are cached as different entries.
  *
  * <p><b>Migrated off `DocumentsApi`.</b> {@code list}'s cache goes through
  * {@link CacheService#wrapTyped} — a bare {@code Class<T>} would erase
@@ -800,7 +796,7 @@ public class DocumentsController {
       DocumentIdRequest.newBuilder().setId(id).build()
     );
 
-    // A page, as the ingestion-job worklist answers and as Node does: the RPC returns
+    // A page, as the ingestion-job worklist answers: the RPC returns
     // `{ items, meta }`, and dropping the meta answered a bare list instead.
     PagedData<IngestionJobResponseDto> data = new PagedData<>(
       response.getItemsList().stream().map(IngestionJobMapper::toDto).toList(),
@@ -926,9 +922,8 @@ public class DocumentsController {
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    // Only page/limit are meaningful for chunks — Node reuses the whole
-    // documents list query DTO for this route's pagination and forwards
-    // nothing else.
+    // Only the paging fields are meaningful for chunks — the route accepts the
+    // whole documents-list query (and validates it) but forwards nothing else.
     PageRequest pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
@@ -1129,10 +1124,9 @@ public class DocumentsController {
   }
 
   /**
-   * `visibilityDigest`, reproduced: sha256 of the sorted department set (or the
-   * literal `super-admin`), truncated to 16 hex characters — must mirror
-   * `cacheable.interceptor.ts` exactly, or a Java-written entry and a
-   * Node-written entry for the same caller land under different keys.
+   * sha256 of the sorted department set (or the literal `super-admin`),
+   * truncated to 16 hex characters — callers who see the same departments
+   * share one cache entry; callers who see different ones never do.
    */
   private static String visibilityDigest(RequestContext context) {
     String material = context.isSuperAdmin()

@@ -14,10 +14,9 @@ import synapsedesk.auth.User.ListUsersResponse;
 import synapsedesk.auth.User.UserSummaryResponse;
 
 /**
- * Wire -> the flat GraphQL `User` — `user.mapper.ts`'s `toUserResponseGqlDto`,
- * reproduced. Every envelope this gateway reads for a `User` nests the user
- * under `.user` and carries `departmentIds` beside it, exactly the shape
- * Node's own docblock warns a naive `current.user` read drops half of.
+ * Wire -> the flat GraphQL `User`. Every envelope this gateway reads for a
+ * `User` nests the user under `.user` and carries `departmentIds` beside it,
+ * so a naive `current.user` read would drop `departmentIds`.
  */
 public final class UserGqlMapper {
 

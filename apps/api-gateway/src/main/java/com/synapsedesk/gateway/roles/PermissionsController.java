@@ -28,7 +28,7 @@ import synapsedesk.auth.RoleServiceGrpc;
 
 /**
  * `PermissionsApi` — the seeded permission catalogue, read-only by design
- * (ADR 0038). Ported from `permissions.controller.ts`.
+ * (ADR 0038).
  *
  * <p>
  * <b>This route's cache entry is shared with a GraphQL loader.</b>

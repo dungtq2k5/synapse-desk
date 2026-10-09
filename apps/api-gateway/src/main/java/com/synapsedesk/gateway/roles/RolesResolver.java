@@ -29,9 +29,9 @@ import synapsedesk.auth.RoleServiceGrpc;
 
 /**
  * `Query.role`, `Query.roles`, `Query.permissions`, and the `Role.permissions`
- * edge — `roles.resolver.ts`, reproduced.
+ * edge.
  *
- * <p>`Role.users` is deliberately absent, matching Node exactly: it would
+ * <p>`Role.users` is deliberately absent: it would
  * need a batch RPC that does not exist, against the same precedent as
  * `Ticket.messages` — `userAssigned` is the count and `GET /users?roleId=`
  * is the list.
@@ -90,10 +90,9 @@ public class RolesResolver {
     ListRolesResponse response = withMetadata(context).listRoles(
       ListRolesRequest.newBuilder()
         .setPage(pageRequest)
-        // Matching the REST default, not the schema's convenience —
-        // Node's own reasoning: a caller who wants system roles has
-        // to ask, and this surface does not offer that as an
-        // argument.
+        // Matching the REST default, not the schema's convenience: a
+        // caller who wants system roles has to ask, and this surface
+        // does not offer that as an argument.
         .setIncludeSystem(false)
         .build()
     );

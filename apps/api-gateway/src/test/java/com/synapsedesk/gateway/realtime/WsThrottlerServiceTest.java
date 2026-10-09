@@ -59,7 +59,7 @@ class WsThrottlerServiceTest {
 
     assertThat(throttler.allowHandshake("1.2.3.4")).isTrue();
     verify(values).increment("ws_handshake:java-realtime-gateway:1.2.3.4");
-    // Never the coincidentally-same-looking Node class name as a standalone key.
+    // Never the class name as the key's identity.
     verify(values, never()).increment("ws_handshake:RealtimeGateway:1.2.3.4");
   }
 

@@ -6,9 +6,8 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 /**
- * Quoted history is stripped and the new text survives — the Node gateway's
- * {@code quoted-reply.spec.ts}, row for row, plus the one thing a Java port can
- * fail at that the original cannot: input size.
+ * Quoted history is stripped and the new text survives, plus the cost of huge
+ * sender-controlled input.
  *
  * <p>Every case checks that the reply SURVIVED as well as that the quote went.
  * Over-stripping loses a customer's message silently, which is strictly worse than
@@ -177,9 +176,9 @@ class QuotedReplyTest {
     assertThat(QuotedReply.toStoredBody("   ", null)).isEmpty();
   }
 
-  // The inputs below are sender-controlled and unbounded. The Node pattern for a
-  // run of quoted lines is a repeated group, which Java matches recursively: here
-  // it would be a StackOverflowError on the thread serving the webhook.
+  // The inputs below are sender-controlled and unbounded. As a regex, a run of
+  // quoted lines is a repeated group, which Java matches recursively: it would be
+  // a StackOverflowError on the thread serving the webhook.
 
   @Test
   void aHugeRunOfQuotedLinesIsStrippedWithoutOverflowingTheStack() {

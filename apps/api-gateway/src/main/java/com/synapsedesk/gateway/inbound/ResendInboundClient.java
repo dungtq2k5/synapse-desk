@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
  * the caller's whole job is to tell the failures apart: a retryable one must be
  * answered 503 so Resend redelivers, a permanent one 200 so it does not.
  *
- * <p><b>Classifies by the HTTP status.</b> The vendor's own Node SDK reads the
+ * <p><b>Classifies by the HTTP status.</b> The vendor's own JavaScript SDK reads the
  * error out of the JSON body and ignores the status; a client that reads the
  * status agrees with it for every answer the API really gives (its error bodies
  * carry {@code statusCode}) and does not misread a proxy's HTML page. A

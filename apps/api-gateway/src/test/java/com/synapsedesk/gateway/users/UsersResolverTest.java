@@ -115,7 +115,7 @@ class UsersResolverTest {
     verify(stub).getCurrentUser(captor.capture());
     assertThat(captor.getValue().getUserId()).isEqualTo("user-1");
     assertThat(result.id()).isEqualTo("user-1");
-    // The bug Node's own docblock warns about: `departmentIds` is a SIBLING
+    // The bug this guards against: `departmentIds` is a SIBLING
     // of `user` on the envelope, not a field of it — a mapper that read
     // `current.user` alone would answer `[]` here.
     assertThat(result.departmentIds()).containsExactly("dept-1", "dept-2");

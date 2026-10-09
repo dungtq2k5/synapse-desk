@@ -22,8 +22,8 @@ import synapsedesk.ticket.AiServiceGrpc;
 import synapsedesk.ticket.Common.TicketPriority;
 
 /**
- * `AiApi` — the narrowing-to-null mappers, ported from `ai.mapper.ts`'s
- * `fromProtoTicketPriority`/`fromProtoSuggestionsDegradation`. Neither the
+ * `AiApi` — the narrowing-to-null mappers for the ticket priority and the
+ * suggestions degradation. Neither the
  * model's UNSPECIFIED value nor an unrecognized one may surface as a REST
  * enum value the client was never told about.
  */

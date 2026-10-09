@@ -8,11 +8,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * The trailing `!` rule, which is the Node side's `formatErrorMsg`.
+ * The trailing `!` rule.
  *
  * <p>This text is OURS, so these rows are byte-equal contracts rather than
- * loose matches — the distinction being that parity is held only on text
- * this repo writes.
+ * loose matches — exact text is held only on what this repo writes.
  */
 class ErrorMessagesTest {
 

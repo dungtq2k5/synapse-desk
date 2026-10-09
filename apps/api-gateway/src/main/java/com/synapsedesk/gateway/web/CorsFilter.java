@@ -17,19 +17,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * `app.enableCors(...)`, reproduced — a custom filter rather than Spring's
+ * The gateway's CORS policy — a custom filter rather than Spring's
  * {@code WebMvcConfigurer.addCorsMappings}, because the wildcard case needs
  * behaviour Spring's abstraction cannot express directly.
  *
  * <p><b>`CORS = *` is exact-matched, not treated as "allow everything".</b>
- * `cors.config.ts`'s own measurement: {@code origin: ["*"]} (an ARRAY
- * containing the string) produces NO {@code Access-Control-Allow-Origin} at
- * all against `cors@2.8.6` — an array matches an Origin header by exact
- * string equality, and no browser sends the literal Origin {@code "*"}. So
- * this filter does the same thing Node's array-membership check does: build
- * the parsed entries (which may literally contain the one-character string
- * {@code "*"}) and test the request's {@code Origin} header for exact
- * membership. A real origin never equals {@code "*"}, so the wildcard entry
+ * The configured origins are a list matched against the Origin header by
+ * exact string equality, and no browser sends the literal Origin
+ * {@code "*"}. So this filter builds the parsed entries (which may literally
+ * contain the one-character string {@code "*"}) and tests the request's
+ * {@code Origin} header for exact membership. A real origin never equals {@code "*"}, so the wildcard entry
  * naturally matches nothing — no special case needed, and no risk of
  * Spring's {@code allowedOrigins} rejecting {@code "*"} combined with
  * credentials, which would 500 every request instead of quietly refusing the
@@ -42,7 +39,7 @@ public class CorsFilter extends OncePerRequestFilter {
 
   private static final String ORIGIN = "Origin";
 
-  /** Mirrors `CORS_ALLOWED_HEADERS` — a browser-required superset, not a controller-read list. */
+  /** The allowed request headers — a browser-required superset, not a controller-read list. */
   private static final String ALLOWED_HEADERS = String.join(
     ", ",
     "Content-Type",
@@ -53,13 +50,12 @@ public class CorsFilter extends OncePerRequestFilter {
     "apollo-require-preflight"
   );
 
-  /** Mirrors `CORS_METHODS` — `OPTIONS` is deliberately absent; this filter answers preflight itself. */
+  /** The allowed methods — `OPTIONS` is deliberately absent; this filter answers preflight itself. */
   private static final String ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE";
 
   /**
-   * Mirrors `CORS_EXPOSED_HEADERS` — DERIVED from the tier names, the same
-   * way `cors.config.ts` derives it, so a tier rename needs no second edit
-   * here either (known gap 39's fix, reproduced rather than hand-copied).
+   * The exposed headers — DERIVED from the tier names, so a tier rename
+   * needs no second edit here (known gap 39).
    */
   private static final String EXPOSED_HEADERS = buildExposedHeaders();
 
@@ -146,8 +142,8 @@ public class CorsFilter extends OncePerRequestFilter {
       response.setHeader("Access-Control-Expose-Headers", EXPOSED_HEADERS);
       response.setHeader("Vary", ORIGIN);
     }
-    // Not allowed, not a preflight: Node's `cors` middleware omits the
-    // headers and lets the request proceed — the browser's own same-origin
+    // Not allowed, not a preflight: the headers are omitted and the
+    // request proceeds — the browser's own same-origin
     // policy is what refuses the caller JS from reading the response, not a
     // server-side block, so a non-browser or same-origin caller is unaffected.
 

@@ -25,9 +25,8 @@ import org.springframework.stereotype.Component;
  * what the code already enforces ({@code @NotNull}) decides, and a property
  * springdoc left optional is added to {@code required} and given a null type. No
  * property is named. Measured against the published contract: of 704 properties in
- * the 150 response schemas the document shares with Node, 532 are required and not
- * nullable and 172 are required and nullable, and these two sets are exactly
- * {@code @NotNull} present and absent; Node publishes no optional response property.
+ * 150 response schemas, 532 are required and not nullable and 172 are required and
+ * nullable, and these two sets are exactly {@code @NotNull} present and absent.
  *
  * <p><b>Per schema, not per usage.</b> A schema reachable from a success response
  * and from no request body is a response schema. Measured, no schema is reachable
@@ -37,8 +36,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>This includes the envelope wrappers' {@code warning}, which the gateway always
  * emits ({@code null} when there is nothing to say): published required and
- * nullable, where Node's document says optional. Both gateways send the key, so
- * the document now describes what they do.
+ * nullable, because the key is always sent.
  */
 @Component
 @Order(OpenApiCustomizerOrder.RESPONSE_SCHEMAS)

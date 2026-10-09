@@ -21,8 +21,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 /**
- * RS256 verification only — the gateway VERIFIES, never mints, exactly as
- * `jwt.strategy.ts` / `jwt-2fa.strategy.ts` do.
+ * RS256 verification only — the gateway VERIFIES, never mints; auth-service
+ * holds the private keys.
  *
  * <p><b>Two keys, loaded once.</b> The access and 2FA-challenge tokens are
  * signed by SEPARATE key pairs, so a challenge token cannot verify as an
@@ -41,7 +41,7 @@ public class JwtVerifier {
     this.twoFactorVerifier = verifierFor(jwt.twoFactorPublicKeyPath());
   }
 
-  /** The access cookie's token. Rejects a 2FA challenge token, like `JwtStrategy.validate`. */
+  /** The access cookie's token. Rejects a 2FA challenge token. */
   public Optional<JwtPrincipal> verifyAccess(String token) {
     return verify(token, accessVerifier)
       .filter(claims -> !isChallenge(claims))
@@ -64,8 +64,7 @@ public class JwtVerifier {
 
       JWTClaimsSet claims = jwt.getJWTClaimsSet();
       Date expiry = claims.getExpirationTime();
-      // `ignoreExpiration: false` on the Node side — an expired token verifies
-      // cryptographically and must still be refused.
+      // An expired token verifies cryptographically and must still be refused.
       if (expiry != null && expiry.before(new Date())) {
         return Optional.empty();
       }
@@ -94,8 +93,8 @@ public class JwtVerifier {
   }
 
   /**
-   * Reads a PEM public key (`-----BEGIN PUBLIC KEY-----`) exactly as
-   * `readFileSync(...)` hands Node's `jsonwebtoken` the raw bytes.
+   * Reads a PEM public key (`-----BEGIN PUBLIC KEY-----`) from the file at
+   * {@code path}, stripping the armour and decoding the X.509 DER body.
    */
   private static JWSVerifier verifierFor(String path)
     throws IOException, JOSEException {

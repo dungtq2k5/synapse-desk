@@ -129,8 +129,9 @@ class GraphqlLimitInstrumentationTest {
 
   @Test
   void aQueryScoringOverTheComplexityLimitIsRefused() throws Exception {
-    // 1 + 23×87 = 2 002 — the exact pair `graphql.contract-spec.ts` uses on
-    // the Node side, ported here so the same boundary is proven server-side.
+    // 1 + 23×87 = 2 002 — the exact pair
+    // `test/gateway-contract/graphql.contract-spec.ts` uses over HTTP, so the
+    // same boundary is proven at the instrumentation too.
     ExecutionResult result = graphQl().execute(
       "{ tickets(first: 87) { items { assignee { fullName } department { name } } } }"
     );

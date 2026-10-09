@@ -11,11 +11,10 @@ import synapsedesk.auth.Common.Gender;
 import synapsedesk.auth.Common.UserResponse;
 
 /**
- * Wire `UserResponse` -> the REST `UserResponseDto` — `user.mapper.ts`,
- * reproduced.
+ * Wire `UserResponse` -> the REST `UserResponseDto`.
  *
- * <p>Every proto `optional` becomes `null`, never left unset, matching the
- * Node side's commitment to a stable key set.
+ * <p>Every proto `optional` becomes `null`, never left unset, so every
+ * response carries the same stable key set.
  */
 public final class UserMapper {
 

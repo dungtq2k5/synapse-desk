@@ -7,13 +7,11 @@ package com.synapsedesk.gateway.inbound;
  * <p><b>Why not regular expressions.</b> {@code <[^>]+>}, {@code
  * <script[\s\S]*?</script>} and {@code <div[^>]*class="…} each rescan to the end of
  * the input from every opener that is never closed, so a body of many unclosed tags
- * costs time proportional to the SQUARE of its length. The Java engine is about
- * eight times slower on that shape than Node's, so the port was thirty times worse
- * per byte than the original — a divergence the port introduced, not a quirk worth
- * reproducing. What is reproduced is the BEHAVIOUR: {@code quoted-reply-parity.json}
- * and {@code quoted-reply-fuzz.json}, both recomputed from the Node functions,
- * hold these scanners to the regular expressions' answers on awkward and on
- * randomized input.
+ * costs time proportional to the SQUARE of its length, and the Java regex engine is
+ * especially slow on that shape. The BEHAVIOUR is kept: the fixed tables
+ * {@code quoted-reply-parity.json} and {@code quoted-reply-fuzz.json} (under
+ * {@code test/fixtures/inbound-email/}) hold these scanners to the regular
+ * expressions' answers on awkward and on randomized input.
  *
  * <p><b>The one idea.</b> A search that fails from an opener fails from every later
  * opener of the same kind, because its search area is a subset. Each scanner

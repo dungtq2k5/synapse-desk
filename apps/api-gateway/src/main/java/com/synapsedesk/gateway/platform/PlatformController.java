@@ -77,7 +77,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Platform")
 @RestController
-// Refused to anyone but a super admin, as Node's guard does and before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
+// Refused to anyone but a super admin, before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
 @SuperAdminOnly
 @OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)

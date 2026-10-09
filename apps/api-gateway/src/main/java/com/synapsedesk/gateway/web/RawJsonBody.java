@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>For a field that is merely optional, with null meaning absent, none of this is
  * needed: {@code ExplicitNullJsonCustomizer} makes the DTO read it that way. Reach for
- * this only where Node gives a literal {@code null} a meaning of its own.
+ * this only where a literal {@code null} has a meaning of its own.
  */
 @Component
 public class RawJsonBody {

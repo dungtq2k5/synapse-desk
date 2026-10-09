@@ -50,33 +50,27 @@ import synapsedesk.rag.Rag.SearchResponse;
 import synapsedesk.rag.RagServiceGrpc;
 
 /**
- * `KnowledgeApi` — the knowledge base's read surface (`knowledge.controller.ts`
- * and `knowledge-articles.controller.ts`, reproduced as one interface,
- * matching the published contract's own grouping). Two peers: `articles`
- * routes go through the EXISTING {@code documentServiceStub}
- * (ingestion-service); `ask`/`search` are the first Java routes to reach
- * rag-service, so this port adds {@code ragServiceStub} to {@code
- * GrpcChannels}.
+ * `KnowledgeApi` — the knowledge base's read surface, articles and Q&A as one
+ * interface, matching the published contract's own grouping. Two peers:
+ * `articles` routes go through {@code documentServiceStub}
+ * (ingestion-service); `ask`/`search` reach rag-service through {@code
+ * ragServiceStub} on {@code GrpcChannels}.
  *
- * <p><b>No {@code @RequirePermission} anywhere in this class — deliberately,
- * matching Node exactly.</b> A knowledge base must be readable by every
+ * <p><b>No {@code @RequirePermission} anywhere in this class — deliberately.</b> A knowledge base must be readable by every
  * authenticated user, including one holding zero permissions; the actual
  * narrowing (org-wide ∪ caller's departments) happens server-side from
  * gRPC metadata, the same predicate `GET /documents` uses. {@code
- * PermissionInterceptor} fails open on a method with no annotation — the
- * same fail-open Node's own `PermissionGuard` performs with no {@code
- * @RequirePermission} — so simply not annotating reproduces this exactly.
+ * PermissionInterceptor} fails open on a method with no annotation, so
+ * simply not annotating gives exactly this.
  * Every method still calls {@code currentUser.require(...)}, so an
  * unauthenticated caller is refused regardless.
  *
  * <p><b>{@code ask}/{@code search} trim their body strings by hand.</b>
- * Node's {@code @Transform(trimIfString)} has no Bean Validation
- * equivalent — it is a mutation, not a constraint — so the generator drops
- * it entirely. A value that is all whitespace would pass the generated
- * {@code @Size(min=1)} check on the UNTRIMMED string; Node's pipeline trims
- * FIRST, then validates the trimmed result is non-empty. Reproduced here by
- * trimming before use and refusing an empty result with the same 400 a
- * failed {@code @MinLength(1)} would have produced.
+ * Trimming has no Bean Validation equivalent — it is a mutation, not a
+ * constraint. A value that is all whitespace would pass the generated
+ * {@code @Size(min=1)} check on the UNTRIMMED string, so these routes trim
+ * FIRST, then refuse an empty result with the same 400 a failed length
+ * check produces.
  *
  * <p><b>{@code ask} refuses at the AI cap; {@code search} degrades.</b> A
  * generated answer has no degraded form, so rag-service raises a gRPC
@@ -195,9 +189,9 @@ public class KnowledgeController {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // The service always sorts blocks by `chunkIndex` server-side regardless
-    // of what this sends — Node deliberately sends an EMPTY sortBy rather
-    // than a second hardcoded `"chunkIndex"` literal that must agree with
-    // the service's own allowlist. Not the shared list-pagination default.
+    // of what this sends, so this sends an EMPTY sortBy rather than a second
+    // hardcoded `"chunkIndex"` literal that must agree with the service's own
+    // allowlist. Not the shared list-pagination default.
     PageRequest blockRange = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
@@ -310,10 +304,9 @@ public class KnowledgeController {
   }
 
   /**
-   * Node's {@code @Transform(trimIfString)} + {@code @MinLength(1)},
-   * reproduced — the generator drops the transform, so a value that is all
-   * whitespace would otherwise pass the generated {@code @Size(min=1)}
-   * check on the untrimmed string.
+   * Trims, then refuses an empty result — a value that is all whitespace
+   * would otherwise pass the generated {@code @Size(min=1)} check on the
+   * untrimmed string.
    */
   private static String requireNonBlank(String value, String field) {
     String trimmed = value == null ? "" : value.trim();

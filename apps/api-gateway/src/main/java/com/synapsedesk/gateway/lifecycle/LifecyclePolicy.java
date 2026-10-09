@@ -17,12 +17,13 @@ import org.springframework.web.server.ResponseStatusException;
  * a button that appears to suspend a customer and does not. Billing suspension,
  * offboarding and freezing all become advisory, and the tenant keeps working.
  *
- * <p>The table is {@code ORG_STATUS_ACCESS} in {@code libs/common}, and the messages
- * are Node's own. An unknown status (a cached value some other writer produced)
- * allows nothing, as Node's {@code ORG_STATUS_ACCESS[status] ?? []} does.
+ * <p>The table is {@code ORG_STATUS_ACCESS} in
+ * {@code libs/common/src/configs/organization.config.ts}, and the messages are the
+ * ones {@code test/gateway-contract/org-lifecycle.contract-spec.ts} asserts. An
+ * unknown status (a cached value some other writer produced) allows nothing.
  *
- * <p>A refusal is marked as a guard's ({@link GuardRefusal}): Node's gate runs
- * outside its metrics interceptor, so a request refused here is not counted.
+ * <p>A refusal is marked as a guard's ({@link GuardRefusal}), so a request refused
+ * here is not counted in the request metrics.
  */
 @Component
 public class LifecyclePolicy {

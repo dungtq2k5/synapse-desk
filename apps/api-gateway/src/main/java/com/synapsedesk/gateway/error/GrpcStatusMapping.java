@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 
 /**
- * A gRPC failure, as a client sees it — the Node gateway's
- * `client-safe-message.ts`, reproduced.
+ * A gRPC failure, as a client sees it: an HTTP status and a message that is
+ * safe to show.
  *
  * <p><b>Gap 38, and it is the reason this is not just a status table.</b> The
  * three codes grpc generates ITSELF — a peer that is down, a deadline, a
@@ -19,15 +19,15 @@ import org.springframework.http.HttpStatus;
  * answers a FIXED message in every environment, production or not.
  *
  * <p>The exception is a message a service deliberately wrote for the user:
- * `withHttpStatus` prefixes it with `[http:NNN]`, and a marked message is
- * forwarded with the marked status. That marker is the whole channel — a
+ * `withHttpStatus` (`libs/common/src/utils/http-status-hint.ts`) prefixes it
+ * with `[http:NNN]`, and a marked message is forwarded with the marked status. That marker is the whole channel — a
  * service cannot otherwise make its own text reach a client.
  */
 public final class GrpcStatusMapping {
 
   private GrpcStatusMapping() {}
 
-  /** The same marker `withHttpStatus` writes, and the same 100–599 guard. */
+  /** The marker `withHttpStatus` writes, and `readHttpStatusHint`'s 100–599 guard. */
   private static final Pattern MARKER = Pattern.compile(
     "^\\[http:(\\d{3})]\\s*"
   );
@@ -40,7 +40,7 @@ public final class GrpcStatusMapping {
    * What a client is told for a transport-class failure nobody vouched for.
    *
    * <p>No trailing punctuation here: {@link ErrorMessages#format} adds the
-   * `!`, exactly as the Node side does.
+   * `!`.
    */
   private static final Map<Status.Code, String> TRANSPORT = new EnumMap<>(
     Status.Code.class
@@ -81,7 +81,7 @@ public final class GrpcStatusMapping {
   /**
    * Resolves one gRPC failure.
    *
-   * <p>Order matters, and it is the Node side's: the marker wins over the
+   * <p>Order matters: the marker wins over the
    * table, and the fixed transport message applies only when there is NO
    * marker. A marked `UNAVAILABLE` is a service saying something deliberate
    * while its peer happened to be down, and that text is forwarded.

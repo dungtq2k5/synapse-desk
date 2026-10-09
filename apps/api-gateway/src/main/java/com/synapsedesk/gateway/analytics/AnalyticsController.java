@@ -94,10 +94,8 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
 
 /**
  * `AnalyticsApi` — the executive dashboard, `analytics.read` throughout
- * (class-level in Node, reproduced the same way here since every one of the
- * 11 routes needs it). Ported from `analytics.service.ts` /
- * `analytics-grpc.client.ts` / `analytics.mapper.ts` in one file, the way
- * `ChatController` folds Node's controller+service+mapper together.
+ * (every one of the 11 routes needs it). Controller, gRPC client calls and
+ * wire mapping live in this one file, as in `ChatController`.
  *
  * <p>
  * <b>Nine of the eleven routes are cached</b> through {@link CacheService}
@@ -109,12 +107,10 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  * `knowledgeGaps`): ticket-service, the new ingestion-service channel this
  * module pays for, and — for `agents`' name hydration — auth-service. A leg
  * that fails does not fail the request; it is recorded in `unavailable` and
- * the rest of the answer still renders, matching `tryLeg`/`unwrap` in the
- * Node client.
+ * the rest of the answer still renders.
  *
  * <p>
- * {@code ponytail:} legs run SEQUENTIALLY, not in `Promise.all`'s true
- * parallel — the blocking stub has no cheap fan-out primitive here, and
+ * {@code ponytail:} legs run SEQUENTIALLY, not in parallel — the blocking stub has no cheap fan-out primitive here, and
  * nothing observable from outside (the response shape, the partial-failure
  * behaviour) depends on wall-clock overlap. Move to `CompletableFuture` if a
  * latency budget ever makes this endpoint's p99 the thing to fix.

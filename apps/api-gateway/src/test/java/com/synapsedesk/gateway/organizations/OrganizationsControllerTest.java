@@ -219,7 +219,7 @@ class OrganizationsControllerTest {
 
   @Test
   void getCarriesNoPermissionRequirement() throws NoSuchMethodException {
-    // Node's own choice, not an omission — the End User role holds zero
+    // A choice, not an omission — the End User role holds zero
     // permission rows, so gating the app shell's own workspace read 403s the
     // first screen for every ordinary member.
     Method get = OrganizationsController.class.getMethod(

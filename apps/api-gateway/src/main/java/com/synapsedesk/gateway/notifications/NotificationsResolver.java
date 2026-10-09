@@ -23,8 +23,7 @@ import synapsedesk.notification.Notification.UnreadCountResponse;
 import synapsedesk.notification.NotificationServiceGrpc;
 
 /**
- * The notification feed, and one mutation — `notifications.resolver.ts`,
- * reproduced. No `@RequirePermission` anywhere here: a notification belongs
+ * The notification feed, and one mutation. No `@RequirePermission` anywhere here: a notification belongs
  * to its recipient, and the service scopes every read to the caller's own
  * `sub` — a permission would be asking whether someone may read their own
  * inbox.

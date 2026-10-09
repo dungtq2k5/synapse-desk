@@ -21,8 +21,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import tools.jackson.databind.DatabindException;
 
 /**
- * Every failure leaves as one {@link ErrorEnvelope} — the Node gateway's
- * `AllHttpExceptionFilter`, reproduced against the re-taken P3 capture.
+ * Every failure leaves as one {@link ErrorEnvelope}: status, `path` and one
+ * message ending in `!`. The envelope and the text written here are the
+ * published contract, and a client may show that text to its user.
  *
  * <p><b>Which rows are byte-equal and which are not is decided by where the
  * string is authored</b>, not by how important the row looks:
@@ -32,8 +33,8 @@ import tools.jackson.databind.DatabindException;
  *       message (gap 38), and the joining and trailing `!` of a validation
  *       400. All written here.
  *   <li><b>Opaque</b> — a malformed body and an unsupported content type.
- *       Their text belongs to the JSON parser and to the framework, and V8
- *       alone produced three different strings for three malformed bodies. The
+ *       Their text belongs to the JSON parser and to the framework, and a
+ *       parser can word three malformed bodies three different ways. The
  *       contract is the status, the envelope shape and `path`.
  *   <li><b>Split</b> — a validation 400 is one string containing both kinds:
  *       ours in the `, ` separator and the trailing `!`, the library's in each
@@ -44,7 +45,7 @@ import tools.jackson.databind.DatabindException;
 @RestControllerAdvice
 public class GatewayExceptionHandler {
 
-  /** A failed `@Valid` body: one message per broken rule, joined as Node joins them. */
+  /** A failed `@Valid` body: one message per broken rule, joined by {@link ErrorMessages#format}. */
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorEnvelope> onValidationFailure(
     MethodArgumentNotValidException exception,
@@ -114,7 +115,7 @@ public class GatewayExceptionHandler {
    * an enum value outside its set ({@code sortOrder=sideways}), a non-numeric
    * number, a malformed UUID. Uncaught, it fell through to the catch-all below
    * as a 500, which a client reads as the gateway failing rather than as its own
-   * mistake. The enum message is class-validator's, as Node's is, so the field
+   * mistake. The enum message uses class-validator's wording, so the field
    * name and the allowed values are what the client reads.
    */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -143,7 +144,7 @@ public class GatewayExceptionHandler {
 
   /**
    * A body that could not be read. Malformed JSON is **opaque by decision**: that
-   * message is the parser's, as the Node one is V8's. A body that parsed but does not
+   * message is the parser's and is not part of the contract. A body that parsed but does not
    * fit the class (an unknown key, a wrong type) is answered in our own words, naming
    * the field: Jackson's text for it names Java types, which are not the caller's
    * business.
@@ -233,10 +234,8 @@ public class GatewayExceptionHandler {
    * used rather than its internal detail: opaque, by the same rule as a
    * malformed body.
    *
-   * <p>The 500 text is fixed in every environment. The Node side varies only
-   * this one string by `isProduction`; here it does not vary at all, because
-   * what the variation bought was reading a stack in development, and this
-   * side logs that instead of sending it.
+   * <p>The 500 text is fixed in every environment. The cause is logged, never
+   * sent, so a development build needs no different text to show a stack.
    */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorEnvelope> onAnythingElse(

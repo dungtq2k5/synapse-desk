@@ -10,10 +10,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * The Java ports of {@code @IsStrongPassword()}, {@code @IsPhoneNumber()} and
- * {@code @IsNumberString()}, held to the table Node recomputes from the real
- * functions on every run. A table row is the contract; a port that disagrees with one
- * is wrong, not the row.
+ * The validators for {@code @IsStrongPassword()}, {@code @IsPhoneNumber()} and
+ * {@code @IsNumberString()}, held to the committed table generated from the real
+ * class-validator functions. A table row is the contract; a validator that disagrees
+ * with one is wrong, not the row.
  */
 class FieldValidatorParityTest {
 

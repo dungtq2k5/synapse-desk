@@ -25,7 +25,7 @@ import synapsedesk.ingestion.Document.ListIngestionJobsRequest;
 import synapsedesk.ingestion.Document.ListIngestionJobsResponse;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 
-/** `Query.ingestionJob`, `Query.ingestionJobs`, and the `document` edge — `ingestion-jobs.resolver.ts`, reproduced. */
+/** `Query.ingestionJob`, `Query.ingestionJobs`, and the `document` edge. */
 @Controller
 public class IngestionJobsResolver {
 

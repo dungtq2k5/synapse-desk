@@ -10,8 +10,8 @@ import java.util.List;
  * <p>JS {@code trim()} and {@code /\s+/} strip the Unicode spaces — a no-break
  * space, the BOM, the line separators — that Java's {@code trim()} and
  * {@code strip()} each treat differently. A {@code References} header is
- * sender-controlled and a no-break space in one is ordinary, so reproducing the
- * Node behaviour means reproducing the character set, not approximating it.
+ * sender-controlled and a no-break space in one is ordinary, so this class uses
+ * the exact ECMAScript character set rather than an approximation.
  */
 final class JsText {
 

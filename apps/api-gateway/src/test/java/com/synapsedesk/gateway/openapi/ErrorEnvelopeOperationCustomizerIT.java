@@ -21,9 +21,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 /**
  * The two acceptance rows for {@link ErrorEnvelopeOperationCustomizer},
  * asserted against the real generated {@code /v3/api-docs} document rather
- * than a one-time diff against the committed Node document — these must keep
- * holding for every route added after the flip, not just the 230 ported at
- * migration time.
+ * than a one-time diff against the committed document — these must keep
+ * holding for every route, including each one added later.
  *
  * <p><b>Closes its context when it finishes.</b> Spring caches a booted context
  * for the rest of the JVM, and this one holds the gateway lease with a live

@@ -73,11 +73,11 @@ import synapsedesk.auth.UserServiceGrpc;
 
 /**
  * `UserAdminApi` — tenant administration of OTHER users, against
- * auth-service's `UserService` (`user-admin.controller.ts` reproduced). Same
- * channel/stub bean as `UsersApi` (`GrpcChannels.userServiceStub`).
+ * auth-service's `UserService`. Same channel/stub bean as `UsersApi`
+ * (`GrpcChannels.userServiceStub`).
  *
  * <p>The self / last-admin 409 and the role no-escalation rule are NOT
- * gateway code on the Node side — both live entirely in auth-service, so
+ * gateway code — both live entirely in auth-service, so
  * this forwards and lets the gRPC error surface (`GrpcStatusMapping` already
  * turns `ABORTED`/`ALREADY_EXISTS` into 409). The one guard that IS gateway
  * code is `includeDeleted`, because it widens a route past what
@@ -306,9 +306,8 @@ public class UserAdminController {
       wire.setFullName(updateUserDto.getFullName());
     }
     // `dob === null` clears it (empty string on the wire); `dob === undefined`
-    // (here: field simply absent from the JSON body) leaves it unchanged —
-    // `toProfileFields`, reproduced. The DTO reads both as null, so the raw body
-    // says which the client sent.
+    // (here: field simply absent from the JSON body) leaves it unchanged. The
+    // DTO reads both as null, so the raw body says which the client sent.
     if (updateUserDto.getDob() != null) {
       wire.setDob(updateUserDto.getDob());
     } else if (rawBody.isNull("dob")) {
@@ -320,11 +319,9 @@ public class UserAdminController {
     } else if (rawBody.isNull("gender")) {
       wire.setGender(Gender.GENDER_UNSPECIFIED);
     }
-    // Node's own `update()` does `dto.phoneNumber ?? undefined`, which collapses
-    // an explicit `null` to "leave unchanged" same as an absent field — so
-    // `phoneNumber` cannot actually be cleared through this route on either
-    // side. Reproduced as-is rather than fixed: fixing it here would diverge
-    // Java's behaviour from Node's.
+    // An explicit `null` `phoneNumber` is treated as "leave unchanged", the
+    // same as an absent field — so `phoneNumber` cannot be cleared through
+    // this route (unlike `dob` and `gender` above).
     if (updateUserDto.getPhoneNumber() != null) {
       wire.setPhoneNumber(updateUserDto.getPhoneNumber());
     }

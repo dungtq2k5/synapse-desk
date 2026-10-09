@@ -34,12 +34,8 @@ import synapsedesk.auth.SessionServiceGrpc;
  * auth-service's `SessionService`. Same channel as `UsersApi`/`OtpApi`:
  * auth-service is already paid for, so no new bean here.
  *
- * <p><b>Migrated off `UserSessionsApi`.</b> `revoke`'s {@code data} was
- * already an ad-hoc {@code {revokedCount}} map, not a real generated model —
- * Node's own {@code @ApiWrappedResponse()} declares no model for this route,
- * and the generator only supplied a same-shaped envelope borrowed from
- * elsewhere. {@code ApiResponse<Object>} names that honestly instead of
- * reusing another route's generated class.
+ * <p>`revoke`'s {@code data} is the {@code {revokedCount}} shape
+ * {@link RevokedCountDto} names.
  */
 @Tag(name = "User Sessions")
 @RestController

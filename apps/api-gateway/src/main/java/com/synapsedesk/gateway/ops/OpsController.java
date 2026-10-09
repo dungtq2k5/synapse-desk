@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Ops")
 @RestController
-// Public: Node's JwtAuthGuard never runs here, so its lifecycle gate never does either.
+// Public: no session is authenticated here, so the lifecycle gate never runs either.
 @OrgAccessKind(OrgAccess.AUTH)
 @Validated
 public class OpsController {

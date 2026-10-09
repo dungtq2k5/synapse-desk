@@ -159,7 +159,7 @@ class InvitationsControllerTest {
 
   @Test
   void createAndResendCarryTheVerifiedEmailMarker() {
-    // The mail-sending routes are the two Node puts `EmailVerifiedGuard` on. The marker is
+    // The mail-sending routes need a verified email. The marker is
     // the declaration; `SessionInterceptor` is the mechanism and the contract rows hold it.
     for (String name : List.of(
       "invitationsControllerCreateV1",

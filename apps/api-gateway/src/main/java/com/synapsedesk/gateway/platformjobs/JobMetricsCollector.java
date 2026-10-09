@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Exports {@code job_last_success_timestamp_seconds} from the {@code job_runs}
- * heartbeats — Node's {@code JobMetricsCollector}.
+ * heartbeats.
  *
  * <p>Exporting that table as a gauge turns a staleness alert into a Prometheus
  * rule ({@code time() - job_last_success_timestamp_seconds{scheduled_job="ledger-daily"}
@@ -69,7 +69,7 @@ public class JobMetricsCollector {
           new JobSuccess(
             item.jobName(),
             item.service(),
-            // Millisecond precision, as Node's `Date#getTime() / 1000`.
+            // Seconds, keeping millisecond precision as the fraction.
             item.row().lastSucceededAt().toEpochMilli() / 1000d
           )
         );

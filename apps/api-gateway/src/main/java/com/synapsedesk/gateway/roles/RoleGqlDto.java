@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * `Role` — `permissionCodes` doubles as the input to the `permissions` edge
  * ({@code RolesResolver.permissions} filters the tenant catalogue against
- * it), matching `role-response.gql-dto.ts`'s flat shape exactly.
+ * it), so the type stays flat.
  */
 public record RoleGqlDto(
   String id,

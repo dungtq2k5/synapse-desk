@@ -21,7 +21,7 @@ import synapsedesk.rag.Rag.Citation;
 import synapsedesk.rag.Rag.RetrievedChunk;
 import synapsedesk.rag.Rag.SearchDegradation;
 
-/** `knowledge.mapper.ts` and `knowledge-article.mapper.ts`, reproduced. */
+/** Wire knowledge articles, blocks, answers and search results -> REST DTOs. */
 final class KnowledgeMapper {
 
   private KnowledgeMapper() {}

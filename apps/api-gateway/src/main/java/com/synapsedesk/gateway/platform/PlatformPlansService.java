@@ -55,12 +55,10 @@ import synapsedesk.ingestion.Platform.TenantUsage;
  * `PlatformApi`'s plan-catalogue group (6 of 20 operations) — the third and
  * final sub-pass across this interface.
  *
- * <p><b>{@code applyPlan}'s usage leg degrades, never refuses.</b> Node's
- * own {@code plan-usage.composer.ts}: {@code if ('failure' in usage) return
- * projection;} — an unreachable ingestion-service answers the un-enriched
- * projection, not an error. This is the "reporting" side of the rule this
- * port has been encoding (degrade what you report, refuse what you
- * authorise): {@code applyPlan} with {@code dryRun=false} DOES authorise a
+ * <p><b>{@code applyPlan}'s usage leg degrades, never refuses.</b> An
+ * unreachable ingestion-service answers the un-enriched projection, not an
+ * error. This is the "reporting" side of the rule (degrade what you report,
+ * refuse what you authorise): {@code applyPlan} with {@code dryRun=false} DOES authorise a
  * write, but that write is auth-service's seats-and-quota grant, computed
  * entirely from auth's own tables — the usage leg only ANNOTATES the
  * response with current storage/document consumption, the same "extra
@@ -70,10 +68,9 @@ import synapsedesk.ingestion.Platform.TenantUsage;
  * appear in {@code evaluatedDimensions}, so a zero {@code overLimitCount}
  * during an ingestion outage is never confused with "nobody is over."
  *
- * <p><b>Both dry-run and apply share this exact code path</b> — the same
- * property Node's own docblock asserts: a dry run enriched by different
- * code from the apply it predicts would be believed exactly when it was
- * wrong.
+ * <p><b>Both dry-run and apply share this exact code path</b>: a dry run
+ * enriched by different code from the apply it predicts would be believed
+ * exactly when it was wrong.
  *
  * <p><b>{@code CreatePlanDto.prices}' {@code @ArrayMaxSize} is dropped</b>,
  * same generator-validation family as the rest of this session's findings —
@@ -478,8 +475,8 @@ public class PlatformPlansService {
   private static SubscriptionPlanResponseDto toSubscriptionPlanResponseDto(
     SubscriptionPlanResponse plan
   ) {
-    // `UNSPECIFIED` reads as the product default, never as a wire value — same
-    // fallback Node's `fromProtoAiModelTier(...) ?? DEFAULT_AI_MODEL_TIER` uses.
+    // `UNSPECIFIED` reads as the product default, never as a wire value: `FAST`,
+    // `DEFAULT_AI_MODEL_TIER` in `libs/common/src/configs/ai-settings.config.ts`.
     String aiModelTier =
       plan.getAiModelTier() == AiModelTier.AI_MODEL_TIER_UNSPECIFIED
         ? "FAST"

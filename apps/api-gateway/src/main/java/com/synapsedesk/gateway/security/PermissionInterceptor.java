@@ -9,18 +9,15 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
- * `PermissionGuard`, reproduced — reads {@link RequirePermission} off the
- * invoked handler and enforces it.
+ * Reads {@link RequirePermission} off the invoked handler and enforces it.
  *
  * <p>
- * <b>No annotation is not a bug, it is Node's own fail-open.</b>
- * {@code PermissionGuard.canActivate} returns {@code true} immediately when
- * `@RequirePermission` metadata is absent — correct for a caller-scoped route
- * like `NotificationsApi`, wrong for one that forgot the annotation. This
- * class makes the SAME choice for the SAME reason: an unannotated method is
- * open, and the guard against forgetting the annotation on a route that needs
- * one is {@code PermissionCoverageTest} (Java) / the coverage check in the
- * contract harness (Node), not a stricter default here.
+ * <b>No annotation is not a bug, it is a deliberate fail-open.</b>
+ * An unannotated method is open — correct for a caller-scoped route like
+ * `NotificationsApi`, wrong for one that forgot the annotation. The guard
+ * against forgetting it on a route that needs one is the permission registry
+ * check, `test/gateway-contract/permission-coverage.contract-spec.ts`, not a
+ * stricter default here.
  */
 @Component
 public class PermissionInterceptor implements HandlerInterceptor {

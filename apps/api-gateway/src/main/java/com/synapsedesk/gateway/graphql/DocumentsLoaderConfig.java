@@ -19,8 +19,9 @@ import synapsedesk.ingestion.Document.ListDocumentsByIdsResponse;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 
 /**
- * The documents loader — `document.loader.ts`, reproduced. Deliberately NOT
- * cached (Node's own decision, ADR 0029): a `Document` is large, changes
+ * The documents loader — batches `Document` lookups by id into one
+ * `DocumentService` call per request. Deliberately NOT
+ * cached (ADR 0029): a `Document` is large, changes
  * asynchronously as ingestion re-indexes it, and its only consumers today are
  * cold reads — `IngestionJob.document`, later the analytics edges.
  *

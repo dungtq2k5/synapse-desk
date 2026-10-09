@@ -24,9 +24,9 @@ public record RequestContext(
    * carries {@code isSuperAdmin} with a null organization).
    *
    * <p>What a protobuf string field takes: its setter refuses {@code null}, which
-   * answered 500 before any peer was called, where Node sends the empty default and
-   * lets the peer decide. Every request to a peer that names the caller's
-   * organization goes through this, so there is one definition of "none".
+   * would answer 500 before any peer is called; the empty default lets the peer
+   * decide. Every request to a peer that names the caller's organization goes
+   * through this, so there is one definition of "none".
    */
   public String organizationIdOrEmpty() {
     return organizationId == null ? "" : organizationId;

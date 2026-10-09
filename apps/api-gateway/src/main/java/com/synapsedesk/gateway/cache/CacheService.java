@@ -24,19 +24,15 @@ import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.std.StdSerializer;
 
 /**
- * The shared cache — `cache.service.ts`, reproduced key-for-key and
- * byte-for-byte.
+ * The shared cache: Redis entries keyed `cache:{org}|{scope}|{params}`, with
+ * JSON values.
  *
  * <p>
- * <b>Both halves carry the risk.</b> The KEY format
- * (`cache:{org}|{scope}|{params}`) is easy to get right by eye; the VALUE
- * encoding is not — plain JSON writes an {@link OffsetDateTime} as a bare ISO
- * string, and `GraphQLISODateTime.serialize()` on the Node side reads a bare
- * string as {@code null} rather than throwing. So a Java-written entry with an
- * untagged timestamp reads as "never computed" on every Node hit, silently. A
- * {@link SimpleModule} here writes the SAME `{"__cache_date__": "…"}` shape
- * `encode()` does, which is what makes the two implementations' entries
- * interchangeable rather than merely similarly-shaped.
+ * <b>Timestamps are tagged.</b> Plain JSON writes an {@link OffsetDateTime} as
+ * a bare ISO string, which decodes back as a string, not a timestamp. A
+ * {@link SimpleModule} here writes every timestamp as
+ * `{"__cache_date__": "…"}` and reads that shape back into an
+ * {@link OffsetDateTime}, so a cached value round-trips with its types.
  *
  * <p>
  * A Super Admin's tenant segment is the literal `no-tenant`, matching
@@ -48,13 +44,13 @@ public class CacheService {
 
   private static final Logger LOG = LoggerFactory.getLogger(CacheService.class);
 
-  /** The tag a timestamp is stored under — matches `DATE_TAG` exactly. */
+  /** The tag a timestamp is stored under. */
   static final String DATE_TAG = "__cache_date__";
 
   private static final String PREFIX = "cache:";
   private static final String NO_TENANT = "no-tenant";
 
-  /** Matches Node's own `SCAN ... COUNT`, and the batch size a `DEL` is issued at. */
+  /** The `SCAN ... COUNT` hint, and the batch size a `DEL` is issued at. */
   private static final int SCAN_BATCH = 200;
 
   private final StringRedisTemplate redis;
@@ -103,18 +99,18 @@ public class CacheService {
   }
 
   /**
-   * `invalidateScope`, reproduced: a `SCAN`-based drop of every key under one
+   * A `SCAN`-based drop of every key under one
    * tenant's scope, never `KEYS` — a scope can hold thousands of parameter
    * combinations, and `KEYS` blocks the whole Redis event loop for the
    * duration.
    *
    * <p><b>The pattern's {@code [|:]} character class is load-bearing.</b> A
    * bare {@code scope*} glob would also delete a DIFFERENT, longer-named
-   * scope that happens to share this one's prefix (Node's own example:
+   * scope that happens to share this one's prefix (e.g.
    * {@code analytics} vs. {@code analytics-graphql}). Matching the character
    * immediately after the scope name against either `|` (a bare scope, no
    * params) or `:` (a scope this project nests, e.g. `users:me`) is what
-   * keeps the two apart — copied byte-for-byte from `scopePattern`.
+   * keeps the two apart.
    *
    * <p>Fails OPEN, same rule as {@link #wrap}: a scan or delete failure costs
    * stale entries until their TTL, never an exception a NATS handler would
@@ -254,8 +250,8 @@ public class CacheService {
   }
 
   /**
-   * For a probe writing Node's exact wire format directly, to prove Java reads
-   * it.
+   * For a probe writing an exact wire format directly, to prove this service
+   * reads it.
    */
   public void putRaw(String key, String value, long ttlSeconds) {
     redis

@@ -34,9 +34,9 @@ import synapsedesk.auth.BillingServiceGrpc;
 /**
  * `WebhooksApi` — the gateway's two INBOUND webhook intakes, unrelated to
  * `WebhookEndpointsApi` (this system's own OUTBOUND subscriptions). Both
- * routes bypass auth/lifecycle/tenant/throttle the same way Node's
- * controllers document: the caller's signature over the exact raw bytes IS
- * the credential, and there is no tenant until the payload names one.
+ * routes bypass auth/lifecycle/tenant/throttle: the caller's signature over
+ * the exact raw bytes IS the credential, and there is no tenant until the
+ * payload names one.
  *
  * <p><b>{@code stripe}</b> is a thin passthrough: the gateway checks only
  * that a raw body and a signature header exist, then forwards both verbatim
@@ -58,12 +58,12 @@ import synapsedesk.auth.BillingServiceGrpc;
  * envelope for both, the same reused-wrapper shape the flip retires
  * elsewhere. {@link StripeWebhookAcknowledgementDto} and {@link
  * ResendWebhookAcknowledgementDto} name what each handler actually returns
- * instead — Node's own return-type annotations, not this port's invention.
+ * instead.
  */
 @Tag(name = "Webhooks")
 @RestController
 @RequestMapping(ApiPaths.V1)
-// Public intakes, authenticated by their own signature: Node's JwtAuthGuard never runs here, so its lifecycle gate never does either.
+// Public intakes, authenticated by their own signature: no JWT check runs here, so the lifecycle gate never does either.
 @OrgAccessKind(OrgAccess.AUTH)
 @Validated
 public class WebhooksController {
@@ -99,8 +99,8 @@ public class WebhooksController {
     HttpServletRequest request = CurrentRequest.request();
     if (!(request instanceof CachedBodyRequest cached)) {
       // A configuration failure (rawBody not captured), not a caller one —
-      // same distinction Node draws, so nobody chases a "bad signature" that
-      // was actually a missing filter.
+      // kept distinct so nobody chases a "bad signature" that was actually a
+      // missing filter.
       throw new ResponseStatusException(
         HttpStatus.BAD_REQUEST,
         "Webhook body could not be read for signature verification"

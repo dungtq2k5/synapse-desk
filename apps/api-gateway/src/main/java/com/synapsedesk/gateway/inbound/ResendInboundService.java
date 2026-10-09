@@ -30,8 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Turns one Resend {@code email.received} delivery into an
- * {@link InboundEmailService#accept} call — the Node gateway's
- * {@code ResendInboundService}.
+ * {@link InboundEmailService#accept} call.
  *
  * <p>Every exit increments {@code inbound_email_webhook_total{outcome}} exactly
  * once:
@@ -312,9 +311,8 @@ public class ResendInboundService {
   /**
    * An expiry, or {@code null} when it cannot be read.
    *
-   * <p>{@code null} means "not known to be expired", which is how the Node
-   * gateway behaves (an invalid {@code Date} compares false): the ingest is
-   * attempted and storage-service refuses an expired URL itself. Accepts the
+   * <p>{@code null} means "not known to be expired": the ingest is attempted
+   * and storage-service refuses an expired URL itself. Accepts the
    * ISO 8601 form and the space-separated, short-offset form a database writes.
    */
   static Instant parseInstant(String value) {

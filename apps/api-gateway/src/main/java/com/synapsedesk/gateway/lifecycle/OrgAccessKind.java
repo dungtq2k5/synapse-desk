@@ -7,18 +7,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Declares a route's {@link OrgAccess} category — Node's {@code @OrgAccessKind}, on a
- * method or a whole controller (the method wins).
+ * Declares a route's {@link OrgAccess} category, on a method or a whole controller
+ * (the method wins).
  *
  * <p>A route with no declaration is still gated, as a READ or a WRITE by its verb:
  * the stricter guess is the safe default, where an allowlist of gated paths would
  * fail the other way and leave a forgotten route open.
  *
- * <p><b>{@code AUTH} also stands for "Node never authenticates this route".</b> Node
- * gates only where {@code JwtAuthGuard} ran, which Java has no layer for, so the
- * routes Node leaves public (health, version, the two webhook intakes) carry
- * {@code AUTH} to be exempt. {@code org-access-routes.json}, recomputed from Node's
- * controllers, holds every route's effective category equal in both gateways.
+ * <p><b>{@code AUTH} also stands for "this route is never authenticated".</b> There
+ * is no separate authentication layer the gate could follow, so the public routes
+ * (health, version, the two webhook intakes) carry {@code AUTH} to be exempt.
+ * {@code test/fixtures/lifecycle/org-access-routes.json} holds every route's
+ * effective category, and {@code OrgAccessRoutesTest} checks it.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

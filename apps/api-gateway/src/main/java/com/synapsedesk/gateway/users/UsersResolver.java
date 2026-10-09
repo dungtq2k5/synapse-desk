@@ -30,7 +30,7 @@ import synapsedesk.auth.UserServiceGrpc;
 
 /**
  * `Query.me`, `Query.user`, `Query.users`, and `User.departmentCount` /
- * `User.departments` — `users.resolver.ts`, reproduced.
+ * `User.departments`.
  *
  * <p><b>`Query.user` carries `@RequirePermission(USER_READ)`, `me` does
  * not</b> — reading your own profile is not an administrative act, matching

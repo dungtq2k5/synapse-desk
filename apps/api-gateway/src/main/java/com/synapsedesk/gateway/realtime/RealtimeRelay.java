@@ -8,8 +8,8 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * `relayToRoom`/`relayToRooms`, LOCAL-ONLY — the `server.local.to(...)` half
- * of Node's pair, and the only half a NATS-sourced consumer may call.
+ * `relayToRoom`/`relayToRooms`, LOCAL-ONLY — delivers to this replica's
+ * sockets only, the only relay a NATS-sourced consumer may call.
  *
  * <p><b>Never {@code getRoomOperations(room).sendEvent(...)}.</b> Read from
  * netty-socketio's own source: that convenience method sends to this

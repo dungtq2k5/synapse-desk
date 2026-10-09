@@ -11,8 +11,8 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 
 /**
- * `scalar DateTime` — Node's `GraphQLISODateTime`, matched byte for byte by
- * reusing {@link JsIsoFormat}, the same formatter {@code CacheService} uses
+ * `scalar DateTime` — an ISO-8601 UTC instant with exactly 3 fractional
+ * digits, written by {@link JsIsoFormat}, the same formatter {@code CacheService} uses
  * so the two never drift apart the way a second hand-written one could.
  */
 final class DateTimeScalar {

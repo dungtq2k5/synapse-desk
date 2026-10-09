@@ -5,13 +5,14 @@ import java.util.Set;
 /**
  * The bounds and allowlist the inbound-email path validates against.
  *
- * <p><b>A second copy, held to the first by a guard.</b> These are
- * {@code libs/common}'s attachment vocabulary and the Node gateway's own
- * {@code dto.config.ts}; the generated Java vocabulary carries neither (it
- * renders string maps, and the DTO bounds are not in the library at all). So
- * they are written here, and {@code scripts/lib/inbound-limits.spec.ts} fails
- * when either side changes — comparing the sets and numbers in both directions,
- * so an added type or a moved bound cannot pass unnoticed.
+ * <p><b>A second copy, held to the first by a guard.</b> The attachment
+ * allowlist and bounds are {@code libs/common}'s attachment vocabulary, which the
+ * generated Java vocabulary does not carry (it renders string maps); the other
+ * bounds are this gateway's own. So they are written here, and
+ * {@code scripts/lib/inbound-limits.spec.ts} fails when either side changes —
+ * every integer here equals its {@code libs/common} counterpart or is listed as
+ * gateway-owned, and the allowlist is compared as a set in both directions, so
+ * an added type or a moved bound cannot pass unnoticed.
  */
 public final class InboundLimits {
 
@@ -53,33 +54,29 @@ public final class InboundLimits {
    * is read at all; the rest is cut off where the mail enters, before anything
    * scans it.
    *
-   * <p>The patterns that strip quoted history and HTML rescan to the end of the
-   * input from every unterminated opener, so a body of unclosed tags costs time
-   * proportional to the SQUARE of its length. Measured on the worst shape ({@code
+   * <p>As regular expressions, the patterns that strip quoted history and HTML
+   * rescan to the end of the input from every unterminated opener, so a body of
+   * unclosed tags costs time proportional to the SQUARE of its length (4.3 s at
+   * 50 000 and about ten minutes at 800 000 in Java's engine). Here they are
+   * scanners ({@link HtmlScan}) and linear. Measured on the worst shape ({@code
    * <div } repeated, no {@code >}), through {@code toStoredBody}:
    *
    * <table>
    *   <caption>Worst-case time by length</caption>
-   *   <tr><th>Length</th><th>Node (regular expressions)</th><th>Java (scanners)</th></tr>
-   *   <tr><td>20 000</td><td>~90 ms</td><td>under 10 ms</td></tr>
-   *   <tr><td>50 000</td><td>540 ms</td><td>~10 ms</td></tr>
-   *   <tr><td>100 000</td><td>2 132 ms</td><td>~15 ms</td></tr>
-   *   <tr><td>800 000</td><td>~two minutes</td><td>~90 ms</td></tr>
+   *   <tr><th>Length</th><th>Scanners</th></tr>
+   *   <tr><td>20 000</td><td>under 10 ms</td></tr>
+   *   <tr><td>50 000</td><td>~10 ms</td></tr>
+   *   <tr><td>100 000</td><td>~15 ms</td></tr>
+   *   <tr><td>800 000</td><td>~90 ms</td></tr>
    * </table>
-   *
-   * <p>Java's patterns are scanners ({@link HtmlScan}) and linear: the same shape
-   * took its regular expressions 4.3 s at 50 000 and about ten minutes at 800 000,
-   * eight times worse than Node's, which was a divergence the port introduced. So
-   * the number that bounds the cost is now Node's: at 50 000 one hostile mail costs
-   * a Node request thread about half a second, where uncapped it was unbounded.
    *
    * <p><b>Why not lower.</b> HTML from some clients carries a large {@code <style>}
    * head before the message, and a cut that lands before the message loses what the
-   * customer wrote — a worse failure than half a second of CPU on a hostile mail.
+   * customer wrote.
    *
    * <p>Truncated, not rejected: a long forwarded thread is a legitimate mail, and
    * what was written last is at the top. Counted in code units because that is
-   * {@code String.length} in both gateways.
+   * {@code String.length}.
    */
   public static final int MAX_INBOUND_BODY_LENGTH = 50000;
 

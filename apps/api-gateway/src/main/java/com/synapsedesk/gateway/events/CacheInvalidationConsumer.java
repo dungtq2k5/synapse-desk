@@ -21,15 +21,15 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * `CacheInvalidationConsumer`, reproduced — the port's first domain-event
- * consumer, and the four decisions every later one inherits.
+ * Evicts cached scopes when a domain event says they are stale — the
+ * gateway's first domain-event consumer, and the four decisions every later
+ * one inherits.
  *
  * <p><b>1. The client: {@code io.nats:jnats} directly</b>, the same reasoning
  * as the gRPC stubs being blocking — one concurrency model.
  *
- * <p><b>2. No queue group.</b> Node sets none, so every replica receives
- * every event (measured against the real, already-running Node gateway
- * publishing to multiple replicas). For EVICTION that is correct: dropping a
+ * <p><b>2. No queue group</b>, so every replica receives every event. For
+ * EVICTION that is correct: dropping a
  * scope twice is idempotent, and each replica holding its own subscription
  * is what makes its own read-through re-warm correctly. A queue group would
  * mean only one replica evicts, leaving every other replica serving a stale
@@ -37,7 +37,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p><b>Measured, not merely asserted: this specific property is
  * unobservable from outside a single-replica test.</b> A queue group was
- * added by hand and every row in {@code cache-invalidation.contract-spec.ts}
+ * added by hand and every row in
+ * {@code test/gateway-contract/cache-invalidation.contract-spec.ts}
  * still passed — because eviction drops a SHARED Redis key, one consumer
  * instance evicting it looks identical, from any external read, to every
  * replica's own consumer having done so. The decision is still correct (it
@@ -60,8 +61,8 @@ import tools.jackson.databind.ObjectMapper;
  * receives the RAW bytes with no such unwrapping, so this consumer performs
  * the same check by hand: a top-level {@code pattern} OR {@code data} key
  * means the payload is that envelope and the real event is `.data`; anything
- * else is the event itself, unwrapped — matching `nats.config.ts`'s own
- * documented rule exactly, on the reading side.
+ * else is the event itself, unwrapped — the rule
+ * `libs/common/src/configs/nats.config.ts` documents, on the reading side.
  */
 @Component
 @Order(0)
@@ -147,10 +148,8 @@ public class CacheInvalidationConsumer implements LeaseParticipant {
   }
 
   /**
-   * One handler for every subscribed subject, matching Node's own
-   * `ticketChanged`/`documentChanged`/`entitlementsChanged` shape: the cache
-   * does not care WHICH ticket pattern fired, only that the tenant's scope is
-   * now wrong.
+   * One handler for every subscribed subject: the cache does not care WHICH
+   * ticket pattern fired, only that the tenant's scope is now wrong.
    */
   void onMessage(Message message) {
     List<String> scopes = SUBJECT_SCOPES.get(message.getSubject());

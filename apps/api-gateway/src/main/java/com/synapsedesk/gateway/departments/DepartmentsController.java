@@ -71,16 +71,12 @@ import synapsedesk.auth.Department.UpdateDepartmentRequest;
 import synapsedesk.auth.DepartmentServiceGrpc;
 
 /**
- * `DepartmentsApi` — against auth-service's `DepartmentService`
- * (`departments.controller.ts`, reproduced).
+ * `DepartmentsApi` — against auth-service's `DepartmentService`.
  *
  * <p>
  * <b>`?includeDeleted=true` needs `department.delete`, checked BEFORE the
- * cache lookup</b> — Node's own fix (`QueryPermissionGuard`, a real guard
- * rather than a handler check, because guards run before its `@Cacheable`
- * interceptor and a handler check would not). The Java shape is different —
- * there is no interceptor to run ahead of here, {@code list}'s own body IS
- * the cache lookup — but the ORDER is the property that matters: this reads
+ * cache lookup</b>. {@code list}'s own body IS the cache lookup, and the
+ * ORDER is the property that matters: this reads
  * the RAW query parameter and refuses BEFORE {@code cache.buildKey}/
  * {@code cache.wrapTyped} ever run, so a caller without the permission can
  * never be served an entry a privileged caller's `?includeDeleted=true`
@@ -88,7 +84,7 @@ import synapsedesk.auth.DepartmentServiceGrpc;
  *
  * <p>
  * No write here evicts the cache — known gap 42, same as every other
- * `@Cacheable` route ported so far.
+ * cached route.
  *
  * <p><b>Migrated off `DepartmentsApi`.</b> `create` answers 201 —
  * {@code @ResponseStatus} is what tells springdoc that. `list`'s cache goes
@@ -494,11 +490,8 @@ public class DepartmentsController {
   /**
    * Whether the caller actually asked for the widening parameter — the raw
    * query string, not the bound/defaulted `Boolean includeDeleted` argument,
-   * matching Node's own reasoning: `isRequested` reads before the framework
-   * coerces `'true'` into a boolean, so keying off the typed argument would
-   * treat every request as having asked (its default is `false`, itself a
-   * valid string a client could have sent explicitly, but the RAW absence is
-   * what Node's guard actually distinguishes).
+   * read before the framework coerces `'true'` into a boolean. Absent,
+   * `false`, `0` and the empty string all count as not asked.
    */
   private static boolean isRequested(
     jakarta.servlet.http.HttpServletRequest request,

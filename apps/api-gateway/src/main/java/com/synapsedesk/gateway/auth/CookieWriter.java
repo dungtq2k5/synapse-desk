@@ -11,10 +11,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
 /**
- * The five session cookies, flag-for-flag against `jwt-cookie.service.ts`.
+ * The five session cookies: how each is set and how each is cleared.
  *
- * <p>Every `set*` and `clear*` pair shares one private builder, exactly as the
- * Node side does with `setTokenCookie`/`clearTokenCookie` — so `httpOnly`,
+ * <p>Every `set*` and `clear*` pair shares one private builder — so `httpOnly`,
  * `secure`, `sameSite` and `path` are written once rather than five times,
  * and the Set-Cookie parity rows in `auth.contract-spec.ts` are asserting a
  * SHARED path, not five independent ones.

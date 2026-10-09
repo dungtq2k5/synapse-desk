@@ -19,8 +19,9 @@ import synapsedesk.auth.Department.ListDepartmentsByIdsResponse;
 import synapsedesk.auth.DepartmentServiceGrpc;
 
 /**
- * The departments loader — `department.loader.ts`, reproduced, minus the
- * entity cache (deferred, same as {@link UsersLoaderConfig}). `Document.departments`
+ * The departments loader — batches department lookups by id into one
+ * `ListDepartmentsByIds` call per request. No entity cache (deferred, same
+ * as {@link UsersLoaderConfig}). `Document.departments`
  * and `User.departments` both batch through this; `Ticket.department` will
  * too, once wired.
  *

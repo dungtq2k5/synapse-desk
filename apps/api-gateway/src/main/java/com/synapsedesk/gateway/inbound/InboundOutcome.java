@@ -1,8 +1,8 @@
 package com.synapsedesk.gateway.inbound;
 
 /**
- * Why a message did not become a ticket, or what it became — the Node gateway's
- * {@code InboundOutcome}, with the same wire spelling.
+ * Why a message did not become a ticket, or what it became; each constant's
+ * wire spelling is its own name.
  *
  * <p><b>Every one of these is answered with a 200.</b> A 4xx tells the provider
  * the request was malformed and worth retrying, so one misconfigured mail rule

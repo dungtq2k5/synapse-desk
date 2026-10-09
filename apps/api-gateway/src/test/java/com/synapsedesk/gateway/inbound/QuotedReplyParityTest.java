@@ -16,8 +16,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link QuotedReply}, held to the table the Node gateway recomputes from its own
- * functions on every run ({@code quoted-reply-parity.spec.ts}).
+ * {@link QuotedReply}, held to the fixed table
+ * {@code test/fixtures/inbound-email/quoted-reply-parity.json}.
  *
  * <p>The table is the one fact; this file only reads it. Its rows are the awkward
  * inputs — {@code \r\n}, bare {@code \r}, {@code U+2028}, non-breaking spaces,

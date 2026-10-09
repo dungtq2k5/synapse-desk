@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.throttle;
 import java.util.List;
 
 /**
- * The four tier names — `throttler.config.ts`'s constants, reproduced.
+ * The four tier names.
  *
  * <p>The names are load-bearing, not labels: {@link ThrottlerInterceptor}
  * routes by comparing against them exactly, and {@code CorsHeaders} derives

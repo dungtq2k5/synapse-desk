@@ -24,7 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
  * What a tenant may do in each lifecycle state, and what is said when it may not.
  *
  * <p>Without the gate, setting a tenant to FROZEN changes a column and nothing else.
- * The access table is Node's {@code ORG_STATUS_ACCESS}; the contract matrix holds it
+ * The access table is {@code ORG_STATUS_ACCESS} in
+ * {@code libs/common/src/configs/organization.config.ts}; the contract matrix holds it
  * equal end to end, and this pins it where a mutation is cheap to run.
  */
 class LifecyclePolicyTest {

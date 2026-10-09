@@ -15,8 +15,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The rule: a request that arrives with NO body is handed on as the empty JSON object
- * Node's body parser makes of it, on the methods that carry a body, whatever
- * Content-Type came with it, and is left alone otherwise.
+ * {@code {}}, on the methods that carry a body, whatever Content-Type came with it,
+ * and is left alone otherwise.
  */
 class JsonBodyFilterTest {
 

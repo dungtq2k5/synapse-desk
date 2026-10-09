@@ -54,7 +54,8 @@ import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc.TicketServiceBlockingStub;
 
 /**
- * The email adapter — the Node gateway's {@code InboundEmailService.accept}.
+ * The email adapter: {@code accept} turns one inbound mail into a ticket, a
+ * message on one, or a refusal ({@link InboundOutcome}).
  *
  * <p><b>The gateway is the only component that knows what an email is.</b>
  * Address parsing, the reply-token HMAC, quoted history and the loop headers are

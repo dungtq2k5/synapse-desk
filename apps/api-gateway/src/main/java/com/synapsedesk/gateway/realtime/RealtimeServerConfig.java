@@ -17,8 +17,7 @@ import org.springframework.context.annotation.Bean;
  * repo's own `socket.io-client` pinned: {@link NullPreservingJsonSupport}
  * (nulls kept), `pingTimeout` 20 000 ms (netty-socketio defaults to 60 000;
  * Engine.IO's own default, which the client already expects, is 20 000), and
- * websocket-only transport (P1 measured Node running Engine.IO's own
- * websocket-only configuration).
+ * websocket-only transport.
  *
  * <p><b>Not started here.</b> Constructing the bean does not bind the port —
  * {@link RealtimeGateway} starts and stops it as a {@code LeaseParticipant},
@@ -26,8 +25,7 @@ import org.springframework.context.annotation.Bean;
  * same "nothing exists until the lease says so" rule
  * {@code CacheInvalidationConsumer} follows for its NATS subscription.
  *
- * <p>Its own port, not `server.port`: Node's socket.io shares one
- * `http.Server` with the REST/GraphQL stack; netty-socketio is a standalone
+ * <p>Its own port, not `server.port`: netty-socketio is a standalone
  * Netty server that cannot bind the port Tomcat already holds. See
  * {@link RealtimeProperties}.
  *
@@ -85,8 +83,8 @@ public class RealtimeServerConfig {
   }
 
   /**
-   * Node's whole realtime surface lives under `/ws` (`@SecureGateway('ws')`),
-   * never the default namespace. Registering it is a NAME, not a bind — safe
+   * The whole realtime surface lives under `/ws`, never the default
+   * namespace. Registering it is a NAME, not a bind — safe
    * before {@link SocketIOServer#start()}, and required before one: a client
    * connecting to `/ws` before this exists gets netty-socketio's own
    * `"Invalid namespace"` and disconnects immediately (measured).

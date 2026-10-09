@@ -15,7 +15,7 @@ import synapsedesk.ticket.Message.MessageAnswerStatus;
 import synapsedesk.ticket.Message.MessageResponse;
 import synapsedesk.ticket.Ticket.ListTicketsResponse;
 
-/** Wire `TicketResponse`/`MessageResponse` -> the GraphQL DTOs — `ticket.mapper.ts`, reproduced. */
+/** Wire `TicketResponse`/`MessageResponse` -> the GraphQL DTOs. */
 public final class TicketMapper {
 
   private TicketMapper() {}
@@ -97,7 +97,7 @@ public final class TicketMapper {
     );
   }
 
-  /** `UNSPECIFIED` -> `null`, matching Node's "a value this build cannot name answers null". */
+  /** `UNSPECIFIED` -> `null`: a value this build cannot name answers null. */
   private static TicketSourceGql toSourceGql(TicketSource source) {
     return switch (source) {
       case TICKET_SOURCE_WEB -> TicketSourceGql.WEB;

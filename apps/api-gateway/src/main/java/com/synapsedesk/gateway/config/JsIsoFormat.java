@@ -6,7 +6,8 @@ import java.time.format.DateTimeFormatter;
 /**
  * `Date.prototype.toISOString()`, exactly: always 3 fractional digits, always
  * `Z`. {@link java.time.Instant#toString()} drops trailing zero millis and
- * cannot be used here — the wire bytes must match Node's, not merely parse.
+ * cannot be used here — the wire bytes must keep this one shape
+ * ({@code 2024-01-05T09:00:00.000Z}), not merely parse.
  *
  * <p>
  * Shared by {@link com.synapsedesk.gateway.cache.CacheService}'s tagged-date

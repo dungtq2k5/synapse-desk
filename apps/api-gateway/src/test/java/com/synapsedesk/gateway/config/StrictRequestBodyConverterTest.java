@@ -21,9 +21,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * A request body's JSON types must match the class exactly: nothing is converted.
  *
- * <p>Held here rather than by contract rows, because Node converts some of these per
- * field ({@code "false"} into {@code true}, {@code true} into the size 1) and a row
- * runs against both gateways.
+ * <p>So {@code "false"} is refused for a boolean rather than read as {@code true},
+ * and {@code true} for a number rather than read as 1.
  */
 class StrictRequestBodyConverterTest {
 

@@ -33,10 +33,10 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * — the second of three sub-passes (see {@link TicketsCrudService} for why
  * this is a plain service, not yet a routed controller).
  *
- * <p><b>{@code RESOLVED}/{@code CLOSED} are NOT refused here.</b> Node's own
- * comment on {@code changeStatus} is explicit: ticket-service refuses those
- * two targets (400, naming the route to use), specifically so this route's
- * {@code @RequirePermission('ticket.update')} decorator keeps describing
+ * <p><b>{@code RESOLVED}/{@code CLOSED} are NOT refused here.</b>
+ * ticket-service refuses those two targets on {@code changeStatus} (400,
+ * naming the route to use), so this route's
+ * {@code @RequirePermission("ticket.update")} keeps describing
  * exactly what the route does — a gateway-side duplicate check would be a
  * SECOND, potentially diverging, encoding of the same rule the docblock on
  * {@code ChangeTicketStatusRequest} already calls out as a single-source

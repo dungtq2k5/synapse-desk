@@ -16,11 +16,10 @@ import org.springframework.stereotype.Component;
 /**
  * The seven series, and the only way this codebase records to them.
  *
- * <p>A class rather than {@code MeterRegistry} injected everywhere, for the
- * reason the Node registry gives: a metric created at a call site is a metric
- * whose name and labels nothing checks. Every series is declared here, so
- * {@code MetricsSeriesContractTest} can walk them and compare against the
- * Node registry.
+ * <p>A class rather than {@code MeterRegistry} injected everywhere: a metric
+ * created at a call site is a metric whose name and labels nothing checks. Every
+ * series is declared here, so {@code MetricsSeriesContractTest} can walk them and
+ * compare against the series registry ({@code test/fixtures/metrics/series.json}).
  *
  * <p><b>Label VALUES stay bounded.</b> None of these takes a tenant id, a user
  * id or a raw path: a label with unbounded values multiplies the series count
@@ -111,8 +110,7 @@ public class GatewayMetrics {
 
   /**
    * The last successful run of every scheduled job, as Unix timestamps — the series
-   * an alert selects on. Replaces the WHOLE set, as Node's gauge is reset and then
-   * set on every scrape.
+   * an alert selects on. Replaces the WHOLE set on every scrape.
    *
    * <p><b>One value per series.</b> Each job is its own row with its own number: a
    * single shared cell would give every tag combination the same value, so two jobs

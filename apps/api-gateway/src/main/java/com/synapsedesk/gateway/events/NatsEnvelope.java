@@ -6,7 +6,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * The Nest {@code ClientProxy.emit(pattern, event)} envelope, unwrapped by
- * hand — every domain-event publisher on the Node side (ticket-service,
+ * hand — every domain-event publisher (ticket-service,
  * ingestion-service, auth-service, notification-service) calls this,
  * putting the message on the wire as {@code {"pattern": "<subject>", "data":
  * <event>}}. Nest's own deserializer unwraps it for {@code .data} on that

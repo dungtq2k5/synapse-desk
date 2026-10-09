@@ -22,13 +22,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The inbound body cap, held to the table the Node gateway recomputes from its own
- * {@code capBody} on every run ({@code body-cap.spec.ts}), plus the mapper's use of
- * it and the property it exists for.
+ * The inbound body cap, held to the fixed table
+ * {@code test/fixtures/inbound-email/body-cap-parity.json}, plus the mapper's use
+ * of it and the property it exists for.
  *
  * <p>The cap is applied where the fetched mail enters, because the patterns that
  * strip quoted history and HTML are quadratic on a body of unclosed tags. The key
- * hashed from the body is the same in both gateways only if the cut is.
+ * hashed from the body depends on exactly where the cut lands.
  */
 class InboundBodyCapParityTest {
 

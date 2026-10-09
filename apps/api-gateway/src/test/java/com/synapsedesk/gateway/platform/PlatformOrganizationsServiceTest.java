@@ -32,10 +32,10 @@ import synapsedesk.auth.PlatformServiceGrpc;
 /**
  * `PlatformApi`'s organizations group (group 1 of 3). Sharpest properties:
  * {@link SuperAdminCheck} runs before the peer is ever dialed (same order
- * discipline as every handler-body guard in this port), and the two
- * hand-replicated validation gaps (`slug`'s pattern, `allowedEmailDomains`'
- * bound) actually refuse what Node refuses — the generator dropped both
- * silently, so nothing else in the stack catches a regression here.
+ * discipline as every handler-body guard in this gateway), and the two
+ * hand-written validations (`slug`'s pattern, `allowedEmailDomains`' bound)
+ * actually refuse — the generated DTOs carry neither, so nothing else in
+ * the stack catches a regression here.
  */
 class PlatformOrganizationsServiceTest {
 

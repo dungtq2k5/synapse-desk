@@ -24,8 +24,7 @@ import synapsedesk.auth.Session.RevokeSessionResponse;
 import synapsedesk.auth.SessionServiceGrpc;
 
 /**
- * `SessionsApi` — {@code revoke}'s cookie-clearing, ported from
- * `SessionsController.revoke` (Node). The property under test is that
+ * `SessionsController.revoke`'s cookie-clearing. The property under test is that
  * cookies clear if and ONLY IF the revoked family was the caller's own
  * ({@code wasCurrent}), which auth-service reports because the gateway never
  * sees a family id and cannot work this out for itself.

@@ -28,12 +28,10 @@ import org.springframework.stereotype.Component;
  * <p><b>A rule, not a list.</b> Nothing here names a field. A bound equal to what
  * {@code @Size} implies when it is not set carries no information, so it is dropped
  * for every schema, present or future, and a field that gives a real bound
- * ({@code @Size(max = 500)}, {@code @Size(min = 1)}) is untouched. Measured against
- * the published contract: the only bound values Java published that Node did not
- * were exactly these four (maxItems and maxLength at {@code Integer.MAX_VALUE},
- * minItems and minLength at 0), and every other bound matched Node's, count for
- * count. {@code minimum} and {@code maximum} are not touched: a 0 there is a
- * written value, not a default.
+ * ({@code @Size(max = 500)}, {@code @Size(min = 1)}) is untouched. The dropped
+ * values are exactly four: maxItems and maxLength at {@code Integer.MAX_VALUE},
+ * minItems and minLength at 0. {@code minimum} and {@code maximum} are not touched:
+ * a 0 there is a written value, not a default.
  */
 @Component
 @Order(OpenApiCustomizerOrder.DEFAULT_BOUNDS)

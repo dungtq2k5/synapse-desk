@@ -18,13 +18,12 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>Spring for GraphQL invokes the mapped resolver methods directly, so the servlet
  * interceptor never runs for them. This is a second way IN to the same
  * {@link LifecyclePolicy}, not a second check, as {@code GraphqlPermissionAspect} is
- * for permissions. The refusal is a GraphQL error carrying {@code FORBIDDEN}, as
- * Node's is, not an HTTP 403.
+ * for permissions. The refusal is a GraphQL error carrying {@code FORBIDDEN}, not an
+ * HTTP 403.
  *
- * <p>Every resolver is gated except {@code VersionResolver}, the one Node leaves
- * public. GraphQL travels over POST, so a gated operation is a WRITE: a
- * past-due-suspended tenant (read-only) is refused here even for a query, exactly as
- * in Node.
+ * <p>Every resolver is gated except {@code VersionResolver}, which is public.
+ * GraphQL travels over POST, so a gated operation is a WRITE: a past-due-suspended
+ * tenant (read-only) is refused here even for a query.
  */
 @Aspect
 @Component

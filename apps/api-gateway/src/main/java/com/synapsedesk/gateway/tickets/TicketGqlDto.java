@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.tickets;
 import java.time.OffsetDateTime;
 
 /**
- * `Ticket` — flat, matching `ticket-response.gql-dto.ts` exactly. Unlike
+ * `Ticket` — flat. Unlike
  * {@code DocumentGqlDto}'s `createdById`, every raw id here
  * (`currentAssigneeId`, `currentDepartmentId`, `authorId`) is ALSO a schema
  * field in its own right, kept beside the loader-backed edge it seeds so a

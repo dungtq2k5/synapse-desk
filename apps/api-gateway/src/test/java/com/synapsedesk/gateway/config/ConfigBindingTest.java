@@ -117,9 +117,8 @@ class ConfigBindingTest {
   @Test
   void refusesACookieNameThatIsNotALegalToken() {
     // A trailing `;` is the easy typo and the worst one: `;` is the cookie
-    // SEPARATOR, so the name silently ends the previous pair. Nothing fails at
-    // boot on the Node side without the schema's pattern — it throws on the
-    // first login instead.
+    // SEPARATOR, so the name silently ends the previous pair. Without the
+    // pattern nothing fails at boot — it throws on the first login instead.
     assertThatThrownBy(() ->
       boot(Map.of("JWT_ACCESS_NAME", "access_token;")).close()
     )

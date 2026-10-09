@@ -19,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * `CacheInvalidationConsumer`'s pure logic — the subject-to-scope table, the
- * Nest envelope unwrap, and each Node property the plan carries over. No
+ * Nest envelope unwrap, and each property the consumer documents. No
  * real NATS connection: {@link CacheInvalidationConsumer#onMessage} and
  * {@link CacheInvalidationConsumer#organizationIdOf} are exercised directly,
  * the same seam `CacheInvalidationConsumerIT` uses for the real-connection

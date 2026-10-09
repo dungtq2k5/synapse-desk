@@ -10,8 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * One inbound mail, as {@code accept()} takes it — the Node gateway's
- * {@code InboundEmailDto}, constraint for constraint.
+ * One inbound mail, as {@code accept()} takes it, with its constraints.
  *
  * <p><b>Validated by hand by the caller</b>, with a {@code Validator}: this is
  * built from a fetched mail, not received as a request body, so nothing else
@@ -19,15 +18,13 @@ import java.util.Map;
  * is dropped and visible in the counter, because Resend would retry a non-2xx
  * for hours to no effect.
  *
- * <p><b>Absent and empty are the same here.</b> The Node DTO defaults its list
- * fields to {@code []}; a record has no field initialisers, so the constructor
- * normalises a missing list to empty, which is what a fixture that omits one
- * deserialises to.
+ * <p><b>Absent and empty are the same here.</b> A record has no field
+ * initialisers, so the constructor normalises a missing list to empty, which is
+ * what a fixture that omits one deserialises to.
  *
- * <p>{@code text} and {@code html} are required to be PRESENT but may be null in
- * Node, because "no text part" and "the field was forgotten" are different
- * facts. A record always has the component, so the distinction is carried by the
- * type and needs no constraint.
+ * <p>{@code text} and {@code html} may be null, because "no text part" and "the
+ * field was forgotten" are different facts. A record always has the component,
+ * so the distinction is carried by the type and needs no constraint.
  */
 public record InboundEmail(
   @Pattern(

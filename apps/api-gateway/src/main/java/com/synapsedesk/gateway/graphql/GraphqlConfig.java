@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.graphql.execution.RuntimeWiringConfigurer;
 
 /**
- * The `DateTime` scalar, and introspection off in production —
- * `graphql.config.ts`'s two hand-wired decisions once schema, limits and
- * loaders are all things Spring for GraphQL reads or collects on its own.
+ * The `DateTime` scalar, and introspection off in production — the two
+ * hand-wired decisions; schema, limits and loaders are all things Spring for
+ * GraphQL reads or collects on its own.
  */
 @Configuration
 public class GraphqlConfig {
@@ -27,9 +27,9 @@ public class GraphqlConfig {
   }
 
   /**
-   * **OFF in production**, matching `introspection: !isProduction`. JVM-wide
-   * rather than per-request — graphql-java has no per-request switch — which
-   * is the same shape as Node's: one process, one deployment, one answer.
+   * **OFF in production** (`NODE_ENV=production`). JVM-wide rather than
+   * per-request — graphql-java has no per-request switch — which fits: one
+   * process, one deployment, one answer.
    */
   @PostConstruct
   void configureIntrospection() {

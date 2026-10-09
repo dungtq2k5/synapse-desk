@@ -63,20 +63,18 @@ import synapsedesk.ingestion.Document.StorageUsageResponse;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 
 /**
- * `BillingApi` — against auth-service's `BillingService`
- * (`billing.controller.ts`, reproduced). The Stripe webhook intake
- * (`POST /webhooks/stripe`) is a separate, unauthenticated controller/tag and
- * is out of scope here.
+ * `BillingApi` — against auth-service's `BillingService`. The Stripe webhook
+ * intake (`POST /webhooks/stripe`) is a separate, unauthenticated
+ * controller/tag and is out of scope here.
  *
  * <p>
  * <b>Two deadlines, not one.</b> A local read (auth-service only) keeps the
  * gateway's shared 5-second default; a route that touches Stripe
  * ({@code createCheckoutSession}, {@code createPortalSession},
  * {@code listInvoices}, and {@code changePlan}'s FINAL RPC — not its
- * {@code previewPlanChange} leg, which is a local read) gets 20 seconds —
- * Node's own {@code STRIPE_DEADLINE_MS}, reproduced exactly, because Stripe's
- * own API is slow enough that the shared deadline turns an ordinary checkout
- * into a 504.
+ * {@code previewPlanChange} leg, which is a local read) gets 20 seconds,
+ * because Stripe's own API is slow enough that the shared deadline turns an
+ * ordinary checkout into a 504.
  *
  * <p>
  * <b>{@code changePlan}'s usage check fails CLOSED, the opposite of

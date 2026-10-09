@@ -59,26 +59,23 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(InterceptorRegistry registry) {
-    // Throttling runs BEFORE permission checks — Node's guard order
-    // (`SmartThrottlerGuard` precedes `PermissionGuard` in `@UseGuards`), and
-    // the one that matters: a caller hammering a route they lack permission
-    // for still consumes the rate-limit budget rather than a cheap 403 every
-    // time.
+    // Throttling runs BEFORE permission checks: a caller hammering a route they
+    // lack permission for still consumes the rate-limit budget rather than a
+    // cheap 403 every time.
     registry.addInterceptor(throttlerInterceptor);
-    // Then the session, as Node's `JwtAuthGuard` follows its throttler guard and precedes
-    // `PermissionGuard`: an anonymous caller is told to sign in before anything about the
-    // body they sent or the permission they lack.
+    // Then the session, before the permission check: an anonymous caller is told
+    // to sign in before anything about the body they sent or the permission they lack.
     registry.addInterceptor(sessionInterceptor);
     registry.addInterceptor(permissionInterceptor);
-    // After the permission check, as Node's gate sits: a request that lacks a
-    // permission is refused for THAT without the gate asking about the tenant.
+    // After the permission check: a request that lacks a permission is refused
+    // for THAT without the lifecycle gate asking about the tenant.
     registry.addInterceptor(organizationLifecycleInterceptor);
     // Order does not decide what is counted: a refusal a guard-equivalent makes
     // is marked ({@code GuardRefusal}) and the recorder skips marked requests,
     // whichever interceptor ran first.
     registry.addInterceptor(httpMetricsInterceptor);
-    // After the metrics, as Node's pipes run inside its interceptors: a malformed
-    // id is refused for THAT, after the guards, and still counted.
+    // After the metrics: a malformed id is refused for THAT, after the guards,
+    // and still counted.
     registry.addInterceptor(pathIdInterceptor);
   }
 }

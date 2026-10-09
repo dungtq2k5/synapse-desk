@@ -30,8 +30,8 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
 /**
  * `IngestionJobsApi`'s 4 operations. The sharpest property: an unrecognized
  * `status` filter must 400, not silently reach {@code IngestionJobStatus
- * .valueOf} and surface as a bare 500 — the generator dropped Node's
- * `@IsIn(INGESTION_JOB_STATUSES)`, so this guard exists only here.
+ * .valueOf} and surface as a bare 500 — the generated interface carries no
+ * allowed-values check for it, so this guard exists only here.
  */
 class IngestionJobsControllerTest {
 

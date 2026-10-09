@@ -10,19 +10,19 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * The per-ticket half of a reply address — {@code libs/common}'s
- * {@code parseTicketReplyToken}, behaviour for behaviour.
+ * The per-ticket half of a reply address: verifies the token that
+ * {@code buildTicketReplyToken} in
+ * {@code libs/common/src/configs/inbound-email.config.ts} mints, with the same
+ * rules as {@code parseTicketReplyToken} there.
  *
  * <p>{@code {base36 ticket number}-{12 hex chars of HMAC-SHA256}}: readable back
  * and unforgeable. The tenant is inside the MAC, so a token minted for one tenant
  * does not verify against another.
  *
- * <p><b>Reproduced as it is, quirks included.</b> The MAC is decoded the way
- * Node's {@code Buffer.from(mac, 'hex')} decodes it: up to the first character
- * that is not hex, an odd trailing digit dropped. So {@code <mac>zz} and
- * {@code <mac>0} verify here exactly as they do there. It forges nothing — the
- * leading 12 digits must still be the right MAC — and holding both gateways to
- * one answer matters more than being stricter in one of them. The shared table
+ * <p><b>The MAC is decoded leniently</b>, the way {@code Buffer.from(mac, 'hex')}
+ * decodes it: up to the first character that is not hex, an odd trailing digit
+ * dropped. So {@code <mac>zz} and {@code <mac>0} verify. It forges nothing — the
+ * leading 12 digits must still be the right MAC. The table
  * ({@code address-parity.json}) pins it.
  */
 public final class TicketReplyToken {
@@ -86,7 +86,7 @@ public final class TicketReplyToken {
     }
   }
 
-  /** Node's lenient hex decode: whole byte pairs, stopping at the first non-hex one. */
+  /** A lenient hex decode: whole byte pairs, stopping at the first non-hex one. */
   private static byte[] leadingHexBytes(String hex) {
     byte[] bytes = new byte[hex.length() / 2];
     int count = 0;
@@ -102,7 +102,7 @@ public final class TicketReplyToken {
 
   /**
    * {@link Character#digit} also accepts non-ASCII digits (Arabic-Indic and the
-   * like); Node's decoder does not.
+   * like); this decoder accepts ASCII hex only.
    */
   private static boolean isAsciiHex(String hex, int index) {
     for (int i = index; i < index + 2; i++) {

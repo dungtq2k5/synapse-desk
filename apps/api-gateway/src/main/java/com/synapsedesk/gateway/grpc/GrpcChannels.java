@@ -33,9 +33,8 @@ import synapsedesk.ticket.MessageServiceGrpc;
 import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
- * One channel per PEER, plaintext — the same trust boundary the Node gateway
- * assumes (`credentials.createInsecure()`): every peer is reached inside the
- * cluster network, never across it.
+ * One channel per PEER, plaintext: every peer is reached inside the cluster
+ * network, never across it, so the cluster network is the trust boundary.
  *
  * <p>`AuthService` and `UserService` share ONE channel: both are served by the
  * same auth-service process, at the same address, so a second channel would

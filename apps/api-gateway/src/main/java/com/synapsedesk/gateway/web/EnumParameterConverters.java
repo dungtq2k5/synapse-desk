@@ -5,7 +5,7 @@ import org.springframework.format.FormatterRegistry;
 
 /**
  * The two enum parameters Spring's by-constant-name conversion cannot read: the
- * document-file-type filter, which Node reads in any case, and the notification
+ * document-file-type filter, which is read in any case, and the notification
  * type, whose wire values are dotted. A value that does not convert throws, which
  * the gateway answers as a 400 naming the parameter.
  */

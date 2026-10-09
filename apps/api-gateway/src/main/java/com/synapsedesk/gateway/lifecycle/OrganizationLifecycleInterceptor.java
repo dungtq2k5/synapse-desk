@@ -12,13 +12,12 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 /**
- * The tenant lifecycle gate for REST — Node's {@code OrganizationStatusInterceptor}.
+ * The tenant lifecycle gate for REST.
  *
  * <p>Every business route checks the owning tenant's status before dispatch. Registered
- * AFTER throttling and permissions: Node's gate is an interceptor, which runs after all
- * its guards, so a request that lacks a permission is refused for THAT, without the
- * gate ever asking about the tenant. Before the request metrics, as in Node, so a
- * request refused here is not counted.
+ * AFTER throttling and permissions, so a request that lacks a permission is refused for
+ * THAT, without the gate ever asking about the tenant. Before the request metrics, so
+ * a request refused here is not counted.
  *
  * <p>Three callers pass through untouched, and none of them is asked about:
  *

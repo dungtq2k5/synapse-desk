@@ -46,8 +46,8 @@ import tools.jackson.databind.ObjectMapper;
  * the mapper here reproduces that file's exact pattern (an empty map
  * serializes to {@code ""}, "no filters", never {@code "{}"}).
  *
- * <p><b>{@code from}/{@code to}</b> are held to Node's
- * {@code @IsISO8601({ strict: true })} by {@code @StrictIso8601} on the DTO.
+ * <p><b>{@code from}/{@code to}</b> must be strict ISO-8601 dates, enforced
+ * by {@code @StrictIso8601} on the DTO.
  */
 @Component
 public class TicketsExportAndAiService {

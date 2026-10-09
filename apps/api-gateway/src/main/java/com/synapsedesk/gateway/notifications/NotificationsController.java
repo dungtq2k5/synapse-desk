@@ -63,9 +63,8 @@ import synapsedesk.notification.Notification.UpdatePreferenceRequest;
 import synapsedesk.notification.NotificationServiceGrpc;
 
 /**
- * `NotificationsApi` — the personal inbox, ported from
- * `notifications.service.ts` / `notifications-grpc.client.ts` /
- * `notification.mapper.ts`.
+ * `NotificationsApi` — the personal inbox, against notification-service's
+ * `NotificationService`.
  *
  * <p><b>Every route is SELF-scoped, and there is deliberately no permission
  * check</b> — the recipient is {@code context.sub()}, carried in the gRPC
@@ -228,8 +227,7 @@ public class NotificationsController {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // Reuses `ListNotificationsRequest` — the recipient comes from metadata,
-    // so every field but these three is irrelevant here, matching the Node
-    // client's own comment on why.
+    // so every field but these three is irrelevant here.
     UnreadCountResponse response = withMetadata(context).getUnreadCount(
       ListNotificationsRequest.newBuilder()
         .setUnreadOnly(true)

@@ -25,8 +25,8 @@ import synapsedesk.auth.OrganizationServiceGrpc.OrganizationServiceBlockingStub;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The cached tenant state: shared with Node under the same key, value and TTL, failing
- * closed, and degrading rather than failing when Redis is unavailable.
+ * The cached tenant state: shared by every replica under one key, value and TTL,
+ * failing closed, and degrading rather than failing when Redis is unavailable.
  */
 class OrganizationStatusServiceTest {
 
@@ -88,7 +88,7 @@ class OrganizationStatusServiceTest {
       ArgumentCaptor.forClass(GetOrganizationStatusRequest.class);
     verify(peer).getOrganizationStatus(asked.capture());
     assertThat(asked.getValue().getOrganizationId()).isEqualTo(ORG);
-    // `status` then `deleted`, as Node writes it, for thirty seconds.
+    // `status` then `deleted`, for thirty seconds.
     verify(values).set(
       KEY,
       "{\"status\":\"SUSPENDED_PAST_DUE\",\"deleted\":false}",

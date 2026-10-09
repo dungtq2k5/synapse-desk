@@ -7,8 +7,7 @@ import org.springframework.validation.annotation.Validated;
 /**
  * The five gRPC peers, every one required.
  *
- * <p>Required rather than optional for the reason the Node schema gives per
- * peer: a gateway that boots without one answers 500 on that surface, naming
+ * <p>Required rather than optional because a gateway that boots without one answers 500 on that surface, naming
  * nothing, instead of failing where the misconfiguration actually is.
  *
  * @param authServiceUrl auth-service

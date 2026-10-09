@@ -69,9 +69,10 @@ import org.springframework.web.bind.annotation.RestController;
  * imperatively because they had no registered route to hang a real
  * annotation on while unrouted — {@code PermissionInterceptor} only fires
  * for a method Spring has actually mapped. Now that this class IS that
- * route, the real annotation is what the platform's generic
- * permission-parity check (`permission-coverage.contract-spec.ts`, which
- * reads Node's decorators and Java's source text, not behaviour) can see,
+ * route, the real annotation is what the permission registry check
+ * (`test/gateway-contract/permission-coverage.contract-spec.ts`, which reads
+ * this source text against `test/fixtures/permissions/rest-routes.json`, not
+ * behaviour) can see,
  * and what `PermissionInterceptor` actually enforces on the wire. The
  * service-layer checks stay: they are what each group's own sabotage tests
  * exercise directly, and a second, redundant guard on the HTTP path costs

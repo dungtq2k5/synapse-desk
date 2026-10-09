@@ -25,8 +25,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Refuses a query scoring above {@link GraphqlLimits#MAX_QUERY_COMPLEXITY},
- * ported from `query-cost.plugin.ts`'s `scoreDocument`/`scoreSelectionSet`/
- * `scoreField`/`listSizeOf`/`listFieldDefaults`.
+ * scored from the cost table in {@link GraphqlLimits}.
  *
  * <p>
  * Not graphql-java's own {@code MaxQueryComplexityInstrumentation}: it

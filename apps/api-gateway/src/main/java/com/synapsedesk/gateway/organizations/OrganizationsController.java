@@ -77,13 +77,13 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * `OrganizationsApi` — the caller's OWN tenant, against auth-service's
- * `OrganizationService` (`organizations.controller.ts`, reproduced). Every
+ * `OrganizationService`. Every
  * route resolves the tenant from the verified caller context; none takes an
  * id.
  *
  * <p>
- * <b>{@code get} carries NO permission requirement</b> — Node's own choice,
- * not an omission: the End User role holds zero permission rows, so gating
+ * <b>{@code get} carries NO permission requirement</b> — a choice, not an
+ * omission: the End User role holds zero permission rows, so gating
  * the app shell's own workspace read on {@code organization.read} 403s the
  * first screen for every ordinary member. Authentication plus tenancy IS the
  * authorization here.
@@ -94,8 +94,7 @@ import tools.jackson.databind.JsonNode;
  * explicit {@code null} = clear, a value = set) — Jackson binds a JSON
  * {@code null} and an absent key to the same {@code null} field, so the
  * distinction is read off the RAW request body via {@link CachedBodyRequest}
- * (populated globally by {@code JsonBodyFilter}), the same as Node reads
- * {@code undefined} vs {@code null} off the parsed body. {@code
+ * (populated globally by {@code JsonBodyFilter}). {@code
  * allowedEmailDomains}' replace-vs-untouched flag needs the same raw
  * presence check, for the same reason.
  *
@@ -399,7 +398,7 @@ public class OrganizationsController {
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  /** The id is ignored — storage usage is a WORKSPACE total, matching Node's own client. */
+  /** The id is ignored — storage usage is a WORKSPACE total. */
   private UsageMeterResponseDto storageLeg(RequestContext context) {
     try {
       StorageUsageResponse storage = documentStub

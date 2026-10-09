@@ -38,27 +38,21 @@ import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
- * `AiStreamService`, reproduced — a token-by-token rag-service `Chat` stream
- * relayed to one socket, never a room.
+ * A token-by-token rag-service `Chat` stream relayed to one socket, never a
+ * room.
  *
- * <p><b>The one semantic gap a straight port cannot close.</b> Node holds
- * the stream as an rxjs {@code Subscription}; `unsubscribe()` IS the gRPC
- * cancellation, propagated by `@nestjs/microservices`' own teardown glue. A
- * Java blocking stub's server-streaming call returns a plain {@code
- * Iterator}, with no such hook — cancellation here is a {@code
+ * <p><b>Cancellation.</b> A blocking stub's server-streaming call returns a
+ * plain {@code Iterator}, with no cancel hook — cancellation here is a {@code
  * Context.CancellableContext} attached on the WORKER thread before the call,
  * cancelled from any other thread; the blocked {@code hasNext()}/{@code
  * next()} then throws a {@code CANCELLED StatusRuntimeException}, which this
  * class treats as the intentional-stop path, never a failure to report.
  *
- * <p><b>Backpressure uses a DIFFERENT metric than Node's, because that is
- * what netty-socketio actually exposes.</b> Node reads Engine.IO's own
- * frame-count `writeBuffer.length` against a 512-frame cap.
- * netty-socketio/Netty expose no frame count — {@link
- * SocketIOClient#isWritable()} is backed by Netty's own BYTE high/low
- * watermark on the channel. Both answer "is this client falling behind on
- * writes", so this is the measured, real equivalent rather than an invented
- * approximation — not the same number, the same question.
+ * <p><b>Backpressure is measured in bytes, because that is what
+ * netty-socketio actually exposes.</b> netty-socketio/Netty expose no frame
+ * count — {@link SocketIOClient#isWritable()} is backed by Netty's own BYTE
+ * high/low watermark on the channel, and answers "is this client falling
+ * behind on writes".
  */
 @Component
 public class AiStreamService {
@@ -73,7 +67,7 @@ public class AiStreamService {
   private final RagServiceGrpc.RagServiceBlockingStub rag;
 
   /**
-   * Per-socket, mirroring Node's `client.data` — a disconnect drops the
+   * Per-socket — a disconnect drops the
    * whole entry ({@link #cancelAll}), so nothing outlives the connection
    * that started it.
    */

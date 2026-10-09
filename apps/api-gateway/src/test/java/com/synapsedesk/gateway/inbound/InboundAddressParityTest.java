@@ -16,9 +16,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * {@link InboundAddress} and {@link TicketReplyToken}, held to the table the Node
- * gateway recomputes from {@code libs/common}'s own functions on every run
- * ({@code address-parity.spec.ts}).
+ * {@link InboundAddress} and {@link TicketReplyToken}, held to the fixed table
+ * {@code test/fixtures/inbound-email/address-parity.json}.
  *
  * <p>The table is the one fact; this file only reads it. It includes the rows
  * where a faithful port and a "sensible" one disagree — a MAC with trailing

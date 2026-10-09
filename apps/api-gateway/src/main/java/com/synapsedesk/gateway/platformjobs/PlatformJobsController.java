@@ -45,8 +45,7 @@ import synapsedesk.ticket.Analytics.RunRollupResponse;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
 
 /**
- * `PlatformJobsApi` — the scheduled-job surface Node's own comments call
- * "the endpoint whose absence cost two domains": {@code health} judges
+ * `PlatformJobsApi` — the scheduled-job surface. {@code health} judges
  * staleness against the jobs this build EXPECTS ({@link #SCHEDULED_JOBS}),
  * never against the rows a service happens to return, so a job that has
  * never run reports {@code never-ran} rather than nothing at all.
@@ -60,12 +59,11 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  * {@link #tryLeg} reports a failure as a name in {@code unavailable} rather
  * than throwing, and a job owned by an unreachable service is EXCLUDED from
  * {@code reachable} (not reported {@code never-ran}) — reporting it would
- * page somebody about a wiring bug that does not exist. See {@code
- * platform-jobs.service.ts}'s own comment on this exact point.
+ * page somebody about a wiring bug that does not exist.
  *
- * <p><b>{@code BackfillJobDto.from}/{@code to}</b> are held to Node's
- * {@code @IsISO8601({ strict: true })} by {@code @StrictIso8601} on the DTO, the
- * validator.js port every other date field uses.
+ * <p><b>{@code BackfillJobDto.from}/{@code to}</b> must be strict ISO-8601
+ * dates, enforced by {@code @StrictIso8601} on the DTO, the validator every
+ * other date field uses.
  *
  * <p><b>Migrated off `PlatformJobsApi`.</b> No {@code @RequirePermission}
  * here — {@link SuperAdminCheck} is the door, same as {@code
@@ -73,7 +71,7 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  */
 @Tag(name = "Platform Jobs")
 @RestController
-// Refused to anyone but a super admin, as Node's guard does and before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
+// Refused to anyone but a super admin, before the body is read (SessionInterceptor, from this marker). A super admin has no tenant, so the lifecycle gate never decides here either: the route is exempt outright.
 @SuperAdminOnly
 @OrgAccessKind(OrgAccess.AUTH)
 @RequestMapping(ApiPaths.V1)

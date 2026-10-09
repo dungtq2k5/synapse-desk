@@ -1,7 +1,8 @@
 package com.synapsedesk.gateway.lifecycle;
 
 /**
- * The category of a route, for the tenant lifecycle gate — Node's {@code OrgAccess}.
+ * The category of a route, for the tenant lifecycle gate — the values of
+ * {@code OrgAccess} in {@code libs/common/src/configs/organization.config.ts}.
  *
  * <p>{@code AUTH} is never gated (a member of a frozen workspace must still be able
  * to sign in and be TOLD why they cannot proceed, rather than meeting an unexplained
