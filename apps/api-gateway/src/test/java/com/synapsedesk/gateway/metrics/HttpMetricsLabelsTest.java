@@ -6,20 +6,13 @@ import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * The labels {@link HttpMetricsInterceptor} writes, derived from every route the
- * gateway maps: each template in the {@code :id} form the dashboards read, and a handler with no
- * declared status labelled 200.
- *
- * <p>Which status each route DECLARES is not checked here: it is what the committed
- * {@code docs/reference/openapi.json} publishes, which {@code npm run openapi:check}
- * holds to the served document, and the contract rows hold to what each route answers.
+ * The route label {@link HttpMetricsInterceptor} writes, derived from every route the
+ * gateway maps: each template in the {@code :id} form the dashboards read.
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -48,22 +41,5 @@ class HttpMetricsLabelsTest {
           .doesNotContain("}");
       }
     }
-  }
-
-  @Test
-  void theStatusLabelOfAnUnannotatedHandlerIs200() {
-    HandlerMethod health = handlers
-      .getHandlerMethods()
-      .values()
-      .stream()
-      .filter(handler ->
-        handler.getBeanType().getSimpleName().equals("OpsController")
-      )
-      .findFirst()
-      .orElseThrow();
-
-    assertThat(HttpMetricsInterceptor.declaredStatus(health)).isEqualTo(
-      HttpStatus.OK
-    );
   }
 }

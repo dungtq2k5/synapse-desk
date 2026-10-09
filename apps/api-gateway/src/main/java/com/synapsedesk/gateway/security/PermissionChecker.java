@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.security;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -41,16 +40,14 @@ public class PermissionChecker {
     }
 
     boolean production = "production".equals(runtime.nodeEnv());
-    throw GuardRefusal.refused(
-      new ResponseStatusException(
-        HttpStatus.FORBIDDEN,
-        production
-          ? "You do not have permission to access this resource"
-          : "Requires one of: " +
-              Arrays.stream(required.value())
-                .map(PermissionCodesEnum::getValue)
-                .collect(Collectors.joining(", "))
-      )
+    throw new ResponseStatusException(
+      HttpStatus.FORBIDDEN,
+      production
+        ? "You do not have permission to access this resource"
+        : "Requires one of: " +
+            Arrays.stream(required.value())
+              .map(PermissionCodesEnum::getValue)
+              .collect(Collectors.joining(", "))
     );
   }
 }

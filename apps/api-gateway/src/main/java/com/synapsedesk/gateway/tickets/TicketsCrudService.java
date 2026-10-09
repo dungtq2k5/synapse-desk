@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.tickets;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.model.CreateTicketDto;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.TicketResponseDto;
@@ -263,11 +262,9 @@ public class TicketsCrudService {
     if (context.permissionCodes().contains(code.getValue())) {
       return;
     }
-    throw GuardRefusal.refused(
-      new ResponseStatusException(
-        HttpStatus.FORBIDDEN,
-        "Requires: " + code.getValue()
-      )
+    throw new ResponseStatusException(
+      HttpStatus.FORBIDDEN,
+      "Requires: " + code.getValue()
     );
   }
 

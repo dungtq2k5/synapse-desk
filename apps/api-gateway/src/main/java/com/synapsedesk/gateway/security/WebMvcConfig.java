@@ -59,6 +59,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(InterceptorRegistry registry) {
+    // First, so a request any later interceptor refuses is still counted.
+    registry.addInterceptor(httpMetricsInterceptor);
     // Throttling runs BEFORE permission checks: a caller hammering a route they
     // lack permission for still consumes the rate-limit budget rather than a
     // cheap 403 every time.
@@ -70,12 +72,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // After the permission check: a request that lacks a permission is refused
     // for THAT without the lifecycle gate asking about the tenant.
     registry.addInterceptor(organizationLifecycleInterceptor);
-    // Order does not decide what is counted: a refusal a guard-equivalent makes
-    // is marked ({@code GuardRefusal}) and the recorder skips marked requests,
-    // whichever interceptor ran first.
-    registry.addInterceptor(httpMetricsInterceptor);
-    // After the metrics: a malformed id is refused for THAT, after the guards,
-    // and still counted.
+    // Last: a malformed id is refused for THAT, after the guards.
     registry.addInterceptor(pathIdInterceptor);
   }
 }

@@ -46,11 +46,9 @@ public class CurrentUser {
   /** Throws 401 {@code "Unauthorized"} if the caller has no valid full session. */
   public RequestContext require(HttpServletRequest request) {
     return read(request).orElseThrow(() ->
-      com.synapsedesk.gateway.metrics.GuardRefusal.refused(
-        new org.springframework.web.server.ResponseStatusException(
-          org.springframework.http.HttpStatus.UNAUTHORIZED,
-          "Unauthorized"
-        )
+      new org.springframework.web.server.ResponseStatusException(
+        org.springframework.http.HttpStatus.UNAUTHORIZED,
+        "Unauthorized"
       )
     );
   }

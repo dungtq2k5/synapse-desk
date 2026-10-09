@@ -16,8 +16,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *
  * <p>Every business route checks the owning tenant's status before dispatch. Registered
  * AFTER throttling and permissions, so a request that lacks a permission is refused for
- * THAT, without the gate ever asking about the tenant. Before the request metrics, so
- * a request refused here is not counted.
+ * THAT, without the gate ever asking about the tenant.
  *
  * <p>Three callers pass through untouched, and none of them is asked about:
  *

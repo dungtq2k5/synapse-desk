@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.lifecycle;
 
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -21,9 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
  * {@code libs/common/src/configs/organization.config.ts}, and the messages are the
  * ones {@code test/gateway-contract/org-lifecycle.contract-spec.ts} asserts. An
  * unknown status (a cached value some other writer produced) allows nothing.
- *
- * <p>A refusal is marked as a guard's ({@link GuardRefusal}), so a request refused
- * here is not counted in the request metrics.
  */
 @Component
 public class LifecyclePolicy {
@@ -98,8 +94,6 @@ public class LifecyclePolicy {
   }
 
   private static ResponseStatusException refused(String message) {
-    return GuardRefusal.refused(
-      new ResponseStatusException(HttpStatus.FORBIDDEN, message)
-    );
+    return new ResponseStatusException(HttpStatus.FORBIDDEN, message);
   }
 }

@@ -1,20 +1,11 @@
 /**
  * @file `http_requests_total` and `http_request_duration_seconds` on `/metrics`.
  *
- * Both are read by alert rules and dashboards, so what is pinned here is what the
- * gateway DOES, including the parts that look like defects: "improving" any of them
- * would step the series by exactly the volume of the difference, which reads as a
- * traffic event and not as a change of meaning.
- *
- * - **Counted only once a request reaches a handler.** The recorder runs after the
- *   guards, so a request a guard refuses, a request that matches no route and a
- *   preflight are not counted. A handler's OWN refusal is.
- * - **`status` is the route's DECLARED success status, never the outcome.** The
- *   recorder reads the status before an error response sets the real one, so a
- *   request the client sees as 404, 503 or 400 is
- *   counted as 200 (a GET) or 201 (a POST). The label cannot show an error rate;
- *   whether it SHOULD is a separate metrics decision, made deliberately with the
- *   dashboards updated in the same change.
+ * - **Every request matched to a route is counted**, refused or not: a guard's
+ *   refusal is counted like a handler's own. A request that matches no route and a
+ *   preflight are not.
+ * - **`status` is the status the client received**, so the series shows an error
+ *   rate.
  * - **`route` is the path TEMPLATE**, as Express writes it (`/api/v1/tickets/:id`),
  *   never the resolved path: one series per ticket otherwise, forever.
  *
@@ -139,7 +130,6 @@ describe('the HTTP metrics on /metrics', () => {
       requests: risen(before.requests, after.requests),
       durations: risen(before.durations, after.durations),
       body: after.body,
-      samples: Object.keys(after.requests),
     };
   };
 
@@ -181,7 +171,7 @@ describe('the HTTP metrics on /metrics', () => {
   );
 
   rowFor('Ops')(
-    '**`status` is the DECLARED success status, never the outcome — a 404, a 503 and a failed validation are all counted as the route’s success status**',
+    '**`status` is the status the client received — a 404, a 503 and a failed validation are each counted under their own**',
     async () => {
       const result = await moved(async () => {
         peers.auth
@@ -220,41 +210,38 @@ describe('the HTTP metrics on /metrics', () => {
       });
 
       expect(result.requests).toEqual({
-        '/api/v1/departments/:id|GET|200': 2,
-        '/api/v1/departments|POST|201': 1,
+        '/api/v1/departments/:id|GET|404': 1,
+        '/api/v1/departments/:id|GET|503': 1,
+        '/api/v1/departments|POST|400': 1,
       });
-      // No series carries an outcome status: that is the whole point of the row.
-      expect(result.samples.some((key) => /\|(400|404|503)$/u.test(key))).toBe(
-        false,
-      );
     },
   );
 
   rowFor('Ops').each([
     [
       'no cookie at all (authentication)',
-      401,
+      '/api/v1/departments/:id|GET|401',
       () => session().get(`${API}/departments/${DEPARTMENT}`),
     ],
     [
       'no cookie on a route that checks authentication in its own handler (authentication, inline)',
-      401,
+      '/api/v1/users/me|GET|401',
       () => session().get(`${API}/users/me`),
     ],
     [
       'a caller without the permission (permissions)',
-      403,
+      '/api/v1/departments/:id|GET|403',
       () =>
         session().get(`${API}/departments/${DEPARTMENT}`, headers(['x.read'])),
     ],
     [
       'a caller who is not a Super Admin on a platform route (super admin)',
-      403,
+      '/api/v1/platform/jobs|GET|403',
       () => session().get(`${API}/platform/jobs`, headers([])),
     ],
     [
       'an unverified email on a route that sends mail (email verified)',
-      403,
+      '/api/v1/users/invitations|POST|403',
       () =>
         session().post(
           `${API}/users/invitations`,
@@ -268,7 +255,7 @@ describe('the HTTP metrics on /metrics', () => {
     ],
     [
       'a caller who is already logged in on a guest-only route (guest)',
-      400,
+      '/api/v1/auth/login|POST|400',
       () =>
         session().post(
           `${API}/auth/login`,
@@ -279,16 +266,24 @@ describe('the HTTP metrics on /metrics', () => {
           headers([]),
         ),
     ],
-    [
-      'a path that matches no route',
-      404,
-      () => session().get(`${API}/no/such/route`),
-    ],
   ])(
-    '**a request refused before its handler is NOT counted: %s — so the series steps by no refused request at cutover**',
-    async (_title, expected, send) => {
+    '**a request a guard refuses is counted under its route and the refusal: %s**',
+    async (_title, series, send) => {
+      const expected = Number(series.split('|')[2]);
       const result = await moved(async () => {
         expect((await send()).status).toBe(expected);
+      });
+
+      expect(result.requests).toEqual({ [series]: 1 });
+      expect(result.durations).toEqual({ [series]: 1 });
+    },
+  );
+
+  rowFor('Ops')(
+    '**a path that matches no route is not counted — a scanner’s guesses would mint one series each**',
+    async () => {
+      const result = await moved(async () => {
+        expect((await session().get(`${API}/no/such/route`)).status).toBe(404);
       });
 
       expect(result.requests).toEqual({});
@@ -311,8 +306,7 @@ describe('the HTTP metrics on /metrics', () => {
         expect(response.status).toBe(401);
       });
 
-      // `@HttpCode(200)` is login's declared status, whatever the client saw.
-      expect(result.requests).toEqual({ '/api/v1/auth/login|POST|200': 1 });
+      expect(result.requests).toEqual({ '/api/v1/auth/login|POST|401': 1 });
     },
   );
 });

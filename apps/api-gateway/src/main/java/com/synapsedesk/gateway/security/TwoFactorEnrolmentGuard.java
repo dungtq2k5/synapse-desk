@@ -6,7 +6,6 @@ import com.synapsedesk.gateway.auth.JwtPrincipal;
 import com.synapsedesk.gateway.auth.JwtVerifier;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -58,8 +57,9 @@ public class TwoFactorEnrolmentGuard {
       return new Enrollee(challenge.get().sub(), currentUser.origin(request));
     }
 
-    throw GuardRefusal.refused(
-      new ResponseStatusException(HttpStatus.UNAUTHORIZED, ENROLMENT_REFUSED)
+    throw new ResponseStatusException(
+      HttpStatus.UNAUTHORIZED,
+      ENROLMENT_REFUSED
     );
   }
 }

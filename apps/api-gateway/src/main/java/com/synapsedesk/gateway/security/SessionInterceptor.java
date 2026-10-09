@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.security;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.RouteSecurity;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -90,9 +89,7 @@ public class SessionInterceptor implements HandlerInterceptor {
         !context.isSuperAdmin() &&
         !context.isEmailVerified()
       ) {
-        throw GuardRefusal.refused(
-          new ResponseStatusException(HttpStatus.FORBIDDEN, VERIFY_EMAIL)
-        );
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, VERIFY_EMAIL);
       }
     } else if (marker.value() == RouteSecurity.Scheme.SESSION_OR_CHALLENGE) {
       enrolment.require(request);

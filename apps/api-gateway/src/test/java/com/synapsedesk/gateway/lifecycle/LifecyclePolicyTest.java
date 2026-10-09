@@ -15,9 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -163,26 +161,6 @@ class LifecyclePolicyTest {
     assertThatThrownBy(() -> policy.require(ORG, OrgAccess.READ)).isInstanceOf(
       IllegalStateException.class
     );
-  }
-
-  @Test
-  void aRefusalIsMarkedAsAGuardsSoItIsNotCountedInTheRequestMetrics() {
-    MockHttpServletRequest request = new MockHttpServletRequest();
-    RequestContextHolder.setRequestAttributes(
-      new ServletRequestAttributes(request)
-    );
-    tenantIs("FROZEN", false);
-
-    assertThatThrownBy(() -> policy.require(ORG, OrgAccess.READ)).isInstanceOf(
-      ResponseStatusException.class
-    );
-
-    assertThat(
-      request.getAttributeNames().asIterator().hasNext() &&
-        java.util.Collections.list(request.getAttributeNames())
-          .stream()
-          .anyMatch(name -> name.contains("GuardRefusal"))
-    ).isTrue();
   }
 
   @Test

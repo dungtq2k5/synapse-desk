@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.auth;
 
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,11 +23,9 @@ public class SuperAdminCheck {
 
   public void require(RequestContext context) {
     if (!context.isSuperAdmin() || context.organizationId() != null) {
-      throw GuardRefusal.refused(
-        new ResponseStatusException(
-          HttpStatus.FORBIDDEN,
-          "Platform administration access required"
-        )
+      throw new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        "Platform administration access required"
       );
     }
   }

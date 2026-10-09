@@ -9,7 +9,6 @@ import com.synapsedesk.gateway.auth.UserMapper;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
-import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.model.ActivateTwoFactorDto;
 import com.synapsedesk.gateway.model.AuthenticateTwoFactorDto;
 import com.synapsedesk.gateway.model.BackupCodesResponseDto;
@@ -362,9 +361,7 @@ public class TwoFactorAuthController {
   }
 
   private static ResponseStatusException unauthorized() {
-    return GuardRefusal.refused(
-      new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized")
-    );
+    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
   }
 
   private static OffsetDateTime toOffsetDateTime(

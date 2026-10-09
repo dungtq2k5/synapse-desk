@@ -4,32 +4,21 @@ import com.synapsedesk.gateway.web.ApplicationRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 
 /**
- * {@code http_requests_total} and {@code http_request_duration_seconds} — including
- * the parts that look like defects, because the series is read by dashboards and
- * alert rules tuned to its current numbers.
+ * {@code http_requests_total} and {@code http_request_duration_seconds}.
  *
- * <p><b>Counted only once a request reaches a handler.</b> A request a guard refuses
- * (no cookie, no permission, rate limited), a request that matches no route, and a
- * request answered by a filter are not counted. This interceptor is registered last,
- * after throttling and permissions, so those never reach it; the guards run inside
- * handlers mark their refusal ({@link GuardRefusal}) and are skipped. A handler's
- * OWN refusal (a wrong password, a 404 from a peer) is counted.
+ * <p><b>Every request matched to a route is counted</b>, refused or not: a guard's
+ * refusal (no cookie, no permission, rate limited) is a request like any other. This
+ * interceptor is registered first, so its completion runs whichever later interceptor
+ * refused. A request that matches no route, and one answered by a filter before MVC,
+ * are not counted.
  *
- * <p><b>The {@code status} label is the route's DECLARED success status, never the
- * outcome.</b> A request the client sees as 404, 503 or 400 is counted as 200 (a
- * {@code GET}) or 201 (a {@code POST}), so the label cannot show an error rate.
- * Whether it SHOULD carry the outcome is a real metrics decision, to be made
- * deliberately with the dashboards updated in the same change. The declared status
- * is {@code @ResponseStatus}, else 200.
+ * <p><b>The {@code status} label is the status the client received.</b> An exception
+ * no handler resolved is a 500, the answer the container gives it.
  *
  * <p><b>The {@code route} label is the path TEMPLATE, never the resolved path</b>,
  * written as Express writes it ({@code /api/v1/tickets/:id}): {@code
@@ -73,8 +62,7 @@ public class HttpMetricsInterceptor implements HandlerInterceptor {
   ) {
     if (
       !counts(handler) ||
-      !(request.getAttribute(STARTED) instanceof Long started) ||
-      GuardRefusal.wasRefused(request)
+      !(request.getAttribute(STARTED) instanceof Long started)
     ) {
       return;
     }
@@ -88,7 +76,7 @@ public class HttpMetricsInterceptor implements HandlerInterceptor {
         ? routeTemplate(template)
         : "unmatched",
       request.getMethod(),
-      declaredStatus((HandlerMethod) handler).value(),
+      failure == null ? response.getStatus() : 500,
       Duration.ofNanos(System.nanoTime() - started)
     );
   }
@@ -101,21 +89,5 @@ public class HttpMetricsInterceptor implements HandlerInterceptor {
   /** {@code /api/v1/tickets/{id}} as Express labels it: {@code /api/v1/tickets/:id}. */
   static String routeTemplate(String pattern) {
     return pattern.replaceAll("\\{(\\w+)(?::[^}]*)?}", ":$1");
-  }
-
-  /** What the framework answers a SUCCESSFUL call with: {@code @ResponseStatus}, else 200. */
-  static HttpStatus declaredStatus(HandlerMethod handler) {
-    ResponseStatus declared = AnnotatedElementUtils.findMergedAnnotation(
-      handler.getMethod(),
-      ResponseStatus.class
-    );
-    if (declared == null) {
-      declared = AnnotatedElementUtils.findMergedAnnotation(
-        handler.getBeanType(),
-        ResponseStatus.class
-      );
-    }
-
-    return declared == null ? HttpStatus.OK : declared.code();
   }
 }

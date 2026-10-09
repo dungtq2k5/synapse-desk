@@ -13,36 +13,23 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerMapping;
 
 /**
  * What the HTTP metrics record, for which requests, under which labels.
  *
- * <p>The series is read by alert rules and dashboards tuned to its current numbers,
- * so each rule here is pinned: counted only once a handler is reached, the route as
- * a template, the DECLARED status and never the outcome.
+ * <p>Each rule is pinned: every request matched to a route is counted, refused or
+ * not, under the route as a template and the status the client received.
  */
 class HttpMetricsInterceptorTest {
 
-  /** A handler of each declared status. */
   static class Handlers {
 
     public void plain() {}
 
     @ResponseStatus(HttpStatus.CREATED)
     public void created() {}
-
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void gone() {}
-  }
-
-  @ResponseStatus(HttpStatus.ACCEPTED)
-  static class AcceptedController {
-
-    public void anything() {}
   }
 
   /** Named like Boot's container error controller, whose dispatch is not counted. */
@@ -193,19 +180,20 @@ class HttpMetricsInterceptorTest {
   }
 
   @Test
-  void aHandlerThatThrewIsStillCounted() throws Exception {
+  void anExceptionNoHandlerResolvedIsCountedAs500() throws Exception {
     serve(
       request("GET", "/api/v1/x"),
       handler(Handlers.class, "plain"),
       new IllegalStateException("peer down")
     );
 
-    assertThat(count("/api/v1/x", "GET", "200")).isEqualTo(1);
+    assertThat(count("/api/v1/x", "GET", "500")).isEqualTo(1);
   }
 
   @Test
   void afterCompletionWithoutAPreHandleRecordsNothing() throws Exception {
-    // A request an earlier interceptor refused: MVC never called preHandle here.
+    // MVC calls afterCompletion only after this preHandle; with no start time
+    // there is nothing to record.
     MockHttpServletRequest request = request("GET", "/api/v1/x");
 
     interceptor.afterCompletion(
@@ -218,54 +206,10 @@ class HttpMetricsInterceptorTest {
     assertThat(recorded()).isZero();
   }
 
-  // ------------------------------------------------------------ guard refusals
+  // ------------------------------------------------------------ the status
 
   @Test
-  void aRequestAGuardRefusedIsNotCounted() throws Exception {
-    MockHttpServletRequest request = request("GET", "/api/v1/x");
-    RequestContextHolder.setRequestAttributes(
-      new ServletRequestAttributes(request)
-    );
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    interceptor.preHandle(request, response, handler(Handlers.class, "plain"));
-
-    // Java runs most guards inside the handler: the refusal marks the request.
-    GuardRefusal.refused(new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-    interceptor.afterCompletion(
-      request,
-      response,
-      handler(Handlers.class, "plain"),
-      null
-    );
-
-    assertThat(recorded()).isZero();
-  }
-
-  @Test
-  void aHandlersOwnRefusalIsNotMarkedAndIsCounted() throws Exception {
-    serve(
-      request("POST", "/api/v1/auth/login"),
-      handler(Handlers.class, "plain"),
-      new ResponseStatusException(HttpStatus.UNAUTHORIZED, "wrong password")
-    );
-
-    assertThat(count("/api/v1/auth/login", "POST", "200")).isEqualTo(1);
-  }
-
-  @Test
-  void markingNeedsNoRequestAndReturnsTheSameRefusal() {
-    RequestContextHolder.resetRequestAttributes();
-    ResponseStatusException refusal = new ResponseStatusException(
-      HttpStatus.FORBIDDEN
-    );
-
-    assertThat(GuardRefusal.refused(refusal)).isSameAs(refusal);
-  }
-
-  // ------------------------------------------------------------ declared status
-
-  @Test
-  void theStatusIsTheDeclaredSuccessStatusAndNeverTheOutcome()
+  void aRefusedRequestIsCountedUnderTheStatusTheClientReceived()
     throws Exception {
     MockHttpServletRequest request = request("POST", "/api/v1/departments");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -274,8 +218,8 @@ class HttpMetricsInterceptorTest {
       response,
       handler(Handlers.class, "created")
     );
-    // The client is about to see a 400; the label must not.
-    response.setStatus(400);
+    // A guard or the handler refused it, and the exception handler wrote the 401.
+    response.setStatus(401);
     interceptor.afterCompletion(
       request,
       response,
@@ -283,27 +227,8 @@ class HttpMetricsInterceptorTest {
       null
     );
 
-    assertThat(count("/api/v1/departments", "POST", "201")).isEqualTo(1);
-    assertThat(count("/api/v1/departments", "POST", "400")).isZero();
-  }
-
-  @Test
-  void theDeclaredStatusComesFromTheMethodThenTheClassThenDefaultsTo200()
-    throws Exception {
-    assertThat(
-      HttpMetricsInterceptor.declaredStatus(handler(Handlers.class, "created"))
-    ).isEqualTo(HttpStatus.CREATED);
-    assertThat(
-      HttpMetricsInterceptor.declaredStatus(handler(Handlers.class, "gone"))
-    ).isEqualTo(HttpStatus.NO_CONTENT);
-    assertThat(
-      HttpMetricsInterceptor.declaredStatus(
-        handler(AcceptedController.class, "anything")
-      )
-    ).isEqualTo(HttpStatus.ACCEPTED);
-    assertThat(
-      HttpMetricsInterceptor.declaredStatus(handler(Handlers.class, "plain"))
-    ).isEqualTo(HttpStatus.OK);
+    assertThat(count("/api/v1/departments", "POST", "401")).isEqualTo(1);
+    assertThat(count("/api/v1/departments", "POST", "201")).isZero();
   }
 
   // ------------------------------------------------------------ the template

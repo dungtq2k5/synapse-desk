@@ -551,7 +551,7 @@ describe('the tenant lifecycle gate', () => {
   // ------------------------------------------------------------------ metrics
 
   rowFor('Ops')(
-    '**a request the gate refuses is not counted in `http_requests_total` — only requests that reach a handler are**',
+    '**a request the gate refuses is counted once in `http_requests_total`, like any other refusal**',
     async () => {
       tenantIs(OrgStatus.FROZEN);
       const total = async (): Promise<number> => {
@@ -569,7 +569,7 @@ describe('the tenant lifecycle gate', () => {
       const response = await ROUTES.READ.send();
 
       expect(response.status).toBe(403);
-      expect(await total()).toBe(before);
+      expect(await total()).toBe(before + 1);
     },
   );
 });
