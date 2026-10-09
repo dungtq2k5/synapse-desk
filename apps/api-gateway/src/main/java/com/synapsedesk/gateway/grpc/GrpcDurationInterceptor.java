@@ -15,15 +15,13 @@ import java.time.Duration;
 /**
  * Records {@code grpc_client_duration_seconds{peer, code}} for every call on one
  * peer's channel — the single place every call passes through, which is what
- * Node's {@code BaseGrpcClient.call} is for it. A call site cannot forget it.
+ * makes it the place to time them. A call site cannot forget it.
  *
- * <p><b>The {@code code} label is Node's, quirks included, because a dashboard
- * reads it:</b> {@code OK} for success, the NUMERIC status code as a string for
- * a failure ({@code "14"}, not {@code UNAVAILABLE}), and {@code
- * DEADLINE_EXCEEDED} by name — Node's own timeout is the one failure it names.
- * A peer that itself answers status 4 is therefore {@code DEADLINE_EXCEEDED}
- * here and {@code "4"} there; the two are not distinguishable on this side.
- * There is no {@code method} label, as in Node.
+ * <p><b>The {@code code} label is the status NAME</b>: {@code OK}, or the failure's
+ * canonical name ({@code NOT_FOUND}, {@code UNAVAILABLE}, {@code DEADLINE_EXCEEDED}).
+ * A deadline is {@code DEADLINE_EXCEEDED} whichever side enforced it, this channel's
+ * own or the peer's. There is no {@code method} label: a series per RPC method would
+ * multiply the series count for no question a dashboard asks.
  */
 public final class GrpcDurationInterceptor implements ClientInterceptor {
 
@@ -36,12 +34,7 @@ public final class GrpcDurationInterceptor implements ClientInterceptor {
   }
 
   static String codeOf(Status status) {
-    if (status.isOk()) return "OK";
-    if (status.getCode() == Status.Code.DEADLINE_EXCEEDED) {
-      return "DEADLINE_EXCEEDED";
-    }
-
-    return String.valueOf(status.getCode().value());
+    return status.getCode().name();
   }
 
   @Override

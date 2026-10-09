@@ -2,10 +2,10 @@
  * @file `grpc_client_duration_seconds{peer, code}` on `/metrics`.
  *
  * Every gateway -> peer call is timed under the PEER it reached and the status it
- * ended with. The `code` label is Node's, quirks included: `OK`, or the numeric
- * status as a string (`5`, `14`), and no `method` label. A dashboard reads these
- * values, so a Java gateway that named them differently would break the panel on
- * the day of cutover and nothing else would notice.
+ * ended with. The `code` label is the status name — `OK`, `NOT_FOUND`,
+ * `UNAVAILABLE` — and there is no `method` label. A dashboard reads these values,
+ * so a change to how they are named would break the panel and nothing else would
+ * notice.
  *
  * Each row measures a DELTA against the peer's own call record: "recorded once
  * per call" is only checkable against what the peer actually saw.
@@ -191,12 +191,12 @@ describe('the gRPC client metric on /metrics', () => {
 
         return new Set(
           Object.keys(countsOf(text))
-            .filter((key) => key.endsWith('|12'))
+            .filter((key) => key.endsWith('|UNIMPLEMENTED'))
             .map((key) => key.split('|')[0]),
         );
       };
 
-      // Unprogrammed in this suite, so every poll answers UNIMPLEMENTED (12).
+      // Unprogrammed in this suite, so every poll answers UNIMPLEMENTED.
       // Wait for the scheduler's poll rather than assume its timing.
       const deadline = Date.now() + 20_000;
       let found = await seenPeers();
@@ -240,7 +240,7 @@ describe('the gRPC client metric on /metrics', () => {
   );
 
   rowFor('Ops')(
-    '**a failed call carries the NUMERIC status code as its `code` — `5`, not `NOT_FOUND`**',
+    '**a failed call carries the status NAME as its `code` — `NOT_FOUND`, not `5`**',
     async () => {
       peers.auth
         .on('DepartmentService/GetDepartment')
@@ -252,15 +252,15 @@ describe('the gRPC client metric on /metrics', () => {
         ).toBe(404);
       });
 
-      expect(result['auth-service|5']).toBe(1);
-      expect(Object.keys(result).some((key) => key.includes('NOT_FOUND'))).toBe(
+      expect(result['auth-service|NOT_FOUND']).toBe(1);
+      expect(Object.keys(result).some((key) => /\|\d+$/u.test(key))).toBe(
         false,
       );
     },
   );
 
   rowFor('Ops')(
-    '**an unreachable peer is `14` (UNAVAILABLE) — the failure an operator pages on**',
+    '**an unreachable peer is `UNAVAILABLE` — the failure an operator pages on**',
     async () => {
       peers.auth
         .on('DepartmentService/GetDepartment')
@@ -272,7 +272,7 @@ describe('the gRPC client metric on /metrics', () => {
         ).toBe(503);
       });
 
-      expect(result['auth-service|14']).toBe(1);
+      expect(result['auth-service|UNAVAILABLE']).toBe(1);
     },
   );
 });
