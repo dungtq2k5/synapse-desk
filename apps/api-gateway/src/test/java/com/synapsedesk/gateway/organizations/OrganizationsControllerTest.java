@@ -4,12 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.config.InboundEmailProperties;
+import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.model.DeleteOrganizationDto;
 import com.synapsedesk.gateway.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
@@ -24,6 +28,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import synapsedesk.auth.Organization.CompleteOnboardingRequest;
+import synapsedesk.auth.Organization.DeleteOrganizationRequest;
+import synapsedesk.auth.Organization.DeleteOrganizationResponse;
+import synapsedesk.auth.Organization.OrganizationResponse;
 import synapsedesk.auth.Organization.OrganizationSettingsResponse;
 import synapsedesk.auth.Organization.UpdateOrganizationSettingsRequest;
 import synapsedesk.auth.OrganizationServiceGrpc;
@@ -45,6 +53,9 @@ class OrganizationsControllerTest {
     mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CacheService cache = mock(CacheService.class);
+  private final OrganizationStatusService statuses = mock(
+    OrganizationStatusService.class
+  );
   private final InboundEmailProperties inboundEmail =
     new InboundEmailProperties(
       "secret",
@@ -90,7 +101,8 @@ class OrganizationsControllerTest {
       currentUser,
       cache,
       inboundEmail,
-      new RawJsonBody(new ObjectMapper())
+      new RawJsonBody(new ObjectMapper()),
+      statuses
     );
   }
 
@@ -226,5 +238,47 @@ class OrganizationsControllerTest {
       "organizationsControllerGetV1"
     );
     assertThat(get.isAnnotationPresent(RequirePermission.class)).isFalse();
+  }
+
+  @Test
+  void deletingTheOwnOrganizationDropsItsCachedStatusAfterAuthServiceFrozeIt() {
+    when(
+      stub.deleteOrganization(any(DeleteOrganizationRequest.class))
+    ).thenReturn(DeleteOrganizationResponse.getDefaultInstance());
+    requestWithBody("{\"reason\":\"closing\"}");
+
+    controller.organizationsControllerRequestOffboardV1(
+      new DeleteOrganizationDto().reason("closing")
+    );
+
+    verify(statuses).invalidate("org-1");
+  }
+
+  @Test
+  void aDeleteAuthServiceRefusedLeavesTheCachedStatusAlone() {
+    when(
+      stub.deleteOrganization(any(DeleteOrganizationRequest.class))
+    ).thenThrow(io.grpc.Status.PERMISSION_DENIED.asRuntimeException());
+    requestWithBody("{\"reason\":\"closing\"}");
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+      controller.organizationsControllerRequestOffboardV1(
+        new DeleteOrganizationDto().reason("closing")
+      )
+    );
+
+    verify(statuses, never()).invalidate(any());
+  }
+
+  @Test
+  void completingOnboardingDropsTheCachedStatus() {
+    when(
+      stub.completeOnboarding(any(CompleteOnboardingRequest.class))
+    ).thenReturn(OrganizationResponse.getDefaultInstance());
+    requestWithBody("{}");
+
+    controller.organizationsControllerCompleteOnboardingV1();
+
+    verify(statuses).invalidate("org-1");
   }
 }

@@ -16,8 +16,9 @@
  * What is pinned is what the gateway DOES: the access table, the category each route
  * resolves to, the three requests that are never gated, the thirty-second cache in
  * Redis under `org-status:<id>` (shared by every replica, so the value is read by
- * whichever replica asks next), failing CLOSED, and that a platform change
- * invalidates the cached decision. The category of EVERY route is held by the table
+ * whichever replica asks next), failing CLOSED, riding out a peer outage on the last
+ * known status but never on none, and that a platform change invalidates the cached
+ * decision. The category of EVERY route is held by the table
  * `org-access-routes.json`; these rows prove the behaviour end to end.
  */
 
@@ -329,21 +330,24 @@ describe('the tenant lifecycle gate', () => {
   // --------------------------------------------------------------------- cache
 
   rowFor('Ops')(
-    '**a decision is cached for thirty seconds in Redis under `org-status:<id>` — two requests, one question**',
+    '**a decision is fresh for thirty seconds in Redis under `org-status:<id>`, and kept five minutes longer for an outage — two requests, one question**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
+      const before = Date.now();
 
       await ROUTES.READ.send();
       await ROUTES.READ.send();
 
       expect(statusCalls()).toHaveLength(1);
-      expect(JSON.parse((await redis.get(CACHE_KEY)) ?? 'null')).toEqual({
-        status: 'ACTIVE',
-        deleted: false,
-      });
+      const { freshUntil, ...decision } = JSON.parse(
+        (await redis.get(CACHE_KEY)) ?? 'null',
+      ) as { freshUntil: number };
+      expect(decision).toEqual({ status: 'ACTIVE', deleted: false });
+      expect(freshUntil).toBeGreaterThanOrEqual(before + 30_000);
+      expect(freshUntil).toBeLessThanOrEqual(Date.now() + 30_000);
       const ttl = await redis.ttl(CACHE_KEY);
-      expect(ttl).toBeGreaterThan(0);
-      expect(ttl).toBeLessThanOrEqual(30);
+      expect(ttl).toBeGreaterThan(300);
+      expect(ttl).toBeLessThanOrEqual(330);
     },
   );
 
@@ -396,7 +400,7 @@ describe('the tenant lifecycle gate', () => {
   );
 
   rowFor('Ops')(
-    '**a peer that cannot be reached fails the request — it does not wave it through**',
+    '**a peer that cannot be reached fails the request of a tenant with no cached status — it does not wave it through**',
     async () => {
       peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
 
@@ -405,6 +409,38 @@ describe('the tenant lifecycle gate', () => {
       expect(statusCalls()).toHaveLength(1);
       expect(response.status).toBe(503);
       expect(downstreamCalls('READ')).toHaveLength(0);
+    },
+  );
+
+  rowFor('Ops')(
+    '**a peer that cannot be reached is ridden out on the last known status — a stale ACTIVE serves, a stale FROZEN refuses**',
+    async () => {
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+      const stale = (status: string) =>
+        redis.set(
+          CACHE_KEY,
+          JSON.stringify({
+            status,
+            deleted: false,
+            freshUntil: Date.now() - 1,
+          }),
+          'EX',
+          300,
+        );
+
+      await stale('ACTIVE');
+      const served = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(lifecycleRefusal(served.status, served.body)).toBe(false);
+      expect(downstreamCalls('READ').length).toBeGreaterThanOrEqual(1);
+
+      await stale('FROZEN');
+      const refused = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(2);
+      expect(refused.status).toBe(403);
+      expect(errorOf(refused.body)).toBe(enveloped(REFUSAL.FROZEN));
     },
   );
 
@@ -444,6 +480,36 @@ describe('the tenant lifecycle gate', () => {
 
       expect(changed.status).toBe(200);
       expect(await redis.exists(CACHE_KEY)).toBe(0);
+    },
+  );
+
+  rowFor('Ops')(
+    '**a tenant deleting its own organization is refused on its next request — the cached ACTIVE is dropped, not served for thirty seconds**',
+    async () => {
+      tenantIs(OrgStatus.ACTIVE);
+      await ROUTES.READ.send();
+      expect(statusCalls()).toHaveLength(1);
+
+      peers.auth
+        .on('OrganizationService/DeleteOrganization')
+        .reply({ revokedSessionCount: 1 });
+      const deleted = await session().request(
+        'DELETE',
+        `${API}/organizations/current`,
+        {
+          body: { reason: 'closing' },
+          headers: headers(['organization.delete']),
+        },
+      );
+      expect(deleted.status).toBe(200);
+
+      // auth-service froze the tenant as it deleted it.
+      tenantIs(OrgStatus.FROZEN);
+      const next = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(2);
+      expect(next.status).toBe(403);
+      expect(errorOf(next.body)).toBe(enveloped(REFUSAL.FROZEN));
     },
   );
 

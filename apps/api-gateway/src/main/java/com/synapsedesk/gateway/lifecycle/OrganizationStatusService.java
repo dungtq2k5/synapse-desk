@@ -1,7 +1,10 @@
 package com.synapsedesk.gateway.lifecycle;
 
 import com.synapsedesk.gateway.auth.RequestOrigin;
+import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -24,8 +27,10 @@ import tools.jackson.databind.ObjectMapper;
  * auth-service for a value that changes a handful of times in a tenant's life.
  *
  * <p><b>Shared by every replica.</b> The decision is cached in Redis under
- * {@code org-status:<id>} as {@code {"status":"ACTIVE","deleted":false}} for thirty
- * seconds, so whichever replica asks next reads what another cached. In Redis rather
+ * {@code org-status:<id>} as
+ * {@code {"status":"ACTIVE","deleted":false,"freshUntil":<epoch ms>}}, fresh for
+ * thirty seconds, so whichever replica asks next reads what another cached. An entry
+ * without {@code freshUntil} is fresh for as long as Redis keeps it. In Redis rather
  * than a map in this process for the same reason the throttler is: a freeze must take effect across every replica, not
  * just the one that happened to serve the status change.
  *
@@ -40,8 +45,17 @@ import tools.jackson.databind.ObjectMapper;
  * read is FROZEN: this cache gates every request, and caching "usable" for a tenant
  * whose state is unknown would gate nothing. A cache that cannot be read or written
  * is not an error: Redis being down must mean "ask auth-service every time", slower
- * but correct, not a 500 on every authenticated request. A peer that cannot be
- * reached DOES fail the request: it is not waved through.
+ * but correct, not a 500 on every authenticated request.
+ *
+ * <p><b>A peer outage serves the last known status, for a bounded time.</b> Redis
+ * keeps an entry {@link #MAX_STALE} past its thirty fresh seconds. Once it is stale
+ * the peer is asked again; if the peer cannot be reached, the stale entry answers, so
+ * an auth-service outage does not take down every route at the thirty-second mark.
+ * {@link #MAX_STALE} is therefore also how long a tenant frozen during the outage
+ * keeps working. A tenant with no entry at all is NOT waved through: the request
+ * fails, as it always did. Every write the gateway sees that changes a tenant's
+ * status calls {@link #invalidate}, so a change made through the gateway is never
+ * what a stale entry serves.
  */
 @Service
 public class OrganizationStatusService {
@@ -52,6 +66,9 @@ public class OrganizationStatusService {
 
   /** {@code STATUS_CACHE_TTL_SECONDS}. */
   static final Duration TTL = Duration.ofSeconds(30);
+
+  /** How long past {@link #TTL} a status still answers while the peer is unreachable. */
+  static final Duration MAX_STALE = Duration.ofMinutes(5);
 
   static final String CACHE_PREFIX = "org-status:";
 
@@ -70,36 +87,54 @@ public class OrganizationStatusService {
    */
   public record State(String status, boolean deleted) {}
 
+  /** A cached state, and whether it is past its fresh thirty seconds. */
+  private record Entry(State state, boolean stale) {}
+
   private final OrganizationServiceBlockingStub organizations;
   private final StringRedisTemplate redis;
   private final ObjectMapper json;
+  private final CacheService cache;
 
   public OrganizationStatusService(
     OrganizationServiceBlockingStub organizations,
     StringRedisTemplate redis,
-    ObjectMapper json
+    ObjectMapper json,
+    CacheService cache
   ) {
     this.organizations = organizations;
     this.redis = redis;
     this.json = json;
+    this.cache = cache;
   }
 
   public State get(String organizationId) {
-    State cached = readCache(organizationId);
-    if (cached != null) return cached;
+    Entry cached = readCache(organizationId);
+    if (cached != null && !cached.stale()) return cached.state();
 
-    OrganizationStatusResponse response = organizations
-      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(
-        MetadataUtils.newAttachHeadersInterceptor(
-          CallerMetadata.of(UNKNOWN_ORIGIN)
+    OrganizationStatusResponse response;
+    try {
+      response = organizations
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(
+            CallerMetadata.of(UNKNOWN_ORIGIN)
+          )
         )
-      )
-      .getOrganizationStatus(
-        GetOrganizationStatusRequest.newBuilder()
-          .setOrganizationId(organizationId)
-          .build()
+        .getOrganizationStatus(
+          GetOrganizationStatusRequest.newBuilder()
+            .setOrganizationId(organizationId)
+            .build()
+        );
+    } catch (StatusRuntimeException failure) {
+      if (cached == null || !unreachable(failure)) throw failure;
+      LOG.warn(
+        "auth-service unreachable ({}); serving the last known status of {}",
+        failure.getStatus().getCode(),
+        organizationId
       );
+
+      return cached.state();
+    }
 
     State state = new State(
       nameOf(response.getStatus()),
@@ -111,13 +146,15 @@ public class OrganizationStatusService {
   }
 
   /**
-   * Drops the cached decision immediately — called by the platform endpoints that
-   * change a tenant's status. Without it a freeze would not take effect for up to
-   * the thirty seconds, which is the wrong direction for the one action an operator
-   * takes when something is going wrong right now. Non-fatal: the entry expires on
-   * its own.
+   * Drops what the gateway caches about a tenant's state at once: this decision and
+   * the tenant's cached {@code GET /organizations/current}. Called by every write that
+   * changes a status (the platform endpoints, the tenant's own delete and onboarding),
+   * so a freeze takes effect on the next request and an outage cannot serve the state
+   * from before it. One method, so a write cannot drop one and miss the other.
+   * Non-fatal: the entries expire on their own.
    */
   public void invalidate(String organizationId) {
+    cache.invalidateScope(organizationId, "organizations");
     try {
       redis.delete(CACHE_PREFIX + organizationId);
     } catch (RuntimeException failure) {
@@ -142,8 +179,16 @@ public class OrganizationStatusService {
     };
   }
 
+  private static boolean unreachable(StatusRuntimeException failure) {
+    Status.Code code = failure.getStatus().getCode();
+
+    return (
+      code == Status.Code.UNAVAILABLE || code == Status.Code.DEADLINE_EXCEEDED
+    );
+  }
+
   /** A read failure, or a value not shaped as {@code writeCache} writes it, is a miss and not an error. */
-  private State readCache(String organizationId) {
+  private Entry readCache(String organizationId) {
     try {
       String raw = redis.opsForValue().get(CACHE_PREFIX + organizationId);
       if (raw == null || raw.isEmpty()) return null;
@@ -152,8 +197,14 @@ public class OrganizationStatusService {
       JsonNode status = node.get("status");
       JsonNode deleted = node.get("deleted");
       if (status == null || !status.isString() || deleted == null) return null;
+      JsonNode freshUntil = node.get("freshUntil");
+      boolean stale =
+        freshUntil != null && freshUntil.asLong() <= System.currentTimeMillis();
 
-      return new State(status.asString(), deleted.asBoolean());
+      return new Entry(
+        new State(status.asString(), deleted.asBoolean()),
+        stale
+      );
     } catch (RuntimeException failure) {
       LOG.warn(
         "Status cache unavailable, falling through to auth-service: {}",
@@ -168,6 +219,7 @@ public class OrganizationStatusService {
     java.util.Map<String, Object> value = new java.util.LinkedHashMap<>();
     value.put("status", state.status());
     value.put("deleted", state.deleted());
+    value.put("freshUntil", System.currentTimeMillis() + TTL.toMillis());
 
     return value;
   }
@@ -177,9 +229,9 @@ public class OrganizationStatusService {
     try {
       redis.opsForValue().set(
         CACHE_PREFIX + organizationId,
-        // Ordered `status`, then `deleted`, as the class doc shows it.
+        // Ordered `status`, `deleted`, `freshUntil`, as the class doc shows it.
         json.writeValueAsString(valueOf(state)),
-        TTL
+        TTL.plus(MAX_STALE)
       );
     } catch (RuntimeException failure) {
       LOG.debug(

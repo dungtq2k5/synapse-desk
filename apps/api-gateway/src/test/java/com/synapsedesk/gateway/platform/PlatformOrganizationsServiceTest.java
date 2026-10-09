@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
@@ -47,7 +46,6 @@ class PlatformOrganizationsServiceTest {
   private final OrganizationStatusService statuses = mock(
     OrganizationStatusService.class
   );
-  private final CacheService cache = mock(CacheService.class);
   private PlatformOrganizationsService service;
 
   private static RequestContext context() {
@@ -67,12 +65,7 @@ class PlatformOrganizationsServiceTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    service = new PlatformOrganizationsService(
-      stub,
-      superAdminCheck,
-      statuses,
-      cache
-    );
+    service = new PlatformOrganizationsService(stub, superAdminCheck, statuses);
   }
 
   @Test
@@ -248,7 +241,6 @@ class PlatformOrganizationsServiceTest {
     );
 
     verify(statuses).invalidate("org-9");
-    verify(cache).invalidateScope("org-9", "organizations");
   }
 
   @Test
@@ -263,7 +255,6 @@ class PlatformOrganizationsServiceTest {
     service.setStatus(context(), "org-9", dto);
 
     verify(statuses).invalidate("org-9");
-    verify(cache).invalidateScope("org-9", "organizations");
   }
 
   @Test
@@ -278,7 +269,6 @@ class PlatformOrganizationsServiceTest {
     service.offboard(context(), "org-9", dto);
 
     verify(statuses).invalidate("org-9");
-    verify(cache).invalidateScope("org-9", "organizations");
   }
 
   @Test
@@ -288,7 +278,6 @@ class PlatformOrganizationsServiceTest {
     service.restore(context(), "org-9");
 
     verify(statuses).invalidate("org-9");
-    verify(cache).invalidateScope("org-9", "organizations");
   }
 
   @Test
@@ -307,6 +296,5 @@ class PlatformOrganizationsServiceTest {
     ).isInstanceOf(io.grpc.StatusRuntimeException.class);
 
     verify(statuses, org.mockito.Mockito.never()).invalidate(any());
-    verify(cache, org.mockito.Mockito.never()).invalidateScope(any(), any());
   }
 }

@@ -9,6 +9,7 @@ import com.synapsedesk.gateway.config.InboundEmailProperties;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
+import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.DeleteOrganizationDto;
 import com.synapsedesk.gateway.model.InboundAddressResponseDto;
@@ -100,8 +101,9 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>
  * Every write evicts the caller's organization's {@code organizations} scope
- * ({@link EvictsCache}); a platform write to it evicts the same scope in
- * {@code PlatformOrganizationsService}.
+ * ({@link EvictsCache}). A write that changes the organization's status (its own
+ * delete, completing onboarding, and the platform writes) also drops the cached
+ * lifecycle decision, through {@link OrganizationStatusService#invalidate}.
  *
  * <p><b>Migrated off `OrganizationsApi`.</b> {@code get}'s cache goes
  * through {@link CacheService#wrapTyped} — a bare {@code Class<T>} would
@@ -130,6 +132,7 @@ public class OrganizationsController {
   private final CacheService cache;
   private final InboundEmailProperties inboundEmail;
   private final RawJsonBody rawBody;
+  private final OrganizationStatusService statuses;
 
   public OrganizationsController(
     OrganizationServiceGrpc.OrganizationServiceBlockingStub stub,
@@ -137,7 +140,8 @@ public class OrganizationsController {
     CurrentUser currentUser,
     CacheService cache,
     InboundEmailProperties inboundEmail,
-    RawJsonBody rawBody
+    RawJsonBody rawBody,
+    OrganizationStatusService statuses
   ) {
     this.stub = stub;
     this.documentStub = documentStub;
@@ -145,6 +149,7 @@ public class OrganizationsController {
     this.cache = cache;
     this.inboundEmail = inboundEmail;
     this.rawBody = rawBody;
+    this.statuses = statuses;
   }
 
   // The workspace's own record, which the billing screens read.
@@ -462,6 +467,7 @@ public class OrganizationsController {
     OrganizationResponse response = withMetadata(context).completeOnboarding(
       CompleteOnboardingRequest.getDefaultInstance()
     );
+    statuses.invalidate(context.organizationId());
 
     return ResponseEntity.ok(
       toGetEnvelope("Onboarding complete", 200, response)
@@ -490,6 +496,8 @@ public class OrganizationsController {
         .setReason(deleteOrganizationDto.getReason())
         .build()
     );
+    // auth-service froze the tenant: the gate must not serve its cached ACTIVE.
+    statuses.invalidate(context.organizationId());
 
     return ResponseEntity.ok(
       ApiResponse.of(

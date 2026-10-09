@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.platform;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
@@ -62,10 +61,9 @@ import synapsedesk.auth.PlatformServiceGrpc;
  *
  * <p><b>Every write evicts both of the organization's caches.</b>
  * {@code updateOrganization}/{@code setStatus}/{@code offboard}/{@code
- * restore} call {@link #evict}: the tenant status, so the lifecycle
- * interceptor reads the new status on the next request, and the
- * organization's own cached {@code GET}. One method, so a new write cannot
- * evict one and miss the other.
+ * restore} call {@code OrganizationStatusService.invalidate}: the tenant
+ * status, so the lifecycle interceptor reads the new status on the next
+ * request, and the organization's own cached {@code GET}.
  *
  * <p><b>Two validations checked by hand</b>, since the generated Java DTOs
  * carry neither the slug pattern nor the array bound. {@link #requireSlug}
@@ -83,24 +81,15 @@ public class PlatformOrganizationsService {
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
   private final SuperAdminCheck superAdminCheck;
   private final OrganizationStatusService statuses;
-  private final CacheService cache;
 
   public PlatformOrganizationsService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
     SuperAdminCheck superAdminCheck,
-    OrganizationStatusService statuses,
-    CacheService cache
+    OrganizationStatusService statuses
   ) {
     this.stub = stub;
     this.superAdminCheck = superAdminCheck;
     this.statuses = statuses;
-    this.cache = cache;
-  }
-
-  /** After a write to {@code id}: its tenant status and its cached {@code GET}. */
-  private void evict(String id) {
-    statuses.invalidate(id);
-    cache.invalidateScope(id, "organizations");
   }
 
   public ResponseEntity<
@@ -259,7 +248,7 @@ public class PlatformOrganizationsService {
       context
     ).updateOrganization(wire.build());
 
-    evict(id);
+    statuses.invalidate(id);
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
@@ -280,7 +269,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
-    evict(id);
+    statuses.invalidate(id);
     return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
   }
 
@@ -324,7 +313,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
-    evict(id);
+    statuses.invalidate(id);
     return ResponseEntity.ok(
       ApiResponse.of(
         200,
@@ -348,7 +337,7 @@ public class PlatformOrganizationsService {
       PlatformOrganizationIdRequest.newBuilder().setOrganizationId(id).build()
     );
 
-    evict(id);
+    statuses.invalidate(id);
     return ok200(
       toPlatformOrganizationResponseDto(response),
       "Workspace restored"

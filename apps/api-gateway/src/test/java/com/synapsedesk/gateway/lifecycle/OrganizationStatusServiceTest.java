@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.synapsedesk.gateway.cache.CacheService;
 import io.grpc.Status;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The cached tenant state: shared by every replica under one key, value and TTL,
- * failing closed, and degrading rather than failing when Redis is unavailable.
+ * failing closed, degrading rather than failing when Redis is unavailable, and
+ * riding out a peer outage on the last known status, never on no status.
  */
 class OrganizationStatusServiceTest {
 
@@ -36,6 +38,7 @@ class OrganizationStatusServiceTest {
   private OrganizationServiceBlockingStub peer;
   private StringRedisTemplate redis;
   private ValueOperations<String, String> values;
+  private CacheService cache;
   private OrganizationStatusService service;
 
   @SuppressWarnings("unchecked")
@@ -47,10 +50,38 @@ class OrganizationStatusServiceTest {
     redis = mock(StringRedisTemplate.class);
     values = mock(ValueOperations.class);
     when(redis.opsForValue()).thenReturn(values);
+    cache = mock(CacheService.class);
     service = new OrganizationStatusService(
       peer,
       redis,
-      JsonMapper.builder().build()
+      JsonMapper.builder().build(),
+      cache
+    );
+  }
+
+  private static final Duration KEPT = Duration.ofSeconds(30).plusMinutes(5);
+
+  /** The one value written, after checking it is kept 30 s + 5 min. */
+  private tools.jackson.databind.JsonNode written() {
+    ArgumentCaptor<String> value = ArgumentCaptor.forClass(String.class);
+    verify(values).set(eq(KEY), value.capture(), eq(KEPT));
+
+    return JsonMapper.builder().build().readTree(value.getValue());
+  }
+
+  private void cached(String status, long freshUntil) {
+    when(values.get(KEY)).thenReturn(
+      "{\"status\":\"" +
+        status +
+        "\",\"deleted\":false,\"freshUntil\":" +
+        freshUntil +
+        "}"
+    );
+  }
+
+  private void peerFails(Status status) {
+    when(peer.getOrganizationStatus(any())).thenThrow(
+      status.asRuntimeException()
     );
   }
 
@@ -77,8 +108,9 @@ class OrganizationStatusServiceTest {
   }
 
   @Test
-  void aMissAsksThePeerForThisTenantAndCachesTheAnswerForThirtySecondsInNodesShape() {
+  void aMissAsksThePeerForThisTenantAndCachesTheAnswerFreshForThirtySeconds() {
     peerSays(OrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE, false);
+    long before = System.currentTimeMillis();
 
     assertThat(service.get(ORG)).isEqualTo(
       new OrganizationStatusService.State("SUSPENDED_PAST_DUE", false)
@@ -88,11 +120,12 @@ class OrganizationStatusServiceTest {
       ArgumentCaptor.forClass(GetOrganizationStatusRequest.class);
     verify(peer).getOrganizationStatus(asked.capture());
     assertThat(asked.getValue().getOrganizationId()).isEqualTo(ORG);
-    // `status` then `deleted`, for thirty seconds.
-    verify(values).set(
-      KEY,
-      "{\"status\":\"SUSPENDED_PAST_DUE\",\"deleted\":false}",
-      Duration.ofSeconds(30)
+    var value = written();
+    assertThat(value.get("status").asString()).isEqualTo("SUSPENDED_PAST_DUE");
+    assertThat(value.get("deleted").asBoolean()).isFalse();
+    assertThat(value.get("freshUntil").asLong()).isBetween(
+      before + 30_000,
+      System.currentTimeMillis() + 30_000
     );
   }
 
@@ -102,11 +135,7 @@ class OrganizationStatusServiceTest {
 
     assertThat(service.get(ORG).deleted()).isTrue();
 
-    verify(values).set(
-      KEY,
-      "{\"status\":\"ACTIVE\",\"deleted\":true}",
-      Duration.ofSeconds(30)
-    );
+    assertThat(written().get("deleted").asBoolean()).isTrue();
   }
 
   @Test
@@ -114,15 +143,11 @@ class OrganizationStatusServiceTest {
     peerSays(OrgStatus.ORG_STATUS_UNSPECIFIED, false);
 
     assertThat(service.get(ORG).status()).isEqualTo("FROZEN");
-    verify(values).set(
-      eq(KEY),
-      eq("{\"status\":\"FROZEN\",\"deleted\":false}"),
-      any(Duration.class)
-    );
+    assertThat(written().get("status").asString()).isEqualTo("FROZEN");
   }
 
   @Test
-  void everyKnownStatusIsSpelledAsNodeSpellsIt() {
+  void everyKnownStatusIsSpelledByItsProtoNameWithoutThePrefix() {
     assertThat(
       OrganizationStatusService.nameOf(OrgStatus.ORG_STATUS_ACTIVE)
     ).isEqualTo("ACTIVE");
@@ -177,10 +202,8 @@ class OrganizationStatusServiceTest {
   }
 
   @Test
-  void aPeerThatCannotBeReachedFailsTheLookupAndCachesNothing() {
-    when(peer.getOrganizationStatus(any())).thenThrow(
-      Status.UNAVAILABLE.asRuntimeException()
-    );
+  void aPeerThatCannotBeReachedFailsTheLookupOfATenantWithNoEntryAndCachesNothing() {
+    peerFails(Status.UNAVAILABLE);
 
     assertThatThrownBy(() -> service.get(ORG)).isInstanceOf(
       io.grpc.StatusRuntimeException.class
@@ -189,11 +212,66 @@ class OrganizationStatusServiceTest {
     verify(values, never()).set(any(), any(), any(Duration.class));
   }
 
+  // ------------------------------------------------------------ peer outage
+
   @Test
-  void invalidatingDropsTheKeyAtOnce() {
+  void aFreshEntryIsUsedWithoutAskingThePeer() {
+    cached("ACTIVE", System.currentTimeMillis() + 10_000);
+
+    assertThat(service.get(ORG).status()).isEqualTo("ACTIVE");
+    verify(peer, never()).getOrganizationStatus(any());
+  }
+
+  @Test
+  void aStaleEntryIsRefreshedFromThePeerWhenItAnswers() {
+    cached("ACTIVE", System.currentTimeMillis() - 1);
+    peerSays(OrgStatus.ORG_STATUS_FROZEN, false);
+
+    assertThat(service.get(ORG).status()).isEqualTo("FROZEN");
+    assertThat(written().get("status").asString()).isEqualTo("FROZEN");
+  }
+
+  @Test
+  void aStaleEntryAnswersWhileThePeerIsUnreachable() {
+    for (Status down : new Status[] {
+      Status.UNAVAILABLE,
+      Status.DEADLINE_EXCEEDED,
+    }) {
+      setUp();
+      cached("ACTIVE", System.currentTimeMillis() - 60_000);
+      peerFails(down);
+
+      assertThat(service.get(ORG).status())
+        .as(down.getCode().name())
+        .isEqualTo("ACTIVE");
+      verify(values, never()).set(any(), any(), any(Duration.class));
+    }
+  }
+
+  @Test
+  void aStaleFreezeStillRefusesWhileThePeerIsUnreachable() {
+    cached("FROZEN", System.currentTimeMillis() - 60_000);
+    peerFails(Status.UNAVAILABLE);
+
+    assertThat(service.get(ORG).status()).isEqualTo("FROZEN");
+  }
+
+  @Test
+  void aStaleEntryDoesNotHideAnAnswerThatIsNotAnOutage() {
+    cached("ACTIVE", System.currentTimeMillis() - 60_000);
+    peerFails(Status.INTERNAL);
+
+    assertThatThrownBy(() -> service.get(ORG)).isInstanceOf(
+      io.grpc.StatusRuntimeException.class
+    );
+  }
+
+  @Test
+  void invalidatingDropsTheDecisionAndTheCachedOrganizationAtOnce() {
     service.invalidate(ORG);
 
     verify(redis).delete(KEY);
+    verify(cache).invalidateScope(ORG, "organizations");
   }
 
   @Test
