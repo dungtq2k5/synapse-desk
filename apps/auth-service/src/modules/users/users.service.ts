@@ -546,6 +546,10 @@ export class UsersService {
     context: CallerContext,
   ): Promise<UserSummaryResponse> {
     const existing = await this.load(request.id, context);
+    const phoneNumber =
+      request.phoneNumber === undefined
+        ? undefined
+        : request.phoneNumber.trim() || null;
 
     // Write, then re-read — see restoreUser for why the include cannot ride
     // along on the write.
@@ -553,8 +557,10 @@ export class UsersService {
       where: { id: existing.id },
       data: {
         ...this.toProfileData(request),
-        ...(request.phoneNumber !== undefined
-          ? { phoneNumber: request.phoneNumber.trim() || null }
+        // Only the OTP flow verifies a number, so a changed or cleared one is
+        // unverified; re-saving the same number keeps its verification.
+        ...(phoneNumber !== undefined && phoneNumber !== existing.phoneNumber
+          ? { phoneNumber, isPhoneVerified: false }
           : {}),
       },
       select: { id: true, fullName: true, phoneNumber: true },

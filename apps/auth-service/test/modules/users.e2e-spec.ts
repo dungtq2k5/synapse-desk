@@ -872,6 +872,42 @@ describe('Users (e2e)', () => {
         ).isLocked,
       ).toBe(false);
     });
+
+    it('**a changed or cleared phone number is unverified; the same one stays verified**', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const verify = (phoneNumber: string) =>
+        fx.prisma.user.update({
+          where: { id: t.user.id },
+          data: { phoneNumber, isPhoneVerified: true },
+        });
+      const update = (phoneNumber: string) =>
+        users.updateUser({ id: t.user.id, phoneNumber }, superuser(t));
+      const stored = () =>
+        fx.prisma.user.findUniqueOrThrow({
+          where: { id: t.user.id },
+          select: { phoneNumber: true, isPhoneVerified: true },
+        });
+
+      await verify('+84901234567');
+      await update(' +84901234567 ');
+      expect(await stored()).toEqual({
+        phoneNumber: '+84901234567',
+        isPhoneVerified: true,
+      });
+
+      await update('+84907654321');
+      expect(await stored()).toEqual({
+        phoneNumber: '+84907654321',
+        isPhoneVerified: false,
+      });
+
+      await verify('+84907654321');
+      await update('');
+      expect(await stored()).toEqual({
+        phoneNumber: null,
+        isPhoneVerified: false,
+      });
+    });
   });
 
   // ------------------------------------------------- notification audiences
