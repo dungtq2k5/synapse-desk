@@ -9,13 +9,13 @@
  *   - the analytics routes use `@IsISO8601({ strict: true })`, which accepts a calendar
  *     date (`2026-01-01`), a full timestamp, and the basic form (`20260101`), and refuses
  *     a date that does not exist (`2026-02-30`) and anything else;
- *   - the finance route uses `@Matches(/^\d{4}-\d{2}-\d{2}$/)`, which checks the SHAPE
- *     and nothing else: it refuses a timestamp, and accepts `2026-02-30` and passes it on.
+ *   - the finance route takes a calendar date in the `YYYY-MM-DD` form only: it refuses
+ *     a timestamp, the basic form and a date that does not exist (`2026-02-30`).
  *
  * Neither rule is in the document, and a gateway taking the parameter as a plain
  * string would forward `not-a-date` to the peer on every one of these routes. The
- * second rule differs from the first in BOTH directions, so a reading that treated the
- * finance route as "an ISO date too" would hold the wrong thing.
+ * second rule is narrower than the first, so a reading that treated the finance route
+ * as "an ISO date too" would accept what it refuses.
  *
  * **Generated from the document, bound to a rule by name.** The routes are every GET
  * with a required `from` and `to` and no published format; each must be named below,

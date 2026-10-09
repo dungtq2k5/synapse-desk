@@ -32,9 +32,8 @@ import synapsedesk.auth.PlatformServiceGrpc;
  * the wire request has no other fields at all, so a caller-supplied
  * {@code sortBy}/{@code organizationId} is silently ignored rather than
  * refused, and a port that "fixed" this by inventing wire fields would be
- * wrong; the ISO-date gap on {@code listBillingEvents} (the generator
- * dropped it, same family as {@code PlatformJobsApi}'s {@code
- * BackfillJobDto}); and the finance revenue section's degrade-with-a-reason
+ * wrong; {@code listBillingEvents} refusing an impossible date or a reversed
+ * range before the peer is asked; and the finance revenue section's degrade-with-a-reason
  * shape, where {@code excludes} must survive even when everything else in
  * that section goes null.
  */
@@ -143,6 +142,34 @@ class PlatformUsersRolesFinanceServiceTest {
     assertThat(revenue.getComputedAt()).isNull();
     assertThat(revenue.getExcludes()).containsExactly(
       "annual prices are estimated"
+    );
+  }
+
+  @Test
+  void listBillingEventsRefusesAnImpossibleDateOrAReversedRangeBeforeThePeer() {
+    for (String[] range : new String[][] {
+      { "2026-02-30", "2026-03-31" },
+      { "2026-01-01", "2026-13-01" },
+      { "2026-03-02", "2026-03-01" },
+    }) {
+      assertThatThrownBy(() ->
+        service.listBillingEvents(context(), range[0], range[1])
+      )
+        .as(range[0] + ".." + range[1])
+        .isInstanceOfSatisfying(ResponseStatusException.class, refused ->
+          assertThat(refused.getStatusCode().value()).isEqualTo(400)
+        );
+    }
+    verifyNoMoreInteractions(stub);
+
+    // One day, and a leap day, are ranges.
+    PlatformUsersRolesFinanceService.requireDateRange(
+      "2026-03-01",
+      "2026-03-01"
+    );
+    PlatformUsersRolesFinanceService.requireDateRange(
+      "2028-02-29",
+      "2028-03-01"
     );
   }
 }

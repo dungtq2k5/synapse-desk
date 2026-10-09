@@ -22,8 +22,10 @@ import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.Platform.CreateGlobalRoleRequest;
@@ -62,11 +65,11 @@ import synapsedesk.auth.Role.RoleResponse;
  * silently drops everything the wire can't carry, since the wire contract —
  * not the REST query shape — is the actual constraint.
  *
- * <p><b>{@code from}/{@code to} on {@code listBillingEvents}</b> are checked at the
- * edge, on the controller's parameters: a {@code YYYY-MM-DD} SHAPE and nothing more,
- * so a date that does not exist ({@code 2026-02-30}) passes through to auth-service.
- * Unlike backfill, {@code from > to} is not checked at the gateway (the day-count
- * ceiling is enforced in auth-service).
+ * <p><b>{@code from}/{@code to} on {@code listBillingEvents}</b> must be real
+ * calendar dates with {@code from} not after {@code to}, or 400. The controller
+ * checks the {@code YYYY-MM-DD} shape; this checks the rest, because auth-service
+ * reads {@code 2026-02-30} as 2 March rather than refusing it. The day-count
+ * ceiling is enforced in auth-service.
  */
 @Component
 public class PlatformUsersRolesFinanceService {
@@ -236,6 +239,7 @@ public class PlatformUsersRolesFinanceService {
     ApiResponse<BillingEventsResponseDto>
   > listBillingEvents(RequestContext context, String from, String to) {
     superAdminCheck.require(context);
+    requireDateRange(from, to);
 
     ListBillingEventsResponse response = withMetadata(
       context
@@ -261,6 +265,27 @@ public class PlatformUsersRolesFinanceService {
       .observedEventTypes(response.getObservedEventTypesList());
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
+  }
+
+  /** {@code ISO_LOCAL_DATE} resolves strictly, so {@code 2026-02-30} throws. */
+  static void requireDateRange(String from, String to) {
+    LocalDate start;
+    LocalDate end;
+    try {
+      start = LocalDate.parse(from);
+      end = LocalDate.parse(to);
+    } catch (DateTimeParseException notADate) {
+      throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "from and to must be ISO dates (YYYY-MM-DD)"
+      );
+    }
+    if (end.isBefore(start)) {
+      throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "to must not be before from"
+      );
+    }
   }
 
   private static PageRequest toPageRequest(

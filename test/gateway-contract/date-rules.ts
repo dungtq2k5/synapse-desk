@@ -25,11 +25,15 @@ export const ISO: Rule = {
   refused: ['not-a-date', '2026-02-30', '2026-1-1', ' 2026-01-01', ''],
 };
 
-/** `@Matches(ISO_DATE_PATTERN)`: the shape only, so a date that does not exist passes. */
+/**
+ * A calendar date in the `YYYY-MM-DD` form and nothing else: a timestamp, the basic
+ * form and a date that does not exist are refused.
+ */
 export const PATTERN: Rule = {
-  accepted: ['2026-01-01', '2026-02-30'],
+  accepted: ['2026-01-01', '2026-01-31'],
   refused: [
     'not-a-date',
+    '2026-02-30',
     '2026-01-01T00:00:00Z',
     '20260101',
     '2026-1-1',
