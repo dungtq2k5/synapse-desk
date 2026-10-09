@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.platform;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
+import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
@@ -59,13 +60,12 @@ import synapsedesk.auth.PlatformServiceGrpc;
  * delegates to this service and its two siblings, so each group's logic is
  * unit-testable without a servlet.
  *
- * <p><b>Every status-changing write evicts the cached tenant status.</b>
+ * <p><b>Every write evicts both of the organization's caches.</b>
  * {@code updateOrganization}/{@code setStatus}/{@code offboard}/{@code
- * restore} call {@code OrganizationStatusService.invalidate(id)}, so the
- * lifecycle interceptor reads the new status on the next request. They do
- * NOT evict that organization's cached {@code organizations} entry, so its
- * own {@code GET} can answer with the old values for up to that route's 60 s
- * TTL.
+ * restore} call {@link #evict}: the tenant status, so the lifecycle
+ * interceptor reads the new status on the next request, and the
+ * organization's own cached {@code GET}. One method, so a new write cannot
+ * evict one and miss the other.
  *
  * <p><b>Two validations checked by hand</b>, since the generated Java DTOs
  * carry neither the slug pattern nor the array bound. {@link #requireSlug}
@@ -83,15 +83,24 @@ public class PlatformOrganizationsService {
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
   private final SuperAdminCheck superAdminCheck;
   private final OrganizationStatusService statuses;
+  private final CacheService cache;
 
   public PlatformOrganizationsService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
     SuperAdminCheck superAdminCheck,
-    OrganizationStatusService statuses
+    OrganizationStatusService statuses,
+    CacheService cache
   ) {
     this.stub = stub;
     this.superAdminCheck = superAdminCheck;
     this.statuses = statuses;
+    this.cache = cache;
+  }
+
+  /** After a write to {@code id}: its tenant status and its cached {@code GET}. */
+  private void evict(String id) {
+    statuses.invalidate(id);
+    cache.invalidateScope(id, "organizations");
   }
 
   public ResponseEntity<
@@ -250,7 +259,7 @@ public class PlatformOrganizationsService {
       context
     ).updateOrganization(wire.build());
 
-    statuses.invalidate(id);
+    evict(id);
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
@@ -271,7 +280,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
-    statuses.invalidate(id);
+    evict(id);
     return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
   }
 
@@ -315,7 +324,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
-    statuses.invalidate(id);
+    evict(id);
     return ResponseEntity.ok(
       ApiResponse.of(
         200,
@@ -339,7 +348,7 @@ public class PlatformOrganizationsService {
       PlatformOrganizationIdRequest.newBuilder().setOrganizationId(id).build()
     );
 
-    statuses.invalidate(id);
+    evict(id);
     return ok200(
       toPlatformOrganizationResponseDto(response),
       "Workspace restored"

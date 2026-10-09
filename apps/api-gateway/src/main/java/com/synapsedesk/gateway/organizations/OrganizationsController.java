@@ -100,7 +100,7 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>
  * Every write evicts the caller's organization's {@code organizations} scope
- * ({@link EvictsCache}). A platform write to the organization does not: see
+ * ({@link EvictsCache}); a platform write to it evicts the same scope in
  * {@code PlatformOrganizationsService}.
  *
  * <p><b>Migrated off `OrganizationsApi`.</b> {@code get}'s cache goes
