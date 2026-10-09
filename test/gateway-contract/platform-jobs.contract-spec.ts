@@ -1,6 +1,6 @@
 /**
  * @file `PlatformJobsApi` — `SuperAdminGuard`-only, no permission code. The
- * sharpest property, per Node's own comment on it: a job owned by an
+ * sharpest property: a job owned by an
  * UNREACHABLE service is excluded from the report, never reported
  * `never-ran` — reporting it would page somebody about a wiring bug that
  * does not exist.
