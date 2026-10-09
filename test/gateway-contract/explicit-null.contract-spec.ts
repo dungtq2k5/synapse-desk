@@ -1,8 +1,8 @@
 /**
  * @file **An explicit `null` for an OPTIONAL request field**, on every JSON route.
  *
- * Measured on Node: of the optional fields a minimal request can reach, `null` is
- * accepted on all but two (those two are Node's own 500s, listed below). It means
+ * Of the optional fields a minimal request can reach, `null` is accepted on every one.
+ * It means
  * ABSENT on most and a specific instruction on eleven. A document that says
  * "optional, not nullable" understates this, and a gateway that answers 500 to a
  * `null` the other one accepts breaks a client that serialises its model with
@@ -36,8 +36,8 @@ import {
 import { readRunState } from './run-state';
 
 /**
- * Fields where Node gives an explicit `null` a MEANING of its own, with what the
- * peer must then be asked. Each is measured on Node; none is derived.
+ * Fields where an explicit `null` carries a MEANING of its own, with what the peer must
+ * then be asked. Each is measured, none is derived.
  */
 const MEANINGS: Record<
   string,
@@ -91,10 +91,6 @@ const MEANINGS: Record<
 };
 
 /**
- * Node answers 500 to an explicit `null` here. A defect, not a behaviour to keep: the
- * Java gateway accepts it as absent, and these die with Node.
- */
-/**
  * Routes this arrangement cannot reach the peer on, by operation, with why. Named,
  * never dropped: a route here is one the rows do NOT cover.
  */
@@ -106,11 +102,6 @@ const UNREACHABLE: Record<string, string> = {
   'POST /api/v1/auth/logout':
     'asks its peer only when a refresh cookie is present, and answers 200 without it',
 };
-
-const NODE_REJECTS = new Set([
-  'PATCH /api/v1/webhook-endpoints/{id} eventTypes',
-  'POST /api/v1/platform/plans prices',
-]);
 
 type Field = {
   method: string;
@@ -179,7 +170,6 @@ describe('an explicit null for an optional request field', () => {
 
   const isGeneric = (field: Field) =>
     !(field.key in MEANINGS) &&
-    !NODE_REJECTS.has(field.key) &&
     !(`${field.method} ${field.path}` in UNREACHABLE);
 
   rowFor('Ops').each(fields.filter(isGeneric).map((f) => [f.key] as const))(
