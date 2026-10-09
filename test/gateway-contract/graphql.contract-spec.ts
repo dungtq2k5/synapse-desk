@@ -416,12 +416,10 @@ describe('the GraphQL limits and guards', () => {
           headers(),
         );
 
-        // **Status not asserted.** Node's Apollo maps its
-        // introspection-disabled plugin error to 400; graphql-java's own
-        // check (`Introspection.isEnabledJvmWide`) is an EXECUTION-time
-        // refusal, the same shape as the cost limit's, and answers 200
-        // with the error inside — measured directly against a running
-        // instance, not assumed. The property both implementations share
+        // **Status not asserted.** graphql-java's check
+        // (`Introspection.isEnabledJvmWide`) is an EXECUTION-time refusal,
+        // the same shape as the cost limit's, and answers 200 with the
+        // error inside — measured against a running instance. The property
         // is that the query fails and says why, not the transport code.
         expect(JSON.stringify(response.body.errors)).toMatch(/introspection/i);
         expect(response.body.data?.__schema ?? null).toBeNull();

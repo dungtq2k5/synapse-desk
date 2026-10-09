@@ -149,7 +149,7 @@ const found: Found[] = scanJavaDirectory(
  * Constraints enforced in service code rather than by an annotation, so the scan cannot
  * see them, each with the rule its description must state. Named, so they keep their
  * rows and their publication: the platform `slug` is trimmed and lowercased BEFORE the
- * pattern applies (Node's order, so `ACME-Corp` succeeds), which no annotation or
+ * pattern applies (so `ACME-Corp` succeeds), which no annotation or
  * `pattern` keyword can state, and a pattern would wrongly refuse the uppercase input.
  */
 const ENFORCED_IN_CODE: (Found & { publishedAs: string })[] = [

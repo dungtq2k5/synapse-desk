@@ -3,8 +3,8 @@
  * the date the route's validator accepts.**
  *
  * Eight analytics routes and the finance-events route take a REQUIRED `from` and `to`
- * as query parameters. The published document types them as bare strings, and Node
- * validates them anyway, with a different rule on each family:
+ * as query parameters. The published document types them as bare strings, and the
+ * gateway validates them anyway, with a different rule on each family:
  *
  *   - the analytics routes use `@IsISO8601({ strict: true })`, which accepts a calendar
  *     date (`2026-01-01`), a full timestamp, and the basic form (`20260101`), and refuses
@@ -13,11 +13,9 @@
  *     and nothing else: it refuses a timestamp, and accepts `2026-02-30` and passes it on.
  *
  * Neither rule is in the document, and a gateway taking the parameter as a plain
- * string forwarded `not-a-date` to the peer on every one of these routes. Found by
- * probing both gateways with the same values (84 of 144 answers differed), not by
- * reading a DTO: the second rule differs from the first in BOTH directions, and a
- * reading that treated the finance route as "an ISO date too" would have ported the
- * wrong thing.
+ * string would forward `not-a-date` to the peer on every one of these routes. The
+ * second rule differs from the first in BOTH directions, so a reading that treated the
+ * finance route as "an ISO date too" would hold the wrong thing.
  *
  * **Generated from the document, bound to a rule by name.** The routes are every GET
  * with a required `from` and `to` and no published format; each must be named below,

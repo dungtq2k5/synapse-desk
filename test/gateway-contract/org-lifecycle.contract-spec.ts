@@ -13,10 +13,10 @@
  * skips the call and answers 403 for some other reason, or skips it and lets
  * everything through, fails here for the right reason.
  *
- * What is pinned is what Node DOES: the access table, the category each route
+ * What is pinned is what the gateway DOES: the access table, the category each route
  * resolves to, the three requests that are never gated, the thirty-second cache in
- * Redis under `org-status:<id>` (shared with the Java gateway, so the value is read
- * by whichever replica asks next), failing CLOSED, and that a platform change
+ * Redis under `org-status:<id>` (shared by every replica, so the value is read by
+ * whichever replica asks next), failing CLOSED, and that a platform change
  * invalidates the cached decision. The category of EVERY route is held by the table
  * `org-access-routes.json`; these rows prove the behaviour end to end.
  */
@@ -309,7 +309,7 @@ describe('the tenant lifecycle gate', () => {
       undefined,
     ],
     [
-      'a route Node never authenticates, even for a frozen tenant’s member (health)',
+      'a route that is never authenticated, even for a frozen tenant’s member (health)',
       () => session().get('/health/ready', headers([])),
       200,
     ],
@@ -514,7 +514,7 @@ describe('the tenant lifecycle gate', () => {
   );
 
   rowFor('Ops')(
-    '**the one public GraphQL query stays open for a frozen workspace’s member, and is never asked about — Node’s JwtAuthGuard does not run on it**',
+    '**the one public GraphQL query stays open for a frozen workspace’s member, and is never asked about — the session check does not run on it**',
     async () => {
       tenantIs(OrgStatus.FROZEN);
 

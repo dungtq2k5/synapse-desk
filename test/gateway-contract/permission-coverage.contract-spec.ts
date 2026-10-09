@@ -9,11 +9,9 @@
  * is published, so it is missing from the table until someone writes down what it
  * requires; a route removed leaves an entry that names nothing. Both fail.
  *
- * **Frozen from the Node gateway.** The table was generated once from the Node gateway's
- * `@RequirePermission` decorators, its last word on the question, when the Java gateway
- * matched it on every operation (230; 124 gated). Reading Java's own annotations back
- * against a scan of Java would agree with itself forever; this table is what the code
- * must match, and changing a route's permission is an edit to it.
+ * **The table is what the code must match.** Reading the annotations back against a
+ * scan of themselves would agree forever, so changing a route's permission is an edit
+ * to this table.
  *
  * **An open route is checked too.** `[]` requires the Java handler to carry NO
  * `@RequirePermission`, and the handler must be found: a renamed method is a failure,

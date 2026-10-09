@@ -2,13 +2,11 @@
  * @file **A caller whose email address is not verified is refused with 403 on the routes
  * that send mail on the tenant's behalf, before the body is read.**
  *
- * Node puts `EmailVerifiedGuard` on two routes, creating an invitation and resending
- * one, because an unverified inviter could spray invitations from an unproven address.
- * It runs after the session and ahead of the validation pipe, so an unverified caller who
- * also sends an invalid body is told to verify, not what is wrong with the body. Java
- * checked the claim inside the handler, after the body was bound, so the creating route
- * answered 400 where Node answers 403 (found by sending `{}` as an unverified member to
- * every secured route that takes a required body field: 51 routes, 1 differed).
+ * Two routes require a verified email, creating an invitation and resending one,
+ * because an unverified inviter could spray invitations from an unproven address. The
+ * check runs after the session and before the body is read, so an unverified caller who
+ * also sends an invalid body is told to verify, not what is wrong with the body. A check
+ * inside the handler would run after the body was bound and answer 400 instead.
  *
  * **The route set is found in the Java gateway's source, then named.** A scan of its
  * sources for a method annotated `@RequireVerifiedEmail` (the interceptor reads it from

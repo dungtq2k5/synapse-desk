@@ -10,7 +10,7 @@
  *
  * **The seam is the vendor's base URL**, which the gateway takes from an
  * environment variable (`RESEND_BASE_URL` for the stock Resend SDK, which reads
- * it itself). No code in either gateway knows it is talking to a fake.
+ * it itself). No code in the gateway knows it is talking to a fake.
  *
  * **An unprogrammed route fails loudly and is recorded.** It answers `501`
  * naming itself rather than a status a gateway might act on (`404` reads as
@@ -68,9 +68,8 @@ export type VendorProgram = {
  *
  * **Not decoration.** The stock Resend SDK takes a JSON error body AS the error
  * and never looks at the HTTP status, so a body without `statusCode` classifies
- * as "no status" — different from the real API for the same answer — while a
- * client that reads the HTTP status (the Java gateway's) sees the status
- * regardless. Filling it in keeps the two readings agreeing.
+ * as "no status" — different from the real API for the same answer. Filling it
+ * in keeps the fake answering as the real API does.
  */
 const withStatus = (status: number, body: unknown): unknown =>
   status >= 400 &&

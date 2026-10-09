@@ -10,9 +10,9 @@
  * `JsonToken.START_OBJECT`), and that is an implementation detail leaking to a caller.
  * The rest of the wording is each gateway's own and is not asserted.
  *
- * **Only what both gateways do uniformly.** A string where the shape declares a number,
- * a boolean or a date is NOT covered: Node decides that per field (a `@Type(() =>
- * Number)` accepts `"5"`, and turns `true` into `1`), so there is no one rule to hold.
+ * **Only the types the strict reader holds uniformly.** A string where the shape
+ * declares a number, a boolean or a date is NOT covered here: each of those has a rule
+ * of its own (a date's form, a number's range), held by the rows for that rule.
  *
  * **Generated from the document**, from the minimal valid body `request-bodies.ts`
  * builds, so a new route or field gets rows without anyone remembering. Each row first

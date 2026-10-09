@@ -4,7 +4,7 @@
  *
  * The published document lists 60 query parameters with an `enum` (23 distinct
  * sets: `sortOrder` on 21 routes, `granularity` on 8, `sortBy`, `status`, ...).
- * Node refuses anything else with a 400. A gateway that took the parameter as a
+ * The gateway refuses anything else with a 400. A gateway that took the parameter as a
  * plain string and compared it loosely (`"DESC".equalsIgnoreCase(sortOrder)`)
  * would accept `desc`, accept `sideways`, and answer 200, and no other row would
  * notice: every other row sends a valid value.
@@ -47,7 +47,7 @@ const SOME_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 /**
  * A value that satisfies a REQUIRED, non-enum query parameter, so that what a row
  * refuses is the enum and not a missing date. Without it the analytics
- * `granularity` rows passed on both gateways for the wrong reason: `from` and `to`
+ * `granularity` rows passed for the wrong reason: `from` and `to`
  * are required, and their absence is a 400 whatever `granularity` says.
  */
 const REQUIRED_VALUE: Record<string, string> = {
@@ -200,9 +200,8 @@ describe('enum-valued query parameters', () => {
     refusesOutsideTheEnum,
   );
 
-  // `fileType` is the one parameter Node DELIBERATELY reads case-insensitively
-  // (`document.dto.ts`: the stored values are lowercase, so `?fileType=PDF` would
-  // otherwise 400), so it has its own row below instead of these.
+  // `fileType` is the one parameter DELIBERATELY read case-insensitively (the
+  // stored values are lowercase, so `?fileType=PDF` would otherwise 400), so it has its own row below instead of these.
   const CASE_INSENSITIVE = new Set(['fileType']);
   const caseRows = rows().filter(([, , name]) => !CASE_INSENSITIVE.has(name));
 

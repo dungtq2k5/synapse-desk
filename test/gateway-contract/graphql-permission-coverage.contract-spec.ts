@@ -10,9 +10,8 @@
  * - **A registry, checked from both sides.** A field added to the schema is missing
  *   from the table until someone writes down what it requires; an entry for a field
  *   that no longer exists names nothing. Both fail.
- * - **Frozen from the Node gateway.** Generated once from its resolvers'
- *   `@RequirePermission` decorators (24 fields, 16 gated), when the Java gateway
- *   matched it on every field.
+ * - **The table is what the code must match.** Changing a field's permission is an
+ *   edit to it.
  * - **An open field is checked too.** `[]` requires the Java resolver to carry no
  *   `@RequirePermission`, and the resolver must be found. Two of them are open by
  *   decision rather than by omission: `Query.me` is the caller's own record ("Requires
