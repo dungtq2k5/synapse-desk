@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.graphql;
 
-import graphql.execution.AbortExecutionException;
 import graphql.execution.ExecutionContext;
 import graphql.execution.instrumentation.InstrumentationContext;
 import graphql.execution.instrumentation.InstrumentationState;
@@ -19,8 +18,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>
  * Runs in {@code beginExecuteOperation} — after validation, before any
- * resolver — and throws {@link AbortExecutionException} to short-circuit
- * before execution starts. graphql-java's own {@code
+ * resolver — and throws {@link GraphqlLimitExceeded} ({@code QUERY_TOO_DEEP}) to
+ * short-circuit before execution starts. graphql-java's own {@code
  * MaxQueryDepthInstrumentation} is not reused: this counts by its own rule
  * (introspection exempt, an inline fragment adds no depth, a fragment spread
  * measured at its own AST node), and a different counting rule is a different
@@ -45,12 +44,7 @@ public class DepthLimitInstrumentation extends SimplePerformantInstrumentation {
     );
 
     if (depth > MAX_DEPTH) {
-      throw new AbortExecutionException(
-        "Query is nested %d levels deep, exceeding the maximum of %d.".formatted(
-          depth,
-          MAX_DEPTH
-        )
-      );
+      throw GraphqlLimitExceeded.tooDeep(depth, MAX_DEPTH);
     }
 
     return SimpleInstrumentationContext.noOp();

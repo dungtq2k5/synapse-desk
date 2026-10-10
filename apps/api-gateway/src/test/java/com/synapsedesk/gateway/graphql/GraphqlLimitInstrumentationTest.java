@@ -107,7 +107,13 @@ class GraphqlLimitInstrumentationTest {
     ExecutionResult result = recursiveGraphQl().execute(deep);
 
     assertThat(result.getErrors()).isNotEmpty();
-    assertThat(result.getErrors().get(0).getMessage()).contains("levels deep");
+    assertThat(result.getErrors().get(0).getMessage()).isEqualTo(
+      "Query is nested 9 levels deep, exceeding the maximum of 7."
+    );
+    assertThat(result.getErrors().get(0).getExtensions()).isEqualTo(
+      java.util.Map.of("code", "QUERY_TOO_DEEP", "depth", 9, "maxDepth", 7)
+    );
+    assertThat((Object) result.getData()).isNull();
   }
 
   @Test
@@ -138,6 +144,16 @@ class GraphqlLimitInstrumentationTest {
 
     assertThat(result.getErrors()).isNotEmpty();
     assertThat(result.getErrors().get(0).getMessage()).contains("too complex");
+    assertThat(result.getErrors().get(0).getExtensions()).isEqualTo(
+      java.util.Map.of(
+        "code",
+        "QUERY_TOO_COMPLEX",
+        "cost",
+        2002,
+        "maxComplexity",
+        2000
+      )
+    );
   }
 
   @Test

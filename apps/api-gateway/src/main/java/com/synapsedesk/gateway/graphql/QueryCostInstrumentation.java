@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.graphql;
 
-import graphql.execution.AbortExecutionException;
 import graphql.execution.ExecutionContext;
 import graphql.execution.instrumentation.InstrumentationContext;
 import graphql.execution.instrumentation.InstrumentationState;
@@ -62,11 +61,9 @@ public class QueryCostInstrumentation extends SimplePerformantInstrumentation {
     );
 
     if (cost > GraphqlLimits.MAX_QUERY_COMPLEXITY) {
-      throw new AbortExecutionException(
-        "Query is too complex: %d exceeds the maximum of %d. Request fewer items, or fewer fields that resolve across services.".formatted(
-          cost,
-          GraphqlLimits.MAX_QUERY_COMPLEXITY
-        )
+      throw GraphqlLimitExceeded.tooComplex(
+        cost,
+        GraphqlLimits.MAX_QUERY_COMPLEXITY
       );
     }
 

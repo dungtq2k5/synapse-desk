@@ -300,7 +300,7 @@ describe('the GraphQL limits and guards', () => {
       expect(response.body).not.toHaveProperty('errors');
     });
 
-    it('**one ticket more, scoring just over 2 000, is refused before the peer is called**', async () => {
+    it('**one ticket more, scoring just over 2 000, is refused before the peer is called, with `QUERY_TOO_COMPLEX` and both numbers**', async () => {
       const response = await new Session(gateway.baseUrl).post<GraphqlResponse>(
         '/graphql',
         {
@@ -310,18 +310,22 @@ describe('the GraphQL limits and guards', () => {
         headers(['ticket.read.all']),
       );
 
-      // **Status not asserted, same reasoning as Introspection's row
-      // below.** Apollo's cost plugin is a `didResolveOperation` hook —
-      // after validation — and answers with 500, its shape for any
-      // unhandled plugin-lifecycle throw. graphql-java's own check is the
-      // same kind of execution-time refusal and answers 200 with the
-      // error inside, measured directly against a running instance
-      // rather than assumed. The property both implementations share is
-      // that the query is refused and says why, not the transport code.
-      const messages = (response.body.errors as Array<{ message: string }>).map(
-        (error) => error.message,
-      );
-      expect(messages.some((m) => /too complex/.test(m))).toBe(true);
+      // An execution-time refusal: 200, the error inside, and `extensions`
+      // naming the limit so a client need not read the message.
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty('data');
+      const [error] = response.body.errors as Array<{
+        message: string;
+        extensions?: Record<string, unknown>;
+      }>;
+      expect(error.message).toMatch(/too complex/);
+      // `classification` is graphql-java's own, on every error it serialises.
+      expect(error.extensions).toEqual({
+        classification: 'ExecutionAborted',
+        code: 'QUERY_TOO_COMPLEX',
+        cost: 2002,
+        maxComplexity: 2000,
+      });
       // Refused before execution reaches the resolver — the property the
       // depth row above asserts too, whatever the status code.
       expect(peers.ticket.calls('TicketService/ListTickets')).toHaveLength(0);
