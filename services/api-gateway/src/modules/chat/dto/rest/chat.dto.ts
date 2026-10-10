@@ -10,8 +10,8 @@ import {
   MAX_TICKET_DESCRIPTION_LENGTH,
   MAX_TICKET_TITLE_LENGTH,
   TicketPriority,
-  trimIfString,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 
 /**
  * Starting a conversation.

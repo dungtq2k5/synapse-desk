@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { formatErrorMsg, readHttpStatusHint } from '@synapsedesk/common';
+import { readHttpStatusHint } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * gRPC status -> HTTP status.

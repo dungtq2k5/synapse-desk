@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { obliterateQueues } from '@synapsedesk/common/testing/queues';
+import { obliterateQueues } from '@synapsedesk/testing/queues';
 import { AppModule } from '../../src/app.module';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { NotificationPublisher } from '../../src/modules/notifications/notification-publisher.service';
 import {
-  AuditPublisher,
   avatarObjectPath,
   SystemRoleName,
   FREE_PLAN_SEED,
   SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import { randomUUID } from 'node:crypto';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 

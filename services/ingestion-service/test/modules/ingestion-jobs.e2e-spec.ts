@@ -2,12 +2,12 @@ import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import {
   DocumentStatus,
   INGESTION_QUEUE,
   IngestionJobStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   IngestionJobResponse,
   IngestionJobStatus as ProtoIngestionJobStatus,

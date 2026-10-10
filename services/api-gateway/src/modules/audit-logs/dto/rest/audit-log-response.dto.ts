@@ -1,4 +1,4 @@
-import { AuditAction, AuditResourceType } from '@synapsedesk/common';
+import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 
 export class AuditLogResponseDto {
   id!: string;

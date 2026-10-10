@@ -1,8 +1,8 @@
 import Stripe from 'stripe';
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { waitFor } from '@synapsedesk/common/testing/wait';
-import { BillingEventSource, BillingEventStatus } from '@synapsedesk/common';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { waitFor } from '@synapsedesk/testing/wait';
+import { BillingEventSource, BillingEventStatus } from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   PLAN_FIXTURES,

@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   CreateInAppNotificationCommand,
   EmailTemplateName,
-  formatErrorMsg,
-  isUniqueConstraintViolation,
   NotificationAudience,
   NotificationChannel,
   type SendPushCommand,
@@ -11,7 +9,9 @@ import {
   NotificationResourceType,
   NOTIFICATION_TYPES,
   EmailContent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookDispatchService } from '../webhooks/webhook-dispatch.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';

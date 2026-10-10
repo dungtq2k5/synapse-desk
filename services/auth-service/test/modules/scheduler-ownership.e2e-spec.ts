@@ -1,10 +1,7 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
-import {
-  SCHEDULED_JOBS,
-  SCHEDULER_QUEUE,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+import { SCHEDULED_JOBS, SCHEDULER_QUEUE } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 

@@ -6,11 +6,8 @@ import {
   toOrganizationUsageResponseDto,
 } from './organization.mapper';
 import { ConfigService } from '@nestjs/config';
-import {
-  buildInboundAddress,
-  formatErrorMsg,
-  RequestContext,
-} from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
+import { buildInboundAddress, formatErrorMsg } from '@synapsedesk/nest-common';
 import { OrganizationsGrpcClient } from './organizations-grpc.client';
 import { DocumentsGrpcClient } from '../documents/documents-grpc.client';
 import type { StorageUsageResponse } from '@synapsedesk/grpc-proto';

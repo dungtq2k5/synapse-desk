@@ -2,14 +2,14 @@ import { Module, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
 import type Redis from 'ioredis';
+import { readBuildInfo } from '@synapsedesk/contracts';
 import {
   GrpcHealthService,
   NATS_CLIENT,
   natsProbe,
   postgresProbe,
-  readBuildInfo,
   redisProbe,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { BUILD_INFO, OpsGrpcController } from '@synapsedesk/grpc-proto';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';

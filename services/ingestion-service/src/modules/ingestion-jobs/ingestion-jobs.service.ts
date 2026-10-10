@@ -18,8 +18,8 @@ import {
   DocumentStatus,
   IngestionJobStatus,
   RESUMABLE_INGESTION_STATUSES,
-  requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
 import { IngestionJob, Prisma } from '../../generated/prisma/client';

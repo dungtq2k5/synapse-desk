@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { isFullJwtPayload, RequestContext } from '@synapsedesk/common';
+import { isFullJwtPayload, RequestContext } from '@synapsedesk/contracts';
 
 @Injectable()
 export class RequestContextService {

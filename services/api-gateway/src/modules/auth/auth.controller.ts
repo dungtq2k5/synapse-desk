@@ -17,7 +17,11 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/rest/register.dto';
 import { RegisterResponseDto } from './dto/rest/register-response.dto';
 import { JwtCookieService } from './jwt-cookie.service';
-import { RequestContext, RequestOrigin, OrgAccess } from '@synapsedesk/common';
+import {
+  RequestContext,
+  RequestOrigin,
+  OrgAccess,
+} from '@synapsedesk/contracts';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';

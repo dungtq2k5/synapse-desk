@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import Redis from 'ioredis';
 import { of } from 'rxjs';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import {
   AUTH_GRPC_CLIENT,
   INGESTION_GRPC_CLIENT,

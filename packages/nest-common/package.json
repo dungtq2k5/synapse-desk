@@ -1,0 +1,30 @@
+{
+  "name": "@synapsedesk/nest-common",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "clean": "rimraf dist *.tsbuildinfo",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/microservices": "^11.1.28",
+    "@synapsedesk/contracts": "*",
+    "@synapsedesk/core": "*",
+    "ioredis": "^6.0.0",
+    "nats": "^2.29.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.13.3",
+    "reflect-metadata": "^0.2.2",
+    "typescript": "^6.0.3"
+  }
+}

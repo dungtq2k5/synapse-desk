@@ -116,7 +116,7 @@ class TestTheGrpcCeilingMatchesTheTypeScriptHalf:
 
         source = (
             Path(__file__).resolve().parents[3]
-            / "libs"
+            / "packages"
             / "grpc-proto"
             / "src"
             / "constants.ts"

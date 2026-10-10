@@ -1,5 +1,6 @@
 import type Redis from 'ioredis';
-import { LimitAlertPublisher, limitAlertStateKey } from '@synapsedesk/common';
+import { limitAlertStateKey } from '@synapsedesk/contracts';
+import { LimitAlertPublisher } from '@synapsedesk/nest-common';
 import { bootstrapE2eTest } from '../utils';
 import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
 

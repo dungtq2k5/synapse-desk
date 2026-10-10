@@ -3,11 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import Stripe from 'stripe';
-import {
-  formatErrorMsg,
-  STRIPE_API_VERSION,
-  withHttpStatus,
-} from '@synapsedesk/common';
+import { STRIPE_API_VERSION } from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * The Stripe SDK, and the ONE place the secret keys live.

@@ -3,7 +3,7 @@ import {
   MIN_OTP_CODE_LENGTH,
 } from '../../../../common/config/dto.config';
 import { IsIn, IsNumberString, IsPhoneNumber, Length } from 'class-validator';
-import { OTP_PURPOSES, OtpPurpose } from '@synapsedesk/common';
+import { OTP_PURPOSES, OtpPurpose } from '@synapsedesk/contracts';
 
 export class RequestPhoneVerificationDto {
   /**

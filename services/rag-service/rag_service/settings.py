@@ -8,7 +8,7 @@ and nothing errors; the answer is merely worse, for the customer paying more.
 `scripts/check-model-literals.mjs` makes that mechanical for both languages.
 
 **This is the Python half of a two-language duplication**, mirroring
-`libs/common/src/configs/ai-settings.config.ts`. That is the same class of drift
+`packages/contracts/src/configs/ai-settings.config.ts`. That is the same class of drift
 as the quota key and the purpose enums, and it is handled the same
 way: both halves are asserted against `ai-settings.contract.json`, so a value
 changed on one side and not the other fails that side's own test suite. The
@@ -32,9 +32,9 @@ DEFAULT_AI_MODEL_TIER: AiModelTier = "FAST"
 
 #: **A model name lives in FIVE files and they must move together.**
 #:
-#: `settings.py` (here), `libs/common/src/configs/ai-settings.config.ts`,
+#: `settings.py` (here), `packages/contracts/src/configs/ai-settings.config.ts`,
 #: `ai-settings.contract.json`, `pricing.py` and
-#: `libs/common/src/configs/ai-pricing.config.ts`. The contract fixture and
+#: `packages/contracts/src/configs/ai-pricing.config.ts`. The contract fixture and
 #: `assert_pricing_table_covers` catch four of the five at boot or in CI; the
 #: TypeScript pricing table is the one with no equivalent guard on this path,
 #: so a model added everywhere except there meters as free on the Node side.

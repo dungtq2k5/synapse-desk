@@ -15,7 +15,7 @@ import {
   UserSummary,
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
-import { PermissionCode } from '@synapsedesk/common';
+import { PermissionCode } from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { PresignAvatarResponseDto } from './dto/rest/avatar-response.dto';

@@ -9,7 +9,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { RequestContextService } from '../contexts/request.context';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';
-import { NodeEnv, PermissionCode } from '@synapsedesk/common';
+import { NodeEnv, PermissionCode } from '@synapsedesk/contracts';
 import { ConfigService } from '@nestjs/config';
 import { requestOf } from '../utils/execution-request.util';
 

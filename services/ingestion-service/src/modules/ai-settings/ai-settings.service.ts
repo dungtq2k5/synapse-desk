@@ -7,7 +7,7 @@ import {
   assertPricingTableCovers,
   resolveAiSettings,
   systemContext,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 
 /** How long a tenant's resolved settings survive without an invalidation. */

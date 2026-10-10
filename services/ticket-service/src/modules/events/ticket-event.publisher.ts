@@ -1,10 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  formatErrorMsg,
-  NATS_CLIENT,
-  TicketDomainEvent,
-} from '@synapsedesk/common';
+import { TicketDomainEvent } from '@synapsedesk/contracts';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 /**
  * Publishes Domain B's domain events.

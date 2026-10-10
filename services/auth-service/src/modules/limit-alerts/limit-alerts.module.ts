@@ -1,7 +1,10 @@
 import { Inject, Module, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { ConfigService } from '@nestjs/config';
-import { JetStreamPublisher, LimitAlertPublisher } from '@synapsedesk/common';
+import {
+  JetStreamPublisher,
+  LimitAlertPublisher,
+} from '@synapsedesk/nest-common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthGenerationStore } from './generation.store';
 

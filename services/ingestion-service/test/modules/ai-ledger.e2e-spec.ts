@@ -1,5 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
-import { waitUntil } from '@synapsedesk/common/testing/wait';
+import { waitUntil } from '@synapsedesk/testing/wait';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import Redis from 'ioredis';
@@ -16,9 +16,9 @@ import {
   NotificationPriority,
   quotaCounterKey,
   quotaThresholdEventId,
-  readHttpStatusHint,
-  JetStreamPublisher,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { readHttpStatusHint } from '@synapsedesk/core';
+import { JetStreamPublisher } from '@synapsedesk/nest-common';
 import {
   BUDGET_MICROS,
   CYCLE_START,
@@ -33,7 +33,7 @@ import {
   QuotaCounterService,
 } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('The AI ledger and quota gate (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

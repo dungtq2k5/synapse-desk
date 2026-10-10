@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { memberContext } from '@synapsedesk/common/testing/context';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { memberContext } from '@synapsedesk/testing/context';
 import {
   DeliverySkipReason,
   DeliveryStatus,
@@ -10,7 +10,7 @@ import {
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
   PreferenceSource,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   DigestMode as ProtoDigestMode,
   NotificationChannel as ProtoNotificationChannel,

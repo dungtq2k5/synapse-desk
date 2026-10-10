@@ -1,5 +1,5 @@
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { seedTenantWithUser } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';

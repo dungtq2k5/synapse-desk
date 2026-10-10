@@ -15,11 +15,11 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   DEFAULT_AI_MODEL_TIER,
-  formatErrorMsg,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENTS_PER_TENANT,
   resolveAnalyticsRangeDays,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Validates the ids this service stores but does not own, and reads the one

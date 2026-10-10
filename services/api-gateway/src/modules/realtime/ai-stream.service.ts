@@ -23,7 +23,7 @@ import {
   NodeEnv,
   REALTIME_EVENTS,
   RequestContext,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import type { ErrorResponse } from '../../common/interfaces/http-response.interface';
 import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsResponse } from '../../common/interfaces/ws-response.interface';

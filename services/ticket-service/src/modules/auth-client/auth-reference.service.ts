@@ -16,12 +16,11 @@ import {
   UserServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   MAX_ATTACHMENT_BYTES,
   resolveAnalyticsRangeDays,
   MAX_ATTACHMENTS_PER_MESSAGE,
-  requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, requireTenant } from '@synapsedesk/nest-common';
 
 /** What a tenant will accept on one message, platform ceilings already applied. */
 export type AttachmentLimits = {

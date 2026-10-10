@@ -10,10 +10,10 @@ import {
   MAX_CHUNKS_PER_DOCUMENT,
   UNKNOWN_EXTENSION,
   QDRANT_PAYLOAD_FIELDS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { Logger } from '@nestjs/common';
 import Redis from 'ioredis';
-import { waitFor } from '@synapsedesk/common/testing/wait';
+import { waitFor } from '@synapsedesk/testing/wait';
 import {
   BUDGET_MICROS,
   CYCLE_START,
@@ -32,7 +32,7 @@ import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('The ingestion pipeline (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

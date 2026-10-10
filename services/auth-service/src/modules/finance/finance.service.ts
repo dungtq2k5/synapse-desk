@@ -6,8 +6,8 @@ import {
   MAX_FINANCE_RANGE_DAYS,
   OrgStatus,
   REVENUE_EXCLUSIONS,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { toProtoTimestamp } from '@synapsedesk/grpc-proto';
 import type {
   FinanceSnapshotResponse,

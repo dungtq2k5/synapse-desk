@@ -1,4 +1,4 @@
-import { ReassignmentReason } from '@synapsedesk/common';
+import { ReassignmentReason } from '@synapsedesk/contracts';
 
 /**
  * One entry in a ticket's assignment history.

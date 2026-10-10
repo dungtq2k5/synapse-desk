@@ -1,11 +1,11 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { stripComments } from '@synapsedesk/common/testing/strip-comments';
+import { stripComments } from '@synapsedesk/testing/strip-comments';
 import { join } from 'node:path';
 import {
   CORS_ALLOWED_HEADERS,
   CORS_METHODS,
 } from '../../src/common/config/cors.config';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 
 /**
  * The CORS allow-lists cover what a client actually has to send.

@@ -19,7 +19,7 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"
   },
-  "//@langchain/core": "A required PEER of @langchain/textsplitters, declared here even though NOTHING in src/ imports it \u2014 so a dependency-pruning pass reads it as unused and removing it is a one-line change that looks free. It is not: `text_splitter.cjs` requires `@langchain/core/documents` at LOAD time, so the service builds cleanly and then dies at boot with MODULE_NOT_FOUND, and its whole test suite fails to collect. It was missing from the lockfile for exactly that reason before anyone noticed.",
+  "//@langchain/core": "A required PEER of @langchain/textsplitters, declared here even though NOTHING in src/ imports it — so a dependency-pruning pass reads it as unused and removing it is a one-line change that looks free. It is not: `text_splitter.cjs` requires `@langchain/core/documents` at LOAD time, so the service builds cleanly and then dies at boot with MODULE_NOT_FOUND, and its whole test suite fails to collect. It was missing from the lockfile for exactly that reason before anyone noticed.",
   "dependencies": {
     "@google/genai": "^2.15.0",
     "@grpc/grpc-js": "^1.14.4",
@@ -35,8 +35,10 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@qdrant/js-client-rest": "^1.19.0",
-    "@synapsedesk/common": "*",
+    "@synapsedesk/contracts": "*",
+    "@synapsedesk/core": "*",
     "@synapsedesk/grpc-proto": "*",
+    "@synapsedesk/nest-common": "*",
     "bullmq": "^5.81.3",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
@@ -55,6 +57,7 @@
     "@faker-js/faker": "^10.5.0",
     "@nestjs/cli": "^11.0.24",
     "@nestjs/testing": "^11.1.28",
+    "@synapsedesk/testing": "*",
     "@types/jest": "^30.0.0",
     "@types/turndown": "^5.0.6",
     "jest": "^30.4.2",

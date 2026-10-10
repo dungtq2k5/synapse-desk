@@ -4,7 +4,7 @@ import type {
   GetReceivingEmailResponseSuccess,
   ListAttachmentsResponseSuccess,
 } from 'resend';
-import { generateInboundToken } from '@synapsedesk/common';
+import { generateInboundToken } from '@synapsedesk/nest-common';
 
 /**
  * Inbound-mail fixtures, as the `InboundEmailDto` the webhook hands `accept()`.

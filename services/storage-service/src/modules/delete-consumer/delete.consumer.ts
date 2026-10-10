@@ -1,10 +1,10 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
-  formatErrorMsg,
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
 
 /**

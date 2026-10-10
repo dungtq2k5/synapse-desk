@@ -19,7 +19,7 @@
  * responses. There is no bare number to read.
  */
 
-import { DocumentFlagType } from '@synapsedesk/common';
+import { DocumentFlagType } from '@synapsedesk/contracts';
 import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
 
 @ObjectType('Rate')

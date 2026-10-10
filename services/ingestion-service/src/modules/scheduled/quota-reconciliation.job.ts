@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotaCounterService } from '../ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';

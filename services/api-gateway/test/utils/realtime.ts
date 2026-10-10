@@ -11,11 +11,8 @@ import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
 import { io, Socket as ClientSocket } from 'socket.io-client';
 import type { Server } from 'node:http';
-import {
-  createNatsTransport,
-  JwtPayload,
-  TicketDomainEvent,
-} from '@synapsedesk/common';
+import { JwtPayload, TicketDomainEvent } from '@synapsedesk/contracts';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 import {
   AUTH_GRPC_CLIENT,
   RAG_GRPC_CLIENT,

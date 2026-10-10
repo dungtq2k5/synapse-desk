@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsISO8601, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AuditAction, AuditResourceType } from '@synapsedesk/common';
+import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 
 // **No `searchTerm`, and that is the change.**

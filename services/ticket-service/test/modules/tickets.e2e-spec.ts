@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import {
   BATCH_ID_LIMIT,
   canTransition,
-  compareAlphabetically,
   TICKET_PATTERNS,
   MAX_STATUS_CHANGE_REASON_LENGTH,
   systemContext,
@@ -11,8 +10,9 @@ import {
   TicketSource,
   TERMINAL_TICKET_STATUSES,
   TicketStatus,
-} from '@synapsedesk/common';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {

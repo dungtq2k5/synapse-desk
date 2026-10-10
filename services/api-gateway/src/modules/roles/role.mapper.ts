@@ -1,4 +1,4 @@
-import { PermissionCode } from '@synapsedesk/common';
+import { PermissionCode } from '@synapsedesk/contracts';
 import {
   ListPermissionsResponse,
   ListRolesRequest,

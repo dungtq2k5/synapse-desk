@@ -14,7 +14,7 @@ import {
 import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_MESSAGE_CONTENT_LENGTH,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { NewAttachmentDto } from '../../tickets/dto/rest/message.dto';
 
 /**

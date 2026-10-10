@@ -1,12 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { obliterateQueues } from '@synapsedesk/common/testing/queues';
+import { obliterateQueues } from '@synapsedesk/testing/queues';
 import { ClientProxy } from '@nestjs/microservices';
 import { of } from 'rxjs';
-import {
-  NATS_CLIENT,
-  SCHEDULER_QUEUE,
-  WEBHOOK_QUEUE,
-} from '@synapsedesk/common';
+import { SCHEDULER_QUEUE } from '@synapsedesk/contracts';
+import { NATS_CLIENT, WEBHOOK_QUEUE } from '@synapsedesk/nest-common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';

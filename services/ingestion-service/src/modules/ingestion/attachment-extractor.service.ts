@@ -7,8 +7,8 @@ import {
   MAX_EXTRACTED_TEXT_CHARS,
   PARSE_ELIGIBLE_MIME_TYPES,
   extensionFor,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { DocumentParserService } from './document-parser.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 

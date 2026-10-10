@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   NotificationChannel,
   NotificationResourceType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import type {
   ResolveTicketByMessageIdRequest,
   ResolveTicketByMessageIdResponse,

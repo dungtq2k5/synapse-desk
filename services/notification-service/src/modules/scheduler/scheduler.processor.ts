@@ -1,10 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import {
-  JobRunRecorder,
-  SCHEDULED_JOBS,
-  SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+import { SCHEDULED_JOBS, SCHEDULER_QUEUE } from '@synapsedesk/contracts';
+import { JobRunRecorder } from '@synapsedesk/nest-common';
 import { WebhookRetentionJob } from '../webhooks/webhook-retention.job';
 
 /**

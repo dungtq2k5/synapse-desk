@@ -10,7 +10,7 @@ import {
   packRequestContext,
   fromProtoAiGenerationOutcome,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * The acceptance loop's other end.

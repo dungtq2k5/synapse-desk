@@ -1,6 +1,6 @@
 /** @file What the invitation routes return. */
 
-import { InvitationStatus } from '@synapsedesk/common';
+import { InvitationStatus } from '@synapsedesk/contracts';
 
 export class InvitationResponseDto {
   readonly id!: string;

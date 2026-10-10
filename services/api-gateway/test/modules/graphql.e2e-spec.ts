@@ -32,7 +32,7 @@ import {
   MAX_QUERY_DEPTH,
 } from '../../src/common/config/graphql-limits.config';
 import { SCHEMA_PATH } from '../../src/common/config/graphql.config';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { CacheService } from '../../src/common/cache/cache.service';
 import { CACHE_SCOPES } from '../../src/common/config/cache.config';
 

@@ -1,4 +1,4 @@
-import { EMBEDDING_DIMENSION } from '@synapsedesk/common';
+import { EMBEDDING_DIMENSION } from '@synapsedesk/contracts';
 import {
   EmbeddingClient,
   EmbeddingResult,

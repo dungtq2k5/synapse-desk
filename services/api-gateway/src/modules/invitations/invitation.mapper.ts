@@ -28,7 +28,7 @@ import {
   PreviewInvitationResponseDto,
   PreviewInvitationsResponseDto,
 } from './dto/rest/invitation-response.dto';
-import { InvitationStatus } from '@synapsedesk/common';
+import { InvitationStatus } from '@synapsedesk/contracts';
 
 /** Accepting signs the invitee in, so the controller needs the raw tokens. */
 export type AcceptInvitationResult = {

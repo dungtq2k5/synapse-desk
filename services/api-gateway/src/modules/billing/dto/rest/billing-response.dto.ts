@@ -1,4 +1,4 @@
-import type { AiModelTier, OrgStatus } from '@synapsedesk/common';
+import type { AiModelTier, OrgStatus } from '@synapsedesk/contracts';
 
 export class SubscriptionResponseDto {
   /** NULL for a grandfathered tenant — free, internal, or pre-billing. */

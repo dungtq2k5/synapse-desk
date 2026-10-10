@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
-const SCAN_ROOTS = ['services', 'libs', 'packages', 'scripts'];
+const SCAN_ROOTS = ['services', 'packages', 'scripts'];
 const SCAN_EXTENSIONS = ['.ts', '.tsx', '.mjs', '.js', '.py'];
 
 const SKIP_DIRECTORIES = new Set([
@@ -48,9 +48,9 @@ const ALLOWED = [
   // it is the one place a literal is the point rather than a leak — and
   // `MODEL_PRICING` being `Record<AiModel, …>` is what turns "unpriced model"
   // from a boot-time throw into a compile error.
-  join('libs', 'common', 'src', 'configs', 'ai-models.config.ts'),
-  join('libs', 'common', 'src', 'configs', 'ai-settings.config.ts'),
-  join('libs', 'common', 'src', 'configs', 'ai-pricing.config.ts'),
+  join('packages', 'contracts', 'src', 'configs', 'ai-models.config.ts'),
+  join('packages', 'contracts', 'src', 'configs', 'ai-settings.config.ts'),
+  join('packages', 'contracts', 'src', 'configs', 'ai-pricing.config.ts'),
   join('services', 'rag-service', 'rag_service', 'settings.py'),
   join('services', 'rag-service', 'rag_service', 'pricing.py'),
   // This script names the patterns it searches for, which is unavoidable.

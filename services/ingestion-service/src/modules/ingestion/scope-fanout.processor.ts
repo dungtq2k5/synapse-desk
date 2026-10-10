@@ -5,7 +5,7 @@ import {
   DocumentScopeChangedEvent,
   SCOPE_FANOUT_JOB_NAME,
   SCOPE_FANOUT_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { ScopeWriterService } from './scope-writer.service';
 
 /**

@@ -1,7 +1,7 @@
 import {
   IngestionJobStatus,
   TERMINAL_INGESTION_STATUSES,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   IngestionProcessor,
   JobNoLongerRunnableError,
@@ -110,7 +110,7 @@ describe('IngestionProcessor cancellation (unit)', () => {
     // The enum split: the document goes to FAILED and says "not indexed", the
     // job says why. Asserted here because nothing else would notice the day
     // somebody adds CANCELLED to DocumentStatus for symmetry.
-    const { DocumentStatus } = await import('@synapsedesk/common');
+    const { DocumentStatus } = await import('@synapsedesk/contracts');
 
     expect(Object.values(IngestionJobStatus)).toContain('CANCELLED');
     expect(Object.values(DocumentStatus)).not.toContain('CANCELLED');

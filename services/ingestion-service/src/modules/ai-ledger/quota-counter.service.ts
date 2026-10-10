@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
-import { formatErrorMsg, quotaCounterKey } from '@synapsedesk/common';
+import { quotaCounterKey } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 export const QUOTA_REDIS = Symbol('QUOTA_REDIS');
 

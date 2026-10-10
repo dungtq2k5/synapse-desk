@@ -1,7 +1,6 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
-  formatErrorMsg,
   orgRoom,
   REALTIME_EVENTS,
   TICKET_PATTERNS,
@@ -9,7 +8,8 @@ import {
   ticketInternalRoom,
   ticketRoom,
   userRoom,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RealtimeGateway } from './realtime.gateway';
 
 /**

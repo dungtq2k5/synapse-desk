@@ -24,7 +24,7 @@ import {
   OPS_PROTO_PATHS,
   READINESS_SERVICE,
 } from '@synapsedesk/grpc-proto';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { AppModule } from '../src/app.module';
 
 /**

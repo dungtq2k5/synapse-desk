@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { isUniqueConstraintViolation } from '@synapsedesk/common';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { Prisma } from '../../generated/prisma/client';
 
 /**

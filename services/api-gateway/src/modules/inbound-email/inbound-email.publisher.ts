@@ -2,10 +2,9 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   EMAIL_INBOUND_PATTERNS,
-  formatErrorMsg,
-  NATS_CLIENT,
   type InboundEmailRejectedEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 /**
  * Tells notification-service that mail was refused.

@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  formatErrorMsg,
-  isUniqueConstraintViolation,
-  RecordAuditCommand,
-  UnprocessableMessage,
-} from '@synapsedesk/common';
+import { RecordAuditCommand } from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import { formatErrorMsg, UnprocessableMessage } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 

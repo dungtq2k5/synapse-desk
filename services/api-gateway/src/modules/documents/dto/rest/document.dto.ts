@@ -26,16 +26,18 @@ import {
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
   MAX_OCR_LANGUAGES,
-  normalizeStringArray,
   MAX_DOCUMENT_TITLE_LENGTH,
   MAX_OBJECT_PATH_LENGTH,
-  lowerIfString,
-  trimIfString,
   type AllowedDocumentMimeType,
   type OcrLanguage,
   DOCUMENT_FILE_TYPES,
   type DocumentFileType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import {
+  normalizeStringArray,
+  lowerIfString,
+  trimIfString,
+} from '@synapsedesk/core';
 import { AtMostOneNonLatinScript } from '../../../../common/decorators/at-most-one-non-latin-script.decorator';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';

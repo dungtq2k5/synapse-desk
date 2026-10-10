@@ -1,11 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import {
-  formatErrorMsg,
-  isRestrictingChange,
-  withHttpStatus,
-} from '@synapsedesk/common';
+import { isRestrictingChange } from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QdrantService } from '../qdrant/qdrant.service';
 

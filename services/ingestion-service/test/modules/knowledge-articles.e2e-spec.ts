@@ -1,12 +1,12 @@
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import {
   DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { memberContext, pageRequest } from '../utils/context';
 import {

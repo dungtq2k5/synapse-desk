@@ -1,4 +1,4 @@
-import { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/common';
+import { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/contracts';
 import {
   CODE_HASH_PARAMS,
   generateBackupCode,

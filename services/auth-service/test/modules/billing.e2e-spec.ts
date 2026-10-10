@@ -1,15 +1,14 @@
 import Stripe from 'stripe';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
-  AuditPublisher,
   BillingEventStatus,
   OrgStatus,
-  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
   STRIPE_PORTAL_MARKER,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
 import { fromProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
@@ -24,7 +23,7 @@ import { StripeService } from '../../src/modules/billing/stripe.service';
 import { BillingEventPublisher } from '../../src/modules/billing/billing-event.publisher';
 import { PlatformService } from '../../src/modules/platform/platform.service';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('Billing and entitlements (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

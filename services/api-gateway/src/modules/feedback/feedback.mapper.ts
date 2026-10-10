@@ -10,7 +10,7 @@ import { PaginationResponseDto } from '../../common/dto/rest/pagination-response
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { ListFeedbackQueryDto } from './dto/rest/feedback.dto';
 import { FeedbackResponseDto } from './dto/rest/feedback-response.dto';
-import { FeedbackRating } from '@synapsedesk/common';
+import { FeedbackRating } from '@synapsedesk/contracts';
 
 export function toFeedbackResponseDto(
   feedback: FeedbackResponse,

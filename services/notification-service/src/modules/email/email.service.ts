@@ -2,13 +2,13 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { Resend } from 'resend';
+import { SendEmailCommand } from '@synapsedesk/contracts';
 import {
   isRetryableResendError,
-  SendEmailCommand,
-  UnprocessableMessage,
   extractEmailAddress,
   extractEmailDomain,
-} from '@synapsedesk/common';
+} from '@synapsedesk/core';
+import { UnprocessableMessage } from '@synapsedesk/nest-common';
 import { renderEmail, type TemplateBranding } from './email.templates';
 
 /** What the caller needs back — see `send()`. */

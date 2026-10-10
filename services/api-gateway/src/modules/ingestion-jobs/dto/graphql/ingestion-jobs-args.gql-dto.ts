@@ -1,6 +1,6 @@
 import { ArgsType, Field } from '@nestjs/graphql';
 import { IsIn, IsOptional, IsUUID } from 'class-validator';
-import { IngestionJobStatus } from '@synapsedesk/common';
+import { IngestionJobStatus } from '@synapsedesk/contracts';
 import { PageArgsGqlDto } from '../../../../common/dto/graphql/page-args.gql-dto';
 import '../../../../common/graphql/enums';
 

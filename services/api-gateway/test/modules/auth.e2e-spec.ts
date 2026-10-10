@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 import {
   ACCESS_COOKIE,
   API,

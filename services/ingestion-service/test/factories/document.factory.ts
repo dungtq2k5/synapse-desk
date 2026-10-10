@@ -3,7 +3,7 @@ import {
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 

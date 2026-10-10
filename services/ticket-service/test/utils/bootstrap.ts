@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { obliterateQueues } from '@synapsedesk/common/testing/queues';
+import { obliterateQueues } from '@synapsedesk/testing/queues';
 import {
   EXPORT_QUEUE,
-  AuditPublisher,
   MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';

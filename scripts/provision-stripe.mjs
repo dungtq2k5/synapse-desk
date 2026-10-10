@@ -53,7 +53,7 @@ const ROOT = join(HERE, '..');
  * equal to `STRIPE_API_VERSION`. An import would be invisible to that regex.
  */
 const { STRIPE_ENTITLEMENT_EVENTS, STRIPE_DUNNING_EVENTS } = await import(
-  join(ROOT, 'libs/common/dist/main.js')
+  join(ROOT, 'packages/contracts/dist/index.js')
 );
 
 // --------------------------------- REVIEW THESE BEFORE `--apply`. Amounts are in the currency's smallest unit.

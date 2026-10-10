@@ -2,15 +2,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import {
   CreateInAppNotificationCommand,
-  formatErrorMsg,
   IN_APP_NOTIFICATION_PATTERN,
-  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
   NotificationResourceType,
   QUOTA_ALERT_THRESHOLDS,
   quotaThresholdEventId,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, JetStreamPublisher } from '@synapsedesk/nest-common';
 import { QUOTA_REDIS } from './quota-counter.service';
 
 /** 70 days — long enough to outlive any cycle, short enough not to accumulate. */

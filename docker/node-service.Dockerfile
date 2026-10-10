@@ -242,8 +242,12 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # `node_modules/@synapsedesk/common` to `././libs/common`, so a runtime image
 # that copied only `apps/` would carry a symlink pointing at nothing — and the
 # failure is a module-not-found at boot, after the image has been pushed.
-COPY --from=build /app/libs/common/package.json ./libs/common/
-COPY --from=build /app/libs/common/dist ./libs/common/dist
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build /app/packages/core/package.json ./packages/core/
+COPY --from=build /app/packages/core/dist ./packages/core/dist
+COPY --from=build /app/packages/nest-common/package.json ./packages/nest-common/
+COPY --from=build /app/packages/nest-common/dist ./packages/nest-common/dist
 COPY --from=build /app/packages/grpc-proto/package.json ./packages/grpc-proto/
 # `dist/proto` carries the.proto FILES, not just the compiled types. gRPC's
 # loader reads them at startup, so an image without them fails to boot rather

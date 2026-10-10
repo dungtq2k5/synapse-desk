@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { WEBHOOK_RETENTION_DAYS } from '@synapsedesk/common';
+import { WEBHOOK_RETENTION_DAYS } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

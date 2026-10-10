@@ -1,12 +1,12 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
 import {
   organizationIdFromObjectPath,
   StoragePurpose,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   E2eFixture,
   bootstrapE2eTest,

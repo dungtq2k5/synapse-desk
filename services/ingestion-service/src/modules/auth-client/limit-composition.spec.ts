@@ -1,7 +1,7 @@
 import {
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENTS_PER_TENANT,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { of, throwError } from 'rxjs';
 import { AuthReferenceService } from './auth-reference.service';
 

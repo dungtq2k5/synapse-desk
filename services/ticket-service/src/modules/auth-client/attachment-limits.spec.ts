@@ -1,7 +1,7 @@
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { of, throwError } from 'rxjs';
 import { AuthReferenceService } from './auth-reference.service';
 

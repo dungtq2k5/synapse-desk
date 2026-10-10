@@ -3,12 +3,14 @@ import { Subject, of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { ConfigService } from '@nestjs/config';
 import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+} from '@synapsedesk/contracts';
+import {
   buildInboundAddress,
   buildTicketReplyToken,
   generateInboundToken,
-  MAX_ATTACHMENT_BYTES,
-  MAX_ATTACHMENTS_PER_MESSAGE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { OrgStatus as ProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { InboundOutcome } from '../../src/modules/inbound-email/inbound-email.service';
 import {

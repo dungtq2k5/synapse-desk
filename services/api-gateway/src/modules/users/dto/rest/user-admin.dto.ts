@@ -20,7 +20,7 @@ import {
   DEFAULT_SEARCH,
   USER_SORTABLE_FIELDS,
   type UserSortableField,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   MAX_FULL_NAME_LENGTH,
   MAX_LOCK_REASON_LENGTH,

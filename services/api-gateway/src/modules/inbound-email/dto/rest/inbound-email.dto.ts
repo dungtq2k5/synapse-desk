@@ -23,7 +23,7 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_OBJECT_PATH_LENGTH,
   type AllowedAttachmentMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   MAX_DATE_HEADER_LENGTH,
   MAX_EMAIL_ADDRESS_LENGTH,

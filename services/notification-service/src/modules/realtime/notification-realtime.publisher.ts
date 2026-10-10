@@ -2,12 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   CreateInAppNotificationCommand,
-  formatErrorMsg,
-  NATS_CLIENT,
   NOTIFICATION_REALTIME_PATTERNS,
   NotificationReadPayload,
   NotificationRealtimePayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 /** What `persist()` decided, so the publisher can pick `created` vs `updated`. */
 type PersistOutcome = {

@@ -26,20 +26,22 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   BATCH_ID_LIMIT,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
   DEPARTMENT_SORTABLE_FIELDS,
-  isUniqueConstraintViolation,
   normalizeBatchIds,
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import {
+  AuditPublisher,
   requireActor,
   requireTenant,
   restoreData,
   restoreOrConflict,
   softDeleteData,
   tenantScope,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {

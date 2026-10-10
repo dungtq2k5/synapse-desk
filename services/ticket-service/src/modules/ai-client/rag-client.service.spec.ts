@@ -2,8 +2,8 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { of } from 'rxjs';
 import { RAG_GRPC_CLIENT, SearchDegradation } from '@synapsedesk/grpc-proto';
-import { RetrievalDegradation } from '@synapsedesk/common';
-import { memberContext } from '@synapsedesk/common/testing/context';
+import { RetrievalDegradation } from '@synapsedesk/contracts';
+import { memberContext } from '@synapsedesk/testing/context';
 import { RagClientService } from './rag-client.service';
 
 /**

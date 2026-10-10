@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/common';
+import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/contracts';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { ScheduledModule } from '../scheduled/scheduled.module';

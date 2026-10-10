@@ -11,7 +11,7 @@ import {
   buildInboundAddress,
   buildTicketReplyToken,
   formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /**
  * The `Reply-To` that makes an email notification answerable.

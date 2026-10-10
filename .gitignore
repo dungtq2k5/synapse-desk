@@ -69,9 +69,6 @@ docker/firebase/*.log
 # `outDir`/`rootDir` mismatch emits `.js` and `.d.ts` beside the `.ts` they came from).
 # Ignored rather than merely deleted because eslint's type-aware rules fail on
 # a stray `.d.ts` with a parsing error that names the file but not the cause.
-libs/*/src/**/*.js
-libs/*/src/**/*.js.map
-libs/*/src/**/*.d.ts
 packages/*/src/**/*.js
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts

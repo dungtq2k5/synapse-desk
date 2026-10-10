@@ -3,7 +3,7 @@ import { AiModelTier } from '@synapsedesk/grpc-proto';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import type { PermissionCode } from '@synapsedesk/common';
+import type { PermissionCode } from '@synapsedesk/contracts';
 import { PermissionGuard } from '../../src/common/guards/permission.guard';
 import {
   API,

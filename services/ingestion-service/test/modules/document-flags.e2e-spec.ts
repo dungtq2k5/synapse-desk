@@ -1,16 +1,16 @@
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { fromProtoTimestamp } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import {
   DocumentFlagResolution as ProtoDocumentFlagResolution,
   DocumentFlagSeverity as ProtoDocumentFlagSeverity,

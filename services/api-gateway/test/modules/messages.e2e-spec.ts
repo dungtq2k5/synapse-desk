@@ -4,7 +4,7 @@ import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   MAX_ATTACHMENT_BYTES,
   REDACTED_MESSAGE_PLACEHOLDER,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   API,
   E2eFixture,

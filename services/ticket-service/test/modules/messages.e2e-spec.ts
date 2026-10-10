@@ -1,4 +1,4 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -7,7 +7,7 @@ import {
   SupersededReason,
   TICKET_PATTERNS,
   ticketMessageGroupKey,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   E2eFixture,
   bootstrapE2eTest,

@@ -1,6 +1,6 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { InvitationStatus } from '@synapsedesk/common';
+import { InvitationStatus } from '@synapsedesk/contracts';
 import { PageRequest, SortOrder } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {

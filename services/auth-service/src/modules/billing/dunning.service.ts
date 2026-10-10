@@ -3,12 +3,11 @@ import Stripe from 'stripe';
 import {
   CreateInAppNotificationCommand,
   IN_APP_NOTIFICATION_PATTERN,
-  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
   NotificationResourceType,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { JetStreamPublisher, formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

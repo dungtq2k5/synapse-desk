@@ -18,15 +18,14 @@ import {
   StorageServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   isStorageObjectPath,
-  NATS_CLIENT,
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
   systemContext,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 /**
  * Longer than `GRPC_DEADLINE_MS`, and it has to be: a document is up to 25 MB

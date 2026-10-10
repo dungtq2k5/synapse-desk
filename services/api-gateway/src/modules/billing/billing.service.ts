@@ -3,7 +3,7 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import { BillingGrpcClient } from './billing-grpc.client';
 import { PlanChangeGuard } from './plan-change.guard';
 import {

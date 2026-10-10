@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { PermissionCode } from '@synapsedesk/common';
+import { PermissionCode } from '@synapsedesk/contracts';
 
 export const PERMISSION_KEY = 'permission';
 

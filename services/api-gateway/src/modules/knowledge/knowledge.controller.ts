@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,

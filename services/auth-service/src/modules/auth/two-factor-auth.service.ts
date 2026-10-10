@@ -28,7 +28,7 @@ import {
   RequestOrigin,
   UNKNOWN_ORIGIN,
   type TwoFactorJwtPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';

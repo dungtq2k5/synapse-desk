@@ -1,5 +1,5 @@
 import { registerDecorator, ValidationOptions } from 'class-validator';
-import { NON_LATIN_OCR_LANGUAGES, OcrLanguage } from '@synapsedesk/common';
+import { NON_LATIN_OCR_LANGUAGES, OcrLanguage } from '@synapsedesk/contracts';
 
 /**
  * At most one non-Latin OCR language.

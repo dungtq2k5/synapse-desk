@@ -23,7 +23,8 @@ import { AllHttpExceptionFilter } from './common/filters/all-http-exception.filt
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { MicroserviceOptions } from '@nestjs/microservices';
-import { createNatsTransport, NodeEnv } from '@synapsedesk/common';
+import { NodeEnv } from '@synapsedesk/contracts';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 import { VALIDATION_PIPE_OPTIONS } from './common/config/validation.config';
 

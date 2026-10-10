@@ -4,7 +4,7 @@ import {
   JobHealthService,
   JobRunRecorder,
   JobRunStore,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 

@@ -2,7 +2,7 @@ import { of } from 'rxjs';
 import {
   REVENUE_EXCLUSIONS,
   RevenueUnavailableReason,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   API,
   E2eFixture,

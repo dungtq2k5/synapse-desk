@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { isUniqueConstraintViolation } from '@synapsedesk/common';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
 
 /**
  * The partial unique index enforcing "at most one live ingestion job per

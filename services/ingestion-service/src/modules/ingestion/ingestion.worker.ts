@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/common';
+import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/contracts';
 import { IngestionJobData, IngestionProcessor } from './ingestion.processor';
 import { INGESTION_OUTCOMES } from '../../common/configs/ingestion.config';
 

@@ -9,7 +9,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { Gender, trimIfString } from '@synapsedesk/common';
+import { Gender } from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 import { IsNullable } from '../../../../common/decorators/is-nullable.decorator';
 import {
   MAX_FULL_NAME_LENGTH,

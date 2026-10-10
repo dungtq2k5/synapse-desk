@@ -5,7 +5,7 @@ import {
   packRequestContext,
   type GrpcPeer,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import {
   catchError,
   firstValueFrom,

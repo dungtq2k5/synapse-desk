@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import twilio, { type Twilio } from 'twilio';
-import { SendSmsCommand, SmsTemplateName } from '@synapsedesk/common';
+import { SendSmsCommand, SmsTemplateName } from '@synapsedesk/contracts';
 
 @Injectable()
 export class SmsService {

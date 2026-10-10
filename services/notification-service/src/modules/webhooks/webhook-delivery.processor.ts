@@ -3,16 +3,18 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
   IN_APP_NOTIFICATION_PATTERN,
-  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
+  type CreateInAppNotificationCommand,
+} from '@synapsedesk/contracts';
+import {
+  JetStreamPublisher,
   WEBHOOK_DISABLE_AFTER_FAILURES,
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_QUEUE,
   WebhookDeliveryStatus,
-  type CreateInAppNotificationCommand,
   type WebhookEventPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookSenderService } from './webhook-sender.service';
 import type { WebhookJobData } from './webhook-dispatch.service';

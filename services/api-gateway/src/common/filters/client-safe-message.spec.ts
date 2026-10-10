@@ -1,6 +1,6 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import { status } from '@grpc/grpc-js';
-import { withHttpStatus } from '@synapsedesk/common';
+import { withHttpStatus } from '@synapsedesk/core';
 import { clientSafeError, clientSafeMessage } from './client-safe-message';
 
 /** A gRPC `ServiceError` as grpc-js raises it: an `Error` with `code` and `details`. */

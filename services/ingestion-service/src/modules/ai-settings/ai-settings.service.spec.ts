@@ -5,7 +5,7 @@ import {
   EMBEDDING_MODEL,
   GENERATION_MODEL_BY_TIER,
   MODEL_PRICING,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { AiSettingsService } from './ai-settings.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { EntitlementsConsumer } from './entitlements.consumer';

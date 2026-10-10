@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AnswerStatus, RequestContext } from '@synapsedesk/common';
+import { AnswerStatus, RequestContext } from '@synapsedesk/contracts';
 import {
   DraftCitation,
   GetAiAttachmentsResponse,

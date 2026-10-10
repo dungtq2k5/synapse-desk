@@ -12,7 +12,7 @@ import {
   fromProtoAuditResourceType,
   requireProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { AuditAction } from '@synapsedesk/common';
+import { AuditAction } from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { ListAuditLogsQueryDto } from './dto/rest/audit-log.dto';

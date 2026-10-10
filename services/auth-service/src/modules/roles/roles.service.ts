@@ -3,16 +3,18 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
-  isUniqueConstraintViolation,
   PERMISSION_CODES,
   PermissionCode,
-  requireActor,
-  requireTenant,
   ROLE_SORTABLE_FIELDS,
   SystemRoleName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import {
+  AuditPublisher,
+  requireActor,
+  requireTenant,
+} from '@synapsedesk/nest-common';
 import {
   CallerContext,
   CreateRoleRequest,

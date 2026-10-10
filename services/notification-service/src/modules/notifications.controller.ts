@@ -5,8 +5,8 @@ import {
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
-  UnprocessableMessage,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { UnprocessableMessage } from '@synapsedesk/nest-common';
 import { InAppNotificationService } from './in-app/in-app-notification.service';
 import { EmailService } from './email/email.service';
 import { SmsService } from './sms/sms.service';

@@ -2,7 +2,7 @@ import {
   EmailTemplateName,
   NotificationOrigin,
   EmailContent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /** Everything a template needs that comes from config rather than the event. */
 export type TemplateBranding = {

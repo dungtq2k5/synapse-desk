@@ -1,15 +1,14 @@
 import type { GrpcPeer } from '@synapsedesk/grpc-proto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
-  checkStaleness,
-  JobHeartbeat,
   RequestContext,
   RequestOrigin,
   JOB_SERVICE,
   SCHEDULED_JOBS,
   SchedulerService,
   ScheduledJobName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { checkStaleness, JobHeartbeat } from '@synapsedesk/core';
 import { PlatformJobsClient } from './platform-jobs.client';
 import { BackfillJobDto } from './dto/platform-jobs.dto';
 import {

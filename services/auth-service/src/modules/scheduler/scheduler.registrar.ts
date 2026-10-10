@@ -2,13 +2,13 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import {
-  formatErrorMsg,
   jobsOwnedBy,
   repeatJobId,
   SCHEDULE_CRON,
   ScheduledJobName,
   SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Registers this service's repeat entry on boot.

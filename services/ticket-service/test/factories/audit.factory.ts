@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { AuditAction, AuditResourceType } from '@synapsedesk/common';
+import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 

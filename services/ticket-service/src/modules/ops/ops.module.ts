@@ -3,14 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { readBuildInfo, SCHEDULER_QUEUE } from '@synapsedesk/contracts';
 import {
   GrpcHealthService,
   NATS_CLIENT,
   postgresProbe,
   natsProbe,
-  readBuildInfo,
-  SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { BUILD_INFO, OpsGrpcController } from '@synapsedesk/grpc-proto';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';

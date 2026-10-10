@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  exceedsLimit,
-  formatErrorMsg,
-  RequestContext,
-} from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
+import { exceedsLimit } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import type {
   PlanChangePreviewResponse,
   StorageUsageResponse,

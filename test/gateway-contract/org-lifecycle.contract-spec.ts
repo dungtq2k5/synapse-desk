@@ -24,7 +24,7 @@
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import Redis from 'ioredis';
 import { sign } from 'jsonwebtoken';
-import { ORG_STATUS_ACCESS, OrgStatus } from '@synapsedesk/common';
+import { ORG_STATUS_ACCESS, OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';

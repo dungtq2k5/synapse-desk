@@ -34,13 +34,15 @@ const EXPORT_ENV_FILE = 'services/api-gateway/.env.test';
 /**
  * Every build output the export requires at runtime.
  *
- * Three, not one: the built gateway `require`s `@synapsedesk/common` and
- * `@synapsedesk/grpc-proto` through their packages' `main`, which is each
- * library's own `dist/` — not the copies `nest build` emits beside the gateway.
+ * Five, not one: the built gateway `require`s each shared package through its
+ * `main`, which is that package's own `dist/` — not the copies `nest build`
+ * emits beside the gateway.
  */
 const RUNTIME_OUTPUTS = [
   'services/api-gateway/dist/services/api-gateway/src/main.js',
-  'libs/common/dist/main.js',
+  'packages/contracts/dist/index.js',
+  'packages/core/dist/index.js',
+  'packages/nest-common/dist/index.js',
   'packages/grpc-proto/dist/index.js',
 ];
 

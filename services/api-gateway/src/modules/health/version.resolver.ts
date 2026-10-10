@@ -1,6 +1,6 @@
 import { Query, Resolver } from '@nestjs/graphql';
 import { ConfigService } from '@nestjs/config';
-import { readBuildInfo } from '@synapsedesk/common';
+import { readBuildInfo } from '@synapsedesk/contracts';
 import { VersionResponseGqlDto } from './dto/graphql/version-response.gql-dto';
 
 /**

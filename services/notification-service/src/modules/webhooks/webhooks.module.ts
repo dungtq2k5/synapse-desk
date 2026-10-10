@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WEBHOOK_QUEUE } from '@synapsedesk/common';
+import { WEBHOOK_QUEUE } from '@synapsedesk/nest-common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { WebhookAdminService } from './webhook-admin.service';
 import { WebhookDeliveryProcessor } from './webhook-delivery.processor';

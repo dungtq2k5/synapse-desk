@@ -1,6 +1,6 @@
 """B — the settings layer, and the half of the contract test that lives here.
 
-The TypeScript half is `libs/common/src/configs/ai-settings.config.spec.ts`.
+The TypeScript half is `packages/config/src/ai-settings.config.spec.ts`.
 Between them, a default changed on one side and not the other fails that side's
 own suite, in that side's own CI job — which is the point of duplicating the
 assertion rather than picking one language to be authoritative.
@@ -32,8 +32,8 @@ from rag_service.settings import (
 
 CONTRACT_PATH = (
     Path(__file__).resolve().parents[3]
-    / "libs"
-    / "common"
+    / "packages"
+    / "contracts"
     / "src"
     / "configs"
     / "ai-settings.contract.json"

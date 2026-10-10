@@ -1,4 +1,4 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -9,11 +9,8 @@ import {
   type ListAuditLogsRequest,
   type ProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import {
-  AuditAction,
-  AuditResourceType,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import {
   E2eFixture,
   bootstrapE2eTest,

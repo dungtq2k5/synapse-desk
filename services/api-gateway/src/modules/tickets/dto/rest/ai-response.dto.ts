@@ -1,5 +1,5 @@
 import { PickType } from '@nestjs/swagger';
-import { RetrievalDegradation, TicketPriority } from '@synapsedesk/common';
+import { RetrievalDegradation, TicketPriority } from '@synapsedesk/contracts';
 import { CitationResponseDto } from './message-response.dto';
 
 export class AiSummaryResponseDto {

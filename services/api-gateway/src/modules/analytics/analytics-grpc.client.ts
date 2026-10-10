@@ -27,7 +27,8 @@ import {
   SatisfactionResponse,
   VolumeResponse,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg, RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /** What a failed leg reports back, so the caller can mark it unavailable. */

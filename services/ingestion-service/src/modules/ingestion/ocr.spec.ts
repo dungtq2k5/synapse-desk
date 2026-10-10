@@ -1,5 +1,5 @@
 import { DocumentParserService } from './document-parser.service';
-import { parseOcrLanguages } from '@synapsedesk/common';
+import { parseOcrLanguages } from '@synapsedesk/contracts';
 import { OcrService } from './ocr.service';
 import {
   buildMixedPdf,

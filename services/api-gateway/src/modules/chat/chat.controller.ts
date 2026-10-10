@@ -15,7 +15,7 @@ import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
-import { RequestContext, TicketSource } from '@synapsedesk/common';
+import { RequestContext, TicketSource } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

@@ -4,7 +4,7 @@
 #
 # **What must never run here**, as a named list rather than an absence — an
 # absence and an oversight look identical to whoever adds the next job, and
-# `libs/common/src/configs/ci-contract.spec.ts` fails if one appears:
+# `packages/config/src/ci-contract.spec.ts` fails if one appears:
 #
 #   npm run test:system   DESTRUCTIVE to three stores in setup AND teardown —
 #                         flushes the whole dev Redis, drops the Qdrant

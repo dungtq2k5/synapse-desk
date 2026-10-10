@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CookieSameSite, NodeEnv } from '@synapsedesk/common';
+import { CookieSameSite, NodeEnv } from '@synapsedesk/contracts';
 import type { Response } from 'express';
 
 /** Anything cookie-parser has run over. */

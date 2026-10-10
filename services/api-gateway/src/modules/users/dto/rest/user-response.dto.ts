@@ -18,7 +18,7 @@ import {
   Gender,
   PERMISSION_CODES,
   type PermissionCode,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { Type } from 'class-transformer';
 import {
   IsArray,

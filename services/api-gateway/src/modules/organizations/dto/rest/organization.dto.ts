@@ -25,12 +25,11 @@ import {
   MinLength,
 } from 'class-validator';
 import {
-  lowerIfString,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
-  trimIfString,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { lowerIfString, trimIfString } from '@synapsedesk/core';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`

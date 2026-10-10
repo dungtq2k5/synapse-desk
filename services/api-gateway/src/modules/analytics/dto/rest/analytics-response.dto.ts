@@ -18,7 +18,7 @@ import {
   ExportKind,
   ExportStatus,
   DocumentFlagType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 export class RateResponseDto {
   /** null when the denominator is zero — NOT zero. The two are different facts. */

@@ -3,7 +3,7 @@ import { validateSync } from 'class-validator';
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_BYTES,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { UploadAttachmentDto } from './message.dto';
 
 /**

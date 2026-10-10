@@ -16,7 +16,6 @@ import {
   Gender,
   InvitationStatus,
   NOTIFICATION_TYPES,
-  WebhookDeliveryStatus,
   DevicePlatform,
   NotificationChannel,
   NotificationPriority,
@@ -31,7 +30,8 @@ import {
   TicketSource,
   TicketStatus,
   RetrievalDegradation,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { WebhookDeliveryStatus } from '@synapsedesk/nest-common';
 import {
   AiModelTier as ProtoAiModelTier,
   Gender as ProtoGender,

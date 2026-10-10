@@ -3,7 +3,7 @@ import {
   ExecutionContext,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { TwoFactorJwtPayload } from '@synapsedesk/common';
+import { TwoFactorJwtPayload } from '@synapsedesk/contracts';
 import { requestOf } from '../utils/execution-request.util';
 
 /**

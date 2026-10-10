@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import type { PermissionCode } from '@synapsedesk/common';
+import type { PermissionCode } from '@synapsedesk/contracts';
 import { AiModelTier } from '@synapsedesk/grpc-proto';
 import {
   API,

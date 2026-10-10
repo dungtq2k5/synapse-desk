@@ -10,7 +10,7 @@ import {
   OtpPurpose,
   PreferenceSource,
   SORT_ORDER_OPTIONS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   AiModelTier as ProtoAiModelTier,
   Gender as ProtoGender,

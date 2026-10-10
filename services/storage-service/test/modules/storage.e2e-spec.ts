@@ -1,16 +1,16 @@
 import { ConfigService } from '@nestjs/config';
 import { Socket } from 'node:net';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { faultInjector } from '@synapsedesk/testing/fault';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
 import {
   INGEST_TIMEOUT_MS,
   MAX_ATTACHMENT_BYTES,
-  compareAlphabetically,
   organizationIdFromObjectPath,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import {
   DISGUISED_BYTES,
   E2eFixture,

@@ -2,7 +2,7 @@ import {
   CHARACTER_TRUNCATION_MARKER,
   MAX_EXTRACTED_TEXT_CHARS,
   type ParseEligibleMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { AttachmentExtractorService } from './attachment-extractor.service';
 import { DocumentParserService } from './document-parser.service';
 import type { ParsedDocument } from './document-parser.service';

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
-import { EMBEDDING_DIMENSION } from '@synapsedesk/common';
+import { EMBEDDING_DIMENSION } from '@synapsedesk/contracts';
 import { EmbeddingClient, EmbeddingResult } from './embedding.contract';
 
 /**

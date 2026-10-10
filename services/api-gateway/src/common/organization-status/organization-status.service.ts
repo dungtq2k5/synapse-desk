@@ -9,7 +9,7 @@ import {
   OrganizationServiceClient,
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
-import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/common';
+import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/contracts';
 
 /** What the gate needs to decide, and nothing else. */
 export type OrganizationState = {

@@ -1,11 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import {
-  SCHEDULED_JOBS,
-  SCHEDULER_QUEUE,
-  JobRunRecorder,
-} from '@synapsedesk/common';
+import { SCHEDULED_JOBS, SCHEDULER_QUEUE } from '@synapsedesk/contracts';
+import { JobRunRecorder } from '@synapsedesk/nest-common';
 import { InvitationsService } from '../invitations/invitations.service';
 import { ExpiredLockSweep } from '../users/expired-lock.sweep';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';

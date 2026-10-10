@@ -1,12 +1,12 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
-  compareAlphabetically,
   EmailTemplateName,
   OrgStatus,
   SystemRoleName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import {
   E2eFixture,
   bootstrapE2eTest,

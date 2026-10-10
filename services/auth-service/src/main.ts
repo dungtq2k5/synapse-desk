@@ -9,7 +9,7 @@ import {
   ensureStream,
   JETSTREAM_CONNECTION,
   JETSTREAM_STREAMS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import {
   AUTH_PACKAGE_NAME,

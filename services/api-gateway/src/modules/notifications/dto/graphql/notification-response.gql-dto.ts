@@ -3,7 +3,7 @@ import {
   NotificationPriority,
   NotificationResourceType,
   NotificationType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * One row of the in-app feed, as the GraphQL schema serves it.

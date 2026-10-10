@@ -25,8 +25,8 @@ import {
 import {
   AiGenerationPurpose,
   AiGenerationStatus,
-  JobHealthService,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { JobHealthService } from '@synapsedesk/nest-common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';

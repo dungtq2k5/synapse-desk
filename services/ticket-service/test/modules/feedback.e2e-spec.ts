@@ -1,4 +1,4 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { toProtoTimestamp } from '@synapsedesk/grpc-proto';

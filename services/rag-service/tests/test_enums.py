@@ -29,7 +29,7 @@ from rag_service.enums import (
 from rag_service.generated.synapsedesk.ingestion import ledger_pb2
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-TS_ENUM_SOURCE = REPO_ROOT / "libs/common/src/configs/document.config.ts"
+TS_ENUM_SOURCE = REPO_ROOT / "packages/contracts/src/configs/document.config.ts"
 
 
 def ts_enum_members(name: str) -> set[str]:

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { of, throwError } from 'rxjs';
 import { status } from '@grpc/grpc-js';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoAiModelTier, toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import {
   API,

@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { waitUntil } from '@synapsedesk/common/testing/wait';
+import { waitUntil } from '@synapsedesk/testing/wait';
 import { INestApplication, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions } from '@nestjs/microservices';
@@ -9,17 +9,19 @@ import {
   AUDIT_PATTERNS,
   AuditAction,
   AuditResourceType,
+  RecordAuditCommand,
+} from '@synapsedesk/contracts';
+import {
   createNatsTransport,
   ensureStream,
   JETSTREAM_CONNECTION,
   JETSTREAM_STREAMS,
   PullConsumerRunner,
-  RecordAuditCommand,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { AuditConsumer } from '../../src/modules/audit/audit.consumer';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 import { stopWorkers } from '../utils';
 
 /**

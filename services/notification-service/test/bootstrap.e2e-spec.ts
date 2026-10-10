@@ -4,9 +4,9 @@ import {
   NotificationPriority,
   TICKET_PATTERNS,
   AUDIT_PATTERNS,
-  DURABLE_SUBJECTS,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { DURABLE_SUBJECTS } from '@synapsedesk/nest-common';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
 import {
   NotificationsController,

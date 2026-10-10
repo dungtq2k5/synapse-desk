@@ -23,9 +23,9 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_MESSAGE_CONTENT_LENGTH,
   MAX_OBJECT_PATH_LENGTH,
-  trimIfString,
   type AllowedAttachmentMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 

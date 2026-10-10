@@ -15,12 +15,14 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
+} from '@synapsedesk/contracts';
+import {
+  AuditPublisher,
   requireActor,
   tenantScope,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { hashToken } from '../../common/utils';

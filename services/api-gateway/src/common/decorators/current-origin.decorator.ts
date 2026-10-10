@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { RequestOrigin, UNKNOWN_ORIGIN } from '@synapsedesk/common';
+import { RequestOrigin, UNKNOWN_ORIGIN } from '@synapsedesk/contracts';
 import { requestOf } from '../utils/execution-request.util';
 
 /**

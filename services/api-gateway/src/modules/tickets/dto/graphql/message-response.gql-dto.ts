@@ -1,5 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
-import { AnswerStatus } from '@synapsedesk/common';
+import { AnswerStatus } from '@synapsedesk/contracts';
 
 /** One passage an AI answer cited, as the GraphQL schema serves it. */
 @ObjectType('Citation')

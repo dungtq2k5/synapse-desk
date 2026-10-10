@@ -4,7 +4,7 @@ import {
   canTransition,
   TICKET_STATUS_TRANSITIONS,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * THE transition check. One function, one table, every entry point.

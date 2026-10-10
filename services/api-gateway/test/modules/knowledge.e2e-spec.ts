@@ -1,11 +1,8 @@
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import {
-  AnswerStatus,
-  compareAlphabetically,
-  withHttpStatus,
-} from '@synapsedesk/common';
+import { AnswerStatus } from '@synapsedesk/contracts';
+import { compareAlphabetically, withHttpStatus } from '@synapsedesk/core';
 import {
   AnswerStatus as ProtoAnswerStatus,
   SearchDegradation,

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { CallerContext } from '@synapsedesk/grpc-proto';
-import { tenantScope } from '@synapsedesk/common';
+import { tenantScope } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Ticket } from '../../generated/prisma/client';
 

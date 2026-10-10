@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { randomBytes } from 'node:crypto';
-import { OtpPurpose } from '@synapsedesk/common';
+import { OtpPurpose } from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import {

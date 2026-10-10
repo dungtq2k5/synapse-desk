@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SCHEDULER_QUEUE } from '@synapsedesk/common';
+import { SCHEDULER_QUEUE } from '@synapsedesk/contracts';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { UsersModule } from '../users/users.module';
 import { FinanceModule } from '../finance/finance.module';

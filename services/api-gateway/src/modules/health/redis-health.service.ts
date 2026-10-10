@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * How long a readiness probe will wait on Redis before calling it down.

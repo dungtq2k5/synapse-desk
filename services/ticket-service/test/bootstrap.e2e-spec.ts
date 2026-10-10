@@ -12,10 +12,8 @@ import {
   TICKET_PACKAGE_NAME,
   TICKET_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
-import {
-  compareAlphabetically,
-  createNatsTransport,
-} from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
 import { buildTenant, buildTicket } from './factories';
 import { AppModule } from '../src/app.module';

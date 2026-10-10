@@ -5,7 +5,7 @@ import {
   AuditPublisher,
   createNatsTransport,
   NATS_CLIENT,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /**
  * Registers its own NATS client rather than importing NotificationsModule.

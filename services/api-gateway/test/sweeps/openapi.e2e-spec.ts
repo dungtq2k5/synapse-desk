@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { stripComments } from '@synapsedesk/common/testing/strip-comments';
+import { stripComments } from '@synapsedesk/testing/strip-comments';
 import request from 'supertest';
 import { of } from 'rxjs';
 import Ajv from 'ajv';
@@ -20,7 +20,7 @@ import {
 import { timestamp } from '../fixtures/wire';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
-import { canonicalizeEnums, compareAlphabetically } from '@synapsedesk/common';
+import { canonicalizeEnums, compareAlphabetically } from '@synapsedesk/core';
 import { RESEND_SIGNATURE_HEADERS } from '../../src/modules/inbound-email/resend-inbound.service';
 
 describe('The OpenAPI document', () => {

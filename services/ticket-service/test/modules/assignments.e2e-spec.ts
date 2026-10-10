@@ -1,8 +1,8 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { ReassignmentReason, TICKET_PATTERNS } from '@synapsedesk/common';
+import { ReassignmentReason, TICKET_PATTERNS } from '@synapsedesk/contracts';
 import { ReassignmentReason as ProtoReassignmentReason } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
@@ -19,7 +19,7 @@ import {
 import { AssignmentsService } from '../../src/modules/assignments/assignments.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('Assignment & reassignment (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

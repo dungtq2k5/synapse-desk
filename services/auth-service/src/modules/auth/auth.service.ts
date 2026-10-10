@@ -26,25 +26,29 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
-  extractEmailDomain,
-  formatErrorMsg,
-  extractEmailLocalPart,
-  isUniqueConstraintViolation,
   JwtPayload,
-  normalizeEmail,
   OrgStatus,
   RequestOrigin,
-  requireActor,
   SystemRoleName,
-  tenantScope,
   TenantSelectionJwtPayload,
   TwoFactorJwtPayload,
   WEB_ROUTES,
   FREE_TIER_ORGANIZATION_GRANTS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import {
+  extractEmailDomain,
+  extractEmailLocalPart,
+  isUniqueConstraintViolation,
+  normalizeEmail,
+} from '@synapsedesk/core';
+import {
+  AuditPublisher,
+  formatErrorMsg,
+  requireActor,
+  tenantScope,
+} from '@synapsedesk/nest-common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {

@@ -19,7 +19,7 @@
 
 import { execFileSync } from 'node:child_process';
 import Redis from 'ioredis';
-import { QDRANT_COLLECTION } from '@synapsedesk/common';
+import { QDRANT_COLLECTION } from '@synapsedesk/contracts';
 import { REPO_ROOT } from './services';
 
 const QDRANT_URL = process.env.QDRANT_URL ?? 'http://localhost:6333';

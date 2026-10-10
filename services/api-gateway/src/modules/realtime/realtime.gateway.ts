@@ -17,7 +17,6 @@ import {
   CLIENT_EVENTS,
   ClientEvent,
   deptRoom,
-  formatErrorMsg,
   isFullJwtPayload,
   JwtPayload,
   MaybeJwtPayload,
@@ -29,7 +28,8 @@ import {
   ticketInternalRoom,
   ticketRoom,
   userRoom,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { SecureGateway } from '../../common/decorators/secure-gateway.decorator';
 import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsThrottlerService } from './ws-throttler.service';

@@ -1,6 +1,6 @@
 import { createOrganization } from './factories';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
-import { PERMISSION_CODES } from '@synapsedesk/common';
+import { PERMISSION_CODES } from '@synapsedesk/contracts';
 
 /**
  * Proves the fixture itself, before any suite depends on it.

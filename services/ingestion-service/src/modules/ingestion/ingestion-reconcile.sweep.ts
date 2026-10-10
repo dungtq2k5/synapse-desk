@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AiSurface,
-  formatErrorMsg,
   IngestionJobStatus,
   parseOcrLanguages,
   systemContext,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
 import { IngestionQueueService } from './ingestion-queue.service';

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import { SessionsGrpcClient } from './sessions-grpc.client';
 import { toSessionResponseDtos } from './session.mapper';
 import {

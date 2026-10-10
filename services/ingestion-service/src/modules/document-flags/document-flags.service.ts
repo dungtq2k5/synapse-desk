@@ -14,15 +14,17 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   CallerContext,
   DOCUMENT_FLAG_SORTABLE_FIELDS,
   DocumentFlagResolution,
   DocumentFlagType,
+} from '@synapsedesk/contracts';
+import {
+  AuditPublisher,
   requireActor,
   requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { documentVisibility } from '../../common/document-visibility';
 import { Prisma } from '../../generated/prisma/client';

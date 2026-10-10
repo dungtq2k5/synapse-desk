@@ -9,7 +9,7 @@ import {
   OtpServiceClient,
   toProtoOtpPurpose,
 } from '@synapsedesk/grpc-proto';
-import { OtpPurpose, RequestOrigin } from '@synapsedesk/common';
+import { OtpPurpose, RequestOrigin } from '@synapsedesk/contracts';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 @Injectable()

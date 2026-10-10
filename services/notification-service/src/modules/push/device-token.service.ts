@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import type { DevicePlatform } from '@synapsedesk/common';
+import type { DevicePlatform } from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

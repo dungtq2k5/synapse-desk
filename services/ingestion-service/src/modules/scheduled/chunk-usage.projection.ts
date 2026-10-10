@@ -3,7 +3,7 @@ import {
   PROJECTION_BACKFILL_WINDOW_DAYS,
   PROJECTION_RESET_BATCH,
   PROJECTION_TRANSACTION_TIMEOUT_MS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 

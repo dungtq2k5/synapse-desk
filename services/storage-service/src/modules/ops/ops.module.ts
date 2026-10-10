@@ -1,13 +1,13 @@
 import { Module, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientsModule } from '@nestjs/microservices';
+import { readBuildInfo } from '@synapsedesk/contracts';
 import {
   createNatsTransport,
   GrpcHealthService,
   NATS_CLIENT,
   natsProbe,
-  readBuildInfo,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { BUILD_INFO, OpsGrpcController } from '@synapsedesk/grpc-proto';
 import { FirebaseStorageModule } from '../firebase/firebase-storage.module';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';

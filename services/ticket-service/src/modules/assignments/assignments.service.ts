@@ -11,12 +11,9 @@ import {
   UnassignTicketRequest,
   UnassignTicketResponse,
 } from '@synapsedesk/grpc-proto';
-import {
-  isUniqueConstraintViolation,
-  ReassignmentReason,
-  requireActor,
-  TICKET_PATTERNS,
-} from '@synapsedesk/common';
+import { ReassignmentReason, TICKET_PATTERNS } from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import { requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';

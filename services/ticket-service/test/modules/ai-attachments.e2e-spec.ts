@@ -6,7 +6,7 @@ import {
   MAX_AI_ATTACHMENT_BYTES,
   MAX_EXTRACTED_TEXT_PER_MESSAGE,
   type ParseEligibleMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import {
   buildTenant,

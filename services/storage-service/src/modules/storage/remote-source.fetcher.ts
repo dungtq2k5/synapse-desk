@@ -3,13 +3,13 @@ import { request as httpsRequest } from 'node:https';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { status } from '@grpc/grpc-js';
+import { INGEST_TIMEOUT_MS } from '@synapsedesk/contracts';
 import {
   DeniedTargetError,
-  INGEST_TIMEOUT_MS,
   buildGuardedLookup,
   deniedLiteral,
   privateTargetsAllowed,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /** Redirect hops followed before a source is refused; the next one fails. */
 export const INGEST_MAX_REDIRECTS = 2;

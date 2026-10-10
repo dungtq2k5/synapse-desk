@@ -5,7 +5,7 @@ import {
   DEFAULT_SEARCH,
   SORT_ORDER_OPTIONS,
   type SortOrder,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * Pagination and sorting, with NO search term.

@@ -8,7 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { formatErrorMsg, isRetryableResendError } from '@synapsedesk/common';
+import { isRetryableResendError } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { MetricsRegistry } from '../metrics/metrics.registry';
 import { MAX_INBOUND_BODY_LENGTH } from '../../common/config/dto.config';
 import { VALIDATION_PIPE_OPTIONS } from '../../common/config/validation.config';

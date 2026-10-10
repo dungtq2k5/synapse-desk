@@ -31,7 +31,7 @@ import {
   ListBillingEventsRequest,
   ListBillingEventsResponse,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 @Injectable()

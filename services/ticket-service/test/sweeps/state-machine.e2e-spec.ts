@@ -1,11 +1,11 @@
 import { RpcException } from '@nestjs/microservices';
-import { rpcCode } from '@synapsedesk/common/testing/rpc';
+import { rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   canTransition,
   TERMINAL_TICKET_STATUSES,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';

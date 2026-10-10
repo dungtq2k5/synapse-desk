@@ -1,5 +1,5 @@
 import { status } from '@grpc/grpc-js';
-import { withHttpStatus } from '@synapsedesk/common';
+import { withHttpStatus } from '@synapsedesk/core';
 import { throwError } from 'rxjs';
 import {
   API,

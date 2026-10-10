@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import {
   parseInboundAddress,
   parseTicketReplyToken,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /**
  * A table of inputs and answers for the inbound address and reply-token parsers.

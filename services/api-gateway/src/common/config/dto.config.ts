@@ -222,7 +222,7 @@ export const MIN_ORGANIZATION_SLUG_LENGTH = 2;
 // validators, and a gateway spec asserting the producer's conformance had to
 // reach across workspaces to do it — an import a pruned image build refuses.
 // Re-exported so the gateway's DTO imports stay local.
-export { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/common';
+export { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/contracts';
 
 /** Matches `organizations.allowed_email_domains` — `@db.VarChar(255)`. */
 export const MAX_ORGANIZATION_DOMAIN_LENGTH = 255;

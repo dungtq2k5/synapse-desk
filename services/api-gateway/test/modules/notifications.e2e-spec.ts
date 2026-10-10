@@ -7,7 +7,7 @@ import {
   NotificationPriority,
   NotificationResourceType,
   PreferenceSource,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   DigestMode as ProtoDigestMode,
   NotificationChannel as ProtoNotificationChannel,

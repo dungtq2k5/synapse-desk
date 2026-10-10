@@ -9,7 +9,7 @@
  */
 
 import { faker } from '@faker-js/faker';
-import { TicketStatus } from '@synapsedesk/common';
+import { TicketStatus } from '@synapsedesk/contracts';
 import {
   buildMessage,
   buildTenant,

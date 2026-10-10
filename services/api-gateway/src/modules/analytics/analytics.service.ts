@@ -13,7 +13,7 @@ import {
   toVolumeResponseDto,
 } from './analytics.mapper';
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import { AnalyticsCacheService } from './analytics-cache.service';
 import { AnalyticsGrpcClient, LegFailure } from './analytics-grpc.client';
 import {

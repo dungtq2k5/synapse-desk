@@ -32,19 +32,21 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
-  generateInboundToken,
   InvitationStatus,
-  isUniqueConstraintViolation,
   OrgStatus,
-  requireTenant,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import {
+  AuditPublisher,
+  generateInboundToken,
+  requireTenant,
   LimitAlertPublisher,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';

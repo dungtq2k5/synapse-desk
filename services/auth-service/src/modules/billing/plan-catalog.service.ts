@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PlanEntitlements } from '@synapsedesk/common';
+import { PlanEntitlements } from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

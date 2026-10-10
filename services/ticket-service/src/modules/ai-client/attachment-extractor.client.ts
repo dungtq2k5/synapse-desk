@@ -8,7 +8,7 @@ import {
   INGESTION_GRPC_CLIENT,
   packRequestContext,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Longer than `GRPC_DEADLINE_MS`, because this is a PARSE and not a lookup.

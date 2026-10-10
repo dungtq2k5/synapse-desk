@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { SCHEDULER_QUEUE } from '@synapsedesk/common';
+import { SCHEDULER_QUEUE } from '@synapsedesk/contracts';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { SchedulerProcessor } from './scheduler.processor';

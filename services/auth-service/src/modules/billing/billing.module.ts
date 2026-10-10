@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
-import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/common';
+import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/nest-common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { AuditModule } from '../audit/audit.module';

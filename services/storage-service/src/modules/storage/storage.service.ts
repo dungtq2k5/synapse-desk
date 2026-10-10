@@ -23,13 +23,15 @@ import {
   fromProtoStoragePurpose,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   organizationIdFromObjectPath,
+  StoragePurpose,
+} from '@synapsedesk/contracts';
+import { exceedsLimit } from '@synapsedesk/core';
+import {
+  formatErrorMsg,
   requireActor,
   requireTenant,
-  StoragePurpose,
-  exceedsLimit,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
 import { extensionFor, PURPOSE_POLICY } from '../../common/purpose-registry';
 import {

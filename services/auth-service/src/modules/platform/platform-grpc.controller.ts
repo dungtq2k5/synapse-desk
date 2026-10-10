@@ -1,4 +1,4 @@
-import { JobHealthService } from '@synapsedesk/common';
+import { JobHealthService } from '@synapsedesk/nest-common';
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {

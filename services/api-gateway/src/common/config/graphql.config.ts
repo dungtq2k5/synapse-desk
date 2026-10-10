@@ -3,7 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { ApolloDriverConfig } from '@nestjs/apollo';
 import type { ClientGrpc } from '@nestjs/microservices';
 import type { Request, Response } from 'express';
-import { NodeEnv } from '@synapsedesk/common';
+import { NodeEnv } from '@synapsedesk/contracts';
 import { MAX_QUERY_COMPLEXITY, MAX_QUERY_DEPTH } from './graphql-limits.config';
 import { depthLimitRule } from '../graphql/depth-limit.rule';
 import { queryCostPlugin } from '../graphql/query-cost.plugin';

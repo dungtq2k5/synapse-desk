@@ -11,7 +11,7 @@ import {
   type ScryptOptions,
 } from 'node:crypto';
 
-import { safeCompareHex } from '@synapsedesk/common';
+import { safeCompareHex } from '@synapsedesk/nest-common';
 
 /**
  * A cryptographically random, URL-safe secret.

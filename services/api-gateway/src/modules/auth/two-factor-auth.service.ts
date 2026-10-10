@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestOrigin } from '@synapsedesk/contracts';
 import { TwoFactorAuthGrpcClient } from './two-factor-auth-grpc.client';
 import {
   toBackupCodesStatusResponseDto,

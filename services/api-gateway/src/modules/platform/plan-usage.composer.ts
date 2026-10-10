@@ -1,4 +1,5 @@
-import { PLAN_LIMIT_DIMENSIONS, exceedsLimit } from '@synapsedesk/common';
+import { PLAN_LIMIT_DIMENSIONS } from '@synapsedesk/contracts';
+import { exceedsLimit } from '@synapsedesk/core';
 import type { ApplyPlanResponseDto } from './dto/rest/platform-response.dto';
 import type { UsageLeg } from './platform-usage.client';
 

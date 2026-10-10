@@ -1,11 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import {
-  CallerContext,
-  NotificationReadPayload,
-  requireActor,
-} from '@synapsedesk/common';
+import { CallerContext, NotificationReadPayload } from '@synapsedesk/contracts';
+import { requireActor } from '@synapsedesk/nest-common';
 import {
   ListNotificationsRequest,
   ListNotificationsResponse,

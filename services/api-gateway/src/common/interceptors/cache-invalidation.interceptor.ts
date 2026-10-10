@@ -8,7 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { concatMap, type Observable } from 'rxjs';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RequestContextService } from '../contexts/request.context';
 import { CacheService } from '../cache/cache.service';
 import {

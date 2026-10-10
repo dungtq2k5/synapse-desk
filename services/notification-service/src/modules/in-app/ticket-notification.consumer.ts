@@ -2,7 +2,6 @@ import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   CreateInAppNotificationCommand,
-  formatErrorMsg,
   NOTIFICATION_TYPES,
   NotificationAudience,
   NotificationPriority,
@@ -10,7 +9,8 @@ import {
   TICKET_PATTERNS,
   TicketEventOf,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { InAppNotificationService } from './in-app-notification.service';
 
 /**

@@ -36,12 +36,14 @@ describe('the OpenAPI export — the pure half', () => {
     });
     afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-    it('**names the gateway AND both libraries** — the export requires all three at runtime', () => {
-      // The built gateway resolves `@synapsedesk/common` and `grpc-proto` to
-      // each library's own `dist/`; a gateway-only build is not enough.
+    it('**names the gateway AND every shared package** — the export requires all of them at runtime', () => {
+      // The built gateway resolves each `@synapsedesk/*` package to
+      // that package's own `dist/`; a gateway-only build is not enough.
       expect(RUNTIME_OUTPUTS).toEqual([
         'services/api-gateway/dist/services/api-gateway/src/main.js',
-        'libs/common/dist/main.js',
+        'packages/contracts/dist/index.js',
+        'packages/core/dist/index.js',
+        'packages/nest-common/dist/index.js',
         'packages/grpc-proto/dist/index.js',
       ]);
       expect(missingOutputs(root)).toEqual(RUNTIME_OUTPUTS);

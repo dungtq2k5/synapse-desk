@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import type { PermissionCode } from '@synapsedesk/common';
+import type { PermissionCode } from '@synapsedesk/contracts';
 
 /**
  * The query-parameter permission rules, and the decorator that declares them.

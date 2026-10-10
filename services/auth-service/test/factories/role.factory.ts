@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { PermissionCode, SystemRoleName } from '@synapsedesk/common';
+import { PermissionCode, SystemRoleName } from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 

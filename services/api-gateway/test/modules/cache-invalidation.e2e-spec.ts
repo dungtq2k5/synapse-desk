@@ -4,7 +4,7 @@ import {
   TICKET_PATTERNS,
   DOCUMENT_PATTERNS,
   OrgStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import {
   API,

@@ -16,13 +16,15 @@ import {
 } from '@synapsedesk/grpc-proto';
 import type Stripe from 'stripe';
 import {
-  formatErrorMsg,
   PORTAL_CONFIGURATION_TTL_MS,
+  STRIPE_PORTAL_MARKER,
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import {
+  formatErrorMsg,
   requireActor,
   requireTenant,
-  STRIPE_PORTAL_MARKER,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
 import { PlanCatalogService } from './plan-catalog.service';

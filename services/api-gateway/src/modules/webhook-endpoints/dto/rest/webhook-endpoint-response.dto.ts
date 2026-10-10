@@ -1,9 +1,7 @@
 /** @file What the webhook management routes return. */
 
-import type {
-  NotificationType,
-  WebhookDeliveryStatus,
-} from '@synapsedesk/common';
+import type { NotificationType } from '@synapsedesk/contracts';
+import type { WebhookDeliveryStatus } from '@synapsedesk/nest-common';
 
 export class WebhookEndpointResponseDto {
   readonly id!: string;

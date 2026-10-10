@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { FEEDBACK_RATINGS, FeedbackRating } from '@synapsedesk/common';
+import { FEEDBACK_RATINGS, FeedbackRating } from '@synapsedesk/contracts';
 
 export class FeedbackResponseDto {
   id!: string;

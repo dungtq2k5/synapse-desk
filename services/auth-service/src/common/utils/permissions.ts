@@ -1,4 +1,4 @@
-import { PermissionCode } from '@synapsedesk/common';
+import { PermissionCode } from '@synapsedesk/contracts';
 
 /** The minimum a row must expose to be flattened. */
 type RoleWithPermissions = { permissions: { code: string }[] };

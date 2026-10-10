@@ -27,20 +27,21 @@ import {
   type UserServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
-  extractEmailAddress,
   INGEST_DEADLINE_MS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
-  exceedsLimit,
-  formatErrorMsg,
   OrgStatus,
-  parseInboundAddress,
-  parseTicketReplyToken,
   UNKNOWN_ORIGIN,
   type RequestContext,
   type RequestOrigin,
   InboundRejectionReason,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { extractEmailAddress, exceedsLimit } from '@synapsedesk/core';
+import {
+  formatErrorMsg,
+  parseInboundAddress,
+  parseTicketReplyToken,
+} from '@synapsedesk/nest-common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { MAX_INBOUND_BODY_LENGTH } from '../../common/config/dto.config';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';

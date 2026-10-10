@@ -35,18 +35,16 @@ import {
   fromProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   MAX_MESSAGE_CONTENT_LENGTH,
   REDACTED_MESSAGE_PLACEHOLDER,
-  isUniqueConstraintViolation,
-  requireActor,
   TICKET_MESSAGE_SORTABLE_FIELDS,
   TICKET_PATTERNS,
   SupersededReason,
   ticketMessageGroupKey,
   PARSE_ELIGIBLE_MIME_TYPES,
-  exceedsLimit,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
+import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 import { isDraftRefusal } from '../ai-client/refusal';

@@ -6,7 +6,7 @@ import {
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
   PreferenceSource,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { isWithinQuietHours } from './quiet-hours';
 

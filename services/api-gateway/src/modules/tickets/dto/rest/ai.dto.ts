@@ -1,7 +1,7 @@
 import { MAX_DRAFT_INSTRUCTION_LENGTH } from '../../../../common/config/dto.config';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { trimIfString } from '@synapsedesk/common';
+import { trimIfString } from '@synapsedesk/core';
 
 export class GenerateDraftDto {
   /**

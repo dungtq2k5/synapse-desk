@@ -7,7 +7,7 @@ import {
   TicketSource,
   TicketStatus,
   type TicketSortableField,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { MAX_PAGE_SIZE } from '../../../../common/config/graphql-limits.config';
 import '../../../../common/graphql/enums';
 

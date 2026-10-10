@@ -1,5 +1,8 @@
 import ExcelJS from 'exceljs';
-import { MAX_EXTRACTED_TEXT_CHARS, MAX_SHEET_ROWS } from '@synapsedesk/common';
+import {
+  MAX_EXTRACTED_TEXT_CHARS,
+  MAX_SHEET_ROWS,
+} from '@synapsedesk/contracts';
 import { DocumentParserService } from './document-parser.service';
 import { OcrService } from './ocr.service';
 import { buildXlsx, tallSheet } from '../../../test/utils/xlsx-fixture';

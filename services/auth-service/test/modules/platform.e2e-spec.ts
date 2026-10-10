@@ -1,18 +1,20 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   OrgStatus as ProtoOrgStatus,
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
-  compareAlphabetically,
   ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
+  limitAlertStateKey,
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import {
   JetStreamPublisher,
   LimitAlertPublisher,
-  limitAlertStateKey,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import {
   E2eFixture,
   bootstrapE2eTest,

@@ -146,7 +146,9 @@ const EXPORTED_CLASS = /^export (?:abstract )?class (\w+)/gm;
 const CLASSES = new Set(
   [
     join(ROOT, 'services/api-gateway/src'),
-    join(ROOT, 'libs/common/src'),
+    join(ROOT, 'packages/contracts/src'),
+    join(ROOT, 'packages/core/src'),
+    join(ROOT, 'packages/nest-common/src'),
   ].flatMap((root) =>
     readdirSync(root, { recursive: true, encoding: 'utf8' })
       .filter((entry) => entry.endsWith('.ts'))

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { compareAlphabetically, formatErrorMsg } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RedisService } from '../redis/redis.service';
 
 /**

@@ -1,5 +1,5 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
-import { IngestionJobStatus } from '@synapsedesk/common';
+import { IngestionJobStatus } from '@synapsedesk/contracts';
 import { PageMetaResponseGqlDto } from '../../../../common/dto/graphql/page-meta-response.gql-dto';
 import '../../../../common/graphql/enums';
 

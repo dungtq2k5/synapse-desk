@@ -8,11 +8,11 @@ import {
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
-  compareAlphabetically,
   quotaThresholdEventId,
   limitThresholdEventId,
-  UnprocessableMessage,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { UnprocessableMessage } from '@synapsedesk/nest-common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InAppNotificationService } from '../../src/modules/in-app/in-app-notification.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';

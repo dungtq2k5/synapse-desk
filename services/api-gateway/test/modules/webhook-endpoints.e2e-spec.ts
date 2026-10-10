@@ -4,8 +4,8 @@ import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   NOTIFICATION_TYPES,
   NOTIFICATION_TYPE_VALUES,
-  WEBHOOK_DELIVERY_LIMIT,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { WEBHOOK_DELIVERY_LIMIT } from '@synapsedesk/nest-common';
 import {
   NotificationType as ProtoNotificationType,
   WebhookDeliveryStatus as ProtoDeliveryStatus,

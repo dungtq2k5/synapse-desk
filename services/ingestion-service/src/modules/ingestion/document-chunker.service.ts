@@ -7,7 +7,7 @@ import {
   CHUNK_TARGET_TOKENS,
   CHUNK_TOKENIZER,
   MIN_CHUNK_TOKENS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { ParsedPage } from './document-parser.service';
 
 export type Chunk = {

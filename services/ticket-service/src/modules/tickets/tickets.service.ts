@@ -34,21 +34,23 @@ import {
 import {
   BATCH_ID_LIMIT,
   normalizeBatchIds,
-  formatErrorMsg,
   MAX_BULK_TICKET_IDS,
   MAX_STATUS_CHANGE_REASON_LENGTH,
-  requireActor,
-  requireTenant,
-  restoreData,
-  softDeleteData,
   TICKET_PATTERNS,
   TICKET_SORTABLE_FIELDS,
   TicketPriority,
   TicketSource,
   TERMINAL_TICKET_STATUSES,
   TicketStatus,
+} from '@synapsedesk/contracts';
+import {
+  formatErrorMsg,
+  requireActor,
+  requireTenant,
+  restoreData,
+  softDeleteData,
   tenantScope,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { recordInboundEmail, withInboundDedup } from './inbound-dedup';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';

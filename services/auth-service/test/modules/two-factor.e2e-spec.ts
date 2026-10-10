@@ -1,8 +1,8 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { generateSync } from 'otplib';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest, requestOrigin } from '../utils';
 import {
   createBackupCode,

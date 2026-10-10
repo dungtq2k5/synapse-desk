@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { CallerContext, requireTenant } from '@synapsedesk/common';
+import { CallerContext } from '@synapsedesk/contracts';
+import { requireTenant } from '@synapsedesk/nest-common';
 import {
   CreateExportRequest,
   ExportResponse,

@@ -10,7 +10,7 @@ import {
   BillingEventStatus,
   OrgStatus,
   SystemRoleName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   createDepartment,
   createOrganization,

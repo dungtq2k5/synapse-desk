@@ -2,7 +2,7 @@ import { IsIn, IsOptional, IsUUID } from 'class-validator';
 import {
   IngestionJobStatus,
   INGESTION_JOB_STATUSES,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 
 /** Query for `GET /ingestion-jobs`. */

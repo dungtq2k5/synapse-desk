@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { ReassignmentReason } from '@synapsedesk/common';
+import { ReassignmentReason } from '@synapsedesk/contracts';
 import { ReassignmentReason as ProtoReassignmentReason } from '@synapsedesk/grpc-proto';
 import {
   API,

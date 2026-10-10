@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   backfillWindow,
-  formatErrorMsg,
   RollupWindow,
   safeTimezone,
   trailingWindow,
-} from '@synapsedesk/common';
+} from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 

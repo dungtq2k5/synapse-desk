@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { MAX_ANALYTICS_RANGE_DAYS } from '@synapsedesk/common';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { MAX_ANALYTICS_RANGE_DAYS } from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, type TenantFixture } from '../factories';
 import { AnalyticsService } from '../../src/modules/analytics/analytics.service';

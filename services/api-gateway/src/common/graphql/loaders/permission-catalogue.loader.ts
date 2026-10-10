@@ -5,7 +5,7 @@ import {
   type RoleServiceClient,
 } from '@synapsedesk/grpc-proto';
 import { firstValueFrom } from 'rxjs';
-import type { RequestContext } from '@synapsedesk/common';
+import type { RequestContext } from '@synapsedesk/contracts';
 import type { CacheService } from '../../cache/cache.service';
 import { CACHE_SCOPES } from '../../config/cache.config';
 import { createLoader } from './loaders.factory';

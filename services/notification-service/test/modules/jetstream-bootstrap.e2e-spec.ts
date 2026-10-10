@@ -1,10 +1,9 @@
+import { NOTIFICATION_PATTERNS, TICKET_PATTERNS } from '@synapsedesk/contracts';
 import {
   connectJetStream,
   ensureStream,
   JETSTREAM_STREAMS,
-  NOTIFICATION_PATTERNS,
-  TICKET_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import type { NatsConnection } from 'nats';
 
 describe('JetStream bootstrap (e2e)', () => {

@@ -15,12 +15,14 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  NOTIFICATION_TYPE_VALUES,
+  type NotificationType,
+} from '@synapsedesk/contracts';
+import {
   MAX_WEBHOOK_DESCRIPTION_LENGTH,
   MAX_WEBHOOK_URL_LENGTH,
-  NOTIFICATION_TYPE_VALUES,
   WEBHOOK_DELIVERY_LIMIT,
-  type NotificationType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /**
  * The endpoint's writable fields.

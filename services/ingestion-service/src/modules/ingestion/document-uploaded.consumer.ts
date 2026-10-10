@@ -3,8 +3,8 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   DOCUMENT_PATTERNS,
   DocumentUploadedEvent,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { IngestionQueueService } from './ingestion-queue.service';
 
 /**

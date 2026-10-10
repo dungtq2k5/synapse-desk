@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientsModule } from '@nestjs/microservices';
-import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/common';
+import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/nest-common';
 import { NotificationRealtimePublisher } from './notification-realtime.publisher';
 
 /**

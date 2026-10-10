@@ -2,14 +2,14 @@ import {
   RetrievalDegradation,
   TicketPriority,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   fromProtoTicketPriority,
   SuggestionsDegradation,
 } from '@synapsedesk/grpc-proto';
 import { RpcException } from '@nestjs/microservices';
-import { waitFor } from '@synapsedesk/common/testing/wait';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { waitFor } from '@synapsedesk/testing/wait';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';

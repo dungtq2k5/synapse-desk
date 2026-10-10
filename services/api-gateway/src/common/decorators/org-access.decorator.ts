@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { OrgAccess } from '@synapsedesk/common';
+import { OrgAccess } from '@synapsedesk/contracts';
 
 export const ORG_ACCESS_KEY = 'orgAccess';
 

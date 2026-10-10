@@ -23,7 +23,7 @@ import {
   OrgStatus,
   REALTIME_EVENTS,
   TICKET_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';

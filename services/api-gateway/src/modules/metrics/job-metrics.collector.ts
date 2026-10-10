@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatErrorMsg, RequestOrigin } from '@synapsedesk/common';
+import { RequestOrigin } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PlatformJobsService } from '../platform-jobs/platform-jobs.service';
 import { MetricsRegistry } from './metrics.registry';
 

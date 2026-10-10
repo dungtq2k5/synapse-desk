@@ -20,7 +20,7 @@ import {
   InvitationStatus,
   MIN_PASSWORD_LENGTH,
   type InvitationSortableField,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import {
   MAX_DEVICE_NAME_LENGTH,

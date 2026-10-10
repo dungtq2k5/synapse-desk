@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
-import { formatErrorMsg, RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import {
   GRPC_DEADLINE_MS,
   INGESTION_GRPC_CLIENT,

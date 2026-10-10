@@ -1,5 +1,5 @@
-import { PERMISSION_CODES } from '@synapsedesk/common';
-import type { CallerContext } from '@synapsedesk/common';
+import { PERMISSION_CODES } from '@synapsedesk/contracts';
+import type { CallerContext } from '@synapsedesk/contracts';
 import { memberContext } from './context';
 
 /**

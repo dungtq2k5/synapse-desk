@@ -20,15 +20,14 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   INGEST_DEADLINE_MS,
-  formatErrorMsg,
   isStorageObjectPath,
-  NATS_CLIENT,
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
   UNKNOWN_ORIGIN,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 export type PresignedUpload = {
   uploadUrl: string;

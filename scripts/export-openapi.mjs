@@ -78,7 +78,7 @@ const { applyApiRouting, resolveGlobalPrefix } = gatewayRequire(
   './modules/health/ops-routes',
 );
 // The built lib the gateway itself requires, so both apply one canonicalization.
-const { canonicalizeEnums } = gatewayRequire('@synapsedesk/common');
+const { canonicalizeEnums } = gatewayRequire('@synapsedesk/core');
 
 /** The canonical document text, exactly as it is committed. */
 async function exportDocument() {

@@ -13,8 +13,8 @@ import {
   FEEDBACK_RATINGS,
   FeedbackRating,
   MAX_MESSAGE_CONTENT_LENGTH,
-  trimIfString,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 

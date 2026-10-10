@@ -13,4 +13,4 @@ export {
   memberContext,
   requestOrigin,
   superAdminContext,
-} from '@synapsedesk/common/testing/context';
+} from '@synapsedesk/testing/context';

@@ -3,7 +3,7 @@ import {
   TicketPriority,
   TicketSource,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';

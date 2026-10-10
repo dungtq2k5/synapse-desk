@@ -10,12 +10,12 @@ import {
   OrgStatus as ProtoOrgStatus,
   TicketStatus as ProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
+import { MAX_ATTACHMENT_BYTES } from '@synapsedesk/contracts';
 import {
   buildInboundAddress,
   buildTicketReplyToken,
   generateInboundToken,
-  MAX_ATTACHMENT_BYTES,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import {
   API,
   E2eFixture,

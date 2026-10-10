@@ -1,4 +1,5 @@
-import { generateInboundToken, SystemRoleName } from '@synapsedesk/common';
+import { SystemRoleName } from '@synapsedesk/contracts';
+import { generateInboundToken } from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { seedTenantWithUser } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';

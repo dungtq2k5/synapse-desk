@@ -1,4 +1,7 @@
-import { COOKIE_SAMESITE_OPTIONS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
+import {
+  COOKIE_SAMESITE_OPTIONS,
+  NODE_ENV_OPTIONS,
+} from '@synapsedesk/contracts';
 import * as Joi from 'joi';
 
 /**

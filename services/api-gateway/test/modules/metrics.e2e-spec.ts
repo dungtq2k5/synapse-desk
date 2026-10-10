@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { of } from 'rxjs';
 import { faker } from '@faker-js/faker';
-import { SCHEDULED_JOBS } from '@synapsedesk/common';
+import { SCHEDULED_JOBS } from '@synapsedesk/contracts';
 import {
   API,
   E2eFixture,

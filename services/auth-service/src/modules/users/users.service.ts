@@ -42,25 +42,29 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   BATCH_ID_LIMIT,
   EmailTemplateName,
+  normalizeBatchIds,
+  SupersededReason,
+  SystemRoleName,
+  USER_SORTABLE_FIELDS,
+} from '@synapsedesk/contracts';
+import {
   extractEmailDomain,
   extractEmailLocalPart,
   isUniqueConstraintViolation,
-  normalizeBatchIds,
   normalizeEmail,
+} from '@synapsedesk/core';
+import {
+  AuditPublisher,
   requireActor,
   requireTenant,
   restoreData,
   softDeleteData,
-  SupersededReason,
-  SystemRoleName,
   tenantScope,
-  USER_SORTABLE_FIELDS,
   formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';

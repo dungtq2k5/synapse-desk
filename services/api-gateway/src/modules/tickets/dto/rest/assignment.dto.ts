@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsUUID } from 'class-validator';
-import { ReassignmentReason } from '@synapsedesk/common';
+import { ReassignmentReason } from '@synapsedesk/contracts';
 
 export class AssignTicketDto {
   @IsUUID('4')

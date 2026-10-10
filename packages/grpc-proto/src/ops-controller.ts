@@ -2,11 +2,8 @@ import { Controller, Inject } from '@nestjs/common';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { Observable } from 'rxjs';
-import {
-  GrpcHealthService,
-  NOT_SERVING,
-  type BuildInfo,
-} from '@synapsedesk/common';
+import { type BuildInfo } from '@synapsedesk/contracts';
+import { GrpcHealthService, NOT_SERVING } from '@synapsedesk/nest-common';
 import { READINESS_SERVICE } from './constants';
 import type {
   HealthCheckRequest,

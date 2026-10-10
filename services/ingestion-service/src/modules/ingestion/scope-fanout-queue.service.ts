@@ -3,10 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import {
   DocumentScopeChangedEvent,
-  formatErrorMsg,
   SCOPE_FANOUT_JOB_NAME,
   SCOPE_FANOUT_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Queues the reconciler.

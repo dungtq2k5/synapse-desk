@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 

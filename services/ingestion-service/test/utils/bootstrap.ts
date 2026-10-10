@@ -5,7 +5,7 @@ import {
   INGESTION_QUEUE,
   SCHEDULER_QUEUE,
   SCOPE_FANOUT_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';

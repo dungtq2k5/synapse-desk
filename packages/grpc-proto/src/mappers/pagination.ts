@@ -1,4 +1,4 @@
-import { DEFAULT_SEARCH, type SortOrder } from '@synapsedesk/common';
+import { DEFAULT_SEARCH, type SortOrder } from '@synapsedesk/contracts';
 import {
   PageMeta,
   PageRequest,

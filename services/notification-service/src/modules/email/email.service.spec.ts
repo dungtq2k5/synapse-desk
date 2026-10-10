@@ -3,9 +3,9 @@ import { Logger } from '@nestjs/common';
 import type { ErrorResponse } from 'resend';
 import {
   EmailTemplateName,
-  UnprocessableMessage,
   type SendEmailCommand,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { UnprocessableMessage } from '@synapsedesk/nest-common';
 import { EmailService, idempotencyKeyFor, messageIdFor } from './email.service';
 
 const send = jest.fn();

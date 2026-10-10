@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type Stripe from 'stripe';
-import { RevenueUnavailableReason } from '@synapsedesk/common';
+import { RevenueUnavailableReason } from '@synapsedesk/contracts';
 import { StripeService } from '../billing/stripe.service';
 import {
   BillingSnapshotStore,

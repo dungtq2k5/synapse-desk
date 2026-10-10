@@ -4,7 +4,7 @@ import { envValidationSchema } from '../../src/common/config/env.validation';
 import { ServiceRegistry } from '../../src/modules/health/service-registry.service';
 import { RedisHealthService } from '../../src/modules/health/redis-health.service';
 import { DrainState } from '../../src/modules/health/drain-state.service';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 
 /**
  * `/health` and `/health/ready`.

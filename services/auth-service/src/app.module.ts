@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JetStreamModule } from '@synapsedesk/common';
+import { JetStreamModule } from '@synapsedesk/nest-common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaModule } from './modules/prisma/prisma.module';

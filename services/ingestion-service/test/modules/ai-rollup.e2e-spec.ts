@@ -2,8 +2,8 @@ import {
   AiGenerationPurpose,
   AiGenerationStatus,
   AiGenerationOutcome,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { buildTenant, TenantFixture } from '../factories';
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';

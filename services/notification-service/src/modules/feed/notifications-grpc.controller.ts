@@ -3,10 +3,10 @@ import {
   JobHealthService,
   requireActor,
   requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { status, type Metadata } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import type { DevicePlatform } from '@synapsedesk/common';
+import type { DevicePlatform } from '@synapsedesk/contracts';
 import {
   ListNotificationsRequest,
   ListNotificationsResponse,

@@ -2,7 +2,7 @@ import {
   TicketPriority,
   TicketSource,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * A ticket as the REST API returns it.

@@ -15,7 +15,7 @@ import {
   toProtoTimestamp,
   toProtoTicketPriority,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { isDraftRefusal } from '../ai-client/refusal';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';

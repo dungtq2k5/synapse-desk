@@ -14,7 +14,7 @@ import {
   ticketMessageGroupKey,
   TicketSource,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   ACCESS_COOKIE,
   RealtimeFixture,

@@ -7,7 +7,7 @@
 
 import { sign } from 'jsonwebtoken';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';

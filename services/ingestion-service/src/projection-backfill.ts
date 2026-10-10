@@ -28,7 +28,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { PROJECTION_LAG_MS } from '@synapsedesk/common';
+import { PROJECTION_LAG_MS } from '@synapsedesk/contracts';
 import { envValidationSchema } from './common/configs/env.validation';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { ChunkUsageProjection } from './modules/scheduled/chunk-usage.projection';

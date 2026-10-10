@@ -1,4 +1,4 @@
-import { AuditAction } from '@synapsedesk/common';
+import { AuditAction } from '@synapsedesk/contracts';
 import {
   AuditAction as ProtoAuditAction,
   AuditResourceType as ProtoAuditResourceType,

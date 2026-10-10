@@ -1,6 +1,6 @@
 import { requireField } from '@synapsedesk/grpc-proto';
 import type { CreateMessageRequest } from '@synapsedesk/grpc-proto';
-import type { CallerContext } from '@synapsedesk/common';
+import type { CallerContext } from '@synapsedesk/contracts';
 import type { MessagesService } from '../../src/modules/messages/messages.service';
 
 /**

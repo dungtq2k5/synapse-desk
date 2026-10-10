@@ -1,6 +1,6 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
 import { IsInt, IsOptional, IsString, Min } from 'class-validator';
-import { DEFAULT_SEARCH } from '@synapsedesk/common';
+import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
 
 /**
  * The pagination arguments every list query takes.

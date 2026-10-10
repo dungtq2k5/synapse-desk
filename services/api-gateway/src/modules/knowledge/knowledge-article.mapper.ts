@@ -7,7 +7,7 @@ import {
   requireProtoTimestamp,
   toPageRequest,
 } from '@synapsedesk/grpc-proto';
-import { DEFAULT_SEARCH } from '@synapsedesk/common';
+import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import {

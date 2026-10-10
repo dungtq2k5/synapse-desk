@@ -25,7 +25,7 @@ import {
   NOTIFICATION_TYPE_VALUES,
   NotificationType,
   PREFERENCE_WILDCARD_TYPE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   ListNotificationsQueryDto,
   MarkManyReadDto,

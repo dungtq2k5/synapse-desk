@@ -8,7 +8,7 @@ import {
   NotificationResourceType,
   limitThresholdEventId,
   TICKET_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   DevicePlatform as ProtoDevicePlatform,
   packRequestContext,

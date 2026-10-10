@@ -1,5 +1,5 @@
 import { of } from 'rxjs';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import {
   SuggestionsDegradation,
   toProtoOrgStatus,

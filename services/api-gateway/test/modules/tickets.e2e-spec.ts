@@ -5,7 +5,7 @@ import {
   MAX_STATUS_CHANGE_REASON_LENGTH,
   TicketPriority,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   TicketPriority as ProtoTicketPriority,
   TicketStatus as ProtoTicketStatus,

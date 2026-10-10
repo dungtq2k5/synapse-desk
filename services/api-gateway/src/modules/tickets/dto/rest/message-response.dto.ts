@@ -1,4 +1,4 @@
-import { AnswerStatus } from '@synapsedesk/common';
+import { AnswerStatus } from '@synapsedesk/contracts';
 
 /**
  * One passage an AI answer cited.

@@ -4,7 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { readFileSync } from 'node:fs';
-import { TwoFactorJwtPayload } from '@synapsedesk/common';
+import { TwoFactorJwtPayload } from '@synapsedesk/contracts';
 
 /**
  * Validates the short-lived challenge token issued by `POST /auth/login` when a

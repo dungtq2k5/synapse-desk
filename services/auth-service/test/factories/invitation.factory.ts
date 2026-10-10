@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { randomBytes } from 'node:crypto';
-import { InvitationStatus } from '@synapsedesk/common';
+import { InvitationStatus } from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { addDays, hashToken } from '../../src/common/utils';

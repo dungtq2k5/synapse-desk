@@ -44,7 +44,7 @@ import {
   OCR_LANGUAGES,
   UNKNOWN_EXTENSION,
   type OcrLanguage,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 export function toDocumentResponseDto(
   document: DocumentResponse,

@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { isFullJwtPayload } from '@synapsedesk/common';
+import { isFullJwtPayload } from '@synapsedesk/contracts';
 import { requestOf } from '../utils/execution-request.util';
 
 /**

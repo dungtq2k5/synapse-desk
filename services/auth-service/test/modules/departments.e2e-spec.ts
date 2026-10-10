@@ -1,5 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   E2eFixture,
@@ -16,7 +16,7 @@ import {
 } from '../factories';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
 import { randomUUID } from 'node:crypto';
-import { BATCH_ID_LIMIT } from '@synapsedesk/common';
+import { BATCH_ID_LIMIT } from '@synapsedesk/contracts';
 
 describe('Departments (e2e)', () => {
   let fx: E2eFixture;

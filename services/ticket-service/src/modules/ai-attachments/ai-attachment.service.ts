@@ -5,8 +5,8 @@ import {
   MAX_AI_ATTACHMENT_BYTES,
   MAX_EXTRACTED_TEXT_PER_MESSAGE,
   PARSE_ELIGIBLE_MIME_TYPES,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { AttachmentPart, CallerContext } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';

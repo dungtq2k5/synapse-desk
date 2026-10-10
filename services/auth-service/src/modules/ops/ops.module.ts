@@ -1,10 +1,7 @@
 import { Module, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  GrpcHealthService,
-  postgresProbe,
-  readBuildInfo,
-} from '@synapsedesk/common';
+import { readBuildInfo } from '@synapsedesk/contracts';
+import { GrpcHealthService, postgresProbe } from '@synapsedesk/nest-common';
 import { BUILD_INFO, OpsGrpcController } from '@synapsedesk/grpc-proto';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';

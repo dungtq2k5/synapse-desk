@@ -9,7 +9,7 @@ import { createDepartmentLoader } from './department.loader';
 import { createDocumentLoader } from './document.loader';
 import { createPermissionCatalogueLoader } from './permission-catalogue.loader';
 import type { PermissionResponseGqlDto } from '../../../modules/roles/dto/graphql/role-response.gql-dto';
-import type { RequestContext } from '@synapsedesk/common';
+import type { RequestContext } from '@synapsedesk/contracts';
 import { RequestContextService } from '../../../common/contexts/request.context';
 import type { CacheService } from '../../cache/cache.service';
 

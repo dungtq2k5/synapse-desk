@@ -5,11 +5,11 @@ import {
   OrgStatus as ProtoOrgStatus,
   USER_SERVICE_NAME,
 } from '@synapsedesk/grpc-proto';
+import { InboundRejectionReason } from '@synapsedesk/contracts';
 import {
-  InboundRejectionReason,
   buildInboundAddress,
   generateInboundToken,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { InboundEmailService, InboundOutcome } from './inbound-email.service';
 import type { InboundEmailPublisher } from './inbound-email.publisher';
 import type { InboundEmailDto } from './dto/rest/inbound-email.dto';

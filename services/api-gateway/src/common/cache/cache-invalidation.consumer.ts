@@ -4,8 +4,8 @@ import {
   BILLING_PATTERNS,
   DOCUMENT_PATTERNS,
   TICKET_PATTERNS,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { CacheService } from './cache.service';
 import { CACHE_SCOPES } from '../config/cache.config';
 

@@ -1,12 +1,12 @@
 import { faker } from '@faker-js/faker';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { NEVER, of } from 'rxjs';
 import {
   INGEST_DEADLINE_MS,
   MAX_ATTACHMENTS_PER_MESSAGE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { GRPC_DEADLINE_MS } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import {

@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import {
-  BATCH_ID_LIMIT,
-  compareAlphabetically,
-  SystemRoleName,
-} from '@synapsedesk/common';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { BATCH_ID_LIMIT, SystemRoleName } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   E2eFixture,

@@ -13,9 +13,9 @@ import {
   AVATAR_MIME_TYPES,
   MAX_AVATAR_BYTES,
   MAX_OBJECT_PATH_LENGTH,
-  trimIfString,
   type AvatarMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 
 // The allowlist and cap are duplicated from storage-service's
 // `PURPOSE_POLICY`, deliberately: this layer refuses a 50 MB request before it

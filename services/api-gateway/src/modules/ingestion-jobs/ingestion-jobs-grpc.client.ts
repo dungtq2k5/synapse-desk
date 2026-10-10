@@ -9,7 +9,7 @@ import {
   ListIngestionJobsRequest,
   ListIngestionJobsResponse,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /** The ingestion-service RPCs behind the pipeline worklist. */

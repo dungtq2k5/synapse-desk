@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envValidationSchema } from './env.validation';
-import { extractEmailAddress } from '@synapsedesk/common';
-import { parseEnvFile } from '@synapsedesk/common/testing/env-file';
+import { extractEmailAddress } from '@synapsedesk/core';
+import { parseEnvFile } from '@synapsedesk/testing/env-file';
 
 /**
  * The self-loop guard is only as real as its variable.

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
-import { stripComments } from '@synapsedesk/common/testing/strip-comments';
+import { stripComments } from '@synapsedesk/testing/strip-comments';
 import { API, E2eFixture, bootstrapE2eTest } from '../utils';
 import {
   API_VERSION,

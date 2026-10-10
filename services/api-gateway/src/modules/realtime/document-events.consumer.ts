@@ -4,12 +4,12 @@ import {
   deptRoom,
   DOCUMENT_PATTERNS,
   DocumentEventOf,
-  formatErrorMsg,
   orgRoom,
   REALTIME_EVENTS,
   RealtimeRoom,
   userRoom,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RealtimeGateway } from './realtime.gateway';
 
 /**

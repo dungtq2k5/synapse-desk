@@ -1,8 +1,8 @@
 import type { UpdateOrganizationSettingsRequest } from '@synapsedesk/grpc-proto';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
-import { InvitationStatus, OrgStatus } from '@synapsedesk/common';
+import { InvitationStatus, OrgStatus } from '@synapsedesk/contracts';
 import {
   E2eFixture,
   bootstrapE2eTest,

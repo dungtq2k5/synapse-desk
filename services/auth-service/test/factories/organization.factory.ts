@@ -1,5 +1,8 @@
 import { faker } from '@faker-js/faker';
-import { FREE_TIER_ORGANIZATION_GRANTS, OrgStatus } from '@synapsedesk/common';
+import {
+  FREE_TIER_ORGANIZATION_GRANTS,
+  OrgStatus,
+} from '@synapsedesk/contracts';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 

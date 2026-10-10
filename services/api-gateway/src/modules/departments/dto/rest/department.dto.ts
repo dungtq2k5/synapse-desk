@@ -20,7 +20,7 @@ import {
   DEPARTMENT_SORTABLE_FIELDS,
   type DepartmentMemberSortableField,
   type DepartmentSortableField,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
@@ -29,7 +29,7 @@ import {
   MAX_DEPARTMENT_NAME_LENGTH,
   MIN_DEPARTMENT_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
-import { trimIfString } from '@synapsedesk/common';
+import { trimIfString } from '@synapsedesk/core';
 
 export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',

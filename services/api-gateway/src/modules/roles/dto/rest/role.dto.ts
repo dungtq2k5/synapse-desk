@@ -20,8 +20,8 @@ import {
   PermissionCode,
   ROLE_SORTABLE_FIELDS,
   type RoleSortableField,
-  trimIfString,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {

@@ -1,6 +1,6 @@
 import { of } from 'rxjs';
 import { faker } from '@faker-js/faker';
-import { TicketSource, TicketStatus } from '@synapsedesk/common';
+import { TicketSource, TicketStatus } from '@synapsedesk/contracts';
 import {
   TicketSource as ProtoTicketSource,
   TicketStatus as ProtoTicketStatus,

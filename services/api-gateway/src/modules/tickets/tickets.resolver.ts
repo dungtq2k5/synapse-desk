@@ -10,7 +10,7 @@ import {
   Resolver,
 } from '@nestjs/graphql';
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
-import { RequestContext, TicketStatus } from '@synapsedesk/common';
+import { RequestContext, TicketStatus } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';

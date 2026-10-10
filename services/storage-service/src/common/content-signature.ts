@@ -27,7 +27,7 @@ import type {
   AllowedDocumentMimeType,
   AvatarMimeType,
   ExportMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * Every content type a storage purpose may declare — DERIVED from the four

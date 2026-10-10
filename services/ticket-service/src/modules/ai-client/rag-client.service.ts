@@ -14,12 +14,12 @@ import {
   RagServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   RetrievalDegradation,
   TICKET_PRIORITIES,
   TicketPriority,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Generation is slow — a draft with a review pass is three model calls — so the

@@ -12,14 +12,13 @@ import {
   StorageServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
-  formatErrorMsg,
   isStorageObjectPath,
-  NATS_CLIENT,
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 export type PresignedUpload = {
   uploadUrl: string;

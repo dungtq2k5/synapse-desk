@@ -15,7 +15,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { DocumentFlagResolution, RequestContext } from '@synapsedesk/common';
+import { DocumentFlagResolution, RequestContext } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';

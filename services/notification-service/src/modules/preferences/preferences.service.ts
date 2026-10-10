@@ -9,9 +9,8 @@ import {
   PREFERENCE_CHANNELS,
   PREFERENCE_WILDCARD_TYPE,
   PreferenceSource,
-  requireActor,
-  requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { requireActor, requireTenant } from '@synapsedesk/nest-common';
 import {
   DigestMode as ProtoDigestMode,
   fromProtoDigestMode,

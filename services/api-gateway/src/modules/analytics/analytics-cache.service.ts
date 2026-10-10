@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { toIsoDay } from '@synapsedesk/common';
+import { toIsoDay } from '@synapsedesk/nest-common';
 import { CacheService } from '../../common/cache/cache.service';
 
 /**

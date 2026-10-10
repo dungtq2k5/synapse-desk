@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { RolesGrpcClient } from './roles-grpc.client';
 import {

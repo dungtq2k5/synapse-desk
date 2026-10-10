@@ -5,8 +5,8 @@ import {
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
-  JetStreamPublisher,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { JetStreamPublisher } from '@synapsedesk/nest-common';
 
 /**
  * Fire-and-forget publisher for Domain E.

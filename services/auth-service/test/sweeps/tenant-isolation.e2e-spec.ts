@@ -1,6 +1,6 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { PERMISSION_CODES } from '@synapsedesk/common';
+import { PERMISSION_CODES } from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   createDeviceSession,

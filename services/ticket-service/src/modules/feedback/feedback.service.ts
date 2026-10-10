@@ -23,9 +23,8 @@ import {
   FEEDBACK_SORTABLE_FIELDS,
   FeedbackRating,
   MAX_MESSAGE_CONTENT_LENGTH,
-  requireActor,
-  requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { requireActor, requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { AiResponseFeedback, Prisma } from '../../generated/prisma/client';

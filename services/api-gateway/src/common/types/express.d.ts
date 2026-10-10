@@ -1,4 +1,4 @@
-import type { MaybeJwtPayload } from '@synapsedesk/common';
+import type { MaybeJwtPayload } from '@synapsedesk/contracts';
 
 // Passport writes the value returned by JwtStrategy.validate() to req.user.
 // Merging here makes that contract visible to every consumer, with no casts.

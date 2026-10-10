@@ -11,7 +11,7 @@ import {
   TicketServiceClient,
   TicketStatus,
 } from '@synapsedesk/grpc-proto';
-import { JwtPayload } from '@synapsedesk/common';
+import { JwtPayload } from '@synapsedesk/contracts';
 
 /**
  * "May this person watch this ticket?" — asked once, answered once.

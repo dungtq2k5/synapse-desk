@@ -1,6 +1,6 @@
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { OtpPurpose } from '@synapsedesk/common';
+import { OtpPurpose } from '@synapsedesk/contracts';
 import { OtpPurpose as ProtoOtpPurpose } from '@synapsedesk/grpc-proto';
 import { bootstrapE2eTest, E2eFixture } from '../utils';
 import { createOtp, seedTenantWithUser } from '../factories';

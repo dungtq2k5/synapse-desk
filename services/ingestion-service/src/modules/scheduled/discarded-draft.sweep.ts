@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiGenerationOutcome, AiGenerationPurpose } from '@synapsedesk/common';
+import {
+  AiGenerationOutcome,
+  AiGenerationPurpose,
+} from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

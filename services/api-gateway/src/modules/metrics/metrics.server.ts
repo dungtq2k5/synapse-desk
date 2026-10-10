@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createServer, type Server } from 'node:http';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { MetricsRegistry } from './metrics.registry';
 import { JobMetricsCollector } from './job-metrics.collector';
 

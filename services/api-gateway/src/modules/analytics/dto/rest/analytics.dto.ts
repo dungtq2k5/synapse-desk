@@ -16,7 +16,7 @@ import {
   ANALYTICS_TOP_N,
   AnalyticsGranularity,
   ExportKind,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * The shared analytics filter — api-endpoints-plan §4.

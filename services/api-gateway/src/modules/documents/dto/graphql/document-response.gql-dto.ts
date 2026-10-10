@@ -1,6 +1,6 @@
 import { PageMetaResponseGqlDto } from '../../../../common/dto/graphql/page-meta-response.gql-dto';
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
-import { DocumentStatus, type DocumentFileType } from '@synapsedesk/common';
+import { DocumentStatus, type DocumentFileType } from '@synapsedesk/contracts';
 import '../../../../common/graphql/enums';
 
 /**

@@ -14,10 +14,10 @@ import {
   QDRANT_UPSERT_BATCH,
   TERMINAL_INGESTION_STATUSES,
   estimateCostMicros,
-  formatErrorMsg,
   parseOcrLanguages,
   systemContext,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import {
   INGESTION_OUTCOMES,
   type IngestionOutcome,

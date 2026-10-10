@@ -1,6 +1,6 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { SCHEDULED_JOBS, SystemRoleName } from '@synapsedesk/common';
+import { SCHEDULED_JOBS, SystemRoleName } from '@synapsedesk/contracts';
 import { toProtoTimestamp, UserProjection } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,

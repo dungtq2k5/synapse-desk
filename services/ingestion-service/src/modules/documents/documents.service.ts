@@ -50,19 +50,20 @@ import {
   IngestionJobStatus,
   DocumentFlagResolution,
   SupersededReason,
-  formatErrorMsg,
-  isUniqueConstraintViolation,
   parseOcrLanguages,
   OcrLanguage,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
+import {
+  formatErrorMsg,
   requireActor,
   requireTenant,
   restoreData,
   softDeleteData,
-  exceedsLimit,
   LimitAlertPublisher,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';

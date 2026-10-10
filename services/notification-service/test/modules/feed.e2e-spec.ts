@@ -1,14 +1,11 @@
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import {
-  callerContext,
-  memberContext,
-} from '@synapsedesk/common/testing/context';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { callerContext, memberContext } from '@synapsedesk/testing/context';
 import {
   NOTIFICATION_REALTIME_PATTERNS,
   NOTIFICATION_TYPES,
   NotificationResourceType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   ListNotificationsRequest,
   NotificationResourceType as ProtoNotificationResourceType,

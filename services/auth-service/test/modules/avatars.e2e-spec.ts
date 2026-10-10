@@ -1,9 +1,9 @@
 import {
   avatarObjectPath,
-  compareAlphabetically,
   isStorageObjectPath,
   SupersededReason,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { randomUUID } from 'node:crypto';
 import {
   E2eFixture,

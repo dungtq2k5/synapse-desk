@@ -1,4 +1,4 @@
-import type { NotificationType } from '@synapsedesk/common';
+import type { NotificationType } from '@synapsedesk/contracts';
 import {
   fromProtoTimestamp,
   fromProtoNotificationType,

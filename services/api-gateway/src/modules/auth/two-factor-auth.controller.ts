@@ -17,7 +17,7 @@ import {
   RequestOrigin,
   TwoFactorJwtPayload,
   OrgAccess,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolment.guard';
 import {

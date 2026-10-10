@@ -8,7 +8,7 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_EXPORT_BYTES,
   StoragePurpose,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import type { ValidatedMimeType } from './content-signature';
 
 /**
@@ -92,4 +92,4 @@ export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
  * `documents.file_type`, and they had drifted into two tables mapping the same
  * thing.
  */
-export { extensionFor } from '@synapsedesk/common';
+export { extensionFor } from '@synapsedesk/contracts';

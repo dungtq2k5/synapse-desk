@@ -1,6 +1,7 @@
 /** What the platform job routes return. */
 
-import { JobHealth, ScheduledJobName } from '@synapsedesk/common';
+import { ScheduledJobName } from '@synapsedesk/contracts';
+import { JobHealth } from '@synapsedesk/core';
 import { GrpcPeer } from '@synapsedesk/grpc-proto';
 
 /** One job's heartbeat, as the platform surface reports it. */

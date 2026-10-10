@@ -9,7 +9,8 @@ import { GqlExecutionContext, type GqlContextType } from '@nestjs/graphql';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import type { Request, Response } from 'express';
-import { formatErrorMsg, MaybeJwtPayload } from '@synapsedesk/common';
+import { MaybeJwtPayload } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /** What every transport boils down to for logging purposes. */
 type CallDescription = {

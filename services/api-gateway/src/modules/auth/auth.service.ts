@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import { AuthServiceGrpcClient } from './auth-service-grpc.client';
 import {
   type LoginResult,

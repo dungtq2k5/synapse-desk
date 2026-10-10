@@ -5,12 +5,9 @@ import {
   toProtoExportKind,
 } from '@synapsedesk/grpc-proto';
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import {
-  ExportKind,
-  ExportStatus,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { ExportKind, ExportStatus } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { ExportFacade } from '../../src/modules/analytics/export.facade';

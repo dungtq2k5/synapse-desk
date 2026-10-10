@@ -15,11 +15,8 @@ import {
   NOTIFICATION_SERVICE_NAME,
   NotificationServiceClient,
 } from '@synapsedesk/grpc-proto';
-import {
-  formatErrorMsg,
-  RequestContext,
-  RequestOrigin,
-} from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { JobRunStatusResponseDto } from './dto/platform-jobs-response.dto';
 

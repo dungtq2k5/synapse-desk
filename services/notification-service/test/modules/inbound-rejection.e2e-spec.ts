@@ -4,7 +4,7 @@ import {
   EmailTemplateName,
   InboundRejectionReason,
   type InboundEmailRejectedEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { EmailService } from '../../src/modules/email/email.service';
 import { InboundRejectionConsumer } from '../../src/modules/inbound-email/inbound-rejection.consumer';

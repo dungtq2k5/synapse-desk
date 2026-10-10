@@ -11,7 +11,7 @@
  * returns through the repository's own classifier.
  */
 
-import { isRetryableResendError } from '@synapsedesk/common';
+import { isRetryableResendError } from '@synapsedesk/core';
 import { Resend } from 'resend';
 import { FakeVendor } from './vendor';
 

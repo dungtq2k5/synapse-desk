@@ -3,15 +3,17 @@ import { ClientProxy } from '@nestjs/microservices';
 import {
   BILLING_PATTERNS,
   EntitlementsChangedEvent,
-  formatErrorMsg,
-  NATS_CLIENT,
   CreateInAppNotificationCommand,
   IN_APP_NOTIFICATION_PATTERN,
-  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
   NotificationResourceType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import {
+  formatErrorMsg,
+  NATS_CLIENT,
+  JetStreamPublisher,
+} from '@synapsedesk/nest-common';
 
 /**
  * Publishes `billing.entitlements_changed` once a tenant's entitlements are written.

@@ -13,7 +13,7 @@
  * host addresses rewritten to cluster service names — not its source.
  *
  * **Commented lines count.** `envDocumentedKeys` in
- * `libs/common/src/testing/env-file.ts` is the settled rule, and it
+ * `packages/testing/src/env-file.ts` is the settled rule, and it
  * reads `# KEY = value` as documentation of an optional variable, because that
  * is how this repository documents a default without setting it. Reading only
  * active lines would drop exactly the variables a cluster overrides —

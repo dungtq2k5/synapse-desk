@@ -1,11 +1,7 @@
 import { status } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import {
-  AuditAction,
-  AuditPublisher,
-  PLAN_LIMIT_DIMENSIONS,
-  JetStreamPublisher,
-} from '@synapsedesk/common';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { AuditAction, PLAN_LIMIT_DIMENSIONS } from '@synapsedesk/contracts';
+import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
 import { AiModelTier as ProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,

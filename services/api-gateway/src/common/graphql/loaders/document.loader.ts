@@ -4,7 +4,7 @@ import {
   packRequestContext,
   type DocumentServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
+import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/contracts';
 import { firstValueFrom } from 'rxjs';
 import { alignToKeys, createLoader } from './loaders.factory';
 import { toDocumentResponseGqlDto } from '../../../modules/documents/document.mapper';

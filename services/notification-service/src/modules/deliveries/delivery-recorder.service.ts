@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   DeliverySkipReason,
   DeliveryStatus,
-  formatErrorMsg,
   NotificationChannel,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RedisService } from '../../common/redis/redis.service';
 import { PRESENCE_STATES, PresenceState } from './realtime.config';
 

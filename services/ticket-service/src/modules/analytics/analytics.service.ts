@@ -9,6 +9,11 @@ import {
   aiFirstResponseSeconds,
   EMPTY_TICKET_STATS,
   humanFirstResponseSeconds,
+  resolutionSeconds,
+  TicketStatSums,
+  TicketStatus,
+} from '@synapsedesk/contracts';
+import {
   bucketKey,
   granularityOf,
   newestComputedAt,
@@ -17,10 +22,7 @@ import {
   toIsoDay,
   toMeanWire,
   toRateWire,
-  resolutionSeconds,
-  TicketStatSums,
-  TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import {
   AgentStatsResponse,
   AnalyticsRangeRequest,

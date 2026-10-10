@@ -13,7 +13,7 @@ import { PageMeta, PageRequest } from "../auth/common";
 
 /**
  * The trail's enumerated columns — mirrors `AuditAction` and
- * `AuditResourceType` in `libs/common/src/contracts/audit.contract.ts`.
+ * `AuditResourceType` in `packages/contracts/src/contracts/audit.contract.ts`.
  *
  * `resource_type` is the one that earns this most. Its doc comment records that
  * three services each declared their OWN local `RESOURCE_TYPE` constant and a

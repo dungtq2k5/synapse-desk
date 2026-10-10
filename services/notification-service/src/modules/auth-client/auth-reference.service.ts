@@ -8,7 +8,7 @@ import {
   USER_SERVICE_NAME,
   UserServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import {
   NotificationRecipient,
   toNotificationRecipient,

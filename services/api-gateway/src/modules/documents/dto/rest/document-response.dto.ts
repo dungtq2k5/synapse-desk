@@ -5,7 +5,7 @@ import {
   type DocumentFileType,
   type DocumentFlagType,
   type OcrLanguage,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * A document as the REST API returns it.

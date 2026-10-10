@@ -3,12 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import {
   AuditAction,
-  AuditPublisher,
-  JetStreamPublisher,
   AuditResourceType,
   EmailTemplateName,
   NOTIFICATION_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
 import { NotificationPublisher } from './notification-publisher.service';
 
 /**

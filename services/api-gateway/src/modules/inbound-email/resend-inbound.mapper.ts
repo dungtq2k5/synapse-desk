@@ -5,10 +5,9 @@ import type {
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_FILE_NAME_LENGTH,
-  extractEmailAddress,
-  extractEmailDomain,
   type AllowedAttachmentMimeType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { extractEmailAddress, extractEmailDomain } from '@synapsedesk/core';
 import {
   MAX_INBOUND_BODY_LENGTH,
   MAX_PRESENTED_ATTACHMENTS,

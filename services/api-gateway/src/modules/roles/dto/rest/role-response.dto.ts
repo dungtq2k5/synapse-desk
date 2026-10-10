@@ -1,6 +1,6 @@
 /** What the role routes return. */
 
-import { PermissionCode } from '@synapsedesk/common';
+import { PermissionCode } from '@synapsedesk/contracts';
 
 export class RoleResponseDto {
   readonly id!: string;

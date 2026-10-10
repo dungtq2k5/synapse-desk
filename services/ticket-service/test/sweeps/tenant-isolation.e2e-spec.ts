@@ -1,9 +1,9 @@
 import { AuditAction, AuditResourceType } from '@synapsedesk/grpc-proto';
 import { RpcException } from '@nestjs/microservices';
-import { rpcCode } from '@synapsedesk/common/testing/rpc';
+import { rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { TicketStatus } from '@synapsedesk/common';
+import { TicketStatus } from '@synapsedesk/contracts';
 import {
   E2eFixture,
   bootstrapE2eTest,

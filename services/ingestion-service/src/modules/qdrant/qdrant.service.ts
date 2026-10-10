@@ -8,7 +8,7 @@ import {
   QdrantScopePayload,
   EMBEDDING_DIMENSION,
   EMBEDDING_MODEL,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /** What one chunk looks like as a Qdrant point. */
 export type ChunkPoint = {

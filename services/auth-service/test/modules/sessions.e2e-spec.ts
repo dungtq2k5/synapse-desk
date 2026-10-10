@@ -1,6 +1,6 @@
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { EmailTemplateName } from '@synapsedesk/common';
+import { EmailTemplateName } from '@synapsedesk/contracts';
 import { bootstrapE2eTest, E2eFixture, memberContext } from '../utils';
 import {
   addMember,

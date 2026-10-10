@@ -7,14 +7,11 @@ import {
   MicroserviceOptions,
 } from '@nestjs/microservices';
 import { faker } from '@faker-js/faker';
-import {
-  createNatsTransport,
-  STORAGE_PATTERNS,
-  SupersededReason,
-} from '@synapsedesk/common';
+import { STORAGE_PATTERNS, SupersededReason } from '@synapsedesk/contracts';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 import { AppModule } from '../../src/app.module';
 import { bytesFor } from '../utils';
-import { waitUntil } from '@synapsedesk/common/testing/wait';
+import { waitUntil } from '@synapsedesk/testing/wait';
 import { FirebaseStorageService } from '../../src/modules/firebase/firebase-storage.service';
 
 /**

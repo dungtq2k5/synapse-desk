@@ -21,7 +21,7 @@ import {
   PullConsumerRunner,
   streamFor,
   createNatsTransport,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
 import {

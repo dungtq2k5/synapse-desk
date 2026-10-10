@@ -11,7 +11,7 @@ import {
   privateTargetsAllowed,
   signWebhook,
   type WebhookEventPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 
 /** One attempt's outcome — the row's fields, not an exception. */
 export type SendOutcome =

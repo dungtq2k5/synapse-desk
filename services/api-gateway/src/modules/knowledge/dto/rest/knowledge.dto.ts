@@ -10,7 +10,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { DEFAULT_SEARCH, trimIfString } from '@synapsedesk/common';
+import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
+import { trimIfString } from '@synapsedesk/core';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import {

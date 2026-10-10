@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentScope, ScopeWriterService } from './scope-writer.service';
 

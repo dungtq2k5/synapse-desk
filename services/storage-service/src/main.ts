@@ -13,7 +13,7 @@ import {
   STORAGE_PACKAGE_NAME,
   STORAGE_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
-import { createNatsTransport } from '@synapsedesk/common';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 import { AppModule } from './app.module';
 
 /**

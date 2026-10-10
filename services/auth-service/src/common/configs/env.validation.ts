@@ -3,7 +3,7 @@ import {
   LOG_LEVELS,
   MIN_PASSWORD_LENGTH,
   NODE_ENV_OPTIONS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * Passwords that exist in this repository, and therefore in everyone's clone.

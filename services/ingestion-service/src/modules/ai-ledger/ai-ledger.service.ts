@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import { CallerContext } from '@synapsedesk/grpc-proto';
 import {
   AiGenerationOutcome,
-  isSameText,
   AiGenerationPurpose,
   AiGenerationStatus,
   AiSurface,
@@ -13,10 +12,10 @@ import {
   AtCapAction,
   BudgetDecision,
   estimateCostMicros,
-  formatErrorMsg,
   QUOTA_ALERT_THRESHOLDS,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isSameText, withHttpStatus } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { QuotaCounterService } from './quota-counter.service';

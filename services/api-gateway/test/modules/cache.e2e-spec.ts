@@ -14,7 +14,7 @@ import { AnalyticsCacheService } from '../../src/modules/analytics/analytics-cac
 import { CacheService } from '../../src/common/cache/cache.service';
 import { entityScope } from '../../src/common/config/cache.config';
 import { RedisService } from '../../src/common/redis/redis.service';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 
 /**
  * The shared cache, against a REAL Redis.

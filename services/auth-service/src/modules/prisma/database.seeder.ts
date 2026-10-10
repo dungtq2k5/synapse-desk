@@ -3,15 +3,15 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import {
   Gender,
-  normalizeEmail,
   PERMISSION_CODES,
   PERMISSION_NAMES,
   SYSTEM_ROLE_DESCRIPTIONS,
   SYSTEM_ROLE_PERMISSIONS,
   SystemRoleName,
-  formatErrorMsg,
   FREE_PLAN_SEED,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { normalizeEmail } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from './prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 

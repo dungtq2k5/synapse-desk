@@ -2,7 +2,7 @@
 # The image checks that NEED a daemon, as something that runs.
 #
 # The static half — phantom imports, version-pin agreement, floating tags —
-# lives in `libs/common/src/configs/image-contract.spec.ts` and runs on every
+# lives in `packages/config/src/image-contract.spec.ts` and runs on every
 # `npm run test`, precisely because this script's predecessor is the measured
 # argument against scripts: `check-ocr-image.sh` was correct and unrun for
 # three weeks while the build it depended on was broken, its leftover images
@@ -86,7 +86,7 @@ ocr_checks() {
   # assumption as the Dockerfile, so it agreed with the bug.
   LANGS=$(
     sed -n '/^export const TESSERACT_CODE_BY_LANGUAGE/,/^};/p' \
-      libs/common/src/configs/document.config.ts |
+      packages/contracts/src/configs/document.config.ts |
       grep -oE ":[[:space:]]*'[a-z_]+'" |
       grep -oE "[a-z_]+'" | tr -d "'"
   )
@@ -147,7 +147,7 @@ for service in "${NODE_SERVICES[@]}"; do
     --input-type=module -e '
       import { readFileSync } from "node:fs";
       const own = JSON.parse(readFileSync("package.json", "utf8"));
-      const libs = ["libs/common", "packages/grpc-proto"].map((lib) =>
+      const libs = ["contracts", "core", "nest-common", "grpc-proto"].map((lib) => `packages/${lib}`).map((lib) =>
         JSON.parse(readFileSync(`/app/${lib}/package.json`, "utf8")));
       const deps = new Set([own, ...libs].flatMap((m) => Object.keys(m.dependencies ?? {})));
       let failed = 0;

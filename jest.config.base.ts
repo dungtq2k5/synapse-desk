@@ -65,8 +65,12 @@ const baseConfig: Config = {
   // Mirrors the `paths` in the root tsconfig. Pointed at the entry FILE rather
   // than the directory, matching each lib's package.json `main`.
   moduleNameMapper: {
-    '^@synapsedesk/common$': '<rootDir>/../../libs/common/src/main.ts',
-    '^@synapsedesk/common/(.*)$': '<rootDir>/../../libs/common/src/$1',
+    '^@synapsedesk/contracts$':
+      '<rootDir>/../../packages/contracts/src/index.ts',
+    '^@synapsedesk/core$': '<rootDir>/../../packages/core/src/index.ts',
+    '^@synapsedesk/nest-common$':
+      '<rootDir>/../../packages/nest-common/src/index.ts',
+    '^@synapsedesk/testing/(.*)$': '<rootDir>/../../packages/testing/src/$1',
     '^@synapsedesk/grpc-proto$':
       '<rootDir>/../../packages/grpc-proto/src/index.ts',
     '^@synapsedesk/grpc-proto/(.*)$':

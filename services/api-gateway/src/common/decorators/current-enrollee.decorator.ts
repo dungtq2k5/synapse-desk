@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import type { RequestOrigin } from '@synapsedesk/common';
+import type { RequestOrigin } from '@synapsedesk/contracts';
 
 /**
  * Who is enrolling, plus where from.

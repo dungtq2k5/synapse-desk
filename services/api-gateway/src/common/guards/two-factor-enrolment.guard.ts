@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { isFullJwtPayload } from '@synapsedesk/common';
+import { isFullJwtPayload } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { Jwt2faGuard } from './jwt-2fa.guard';
 

@@ -1,6 +1,6 @@
 import { PageMetaResponseGqlDto } from '../../../../common/dto/graphql/page-meta-response.gql-dto';
 import { Field, ID, ObjectType } from '@nestjs/graphql';
-import { Gender } from '@synapsedesk/common';
+import { Gender } from '@synapsedesk/contracts';
 import '../../../../common/graphql/enums';
 
 /**

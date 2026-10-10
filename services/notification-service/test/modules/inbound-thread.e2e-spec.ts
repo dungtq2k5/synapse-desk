@@ -3,7 +3,7 @@ import {
   NOTIFICATION_TYPES,
   NotificationChannel,
   NotificationResourceType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InboundThreadService } from '../../src/modules/feed/inbound-thread.service';
 

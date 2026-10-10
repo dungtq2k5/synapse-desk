@@ -14,16 +14,15 @@ import {
   TICKET_PACKAGE_NAME,
   TICKET_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
+import { AUDIT_PATTERNS, RecordAuditCommand } from '@synapsedesk/contracts';
 import {
   ensureStream,
   JETSTREAM_CONNECTION,
   PullConsumerRunner,
   streamFor,
-  AUDIT_PATTERNS,
-  RecordAuditCommand,
   JETSTREAM_STREAMS,
   createNatsTransport,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
 import { AuditConsumer } from './modules/audit/audit.consumer';

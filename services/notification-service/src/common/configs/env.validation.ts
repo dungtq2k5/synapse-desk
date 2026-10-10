@@ -1,5 +1,5 @@
 import * as Joi from 'joi';
-import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
+import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/contracts';
 
 /**
  * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,

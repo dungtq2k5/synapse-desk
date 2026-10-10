@@ -16,7 +16,7 @@ import {
   StripeWebhookResponse,
   SubscriptionResponse,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /**

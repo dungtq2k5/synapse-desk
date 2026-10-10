@@ -3,13 +3,12 @@ import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import {
   AuditAction,
-  AuditPublisher,
   AuditResourceType,
   CallerContext,
   PLAN_SORTABLE_FIELDS,
-  requireActor,
   type PlanLimitDimension,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { AuditPublisher, requireActor } from '@synapsedesk/nest-common';
 import {
   emptyPage,
   fromProtoAiModelTier,

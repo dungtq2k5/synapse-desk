@@ -59,12 +59,11 @@ import {
   PERMISSION_CODES,
   PermissionCode,
   USER_SORTABLE_FIELDS,
-  lowerIfString,
-  trimIfString,
   type OrganizationSortableField,
   type PlanSortableField,
   type UserSortableField,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { lowerIfString, trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 

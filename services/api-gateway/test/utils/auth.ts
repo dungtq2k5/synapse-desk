@@ -6,7 +6,7 @@ import type {
   JwtPayload,
   PermissionCode,
   TwoFactorJwtPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { signAccessToken, signTwoFactorToken } from './tokens';
 import { Server } from 'node:http';
 import {

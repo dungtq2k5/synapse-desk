@@ -2,7 +2,7 @@
  * @file String shaping: slugs, masking and URL tidying.
  */
 
-import { extractEmailDomain } from '@synapsedesk/common';
+import { extractEmailDomain } from '@synapsedesk/core';
 
 export function generateUniqueOrganizationSlug(email: string): string {
   const domain = extractEmailDomain(email);

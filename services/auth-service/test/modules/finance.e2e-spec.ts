@@ -1,6 +1,6 @@
 import type Stripe from 'stripe';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { faultInjector } from '@synapsedesk/testing/fault';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   BillingEventSource,
@@ -9,8 +9,8 @@ import {
   REVENUE_EXCLUSIONS,
   RevenueUnavailableReason,
   SCHEDULED_JOBS,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest, superAdminContext } from '../utils';
 import { createOrganization, seedPlans } from '../factories';
 import {

@@ -4,7 +4,7 @@ import {
   packRequestContext,
   type DepartmentServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
+import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/contracts';
 import { firstValueFrom } from 'rxjs';
 import { createCachedLoader } from './loaders.factory';
 import { toDepartmentResponseGqlDto } from '../../../modules/departments/department.mapper';

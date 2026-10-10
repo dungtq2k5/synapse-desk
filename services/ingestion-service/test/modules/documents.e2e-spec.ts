@@ -8,11 +8,11 @@ import {
   DocumentStatus,
   IngestionJobStatus,
   MAX_DOCUMENT_BYTES,
-  LimitAlertPublisher,
   MAX_DOCUMENTS_PER_TENANT,
   SupersededReason,
   type DocumentFileType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { LimitAlertPublisher } from '@synapsedesk/nest-common';
 import {
   type ListDocumentsRequest,
   fromProtoDocumentFileType,
@@ -21,7 +21,7 @@ import {
   toProtoDocumentStatus,
   toProtoIngestionJobStatus,
 } from '@synapsedesk/grpc-proto';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -44,7 +44,7 @@ import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('Documents (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

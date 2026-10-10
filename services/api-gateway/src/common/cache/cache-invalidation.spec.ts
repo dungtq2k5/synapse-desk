@@ -3,7 +3,7 @@ import {
   BILLING_PATTERNS,
   DOCUMENT_PATTERNS,
   TICKET_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { CacheInvalidationConsumer } from './cache-invalidation.consumer';
 import { CacheInvalidationInterceptor } from '../interceptors/cache-invalidation.interceptor';
 import { CACHE_SCOPES } from '../config/cache.config';

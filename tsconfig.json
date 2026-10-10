@@ -8,7 +8,6 @@
     "services/*/src/**/*",
     "services/*/test/**/*",
     "services/*/prisma.config.ts",
-    "libs/*/src/**/*",
     "packages/*/src/**/*",
     // The demo seeder. In the root program because `tsx` does not typecheck —
     // a wrong enum member is `undefined` at runtime, which once wrote 200
@@ -81,8 +80,10 @@
     "noImplicitAny": false,
     "types": ["node", "jest"],
     "paths": {
-      "@synapsedesk/common": ["libs/common/src/main.ts"],
-      "@synapsedesk/common/*": ["libs/common/src/*"],
+      "@synapsedesk/contracts": ["packages/contracts/src/index.ts"],
+      "@synapsedesk/core": ["packages/core/src/index.ts"],
+      "@synapsedesk/nest-common": ["packages/nest-common/src/index.ts"],
+      "@synapsedesk/testing/*": ["packages/testing/src/*"],
       "@synapsedesk/grpc-proto": ["packages/grpc-proto/src/index.ts"],
       "@synapsedesk/grpc-proto/*": ["packages/grpc-proto/src/*"]
     }

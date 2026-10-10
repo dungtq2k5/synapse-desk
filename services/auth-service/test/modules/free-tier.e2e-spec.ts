@@ -4,7 +4,7 @@ import {
   FREE_TIER_ENTITLEMENTS,
   FREE_TIER_ORGANIZATION_GRANTS,
   OrgStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import {
   E2eFixture,
   bootstrapE2eTest,

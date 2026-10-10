@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { EXPORT_QUEUE } from '@synapsedesk/common';
+import { EXPORT_QUEUE } from '@synapsedesk/contracts';
 import { AuthClientModule } from '../auth-client/auth-client.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { TicketRollupJob } from './ticket-rollup.job';

@@ -1,16 +1,16 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
+import { type CreateInAppNotificationCommand } from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import {
   WEBHOOK_BACKOFF_MS,
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_QUEUE,
   WebhookDeliveryStatus,
   formatErrorMsg,
-  isUniqueConstraintViolation,
-  type CreateInAppNotificationCommand,
   type WebhookEventPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 

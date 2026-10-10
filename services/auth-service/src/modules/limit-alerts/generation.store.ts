@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { GenerationStore, LimitAlertDimension } from '@synapsedesk/common';
+import type { LimitAlertDimension } from '@synapsedesk/contracts';
+import type { GenerationStore } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

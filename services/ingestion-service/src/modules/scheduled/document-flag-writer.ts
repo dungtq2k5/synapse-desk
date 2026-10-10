@@ -5,7 +5,7 @@ import {
   DocumentFlagType,
   DocumentFlagSeverity,
   DocumentStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**

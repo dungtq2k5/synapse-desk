@@ -1,14 +1,13 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
-  JobHealthService,
-  JobRunRecorder,
   repeatJobId,
   jobsOwnedBy,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { JobHealthService, JobRunRecorder } from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.registrar';
@@ -241,7 +240,7 @@ describe('The scheduler (e2e)', () => {
    * compile, because every delegate satisfies the interface structurally.
    *
    * The shared behaviour is covered once, against a fake store, in
-   * `libs/common/src/utils/job-runs.spec.ts`. What is left to check here is
+   * `packages/nest-common/src/utils/job-runs.spec.ts`. What is left to check here is
    * only what is local: that a run recorded through the injected recorder lands
    * in this service's own database, in the same failure domain as the work.
    */

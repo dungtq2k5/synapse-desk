@@ -1,4 +1,4 @@
-import { CHUNK_TARGET_TOKENS, MIN_CHUNK_TOKENS } from '@synapsedesk/common';
+import { CHUNK_TARGET_TOKENS, MIN_CHUNK_TOKENS } from '@synapsedesk/contracts';
 import { getEncoding } from 'js-tiktoken';
 import {
   DocumentChunkerService,

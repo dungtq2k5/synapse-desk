@@ -30,7 +30,7 @@ import {
   PREFERENCE_CHANNELS,
   PREFERENCE_WILDCARD_TYPE,
   type NotificationType,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
 /**

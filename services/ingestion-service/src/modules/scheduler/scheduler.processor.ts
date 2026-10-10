@@ -2,13 +2,12 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
-  formatErrorMsg,
   PROJECTION_LAG_MS,
   ROLLUP_TRAILING_DAYS,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
-  JobRunRecorder,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, JobRunRecorder } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChunkUsageProjection } from '../scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';

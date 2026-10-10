@@ -13,7 +13,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { ANALYTICS_TOP_N } from '@synapsedesk/common';
+import { ANALYTICS_TOP_N } from '@synapsedesk/contracts';
 import { grpcError, timestamp } from '../fixtures/wire';
 
 /**

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sign } from 'jsonwebtoken';
-import type { JwtPayload, TwoFactorJwtPayload } from '@synapsedesk/common';
+import type { JwtPayload, TwoFactorJwtPayload } from '@synapsedesk/contracts';
 
 /**
  * Resolved from `__dirname`, not from cwd.

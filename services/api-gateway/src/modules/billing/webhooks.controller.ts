@@ -12,7 +12,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestOrigin } from '@synapsedesk/contracts';
 import { BillingService } from './billing.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {

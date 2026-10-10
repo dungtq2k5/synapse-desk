@@ -3,12 +3,12 @@ import { promisify } from 'node:util';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   DEFAULT_OCR_LANGUAGE,
-  formatErrorMsg,
   OCR_DPI,
   OCR_STAGE_TIMEOUT_MS,
   OcrLanguage,
   TESSERACT_CODE_BY_LANGUAGE,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * Why a page has no text after OCR.
@@ -296,4 +296,4 @@ export class OcrTimeout extends Error {
 }
 
 /** Re-exported so the parser reads one name rather than a config import. */
-export { MAX_OCR_PAGES_PER_DOCUMENT as MAX_OCR_PAGES } from '@synapsedesk/common';
+export { MAX_OCR_PAGES_PER_DOCUMENT as MAX_OCR_PAGES } from '@synapsedesk/contracts';

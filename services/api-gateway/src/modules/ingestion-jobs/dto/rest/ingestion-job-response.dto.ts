@@ -1,4 +1,4 @@
-import { IngestionJobStatus } from '@synapsedesk/common';
+import { IngestionJobStatus } from '@synapsedesk/contracts';
 
 /** One ingestion attempt, as the pipeline worklist shows it. */
 export class IngestionJobResponseDto {

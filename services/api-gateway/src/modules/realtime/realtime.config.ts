@@ -2,7 +2,7 @@ import {
   AnswerStatus,
   CLIENT_EVENTS,
   type ClientEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * What a user's presence can be.

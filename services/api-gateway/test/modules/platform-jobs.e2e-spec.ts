@@ -1,10 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import {
-  SCHEDULED_JOBS,
-  expectedIntervalMs,
-  jobsOwnedBy,
-} from '@synapsedesk/common';
+import { SCHEDULED_JOBS, jobsOwnedBy } from '@synapsedesk/contracts';
+import { expectedIntervalMs } from '@synapsedesk/core';
 import {
   API,
   E2eFixture,

@@ -1,7 +1,7 @@
 import {
   dropIndexes,
   missingIndexes,
-} from '@synapsedesk/common/testing/schema-objects';
+} from '@synapsedesk/testing/schema-objects';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 

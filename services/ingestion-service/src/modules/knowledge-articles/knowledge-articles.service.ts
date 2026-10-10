@@ -16,8 +16,8 @@ import {
   DOCUMENT_CHUNK_SORTABLE_FIELDS,
   DocumentFlagType,
   DocumentStatus,
-  requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { documentVisibility } from '../../common/document-visibility';
 import { Prisma } from '../../generated/prisma/client';

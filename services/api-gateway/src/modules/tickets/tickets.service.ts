@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ExportKind, RequestContext } from '@synapsedesk/common';
+import { ExportKind, RequestContext } from '@synapsedesk/contracts';
 import {
   toProtoTicketPriority,
   toProtoTicketSource,

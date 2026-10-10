@@ -5,7 +5,7 @@ import {
   type PermissionCode,
   type RequestContext,
   type RequestOrigin,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 // Re-exported, not redefined: `CallerContext` and `hasIdentity` live in
 // `libs/common` so `tenantScope()` can sit beside them without `common`
@@ -14,7 +14,7 @@ import {
 //
 // `CallerContext` ALSO needs the `import` above: `export … from` creates no
 // local binding, and `unpackCallerContext` below uses the type locally.
-export { hasIdentity } from '@synapsedesk/common';
+export { hasIdentity } from '@synapsedesk/contracts';
 export type { CallerContext };
 
 // ---- The single round trip for caller context across a service hop.

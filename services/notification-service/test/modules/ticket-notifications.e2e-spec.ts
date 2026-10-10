@@ -5,9 +5,9 @@ import {
   TICKET_PATTERNS,
   TicketEventOf,
   TicketStatus,
-  compareAlphabetically,
   ticketMessageGroupKey,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { TicketNotificationConsumer } from '../../src/modules/in-app/ticket-notification.consumer';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';

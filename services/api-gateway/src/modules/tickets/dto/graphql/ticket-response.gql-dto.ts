@@ -4,7 +4,7 @@ import {
   TicketPriority,
   TicketSource,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import '../../../../common/graphql/enums';
 
 /**

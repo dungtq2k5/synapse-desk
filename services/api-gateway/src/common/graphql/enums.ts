@@ -22,7 +22,7 @@ import {
   TicketPriority,
   TicketSource,
   TicketStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 registerEnumType(TicketStatus, {
   name: 'TicketStatus',

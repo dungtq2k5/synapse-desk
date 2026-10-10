@@ -13,5 +13,5 @@ export {
   memberContext,
   requestOrigin,
   superAdminContext,
-} from '@synapsedesk/common/testing/context';
+} from '@synapsedesk/testing/context';
 export { pageRequest } from '@synapsedesk/grpc-proto/testing/page';

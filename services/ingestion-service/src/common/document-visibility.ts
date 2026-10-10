@@ -1,4 +1,4 @@
-import { CallerContext } from '@synapsedesk/common';
+import { CallerContext } from '@synapsedesk/contracts';
 import { Prisma } from '../generated/prisma/client';
 
 /**

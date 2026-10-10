@@ -1,5 +1,5 @@
 import { Controller, INestApplication, Module } from '@nestjs/common';
-import { waitUntil } from '@synapsedesk/common/testing/wait';
+import { waitUntil } from '@synapsedesk/testing/wait';
 import { NestFactory } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
@@ -11,7 +11,6 @@ import {
 } from '@nestjs/microservices';
 import { faker } from '@faker-js/faker';
 import {
-  createNatsTransport,
   ReassignmentReason,
   TICKET_PATTERNS,
   TicketDomainEvent,
@@ -19,8 +18,9 @@ import {
   TicketSource,
   TicketStatus,
   ticketMessageGroupKey,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { createNatsTransport } from '@synapsedesk/nest-common';
 
 /** Waits for a condition rather than sleeping a fixed interval. */
 /**

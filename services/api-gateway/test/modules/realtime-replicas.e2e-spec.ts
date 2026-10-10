@@ -5,7 +5,7 @@ import {
   REALTIME_EVENTS,
   TICKET_PATTERNS,
   TicketSource,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { of } from 'rxjs';
 import type { Socket as ClientSocket } from 'socket.io-client';
 import { RealtimeFixture, bootstrapRealtimeTest } from '../utils';

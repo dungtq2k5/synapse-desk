@@ -9,7 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 
 /**
  * `it`, declaring the API tags the row exercises. The tags are read by

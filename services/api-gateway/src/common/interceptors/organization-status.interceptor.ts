@@ -14,7 +14,7 @@ import {
   OrgAccess,
   OrgStatus,
   isFullJwtPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { ORG_ACCESS_KEY } from '../decorators/org-access.decorator';
 import { OrganizationStatusService } from '../organization-status/organization-status.service';
 

@@ -1,0 +1,19 @@
+{
+  "name": "@synapsedesk/config",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "devDependencies": {
+    "@synapsedesk/contracts": "*",
+    "@synapsedesk/nest-common": "*",
+    "@synapsedesk/testing": "*",
+    "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.13.3",
+    "js-yaml": "^5.2.1",
+    "typescript": "^6.0.3"
+  }
+}

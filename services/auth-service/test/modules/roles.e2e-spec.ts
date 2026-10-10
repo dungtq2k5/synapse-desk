@@ -1,11 +1,8 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import {
-  compareAlphabetically,
-  PERMISSION_CODES,
-  SystemRoleName,
-} from '@synapsedesk/common';
+import { PERMISSION_CODES, SystemRoleName } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import {
   E2eFixture,
   bootstrapE2eTest,

@@ -2,7 +2,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { of } from 'rxjs';
 import {
   API,

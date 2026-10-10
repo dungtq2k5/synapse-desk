@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { OrgAccess } from '@synapsedesk/common';
+import { OrgAccess } from '@synapsedesk/contracts';
 import { ORG_ACCESS_KEY } from '../decorators/org-access.decorator';
 import { OPS_ROUTES } from '../../modules/health/ops-routes';
 

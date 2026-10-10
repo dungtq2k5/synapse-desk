@@ -4,7 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { readFileSync } from 'node:fs';
-import { JwtPayload, MaybeJwtPayload } from '@synapsedesk/common';
+import { JwtPayload, MaybeJwtPayload } from '@synapsedesk/contracts';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {

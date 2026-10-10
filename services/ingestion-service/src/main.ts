@@ -19,7 +19,7 @@ import {
   ensureStream,
   JETSTREAM_CONNECTION,
   JETSTREAM_STREAMS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
 

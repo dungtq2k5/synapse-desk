@@ -43,7 +43,6 @@ export default defineConfig(
         project: [
           './tsconfig.json',
           './services/*/tsconfig.json',
-          './libs/*/tsconfig.json',
           './packages/*/tsconfig.json',
           // The demo seeder. `scripts/` is neither an app nor a lib, and the
           // root tsconfig does not include it — without this entry every file

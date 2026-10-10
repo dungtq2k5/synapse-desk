@@ -4,10 +4,10 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
   EmailTemplateName,
-  maskPhoneNumber,
   OtpPurpose,
   SmsTemplateName,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { maskPhoneNumber } from '@synapsedesk/core';
 import {
   fromProtoOtpPurpose,
   OtpStatusRequest,

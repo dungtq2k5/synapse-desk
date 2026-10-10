@@ -14,7 +14,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { OrgAccess, RequestContext } from '@synapsedesk/common';
+import { OrgAccess, RequestContext } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';

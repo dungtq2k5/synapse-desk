@@ -1,11 +1,8 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { FinishedStatus, Queue } from 'bullmq';
-import {
-  formatErrorMsg,
-  INGESTION_QUEUE,
-  INGESTION_JOB_NAME,
-} from '@synapsedesk/common';
+import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IngestionJobData } from './ingestion.processor';
 

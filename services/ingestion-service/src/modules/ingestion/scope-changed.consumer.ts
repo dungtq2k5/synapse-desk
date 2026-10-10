@@ -3,7 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   DOCUMENT_PATTERNS,
   DocumentScopeChangedEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { ScopeFanoutQueueService } from './scope-fanout-queue.service';
 
 /**

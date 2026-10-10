@@ -3,7 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   BILLING_PATTERNS,
   EntitlementsChangedEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { AiSettingsService } from './ai-settings.service';
 
 /**

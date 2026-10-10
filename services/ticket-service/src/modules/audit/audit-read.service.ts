@@ -19,11 +19,9 @@ import {
   toProtoAuditAction,
   toProtoAuditResourceType,
 } from '@synapsedesk/grpc-proto';
-import {
-  AUDIT_LOG_SORTABLE_FIELDS,
-  compareAlphabetically,
-  requireTenant,
-} from '@synapsedesk/common';
+import { AUDIT_LOG_SORTABLE_FIELDS } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import { requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLog, Prisma } from '../../generated/prisma/client';
 

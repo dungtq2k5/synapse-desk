@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { readHttpStatusHint } from '@synapsedesk/common';
+import { readHttpStatusHint } from '@synapsedesk/core';
 
 /**
  * The HTTP status rag-service marks a refused draft with — its `DRAFT_REFUSAL`.

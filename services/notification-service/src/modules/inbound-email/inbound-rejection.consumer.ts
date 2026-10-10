@@ -5,10 +5,10 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   EMAIL_INBOUND_PATTERNS,
   EmailTemplateName,
-  formatErrorMsg,
-  isUniqueConstraintViolation,
   type InboundEmailRejectedEvent,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 

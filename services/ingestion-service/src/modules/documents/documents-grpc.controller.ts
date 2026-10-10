@@ -47,7 +47,7 @@ import {
   unpackCallerContext,
   UpdateDocumentRequest,
 } from '@synapsedesk/grpc-proto';
-import { requireTenant } from '@synapsedesk/common';
+import { requireTenant } from '@synapsedesk/nest-common';
 import { DocumentsService } from './documents.service';
 import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
 import { DocumentFlagsService } from '../document-flags/document-flags.service';

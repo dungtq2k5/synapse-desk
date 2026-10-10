@@ -15,8 +15,8 @@ import {
   GENERATION_MODEL_BY_TIER,
   QDRANT_PAYLOAD_FIELDS,
   PROJECTION_LAG_MS,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { bootstrapE2eTest, CYCLE_START, E2eFixture } from '../utils';
 import { memberContext } from '../utils/context';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
@@ -42,7 +42,7 @@ import {
 import { IngestionQueueService } from '../../src/modules/ingestion/ingestion-queue.service';
 import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { faultInjector } from '@synapsedesk/testing/fault';
 
 describe('The fan-out and the scheduled jobs (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an

@@ -16,7 +16,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { stripComments } from '@synapsedesk/common/testing/strip-comments';
+import { stripComments } from '@synapsedesk/testing/strip-comments';
 import { Session, expectOk } from './client';
 import { DEMO_PASSWORD, seededActors } from './seeded-actor';
 import { notificationDb } from './db';

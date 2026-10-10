@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { OtpPurpose, RequestOrigin } from '@synapsedesk/common';
+import { OtpPurpose, RequestOrigin } from '@synapsedesk/contracts';
 import { OtpGrpcClient } from './otp-grpc.client';
 import { toOtpStatusResponseDto } from './otp.mapper';
 import {

@@ -1,6 +1,6 @@
 /** @file What the organization routes return. */
 
-import type { AiModelTier, OrgStatus } from '@synapsedesk/common';
+import type { AiModelTier, OrgStatus } from '@synapsedesk/contracts';
 
 export class OrganizationResponseDto {
   readonly id!: string;

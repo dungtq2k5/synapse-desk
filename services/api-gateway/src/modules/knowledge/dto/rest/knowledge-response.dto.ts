@@ -1,4 +1,4 @@
-import { AnswerStatus, RetrievalDegradation } from '@synapsedesk/common';
+import { AnswerStatus, RetrievalDegradation } from '@synapsedesk/contracts';
 import { CitationResponseDto } from '../../../tickets/dto/rest/message-response.dto';
 
 export class RetrievedChunkResponseDto {

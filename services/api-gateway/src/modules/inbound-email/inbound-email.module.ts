@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientsModule } from '@nestjs/microservices';
-import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/common';
+import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/nest-common';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationGrpcModule } from '../../common/grpc/notification-grpc.module';
 import { InboundEmailPublisher } from './inbound-email.publisher';

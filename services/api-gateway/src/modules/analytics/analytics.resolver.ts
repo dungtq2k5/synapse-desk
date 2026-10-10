@@ -8,7 +8,7 @@ import {
   Resolver,
 } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
-import type { RequestContext } from '@synapsedesk/common';
+import type { RequestContext } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -26,7 +26,7 @@ import {
 import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { DocumentResponseGqlDto } from '../documents/dto/graphql/document-response.gql-dto';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { ANALYTICS_TOP_N } from '@synapsedesk/common';
+import { ANALYTICS_TOP_N } from '@synapsedesk/contracts';
 
 /**
  * The analytics queries

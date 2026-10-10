@@ -1,6 +1,6 @@
 import { TicketPriority, TicketSource } from '@synapsedesk/grpc-proto';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import {
   E2eFixture,
   bootstrapE2eTest,

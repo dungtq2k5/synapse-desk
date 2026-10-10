@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { SCHEDULER_QUEUE } from '@synapsedesk/common';
+import { SCHEDULER_QUEUE } from '@synapsedesk/contracts';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';

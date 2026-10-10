@@ -4,7 +4,7 @@ import {
   MIN_PAGE_CHARACTERS,
   rowTruncationMarker,
   type OcrLanguage,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { MAX_OCR_PAGES, OcrService, type OcrFailure } from './ocr.service';
 
 /** One page of extracted text. PDFs have many; everything else has one. */

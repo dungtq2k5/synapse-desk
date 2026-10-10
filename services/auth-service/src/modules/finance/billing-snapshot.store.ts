@@ -3,8 +3,8 @@ import type Redis from 'ioredis';
 import {
   RevenueUnavailableReason,
   SNAPSHOT_TTL_SECONDS,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
  * The Redis the revenue snapshot lives in.

@@ -8,10 +8,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { firstValueFrom, from, type Observable } from 'rxjs';
-import {
-  compareAlphabetically,
-  type RequestContext,
-} from '@synapsedesk/common';
+import { type RequestContext } from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
 import { RequestContextService } from '../contexts/request.context';
 import { CacheService } from '../cache/cache.service';
 import {

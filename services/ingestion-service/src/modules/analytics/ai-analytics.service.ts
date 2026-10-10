@@ -15,12 +15,14 @@ import {
   Mean,
   meanLatencyMs,
   Rate,
+} from '@synapsedesk/contracts';
+import {
   bucketKey,
   granularityOf,
   newestComputedAt,
   parseAnalyticsRange,
   requireTenant,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import {
   AiUsageRequest,
   AiUsageResponse,

@@ -5,7 +5,7 @@ import {
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
 import { ConfigService } from '@nestjs/config';
-import { readBuildInfo } from '@synapsedesk/common';
+import { readBuildInfo } from '@synapsedesk/contracts';
 import { VersionResponseDto } from './dto/rest/health-response.dto';
 
 /**

@@ -10,12 +10,12 @@ import {
   DocumentFlagType,
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
-  withHttpStatus,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { withHttpStatus } from '@synapsedesk/core';
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { MAX_FLAG_RESOLUTION_COMMENT_LENGTH } from '@synapsedesk/common';
+import { MAX_FLAG_RESOLUTION_COMMENT_LENGTH } from '@synapsedesk/contracts';
 import {
   API,
   E2eFixture,

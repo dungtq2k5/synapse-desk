@@ -7,7 +7,7 @@ import {
   PreferenceSource,
   PREFERENCE_WILDCARD_TYPE,
   type DevicePlatform,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 
 /**
  * The feed's response shapes — api-endpoints-plan §4b.

@@ -2,7 +2,7 @@ import {
   ANALYTICS_TOP_N,
   AiGenerationPurpose,
   MAX_ANALYTICS_RANGE_DAYS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   buildTenant,

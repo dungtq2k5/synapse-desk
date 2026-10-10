@@ -1,4 +1,4 @@
-import { EmailTemplateName } from '@synapsedesk/common';
+import { EmailTemplateName } from '@synapsedesk/contracts';
 import { renderEmail, type TemplateBranding } from './email.templates';
 
 /**

@@ -11,7 +11,7 @@ import {
   TWO_FACTOR_AUTH_SERVICE_NAME,
   TwoFactorAuthServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestOrigin } from '@synapsedesk/contracts';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /** Transport for `TwoFactorAuthService`. Returns proto messages; mapping is `two-factor-auth.mapper.ts`. */

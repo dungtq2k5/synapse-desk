@@ -36,11 +36,9 @@ import {
   OrgStatus,
   RequestOrigin,
   WEB_ROUTES,
-  isUniqueConstraintViolation,
-  normalizeEmail,
-  requireTenant,
-  formatErrorMsg,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
+import { isUniqueConstraintViolation, normalizeEmail } from '@synapsedesk/core';
+import { requireTenant, formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { RolesService } from '../roles/roles.service';

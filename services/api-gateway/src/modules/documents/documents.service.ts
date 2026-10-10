@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DocumentFlagResolution, RequestContext } from '@synapsedesk/common';
+import { DocumentFlagResolution, RequestContext } from '@synapsedesk/contracts';
 import {
   toPageRequest,
   toProtoDocumentFlagResolution,

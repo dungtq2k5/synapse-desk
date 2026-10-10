@@ -4,23 +4,25 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { AddressInfo } from 'node:net';
 import { ConfigService } from '@nestjs/config';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { callerContext } from '@synapsedesk/common/testing/context';
-import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { callerContext } from '@synapsedesk/testing/context';
+import { faultInjector } from '@synapsedesk/testing/fault';
 import { status } from '@grpc/grpc-js';
 import { toProtoNotificationType } from '@synapsedesk/grpc-proto';
 import {
   NOTIFICATION_TYPES,
   type NotificationType,
   NotificationPriority,
+  type CallerContext,
+  type CreateInAppNotificationCommand,
+} from '@synapsedesk/contracts';
+import { compareAlphabetically } from '@synapsedesk/core';
+import {
   WEBHOOK_DISABLE_AFTER_FAILURES,
   WEBHOOK_SIGNATURE_HEADER,
   WebhookDeliveryStatus,
   verifyWebhookSignature,
-  type CallerContext,
-  type CreateInAppNotificationCommand,
-  compareAlphabetically,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils/bootstrap';
 import { InAppNotificationService } from '../../src/modules/in-app/in-app-notification.service';
 import { WebhookAdminService } from '../../src/modules/webhooks/webhook-admin.service';

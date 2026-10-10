@@ -4,18 +4,20 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  NOTIFICATION_TYPE_VALUES,
+  type CallerContext,
+  type NotificationType,
+} from '@synapsedesk/contracts';
+import {
   MAX_WEBHOOK_ENDPOINTS,
   MAX_WEBHOOK_URL_LENGTH,
-  NOTIFICATION_TYPE_VALUES,
   WEBHOOK_DELIVERY_LIMIT,
   WEBHOOK_ROTATION_OVERLAP_HOURS,
   deniedLiteral,
   privateTargetsAllowed,
   requireTenant,
-  type CallerContext,
-  type NotificationType,
   type WebhookEventPayload,
-} from '@synapsedesk/common';
+} from '@synapsedesk/nest-common';
 import {
   fromProtoNotificationType,
   toProtoNotificationType,
