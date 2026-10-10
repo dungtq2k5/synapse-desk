@@ -41,7 +41,7 @@ const EXPORT_ENV_FILE = 'services/api-gateway/.env.test';
 const RUNTIME_OUTPUTS = [
   'services/api-gateway/dist/services/api-gateway/src/main.js',
   'libs/common/dist/main.js',
-  'libs/grpc-proto/dist/index.js',
+  'packages/grpc-proto/dist/index.js',
 ];
 
 /**
@@ -56,7 +56,7 @@ const RUNTIME_OUTPUTS = [
  * its build info together (`turbo.json`'s `build.outputs`) to the content the
  * current source hashes to.
  *
- * @example missingOutputs('/repo') // ['libs/grpc-proto/dist/index.js'] when that library was never built
+ * @example missingOutputs('/repo') // ['packages/grpc-proto/dist/index.js'] when that library was never built
  */
 function missingOutputs(root, outputs = RUNTIME_OUTPUTS) {
   return outputs.filter((output) => !existsSync(join(root, output)));

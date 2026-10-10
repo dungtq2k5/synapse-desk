@@ -57,7 +57,11 @@ describe('mapper functions name their return type verbatim', () => {
    * service is a different animal and its name answers to nothing here.
    */
   const mapperFiles = (): string[] =>
-    repoFiles('services/**/*.mapper.ts', 'libs/**/*.mapper.ts');
+    repoFiles(
+      'services/**/*.mapper.ts',
+      'libs/**/*.mapper.ts',
+      'packages/**/*.mapper.ts',
+    );
 
   /**
    * The name §12 requires for a given return annotation.

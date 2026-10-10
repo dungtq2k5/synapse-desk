@@ -12,9 +12,9 @@
     // **SWC does the opposite: it REWRITES an aliased specifier to a relative
     // path.** `@nestjs/cli` hands it `jsc.paths` verbatim from this file, so
     // `import ... from '@synapsedesk/grpc-proto'` was emitted as
-    // `require("../../../libs/grpc-proto/src")` — a path outside `dist`, since
+    // `require("../../../packages/grpc-proto/src")` — a path outside `dist`, since
     // SWC only compiles `sourceRoot`. The service built cleanly and died at
-    // startup with `Cannot find module '../../../libs/grpc-proto/src'`.
+    // startup with `Cannot find module '../../../packages/grpc-proto/src'`.
     //
     // Empty here and untouched in `tsconfig.json`, so the alias keeps working
     // for the IDE, jest and `npm run typecheck` while the emitted `require`

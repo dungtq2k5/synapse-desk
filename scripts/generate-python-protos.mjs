@@ -41,7 +41,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PROTO_ROOT = join(REPO_ROOT, 'libs/grpc-proto/src/proto');
+const PROTO_ROOT = join(REPO_ROOT, 'packages/grpc-proto/src/proto');
 const RAG_ROOT = join(REPO_ROOT, 'services/rag-service');
 const OUT_DIR = join(RAG_ROOT, 'rag_service/generated');
 const VENV_PYTHON = join(RAG_ROOT, '.venv/bin/python');

@@ -102,6 +102,7 @@ describe('nothing tracked cites the archive', () => {
     repoFiles(
       'services',
       'libs',
+      'packages',
       'scripts',
       'test',
       'docs',

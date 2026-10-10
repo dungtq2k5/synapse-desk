@@ -40,7 +40,7 @@ describe('the image contract (static half)', () => {
      *
      * `src/generated/`  is IN the corpus, deliberately: generated code ships
      * and has to resolve at runtime like any other file, and two of
-     * `libs/grpc-proto`'s three phantom imports lived in it — an exclusion
+     * `packages/grpc-proto`'s three phantom imports lived in it — an exclusion
      * that felt like hygiene would have dropped the majority of that
      * package's findings.
      *
@@ -113,7 +113,7 @@ describe('the image contract (static half)', () => {
     const workspaces = (): string[] =>
       repoFiles('*/*/package.json')
         .filter((file) =>
-          /^(apps|services|libs)\/[^/]+\/package\.json$/.test(file),
+          /^(apps|services|libs|packages)\/[^/]+\/package\.json$/.test(file),
         )
         .map((file) => file.slice(0, -'/package.json'.length))
         .filter((workspace) => !(workspace in GUARDED_ELSEWHERE))
@@ -183,7 +183,7 @@ describe('the image contract (static half)', () => {
     // resolve. Types are build-time input; `--omit=dev` is the line that
     // makes the distinction matter.
     const manifests = repoFiles('*/*/package.json').filter((file) =>
-      /^(apps|services|libs)\/[^/]+\/package\.json$/.test(file),
+      /^(apps|services|libs|packages)\/[^/]+\/package\.json$/.test(file),
     );
     expect(manifests.length).toBeGreaterThanOrEqual(8);
 
@@ -212,7 +212,7 @@ describe('the image contract (static half)', () => {
      * typecheck covers them and that is exactly where the measured case
      * lived. The legitimate cross-workspace channel is `@synapsedesk/*`.
      */
-    it.each(['services', 'libs'])('%s', (top) => {
+    it.each(['services', 'libs', 'packages'])('%s', (top) => {
       // `src/**` + JS filter, and the spelling is measured: `${top}/*/src`
       // matches NOTHING (a pathspec with a wildcard is not a prefix), and
       // `src/**/*.ts` misses files directly in `src/` — the same git `**`
@@ -381,7 +381,7 @@ describe('the image contract (static half)', () => {
       // Not a workspace, so reaching it proves the pathspec is not the
       // workspace globs in disguise.
       expect(manifests()).toContain('scripts/package.json');
-      // Four manifests declare it: the root, `libs/common`, `libs/grpc-proto`
+      // Four manifests declare it: the root, `libs/common`, `packages/grpc-proto`
       // and `storage-service`.
       expect(found.length).toBeGreaterThanOrEqual(4);
     });

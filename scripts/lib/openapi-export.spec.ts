@@ -42,7 +42,7 @@ describe('the OpenAPI export — the pure half', () => {
       expect(RUNTIME_OUTPUTS).toEqual([
         'services/api-gateway/dist/services/api-gateway/src/main.js',
         'libs/common/dist/main.js',
-        'libs/grpc-proto/dist/index.js',
+        'packages/grpc-proto/dist/index.js',
       ]);
       expect(missingOutputs(root)).toEqual(RUNTIME_OUTPUTS);
     });

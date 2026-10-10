@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compiles the SHARED .proto into Python stubs.
 #
-# The proto lives in libs/grpc-proto, not here, and that is the point: the
+# The proto lives in packages/grpc-proto, not here, and that is the point: the
 # TypeScript client and this server are generated from one file. A hand-written
 # Python mirror would drift, and the drift would not be a compile error on
 # either side — it would be an UNIMPLEMENTED at runtime from a healthy server.
@@ -9,7 +9,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
-PROTO_ROOT="$ROOT/libs/grpc-proto/src/proto"
+PROTO_ROOT="$ROOT/packages/grpc-proto/src/proto"
 OUT="$HERE/../rag_service/generated"
 
 mkdir -p "$OUT"

@@ -16,7 +16,7 @@ describe('The AI ledger enums (unit)', () => {
   const PROTO = readFileSync(
     join(
       __dirname,
-      '../../../grpc-proto/src/proto/synapsedesk/ingestion/ledger.proto',
+      '../../../../packages/grpc-proto/src/proto/synapsedesk/ingestion/ledger.proto',
     ),
     'utf8',
   );

@@ -25,7 +25,7 @@ import {
  * an empty IP.
  *
  * The `GatewayTimeoutException` mapping lives here rather than in
- * `libs/grpc-proto` on purpose — 504 is an HTTP concept, and auth-service has
+ * `packages/grpc-proto` on purpose — 504 is an HTTP concept, and auth-service has
  * no business importing it.
  */
 export abstract class BaseGrpcClient {

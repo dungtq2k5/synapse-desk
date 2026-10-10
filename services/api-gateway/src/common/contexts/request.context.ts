@@ -26,7 +26,7 @@ export class RequestContextService {
   }
 
   // The metadata READER moved to `unpackCallerContext` in
-  // libs/grpc-proto/src/metadata.ts. It never belonged here: the gateway packs
+  // packages/grpc-proto/src/metadata.ts. It never belonged here: the gateway packs
   // metadata and services unpack it, so a reader on this side had no caller and
   // sat unused beside a packer that wrote none of the keys it read.
 

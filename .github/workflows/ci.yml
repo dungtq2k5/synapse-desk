@@ -181,7 +181,7 @@ jobs:
       # suites themselves need no `dist` — but two things inside the run do:
       # the seeder specs spawn `scripts/generate-job-alerts.mjs`, a real child
       # process where Node resolves the package by its `main`
-      # (`libs/common/dist/main.js`), and `libs/grpc-proto`'s specs need the
+      # (`libs/common/dist/main.js`), and `packages/grpc-proto`'s specs need the
       # `.d.ts` beside it for ts-jest to typecheck against. Measured on a clean
       # checkout with the clients present and no `dist`: 3 suites failed, 100
       # passed; with it, 103 suites / 1127 tests green.

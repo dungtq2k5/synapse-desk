@@ -41,7 +41,7 @@ describe('the CI contract', () => {
       for (const manifest of [
         'package.json',
         ...repoFiles('*/*/package.json').filter((file) =>
-          /^(apps|services|libs)\/[^/]+\/package\.json$/.test(file),
+          /^(apps|services|libs|packages)\/[^/]+\/package\.json$/.test(file),
         ),
       ]) {
         const parsed = JSON.parse(read(manifest)) as {

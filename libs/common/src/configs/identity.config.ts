@@ -111,11 +111,11 @@ export type RequestOrigin = Pick<RequestContext, 'ip' | 'userAgent'>;
  * `hasIdentity` below, and `requireActor`/`requireTenant` in
  * `utils/tenant-scope.ts`, are what that check looks like.
  *
- * **Lives here rather than in `libs/grpc-proto`, where it started.** It is a
+ * **Lives here rather than in `packages/grpc-proto`, where it started.** It is a
  * DOMAIN concept — who is calling — with no dependency on gRPC at all, and
  * `tenantScope()` needs it. Leaving it next to `packRequestContext` (which does
  * touch `Metadata` and therefore must stay in grpc-proto) would have forced
- * `libs/common` to import `libs/grpc-proto`, and grpc-proto already imports
+ * `libs/common` to import `packages/grpc-proto`, and grpc-proto already imports
  * common: a package cycle turbo's `dependsOn: ["^build"]` rejects outright.
  * grpc-proto re-exports both symbols, so every existing import site is
  * unchanged.

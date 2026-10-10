@@ -29,7 +29,7 @@ src = ["."]
 #
 # **That sentence was aspirational until `scripts/generate-python-protos.mjs`
 # landed.** `buf.gen.yaml` drove only the TypeScript half, so a `.proto` edit
-# regenerated `libs/grpc-proto/src/generated` and left this directory untouched
+# regenerated `packages/grpc-proto/src/generated` and left this directory untouched
 # — for however long it took someone to notice. The script closes it, and
 # `npm run proto:check` fails if these ever fall behind again. It also owns the
 # import rewrite (`from synapsedesk.` -> `from rag_service.generated.synapsedesk.`)

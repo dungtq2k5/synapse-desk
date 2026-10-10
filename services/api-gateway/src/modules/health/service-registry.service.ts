@@ -28,13 +28,13 @@ export type ServiceEndpoint = {
  *      is gateway configuration, so a second consumer could not reuse it as-is
  *      anyway.
  *   2. `libs/common` MUST NOT import `@grpc/grpc-js`. That library is the wire,
- *      and the wire lives in `libs/grpc-proto`. A domain-types package that
+ *      and the wire lives in `packages/grpc-proto`. A domain-types package that
  *      transitively drags in a gRPC runtime is one every service pays for,
  *      including notification-service, which speaks only NATS.
  *
  * If a second service later needs peer health, the reusable part is the
  * connectivity-state mapping, not this class — that would move to
- * `libs/grpc-proto` where the gRPC dependency already belongs.
+ * `packages/grpc-proto` where the gRPC dependency already belongs.
  */
 @Injectable()
 export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {

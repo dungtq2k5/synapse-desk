@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
-const SCAN_ROOTS = ['services', 'libs', 'scripts'];
+const SCAN_ROOTS = ['services', 'libs', 'packages', 'scripts'];
 const SCAN_EXTENSIONS = ['.ts', '.tsx', '.mjs', '.js', '.py'];
 
 const SKIP_DIRECTORIES = new Set([

@@ -503,7 +503,7 @@ function sumAll(rows: TicketStatSums[]): TicketStatSums {
  * How fresh this dashboard is, on the wire.
  *
  * The fold is shared; the proto conversion stays here because `libs/` cannot
- * import `libs/grpc-proto`.
+ * import `packages/grpc-proto`.
  */
 function latestComputedAt(rows: DailyRow[]) {
   const newest = newestComputedAt(rows);

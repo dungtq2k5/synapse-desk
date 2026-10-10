@@ -8,7 +8,7 @@ import "synapsedesk/ticket/common.proto";
 
 // Ticket lifecycle: create, read, list, update, the state machine, and soft
 // delete. The tenant and the caller's identity travel in gRPC METADATA, not in
-// these messages — see libs/grpc-proto/src/metadata.ts for why that is what
+// these messages — see packages/grpc-proto/src/metadata.ts for why that is what
 // makes the tenant filter hard to forget.
 
 message CreateTicketRequest {

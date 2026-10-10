@@ -244,11 +244,11 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # failure is a module-not-found at boot, after the image has been pushed.
 COPY --from=build /app/libs/common/package.json ./libs/common/
 COPY --from=build /app/libs/common/dist ./libs/common/dist
-COPY --from=build /app/libs/grpc-proto/package.json ./libs/grpc-proto/
+COPY --from=build /app/packages/grpc-proto/package.json ./packages/grpc-proto/
 # `dist/proto` carries the.proto FILES, not just the compiled types. gRPC's
 # loader reads them at startup, so an image without them fails to boot rather
 # than failing on the first call — see `scripts/copy-protos.mjs`.
-COPY --from=build /app/libs/grpc-proto/dist ./libs/grpc-proto/dist
+COPY --from=build /app/packages/grpc-proto/dist ./packages/grpc-proto/dist
 
 COPY --from=build /app/services/${SERVICE}/package.json ./services/${SERVICE}/
 COPY --from=build /app/services/${SERVICE}/dist ./services/${SERVICE}/dist

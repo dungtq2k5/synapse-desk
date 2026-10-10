@@ -865,7 +865,7 @@ async def build_dependencies(config: Config) -> Dependencies:
 
 
 #: The sub-service name a READINESS probe asks for — matches
-#: `READINESS_SERVICE` in `libs/grpc-proto/src/constants.ts`. `""` is the
+#: `READINESS_SERVICE` in `packages/grpc-proto/src/constants.ts`. `""` is the
 #: standard's "the server as a whole" and is what a liveness probe sends, so one
 #: port answers two genuinely different questions.
 READINESS_SERVICE = "readiness"

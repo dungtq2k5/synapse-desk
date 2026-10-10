@@ -72,6 +72,9 @@ docker/firebase/*.log
 libs/*/src/**/*.js
 libs/*/src/**/*.js.map
 libs/*/src/**/*.d.ts
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
 
 # Derived: the demo seeder's manifest. A committed one goes stale the first
 # time somebody reseeds, and a stale manifest names ids that no longer exist.

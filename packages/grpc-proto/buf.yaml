@@ -1,7 +1,7 @@
 version: v2
 
 # Paths are relative to THIS file, so buf config lives next to the protos it
-# governs and `libs/grpc-proto` stays self-contained.
+# governs and `packages/grpc-proto` stays self-contained.
 modules:
   - path: src/proto
 

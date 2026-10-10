@@ -1,6 +1,6 @@
 """Unpacking the caller context the gateway packed into gRPC metadata.
 
-The TypeScript half is `packRequestContext` in `libs/grpc-proto`. This is the
+The TypeScript half is `packRequestContext` in `packages/grpc-proto`. This is the
 one place the two languages meet on a wire format that no compiler checks:
 metadata is stringly-typed, so a key spelled differently here does not error —
 it yields nothing, and `department_ids` quietly becomes an empty list.
@@ -19,7 +19,7 @@ from typing import Any
 
 from rag_service.common.caller_context import CallerContext
 
-#: Mirrors `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto/src/constants.ts`.
+#: Mirrors `GRPC_CHANNEL_OPTIONS` in `packages/grpc-proto/src/constants.ts`.
 #:
 #: **The one place in this service where a MISSING value is the bug.** Every
 #: TypeScript client and every TypeScript server applies those options, so both

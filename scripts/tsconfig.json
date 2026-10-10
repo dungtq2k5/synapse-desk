@@ -15,15 +15,16 @@
     "paths": {
       "@synapsedesk/common": ["libs/common/src/main.ts"],
       "@synapsedesk/common/*": ["libs/common/src/*"],
-      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src/index.ts"],
-      "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
+      "@synapsedesk/grpc-proto": ["packages/grpc-proto/src/index.ts"],
+      "@synapsedesk/grpc-proto/*": ["packages/grpc-proto/src/*"]
     }
   },
   "include": [
     "seed-demo/**/*.ts",
     "../services/*/src/**/*",
     "../services/*/test/**/*",
-    "../libs/*/src/**/*"
+    "../libs/*/src/**/*",
+    "../packages/*/src/**/*"
   ],
   // `jest.config.ts` imports `../jest.config.base.ts` by its `.ts` extension —
   // jest loads it through native ESM resolution, which does not do

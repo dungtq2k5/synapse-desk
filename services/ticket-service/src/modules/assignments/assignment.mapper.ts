@@ -5,7 +5,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { TicketAssignment } from '../../generated/prisma/client';
 
-// The reason bridge is NOT declared here. `libs/grpc-proto` already exports one
+// The reason bridge is NOT declared here. `packages/grpc-proto` already exports one
 // built with `enumBridge`, whose forward map is exhaustive over the domain enum
 // and whose reverse map is DERIVED — a local copy is a second table that can
 // disagree with the wire, which is what a VarChar-to-numeric crossing must not

@@ -11,7 +11,7 @@
  *
  * Run by the LIBRARY's build rather than each service's, because services now
  * resolve `@synapsedesk/grpc-proto` through node_modules to
- * `libs/grpc-proto/dist/index.js` — so that is the only `__dirname` the loader
+ * `packages/grpc-proto/dist/index.js` — so that is the only `__dirname` the loader
  * ever sees, no matter which service is running.
  *
  * The copy is recursive and preserves the synapsedesk/auth/ tree, which the
@@ -30,7 +30,7 @@ if (!destArg) {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const source = join(repoRoot, 'libs', 'grpc-proto', 'src', 'proto');
+const source = join(repoRoot, 'packages', 'grpc-proto', 'src', 'proto');
 const dest = resolve(process.cwd(), destArg);
 
 if (!existsSync(source)) {

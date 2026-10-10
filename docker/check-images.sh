@@ -147,8 +147,8 @@ for service in "${NODE_SERVICES[@]}"; do
     --input-type=module -e '
       import { readFileSync } from "node:fs";
       const own = JSON.parse(readFileSync("package.json", "utf8"));
-      const libs = ["common", "grpc-proto"].map((lib) =>
-        JSON.parse(readFileSync(`/app/libs/${lib}/package.json`, "utf8")));
+      const libs = ["libs/common", "packages/grpc-proto"].map((lib) =>
+        JSON.parse(readFileSync(`/app/${lib}/package.json`, "utf8")));
       const deps = new Set([own, ...libs].flatMap((m) => Object.keys(m.dependencies ?? {})));
       let failed = 0;
       for (const dep of deps) {

@@ -52,6 +52,7 @@ describe('doc comments do not open accidental JSDoc tags', () => {
     repoFiles(
       'services/**/*.ts',
       'libs/**/*.ts',
+      'packages/**/*.ts',
       'services/**/*.prisma',
       'scripts/*.mjs',
     )

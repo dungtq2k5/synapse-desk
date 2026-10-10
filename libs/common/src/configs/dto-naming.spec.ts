@@ -41,7 +41,11 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
    * cannot fail the suite and a file deleted but not staged cannot pass it.
    */
   const responseFiles = (): string[] =>
-    repoFiles('services/**/*-response.dto.ts', 'libs/**/*-response.dto.ts');
+    repoFiles(
+      'services/**/*-response.dto.ts',
+      'libs/**/*-response.dto.ts',
+      'packages/**/*-response.dto.ts',
+    );
 
   /**
    * Every REST DTO file that is NOT a response file.
@@ -51,7 +55,11 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
    * carries no obligation.
    */
   const requestFiles = (): string[] =>
-    repoFiles('services/**/*.dto.ts', 'libs/**/*.dto.ts').filter(
+    repoFiles(
+      'services/**/*.dto.ts',
+      'libs/**/*.dto.ts',
+      'packages/**/*.dto.ts',
+    ).filter(
       (file) =>
         !file.endsWith('-response.dto.ts') && !file.endsWith('.gql-dto.ts'),
     );

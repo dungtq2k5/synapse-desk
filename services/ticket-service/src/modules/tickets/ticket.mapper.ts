@@ -10,7 +10,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { Ticket, TicketStatusChange } from '../../generated/prisma/client';
 
-// The enum bridges are NOT declared here. `libs/grpc-proto` already exports one
+// The enum bridges are NOT declared here. `packages/grpc-proto` already exports one
 // per enum, built with `enumBridge`: the forward map is exhaustive over the
 // domain enum, so a new member fails to compile, and the reverse map is DERIVED
 // rather than hand-written. A local copy is a second table that can disagree

@@ -410,7 +410,7 @@ function clampLimit(limit: number | undefined): number {
  * How fresh this dashboard is, on the wire.
  *
  * The fold is shared; the proto conversion stays here because `libs/` cannot
- * import `libs/grpc-proto`.
+ * import `packages/grpc-proto`.
  */
 function latestComputedAt(rows: AiDailyRow[]) {
   const newest = newestComputedAt(rows);

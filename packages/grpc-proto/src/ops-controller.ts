@@ -20,7 +20,7 @@ export const BUILD_INFO = Symbol('BUILD_INFO');
 /**
  * The probe and version surface every gRPC service serves
  *
- * **In `libs/grpc-proto`, not `libs/common`**, and the split is the same one
+ * **In `packages/grpc-proto`, not `libs/common`**, and the split is the same one
  * `ServiceRegistry`'s docblock draws: `libs/common` is domain types, and a
  * `@GrpcMethod`-decorated controller is the wire. The decision logic — what to
  * check, how to bound it, what liveness must never look at — lives in

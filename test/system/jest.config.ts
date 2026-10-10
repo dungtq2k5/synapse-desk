@@ -23,8 +23,10 @@ const config: Config = {
   moduleNameMapper: {
     '^@synapsedesk/common$': '<rootDir>/../../libs/common/src/main.ts',
     '^@synapsedesk/common/(.*)$': '<rootDir>/../../libs/common/src/$1',
-    '^@synapsedesk/grpc-proto$': '<rootDir>/../../libs/grpc-proto/src/index.ts',
-    '^@synapsedesk/grpc-proto/(.*)$': '<rootDir>/../../libs/grpc-proto/src/$1',
+    '^@synapsedesk/grpc-proto$':
+      '<rootDir>/../../packages/grpc-proto/src/index.ts',
+    '^@synapsedesk/grpc-proto/(.*)$':
+      '<rootDir>/../../packages/grpc-proto/src/$1',
   },
   globalSetup: '<rootDir>/global-setup.ts',
   globalTeardown: '<rootDir>/global-teardown.ts',

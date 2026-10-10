@@ -12,6 +12,7 @@ describe('repoFiles is the only way a spec lists the repository', () => {
     repoFiles(
       'services/**/*.spec.ts',
       'libs/**/*.spec.ts',
+      'packages/**/*.spec.ts',
       'scripts/**/*.spec.ts',
     );
 
