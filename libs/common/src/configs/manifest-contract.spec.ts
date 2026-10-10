@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -27,15 +28,6 @@ import { stripComments } from '../testing/strip-comments';
  */
 describe('the manifest contract', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
-
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
 
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
@@ -61,7 +53,7 @@ describe('the manifest contract', () => {
    * the ingress checks are about.
    */
   const manifests = (): { file: string; doc: Doc }[] =>
-    gitFiles('k8s')
+    repoFiles('k8s')
       .filter((file) => file.endsWith('.yaml'))
       .flatMap((file) =>
         // Split BEFORE parsing: `load` throws on a multi-document stream, and
@@ -91,7 +83,7 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    gitFiles('apps/*/package.json')
+    repoFiles('apps/*/package.json')
       .map((file) => file.split('/')[1])
       .sort();
 
@@ -411,7 +403,7 @@ describe('the manifest contract', () => {
     const schemaFiles = (): Map<string, string> => {
       const map = new Map<string, string>();
 
-      for (const file of gitFiles('apps/*/src/**/env.validation.ts')) {
+      for (const file of repoFiles('apps/*/src/**/env.validation.ts')) {
         map.set(file.split('/')[1], file);
       }
 
@@ -532,7 +524,7 @@ describe('the manifest contract', () => {
     // Derived rather than asserted from the list above: the services whose Joi
     // schema NAMES the variable are the services that must hold it, so a third
     // consumer added later fails here instead of shipping with no Secret.
-    const declaring = gitFiles('apps/*/src/**/env.validation.ts')
+    const declaring = repoFiles('apps/*/src/**/env.validation.ts')
       .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
       .map((file) => file.split('/')[1])
       .sort();
@@ -658,7 +650,9 @@ describe('the manifest contract', () => {
     // container on one of them would run `migrate deploy` against nothing and
     // hold the pod at `Init:Error` forever.
     const withSchema = new Set(
-      gitFiles('apps/*/prisma/schema.prisma').map((file) => file.split('/')[1]),
+      repoFiles('apps/*/prisma/schema.prisma').map(
+        (file) => file.split('/')[1],
+      ),
     );
 
     expect(withSchema.size).toBe(4);

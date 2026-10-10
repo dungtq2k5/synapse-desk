@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * Every symbol a flow document names still exists.
@@ -26,19 +26,10 @@ import { basename, join } from 'node:path';
 describe('every symbol the flow documents cite exists', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
 
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
-
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
 
-  const flows = (): string[] => gitFiles('docs/reference/flows/*.md');
+  const flows = (): string[] => repoFiles('docs/reference/flows/*.md');
 
   /**
    * The extensions a flow document may cite — **named once**, because three
@@ -68,7 +59,7 @@ describe('every symbol the flow documents cite exists', () => {
 
   /** One corpus for both halves — the same files, read the same way. */
   const sourceFiles = (): string[] =>
-    CITED_EXTENSIONS.flatMap((extension) => gitFiles(`*.${extension}`));
+    CITED_EXTENSIONS.flatMap((extension) => repoFiles(`*.${extension}`));
 
   /**
    * Backticked filenames — `rerank.py`, `cache.config.ts`, `docker-compose.yml`.

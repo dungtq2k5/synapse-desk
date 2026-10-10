@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * Every class in `<entity>-response.dto.ts` ends `ResponseDto`.
@@ -41,18 +41,7 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
    * cannot fail the suite and a file deleted but not staged cannot pass it.
    */
   const responseFiles = (): string[] =>
-    execFileSync(
-      'git',
-      [
-        'ls-files',
-        '--',
-        'apps/**/*-response.dto.ts',
-        'libs/**/*-response.dto.ts',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
+    repoFiles('apps/**/*-response.dto.ts', 'libs/**/*-response.dto.ts');
 
   /**
    * Every REST DTO file that is NOT a response file.
@@ -62,17 +51,10 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
    * carries no obligation.
    */
   const requestFiles = (): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--', 'apps/**/*.dto.ts', 'libs/**/*.dto.ts'],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean)
-      .filter(
-        (file) =>
-          !file.endsWith('-response.dto.ts') && !file.endsWith('.gql-dto.ts'),
-      );
+    repoFiles('apps/**/*.dto.ts', 'libs/**/*.dto.ts').filter(
+      (file) =>
+        !file.endsWith('-response.dto.ts') && !file.endsWith('.gql-dto.ts'),
+    );
 
   const offenders = (source: string): string[] =>
     [...source.matchAll(DECLARATION)]

@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * Every directory holding TypeScript is claimed by a typecheck.
@@ -47,13 +47,7 @@ describe('every TypeScript directory is inside a typecheck', () => {
    * walk would re-encode all of it and drift.
    */
   const sourceFiles = (): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*.ts'],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean)
+    repoFiles('*.ts')
       // Declaration files describe someone else's program.
       .filter((file) => !file.endsWith('.d.ts'));
 

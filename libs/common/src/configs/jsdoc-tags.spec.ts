@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * An `@` in a doc comment is a TAG, whatever it was meant to be.
@@ -49,33 +49,12 @@ describe('doc comments do not open accidental JSDoc tags', () => {
   const DOC_TAG = /^\s*(?:\*|\/\/\/)\s+@([A-Za-z][\w-]*)/;
 
   const documentedFiles = (): string[] =>
-    execFileSync(
-      'git',
-      [
-        'ls-files',
-        // **The index is not the source tree**, and this scan had both halves
-        // of that: a file written and not yet staged was never read, and a file
-        // staged-then-deleted made this spec throw `ENOENT` on a path that no
-        // longer exists. The second half is why it is fixed here rather than
-        // left for the next reader — it fails loudly, which is luckier than
-        // `mapper-naming.spec.ts`, where the same corpus bug hid a violation in
-        // silence for six runs.
-        '--cached',
-        '--others',
-        // Still `git` rather than a filesystem walk, for the one thing git is
-        // better at: `.gitignore` already excludes `dist`, `node_modules` and
-        // the generated Prisma clients.
-        '--exclude-standard',
-        '--',
-        'apps/**/*.ts',
-        'libs/**/*.ts',
-        'apps/**/*.prisma',
-        'scripts/*.mjs',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
+    repoFiles(
+      'apps/**/*.ts',
+      'libs/**/*.ts',
+      'apps/**/*.prisma',
+      'scripts/*.mjs',
     )
-      .split('\n')
-      .filter(Boolean)
       // Generated output carries whatever its source said, so a hit here is a
       // duplicate report of a defect in the schema that produced it.
       .filter((file) => !file.includes('/generated/'));

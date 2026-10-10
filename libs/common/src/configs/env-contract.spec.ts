@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * The environment contract: the schema is the code, `.env.example` is the
@@ -21,16 +22,6 @@ import { stripComments } from '../testing/strip-comments';
  */
 describe('the environment contract', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
-
-  /** The one counting rule — every corpus below comes from git, never a walk. */
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
 
   /**
    * Documented in `.env.example` but validated by no schema — each with the
@@ -62,7 +53,7 @@ describe('the environment contract', () => {
 
   /** apps/<service> for every workspace under apps/. */
   const services = (): string[] =>
-    gitFiles('apps/*/package.json')
+    repoFiles('apps/*/package.json')
       .map((file) => file.split('/')[1])
       .sort();
 
@@ -70,7 +61,7 @@ describe('the environment contract', () => {
   const schemaFiles = (): Map<string, string> => {
     const map = new Map<string, string>();
 
-    for (const file of gitFiles('apps/*/src/**/env.validation.ts')) {
+    for (const file of repoFiles('apps/*/src/**/env.validation.ts')) {
       map.set(file.split('/')[1], file);
     }
 
@@ -165,7 +156,7 @@ describe('the environment contract', () => {
     // (Untracked `.env` files carry more of these; they are a developer's own
     // and do not exist in CI, so no test can hold them — their cleanup was a
     // one-time manual pass.)
-    const envFiles = gitFiles('apps/*/.env*');
+    const envFiles = repoFiles('apps/*/.env*');
 
     // The corpus floor: seven services × (.env.example + .env.test).
     expect(envFiles.length).toBeGreaterThanOrEqual(14);

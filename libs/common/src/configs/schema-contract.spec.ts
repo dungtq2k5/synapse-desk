@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import { parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * The schema-delivery contract: what may reach a production image, and what
@@ -16,15 +16,6 @@ import { stripComments } from '../testing/strip-comments';
  */
 describe('the schema contract', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
-
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
 
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
@@ -61,7 +52,7 @@ describe('the schema contract', () => {
     const excludedFromBuild = (file: string): boolean =>
       /(^|\/)test\//.test(file) || /spec\.ts$/.test(file);
 
-    const corpus = gitFiles('*').filter(
+    const corpus = repoFiles('*').filter(
       (file) => !excludedFromContext(file) && !excludedFromBuild(file),
     );
 
@@ -93,7 +84,7 @@ describe('the schema contract', () => {
     // points at the file rather than at the rule that stopped mattering.
     expect(read('.dockerignore')).toMatch(/^\*\*\/\.env\.\*$/m);
 
-    const buildConfigs = gitFiles('apps/*/tsconfig.build.json');
+    const buildConfigs = repoFiles('apps/*/tsconfig.build.json');
     expect(buildConfigs.length).toBeGreaterThanOrEqual(6);
 
     for (const file of buildConfigs) {
@@ -116,12 +107,12 @@ describe('the schema contract', () => {
     // objects, removed by the setting a careful operator reaches for. They no
     // longer declare it; auth does, and `required()` like its peers, because
     // an unset seeding flag should stop a service rather than choose for it.
-    const seeders = gitFiles('apps/*/src/modules/prisma/database.seeder.ts');
+    const seeders = repoFiles('apps/*/src/modules/prisma/database.seeder.ts');
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
     for (const seeder of seeders) {
       const service = seeder.split('/')[1];
-      const schema = gitFiles(`apps/${service}/src/**/env.validation.ts`)[0];
+      const schema = repoFiles(`apps/${service}/src/**/env.validation.ts`)[0];
       const declared = /SEED_ON_BOOTSTRAP:/.test(read(schema));
 
       // `seedRows` exists only where there are rows to seed.
@@ -166,7 +157,7 @@ describe('the schema contract', () => {
     // A source regex is brittle and this one earns it: it is the only check
     // covering all four services at once, and the edit it catches is the edit
     // a refactor would make.
-    const seeders = gitFiles('apps/*/src/modules/prisma/database.seeder.ts');
+    const seeders = repoFiles('apps/*/src/modules/prisma/database.seeder.ts');
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
     for (const seeder of seeders) {
@@ -194,7 +185,7 @@ describe('the schema contract', () => {
 
   describe("**the migrations exist and stay out of the seeder's territory**", () => {
     const withSchema = (): string[] =>
-      gitFiles('apps/*/prisma/schema.prisma')
+      repoFiles('apps/*/prisma/schema.prisma')
         .map((file) => file.split('/')[1])
         .sort();
 
@@ -268,7 +259,7 @@ describe('the schema contract', () => {
       // Check 3. `migrate deploy` with an empty `migrations/` directory exits
       // non-zero, so the init container holds the pod at `Init:Error` forever —
       // the safe failure, and a slow way to discover a missing directory.
-      const migrations = gitFiles(
+      const migrations = repoFiles(
         `apps/${service}/prisma/migrations/*/migration.sql`,
       );
 
@@ -294,7 +285,7 @@ describe('the schema contract', () => {
         const forbidden = seederObjects(service);
         expect(forbidden.length).toBeGreaterThanOrEqual(4);
 
-        const sql = gitFiles(
+        const sql = repoFiles(
           `apps/${service}/prisma/migrations/*/migration.sql`,
         )
           .map((file) => `${file}\n${read(file)}`)
@@ -332,7 +323,7 @@ describe('the schema contract', () => {
      * is the exact shape of ADR 0042's finding, one environment over.
      */
     const withSchema = (): string[] =>
-      gitFiles('apps/*/prisma/schema.prisma')
+      repoFiles('apps/*/prisma/schema.prisma')
         .map((file) => file.split('/')[1])
         .sort();
 
@@ -342,7 +333,7 @@ describe('the schema contract', () => {
 
     it.each(withSchema())('%s', (service) => {
       const entrypoint = `apps/${service}/src/schema-apply.ts`;
-      expect(gitFiles(entrypoint)).toEqual([entrypoint]);
+      expect(repoFiles(entrypoint)).toEqual([entrypoint]);
 
       // The entrypoint must reach the DDL, not merely exist.
       expect(

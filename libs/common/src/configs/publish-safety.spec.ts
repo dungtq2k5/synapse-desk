@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * No workspace can be published, and every manifest names the same licence.
@@ -60,13 +60,7 @@ describe('nothing here can be published, and the licence is one string', () => {
    * publish it — it is in the corpus anyway, because `npm publish` run from
    * inside it still can.
    */
-  const manifests = (): string[] =>
-    execFileSync('git', ['ls-files', '--', 'package.json', '*/package.json'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    })
-      .split('\n')
-      .filter(Boolean);
+  const manifests = (): string[] => repoFiles('package.json', '*/package.json');
 
   const parse = (file: string): Record<string, unknown> =>
     JSON.parse(read(file)) as Record<string, unknown>;
@@ -103,13 +97,7 @@ describe('nothing here can be published, and the licence is one string', () => {
     // more than it buys, and the pattern-fires floor below is what keeps the
     // shortcut honest. `pyproject.toml` is found from git, so a second Python
     // package is covered on arrival rather than by editing this test.
-    const pyprojects = execFileSync(
-      'git',
-      ['ls-files', '--', '*pyproject.toml'],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
+    const pyprojects = repoFiles('*pyproject.toml');
 
     // The floor: a glob that matched nothing would report a compliant tree.
     expect(pyprojects).toContain('apps/rag-service/pyproject.toml');

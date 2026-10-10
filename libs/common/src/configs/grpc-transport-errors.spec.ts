@@ -1,7 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stripComments } from '../testing/strip-comments';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * Every transport-class gRPC error a service throws is a DECISION: either the
@@ -19,15 +19,6 @@ import { stripComments } from '../testing/strip-comments';
  */
 describe('transport-class gRPC errors are marked or named', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
-
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
 
   /**
    * Sites that stay UNMARKED on purpose, by file and the start of the message.
@@ -80,7 +71,7 @@ describe('transport-class gRPC errors are marked or named', () => {
       };
     });
 
-  const sites = gitFiles('apps/*/src/**')
+  const sites = repoFiles('apps/*/src/**')
     .filter((file) => file.endsWith('.ts') && !file.endsWith('.spec.ts'))
     .flatMap((file) =>
       sitesIn(file, stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))),

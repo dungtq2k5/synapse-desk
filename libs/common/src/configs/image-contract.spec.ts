@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 import { stripComments } from '../testing/strip-comments';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * The image contract's STATIC half — everything about the Docker build that a
@@ -21,15 +22,6 @@ import { stripComments } from '../testing/strip-comments';
  */
 describe('the image contract (static half)', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
-
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
 
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
@@ -119,7 +111,7 @@ describe('the image contract (static half)', () => {
     };
 
     const workspaces = (): string[] =>
-      gitFiles('*/*/package.json')
+      repoFiles('*/*/package.json')
         .filter((file) => /^(apps|libs)\/[^/]+\/package\.json$/.test(file))
         .map((file) => file.slice(0, -'/package.json'.length))
         .filter((workspace) => !(workspace in GUARDED_ELSEWHERE))
@@ -155,8 +147,8 @@ describe('the image contract (static half)', () => {
       // `main.ts` — the file the whole check was motivated by — came back
       // green.
       const sources = [
-        ...gitFiles(`${workspace}/src`),
-        ...gitFiles(`${workspace}/test`),
+        ...repoFiles(`${workspace}/src`),
+        ...repoFiles(`${workspace}/test`),
       ].filter((file) => file.endsWith('.ts'));
 
       const used = new Map<string, string>();
@@ -188,7 +180,7 @@ describe('the image contract (static half)', () => {
     // resolve check failed on it, because a types package has no module to
     // resolve. Types are build-time input; `--omit=dev` is the line that
     // makes the distinction matter.
-    const manifests = gitFiles('*/*/package.json').filter((file) =>
+    const manifests = repoFiles('*/*/package.json').filter((file) =>
       /^(apps|libs)\/[^/]+\/package\.json$/.test(file),
     );
     expect(manifests.length).toBeGreaterThanOrEqual(8);
@@ -225,8 +217,8 @@ describe('the image contract (static half)', () => {
       // blind spot the phantom corpus above documents. `src/**` returns all
       // 644 files including the six `main.ts`.
       const files = [
-        ...gitFiles(`${top}/*/src/**`),
-        ...gitFiles(`${top}/*/test/**`),
+        ...repoFiles(`${top}/*/src/**`),
+        ...repoFiles(`${top}/*/test/**`),
       ].filter((file) => file.endsWith('.ts'));
 
       // The corpus floor — a glob that stops matching must fail, not pass.
@@ -338,7 +330,7 @@ describe('the image contract (static half)', () => {
       // `*` in a git pathspec is plain fnmatch and CROSSES `/`, so these two
       // reach every depth. Verified, not assumed — the doubled-star spelling
       // would MISS the root `package.json`, which is one of the four.
-      gitFiles('package.json').concat(gitFiles('*/package.json'));
+      repoFiles('package.json').concat(repoFiles('*/package.json'));
 
     /** `^24.13.3` -> `24`. Any range prefix (`^`, `~`, `>=`, none) is fine. */
     const major = (range: string): string | undefined =>
@@ -421,7 +413,7 @@ describe('the image contract (static half)', () => {
     };
 
     const mentions = (): { file: string; network: string }[] =>
-      gitFiles('*')
+      repoFiles('*')
         .filter((file) => /\.(mjs|ts|md|sh|ya?ml)$/.test(file))
         .flatMap((file) =>
           [...read(file).matchAll(/--network[= ]([A-Za-z0-9_.-]+)/g)].map(
@@ -497,8 +489,8 @@ describe('the image contract (static half)', () => {
      * `image:` lines.
      */
     const imageRefs = (): { file: string; image: string }[] =>
-      gitFiles('*.yml')
-        .concat(gitFiles('*.yaml'))
+      repoFiles('*.yml')
+        .concat(repoFiles('*.yaml'))
         .flatMap((file) =>
           [...read(file).matchAll(/^\s+image:\s+(\S+)$/gm)].map((match) => ({
             file,
@@ -597,7 +589,7 @@ describe('the image contract (static half)', () => {
     // `scripts/generate-docker-env.mjs` (host addresses swapped for compose
     // service names), it cannot drift by construction — provided it stays
     // untracked, which is what this pins.
-    expect(gitFiles('apps/*/.env.docker')).toEqual([]);
+    expect(repoFiles('apps/*/.env.docker')).toEqual([]);
 
     let ignored = true;
     try {

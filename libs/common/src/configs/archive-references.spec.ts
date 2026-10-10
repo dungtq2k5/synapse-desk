@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * No tracked file cites `docs/archive`.
@@ -99,38 +99,23 @@ describe('nothing tracked cites the archive', () => {
   ]);
 
   const corpus = (): string[] =>
-    execFileSync(
-      'git',
-      [
-        'ls-files',
-        // Untracked-but-not-ignored too: a file written and not yet staged is
-        // exactly where a fresh citation lives, and the index alone would read
-        // it as clean. `--exclude-standard` is also what keeps `docs/archive`
-        // itself out — it is ignored, so it is never a candidate.
-        '--cached',
-        '--others',
-        '--exclude-standard',
-        '--',
-        'apps',
-        'libs',
-        'scripts',
-        'test',
-        'docs',
-        'k8s',
-        'docker',
-        '.github',
-        // Root-level markdown, which is otherwise in none of the directories
-        // above and is the most externally-visible text in the repository:
-        // `README.md` is what a reader outside this project sees FIRST, so an
-        // archive citation there is the one instance that reaches an audience
-        // who could never resolve it. Git de-duplicates overlapping pathspecs,
-        // so `docs/*.md` is listed once, not twice — verified, not assumed.
-        '*.md',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
+    repoFiles(
+      'apps',
+      'libs',
+      'scripts',
+      'test',
+      'docs',
+      'k8s',
+      'docker',
+      '.github',
+      // Root-level markdown, which is otherwise in none of the directories
+      // above and is the most externally-visible text in the repository:
+      // `README.md` is what a reader outside this project sees FIRST, so an
+      // archive citation there is the one instance that reaches an audience
+      // who could never resolve it. Git de-duplicates overlapping pathspecs,
+      // so `docs/*.md` is listed once, not twice — verified, not assumed.
+      '*.md',
     )
-      .split('\n')
-      .filter(Boolean)
       // Generated output carries whatever its source said, so a hit here is a
       // duplicate report of a citation in the `.proto` or `.prisma` that
       // produced it — and `npm run proto:generate` is what clears it.

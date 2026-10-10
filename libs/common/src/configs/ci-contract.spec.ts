@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import ts from 'typescript';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * The CI contract's static half — what a file parse can decide about the
@@ -20,19 +20,10 @@ import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 describe('the CI contract', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
 
-  const gitFiles = (pattern: string): string[] =>
-    execFileSync(
-      'git',
-      ['ls-files', '--cached', '--others', '--exclude-standard', '--', pattern],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
-
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
 
-  const workflows = (): string[] => gitFiles('.github/workflows/*.yml');
+  const workflows = (): string[] => repoFiles('.github/workflows/*.yml');
 
   // --------------------------------------------------- scripts the jobs name
 
@@ -49,7 +40,7 @@ describe('the CI contract', () => {
 
       for (const manifest of [
         'package.json',
-        ...gitFiles('*/*/package.json').filter((file) =>
+        ...repoFiles('*/*/package.json').filter((file) =>
           /^(apps|libs)\/[^/]+\/package\.json$/.test(file),
         ),
       ]) {
@@ -371,9 +362,9 @@ describe('the CI contract', () => {
       });
 
     const corpus = [
-      ...gitFiles('*.ts'),
-      ...gitFiles('*.mjs'),
-      ...gitFiles('*.json'),
+      ...repoFiles('*.ts'),
+      ...repoFiles('*.mjs'),
+      ...repoFiles('*.json'),
     ].filter((file) => !isIgnored(file));
 
     expect(corpus.length).toBeGreaterThanOrEqual(200);
@@ -523,7 +514,7 @@ describe('the CI contract', () => {
         Object.keys(erd).filter((key) => key !== '//' && key !== 'MD041'),
       ).toEqual([]);
 
-      // **`gitFiles`, not a directory walk, and not plain `git ls-files`.** The
+      // **`repoFiles`, not a directory walk, and not plain `git ls-files`.** The
       // helper passes `--others --exclude-standard`, so it sees a config that
       // is written but not yet committed — the state this very check was
       // written in. Plain `git ls-files` would have found nothing here and
@@ -537,7 +528,7 @@ describe('the CI contract', () => {
       // `docs/.markdownlint.json` sitting directly in `docs/`, which is
       // precisely where a docs-wide exemption would be put. The narrower-looking
       // pattern was the leakier one.
-      const scoped = gitFiles('docs/*.markdownlint*');
+      const scoped = repoFiles('docs/*.markdownlint*');
 
       // The floor: an empty result means the pattern stopped matching, and the
       // equality below would then be vacuously true.

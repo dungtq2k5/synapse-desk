@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { repoFiles } from '../testing/repo-files';
 
 /**
  * `to<ReturnTypeName>` — the destination type's name, verbatim.
@@ -57,35 +57,7 @@ describe('mapper functions name their return type verbatim', () => {
    * service is a different animal and its name answers to nothing here.
    */
   const mapperFiles = (): string[] =>
-    execFileSync(
-      'git',
-      [
-        'ls-files',
-        // **`--cached` alone lists the INDEX**, which is not the source tree.
-        // Measured: an unstaged `probe.mapper.ts` carrying a deliberate
-        // violation returned zero matches — so every new mapper file was
-        // invisible to this guard until somebody `git add`ed it, which is
-        // precisely the window in which a mapper is written and named.
-        //
-        // `finance.mapper.ts` happened to be staged when its violation was
-        // found, and that is the only reason the diagnosis landed on `export`.
-        // Unstaged, widening the pattern would have changed nothing and the fix
-        // would have looked applied.
-        '--cached',
-        '--others',
-        // Still `git` rather than a filesystem walk, for the one thing git is
-        // better at here: `.gitignore` already excludes `dist`, `node_modules`
-        // and the generated Prisma clients, and a hand-rolled walk would have
-        // to re-encode all of it and drift.
-        '--exclude-standard',
-        '--',
-        'apps/**/*.mapper.ts',
-        'libs/**/*.mapper.ts',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    )
-      .split('\n')
-      .filter(Boolean);
+    repoFiles('apps/**/*.mapper.ts', 'libs/**/*.mapper.ts');
 
   /**
    * The name §12 requires for a given return annotation.
