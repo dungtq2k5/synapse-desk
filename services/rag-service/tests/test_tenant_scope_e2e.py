@@ -107,7 +107,7 @@ class TestTenantIsolation:
         # nothing in Postgres but is a perfectly good Qdrant payload value, so a
         # silent fallback would produce a filter that quietly matched the wrong
         # partition rather than failing.
-        with pytest.raises(MissingTenantError): # NOSONAR
+        with pytest.raises(MissingTenantError):  # NOSONAR
             tenant_scope(CallerContext(organization_id=None, sub="u"))
 
     async def test_a_super_admin_gets_no_bypass(self):
@@ -116,7 +116,7 @@ class TestTenantIsolation:
         # does not SHOW an operator another tenant's document — it blends it
         # into prose that names no source. A super admin reads documents through
         # `GET /documents/:id`, where the disclosure is explicit and auditable.
-        with pytest.raises(MissingTenantError): # NOSONAR
+        with pytest.raises(MissingTenantError):  # NOSONAR
             tenant_scope(
                 CallerContext(organization_id=None, sub="u", is_super_admin=True)
             )

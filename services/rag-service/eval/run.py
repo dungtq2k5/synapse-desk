@@ -212,9 +212,7 @@ class Outcome:
         answer = self.answer.strip()
 
         wrapped_in_a_fence = answer.startswith("```") and answer.endswith("```")
-        has_heading = any(
-            line.lstrip().startswith("#") for line in answer.splitlines()
-        )
+        has_heading = any(line.lstrip().startswith("#") for line in answer.splitlines())
 
         return not wrapped_in_a_fence and not has_heading
 
@@ -501,7 +499,7 @@ def rate(values: list[bool | None]) -> tuple[float, int]:
     return (sum(applicable) / len(applicable), len(applicable))
 
 
-def report(outcomes: list[Outcome]) -> dict: # NOSONAR
+def report(outcomes: list[Outcome]) -> dict:  # NOSONAR
     metrics = {
         "retrieval_hit_rate": rate([o.retrieval_hit for o in outcomes]),
         "citation_rate": rate([o.cited_anything for o in outcomes]),
@@ -511,8 +509,10 @@ def report(outcomes: list[Outcome]) -> dict: # NOSONAR
         # rejected the previous design. Inverted so, like every other row here,
         # higher is better.
         "legitimate_not_refused": rate(
-            [None if o.wrongly_refused is None else not o.wrongly_refused
-             for o in outcomes]
+            [
+                None if o.wrongly_refused is None else not o.wrongly_refused
+                for o in outcomes
+            ]
         ),
         "language_match": rate([o.language_match for o in outcomes]),
         "contains_expected": rate([o.contains_expected for o in outcomes]),
@@ -570,7 +570,7 @@ def report(outcomes: list[Outcome]) -> dict: # NOSONAR
     }
 
 
-async def main() -> int: # NOSONAR
+async def main() -> int:  # NOSONAR
     parser = argparse.ArgumentParser(description="Run the RAG eval golden set.")
     parser.add_argument(
         "--baseline",
@@ -637,7 +637,9 @@ async def main() -> int: # NOSONAR
     from rag_service.settings import AiSettingsResolver
 
     embeddings = GeminiEmbeddingClient(config.gemini_api_key)
-    redis_client = redis.from_url(config.redis_url, db=config.redis_db, decode_responses=True)
+    redis_client = redis.from_url(
+        config.redis_url, db=config.redis_db, decode_responses=True
+    )
 
     generator = GeminiGenerator(config.gemini_api_key)
 
@@ -707,8 +709,10 @@ async def main() -> int: # NOSONAR
                 continue
 
             delta = current["rate"] - before
-            arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "=") # NOSONAR
-            print(f"  {name:24} {arrow} {delta:+.1%}  ({before:.1%} → {current['rate']:.1%})")
+            arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "=")  # NOSONAR
+            print(
+                f"  {name:24} {arrow} {delta:+.1%}  ({before:.1%} → {current['rate']:.1%})"
+            )
 
     if args.write_baseline:
         args.baseline.write_text(json.dumps(metrics, indent=2) + "\n")
@@ -725,6 +729,7 @@ class _NullQuota:
     deleted a minute later — and a partial write there would look like budget
     state for an organisation that never existed.
     """
+
     # `async` with nothing awaited, and REQUIRED rather than stylistic:
     # `MeteredGenerator` does `await self._quota.charge(...)`, so a plain
     # function here raises "object NoneType can't be used in 'await'
@@ -740,6 +745,7 @@ class _NullLedger:
     about to be deleted would put noise in `ai_generations` that the flag jobs
     would then reason about.
     """
+
     def record(self, _entry):
         # `async` is what makes this a COROUTINE, which is the only thing
         # `ensure_future` below accepts — a plain function returning a str

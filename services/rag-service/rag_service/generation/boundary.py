@@ -115,7 +115,9 @@ def wrap_turns(turns: list[tuple[str, str]], nonce: str) -> str:
             f'<turn id="{nonce}" from="{speaker}">{strip_nonce(content, nonce)}</turn>'
         )
 
-    return f'<history id="{nonce}">\n' + "\n".join(rendered) + f'\n</history id="{nonce}">'
+    return (
+        f'<history id="{nonce}">\n' + "\n".join(rendered) + f'\n</history id="{nonce}">'
+    )
 
 
 def wrap_history(transcript: str, nonce: str) -> str:

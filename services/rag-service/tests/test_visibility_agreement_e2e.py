@@ -147,9 +147,7 @@ class TestVisibilityAgreement:
             is_organization_wide=False,
             department_ids=[tenant_a.department_b],
         )
-        await scoped_seed(
-            tenant_a.organization_id, text="deleted", is_deleted=True
-        )
+        await scoped_seed(tenant_a.organization_id, text="deleted", is_deleted=True)
 
         ctx = tenant_a.member_of(tenant_a.department_a)
 

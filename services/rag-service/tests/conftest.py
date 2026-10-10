@@ -11,6 +11,7 @@ Both stores are written from ONE fixture call, because a test where the vector
 arm and the lexical arm saw different data would prove nothing about whether
 they enforce the same rule.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -428,9 +429,7 @@ def ledger() -> RecordingLedger:
 
 @pytest_asyncio.fixture
 async def redis_client(config):
-    client = redis.from_url(
-        config.redis_url, db=config.redis_db, decode_responses=True
-    )
+    client = redis.from_url(config.redis_url, db=config.redis_db, decode_responses=True)
     await client.flushdb()
 
     yield client

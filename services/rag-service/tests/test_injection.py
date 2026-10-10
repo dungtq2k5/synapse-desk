@@ -180,7 +180,7 @@ async def test_draft_returns_no_draft_at_all(servicer, tenant_a):
         history=[rag_pb2.ConversationTurn(role="user", content=KNOWN_INJECTION)],
     )
 
-    with pytest.raises(FakeAbort) as raised: # NOSONAR
+    with pytest.raises(FakeAbort) as raised:  # NOSONAR
         await servicer.Draft(request, FakeServicerContext(tenant_a.member_of()))
 
     assert "[http:422]" in raised.value.details
@@ -1186,9 +1186,7 @@ async def test_CHAT_hands_the_attachments_to_the_fused_layer_two(
 
 
 @pytest.mark.asyncio
-async def test_BOTH_surfaces_state_the_attachment_rule_IDENTICALLY(
-    generator, ledger
-):
+async def test_BOTH_surfaces_state_the_attachment_rule_IDENTICALLY(generator, ledger):
     """One policy, two surfaces — V2.
 
     The fused Layer 2 serves `Chat`; `LlmInjectionClassifier` serves `Ask` and

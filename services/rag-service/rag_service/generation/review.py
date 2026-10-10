@@ -76,9 +76,7 @@ REVIEW_MAX_TOKENS = 256
 REFINE_MAX_TOKENS = 1_024
 
 
-def build_review_prompt(
-    question: str, draft: str, chunks: list[HydratedChunk]
-) -> str:
+def build_review_prompt(question: str, draft: str, chunks: list[HydratedChunk]) -> str:
     """Asks for a verdict and a critique, in that order.
 
     Verdict FIRST, on its own line: a model asked to reason and then conclude

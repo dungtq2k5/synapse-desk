@@ -148,9 +148,7 @@ async def test_get_version_reports_the_baked_build(monkeypatch):
     monkeypatch.setenv("BUILD_SHA", "abc123")
     monkeypatch.setenv("BUILD_TIME", "2026-01-01T00:00:00Z")
 
-    response = await OpsServicer().GetVersion(
-        ops_pb2.VersionRequest(), cast(Any, None)
-    )
+    response = await OpsServicer().GetVersion(ops_pb2.VersionRequest(), cast(Any, None))
 
     assert response.version == "1.2.3"
     assert response.sha == "abc123"
@@ -176,8 +174,8 @@ def test_readiness_checks_no_peer_service():
     # `inspect.getdoc` is not usable for the strip — it dedents, so it no longer
     # matches the indented text in the source.
     source = inspect.getsource(_readiness_status)
-    body = re.sub(r'"""[\s\S]*?"""', '', source)
-    body = re.sub(r'#.*$', '', body, flags=re.MULTILINE)
+    body = re.sub(r'"""[\s\S]*?"""', "", source)
+    body = re.sub(r"#.*$", "", body, flags=re.MULTILINE)
 
     for peer in ("ledger", "LedgerClient", "auth_", "grpc.aio.insecure"):
         assert peer not in body, f"readiness must not reference {peer}"

@@ -80,7 +80,9 @@ class TestAtCap:
         # buy anything; the caller turns AT_CAP into a handoff.
         await seed(tenant_a.organization_id, text=SHARED_TEXT)
 
-        frames = await chat(servicer, "what is the carryover policy?", tenant_a.outsider())
+        frames = await chat(
+            servicer, "what is the carryover policy?", tenant_a.outsider()
+        )
 
         assert completion(frames).status == rag_pb2.ANSWER_STATUS_AT_CAP
         assert generator.calls == []
@@ -133,7 +135,7 @@ class TestAnswering:
         # renderer free to interpret HTML — protection that costs correctness
         # and buys nothing. ONE layer decides, and it is the one that knows
         # whether it is producing text or markup.
-        hostile = 'Use <img src=x onerror=alert(1)> carefully [1].'
+        hostile = "Use <img src=x onerror=alert(1)> carefully [1]."
         generator.answer = hostile
         await seed(tenant_a.organization_id, text=SHARED_TEXT)
 
@@ -146,7 +148,9 @@ class TestAnswering:
     ):
         # The behaviour change from the notebook app this came
         # from, which would happily answer from general knowledge.
-        frames = await chat(servicer, "what is the carryover policy?", tenant_a.outsider())
+        frames = await chat(
+            servicer, "what is the carryover policy?", tenant_a.outsider()
+        )
 
         assert completion(frames).status == rag_pb2.ANSWER_STATUS_DOC_MISSING
         # The model was never asked, so it cannot have improvised.
@@ -171,7 +175,10 @@ class TestAnswering:
         await seed(tenant_a.organization_id, text=SHARED_TEXT)
 
         await chat(
-            servicer, SHARED_TEXT, tenant_a.outsider(), ticket_id="11111111-1111-4111-8111-111111111111"
+            servicer,
+            SHARED_TEXT,
+            tenant_a.outsider(),
+            ticket_id="11111111-1111-4111-8111-111111111111",
         )
 
         chat_rows = [e for e in ledger.entries if e.purpose == "CHAT_ANSWER"]
@@ -201,7 +208,7 @@ class TestAsk:
         # Retrieval could degrade; an ANSWER has no free version. 402 rather
         # than 429, carried by the `[http:402]` marker because no gRPC code
         # means "buy more".
-        with pytest.raises(FakeAbort) as raised: # NOSONAR
+        with pytest.raises(FakeAbort) as raised:  # NOSONAR
             await servicer.Ask(
                 rag_pb2.ChatRequest(message="what is the policy?"),
                 FakeServicerContext(tenant_a.outsider()),

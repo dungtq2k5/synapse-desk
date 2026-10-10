@@ -176,7 +176,7 @@ class PreprocessPipeline:
         # Otherwise unchanged: a greeting still costs nothing at all, is still
         # answered at the cap, and still short-circuits before the
         # classification — which is what makes Layer B free on this path
-        #.
+        # .
         if not carried:
             match = detect_greeting_layer_one(message)
             if match is not None:
@@ -409,9 +409,7 @@ class PreprocessPipeline:
                 # there would make `Chat` and `Draft` classify the same
                 # attachment differently — a divergence nobody would look for,
                 # because the layer is conceptually one thing.
-                ATTACHMENT_NOTE
-                if parts
-                else ""
+                ATTACHMENT_NOTE if parts else ""
             )
             + "\n\nAnswer:"
         )

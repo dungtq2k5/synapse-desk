@@ -705,9 +705,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             return False
 
         cycle_start, limit_micros = await self._entitlement(organization_id)
-        spent = await QuotaCounter(self._deps.redis).spent(
-            organization_id, cycle_start
-        )
+        spent = await QuotaCounter(self._deps.redis).spent(organization_id, cycle_start)
 
         # Fails CLOSED on an unreadable counter, like every other gate. The
         # grace is an exemption from the cap, not from knowing where the cap is.
@@ -837,7 +835,9 @@ async def build_dependencies(config: Config) -> Dependencies:
     qdrant = AsyncQdrantClient(url=config.qdrant_url)
     await ensure_collection(qdrant)
 
-    pool = await asyncpg.create_pool(config.ingestion_database_url, min_size=2, max_size=10)
+    pool = await asyncpg.create_pool(
+        config.ingestion_database_url, min_size=2, max_size=10
+    )
 
     client = redis.from_url(config.redis_url, db=config.redis_db, decode_responses=True)
 
@@ -907,7 +907,9 @@ class OpsServicer(ops_pb2_grpc.OpsServiceServicer):
         )
 
 
-async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckResponse.ServingStatus:
+async def _readiness_status(
+    deps: Dependencies,
+) -> health_pb2.HealthCheckResponse.ServingStatus:
     """What this service OWNS: Qdrant, Postgres, Redis
 
     **No peer is checked**, and that is the rule rather than an omission. This
@@ -950,7 +952,9 @@ async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckRespons
     return health_pb2.HealthCheckResponse.NOT_SERVING
 
 
-async def _refresh_readiness(deps: Dependencies, servicer: health_aio.HealthServicer) -> None:
+async def _refresh_readiness(
+    deps: Dependencies, servicer: health_aio.HealthServicer
+) -> None:
     """Keeps the health servicer's cached status current.
 
     **The status is PUSHED on a timer rather than computed inside `Check`.**
@@ -1015,7 +1019,11 @@ async def serve() -> None:
 
     await server.start()
     readiness_task = asyncio.create_task(_refresh_readiness(deps, health_servicer))
-    logger.info("🧠 [RAG Service] gRPC server listening on %s:%s", config.grpc_host, config.grpc_port)
+    logger.info(
+        "🧠 [RAG Service] gRPC server listening on %s:%s",
+        config.grpc_host,
+        config.grpc_port,
+    )
 
     try:
         await server.wait_for_termination()

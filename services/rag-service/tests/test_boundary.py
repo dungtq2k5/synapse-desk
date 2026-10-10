@@ -202,7 +202,6 @@ class _Recorder:
         yield GenerationDelta(done=True, prompt_tokens=10, completion_tokens=2)
 
 
-
 def _nonce_of(prompt: str) -> str:
     """The boundary id the prompt minted.
 
@@ -259,6 +258,7 @@ def _settings():
 
 async def _classify_prompts(recorder):
     from rag_service.preprocess.pipeline import PreprocessPipeline, Turn
+
     pipeline = PreprocessPipeline(recorder, _NullLedger(), _NullQuota())
     await pipeline.run(
         "so what are my permissions?",
@@ -272,6 +272,7 @@ async def _classify_prompts(recorder):
 
 async def _copilot_prompts(recorder, method: str):
     from rag_service.generation.copilot import CopilotService
+
     service = CopilotService(recorder, _NullLedger(), _NullQuota())
     await getattr(service, method)(
         "ticket-1",
@@ -493,9 +494,7 @@ def test_exactly_the_builders_expected_take_attachments():
 def test_the_attachment_block_carries_THIS_requests_nonce(name, build):
     """The file is named inside the boundary, not beside it."""
     _ = name
-    prompt = build_prompt(
-        "what does this error mean?", [chunk()], [SCREENSHOT]
-    )
+    prompt = build_prompt("what does this error mean?", [chunk()], [SCREENSHOT])
     text = prompt_text(prompt)
 
     ids = set(re.findall(r'<question id="([0-9a-f]{16})">', text))
@@ -576,8 +575,7 @@ def test_an_answer_can_never_cite_an_ATTACHMENT():
     """
     chunks = [chunk()]
     citations = extract_citations(
-        "The screenshot shows the quota error [1], and the attachment [2] "
-        "confirms it.",
+        "The screenshot shows the quota error [1], and the attachment [2] confirms it.",
         chunks,
     )
 

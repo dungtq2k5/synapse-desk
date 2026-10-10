@@ -283,7 +283,9 @@ class TestVerdictParsing:
     def test_reads_PARTIALLY_UNGROUNDED_as_the_WORSE_of_the_two(self):
         # A model writing both words should be read as the more serious
         # finding, not as whichever appears first in the string.
-        assert parse_review("PARTIALLY UNGROUNDED\n").verdict is ReviewVerdict.UNGROUNDED
+        assert (
+            parse_review("PARTIALLY UNGROUNDED\n").verdict is ReviewVerdict.UNGROUNDED
+        )
 
     def test_an_unparseable_review_defaults_to_COMPLETE(self):
         # The opposite of the usual instinct, and deliberate: an unparseable

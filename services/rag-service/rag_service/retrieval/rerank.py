@@ -75,7 +75,9 @@ class FlashRankReranker:
             # order is already a reasonable answer. Failing the request instead
             # would turn a missing model file into every user's search being
             # down.
-            logger.warning("Reranker unavailable; falling back to fused order: %s", error)
+            logger.warning(
+                "Reranker unavailable; falling back to fused order: %s", error
+            )
             return candidates
 
         from flashrank import RerankRequest

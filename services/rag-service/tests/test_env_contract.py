@@ -38,11 +38,7 @@ FLOOR = 10
 def declared_variables() -> set[str]:
     source = CONFIG_SOURCE.read_text()
 
-    return {
-        name
-        for pattern in READ_PATTERNS
-        for name in pattern.findall(source)
-    }
+    return {name for pattern in READ_PATTERNS for name in pattern.findall(source)}
 
 
 def documented_variables() -> set[str]:

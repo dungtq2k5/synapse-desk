@@ -238,7 +238,6 @@ DELIMITER_FORGERY = re.compile(
 )
 
 
-
 #: The languages a refusal or a canned reply exists in — the eight
 #: `GREETING_PATTERNS` covers. Imported rather than restated so the two cannot
 #: drift: a ninth language added to the greeting table is a ninth language the
@@ -283,7 +282,9 @@ def parse_classification(text: str) -> tuple[str, str | None]:
         return "FACTUAL", None
 
     head = parts[0].strip(".,!:;\"'").upper()
-    label = next((value for key, value in _LABELS.items() if head.startswith(key)), None)
+    label = next(
+        (value for key, value in _LABELS.items() if head.startswith(key)), None
+    )
     if label is None:
         return "FACTUAL", None
 
@@ -330,7 +331,6 @@ class InjectionVerdict:
 #: The verdict every non-detection returns. A singleton because it is the
 #: overwhelmingly common answer and it carries no per-call state.
 ALLOWED = InjectionVerdict()
-
 
 
 # ------------------------------------------------------------ observability
@@ -455,7 +455,6 @@ class Classifier(Protocol):
         user_id: str | None,
         attachments: list[Attachment] | None = None,
     ) -> tuple[bool, str | None]: ...
-
 
 
 #: The standalone prompt — Chat's fused one lives in `PreprocessPipeline`.
@@ -634,9 +633,7 @@ class InjectionGuard:
                 verdict = InjectionVerdict(
                     layer="layer_a", language=language, pattern_id=pattern_id
                 )
-                log_detection(
-                    verdict, organization_id=organization_id, user_id=user_id
-                )
+                log_detection(verdict, organization_id=organization_id, user_id=user_id)
 
                 return verdict
 

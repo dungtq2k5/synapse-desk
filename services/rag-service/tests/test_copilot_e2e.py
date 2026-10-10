@@ -298,7 +298,7 @@ class TestTheEscalationAsymmetry:
         )
         assert escalation.summary_text
 
-        with pytest.raises(FakeAbort) as raised: # NOSONAR
+        with pytest.raises(FakeAbort) as raised:  # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -318,7 +318,7 @@ class TestTheEscalationAsymmetry:
         budget_limit["limit_micros"] = 1_000
         await redis_client.set(_quota_key(tenant_a), "1101")
 
-        with pytest.raises(FakeAbort): # NOSONAR
+        with pytest.raises(FakeAbort):  # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -335,7 +335,7 @@ class TestTheEscalationAsymmetry:
         # the CAP, not from knowing where the cap is — granting it on an
         # unreadable counter would make an outage the cheapest way to get free
         # generations.
-        with pytest.raises(FakeAbort): # NOSONAR
+        with pytest.raises(FakeAbort):  # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -425,7 +425,11 @@ class TestClassify:
         can be an unauthenticated email sender.
         """
         generator.answer = json.dumps(
-            {"department_id": tenant_a.department_a, "priority": "LOW", "confidence": 0.5}
+            {
+                "department_id": tenant_a.department_a,
+                "priority": "LOW",
+                "confidence": 0.5,
+            }
         )
 
         await servicer.Classify(
@@ -465,7 +469,11 @@ class TestClassify:
         # The 99% case. A block around nothing spends tokens teaching the model
         # to ignore something that is not there.
         generator.answer = json.dumps(
-            {"department_id": tenant_a.department_a, "priority": "LOW", "confidence": 0.5}
+            {
+                "department_id": tenant_a.department_a,
+                "priority": "LOW",
+                "confidence": 0.5,
+            }
         )
 
         await servicer.Classify(
@@ -513,7 +521,11 @@ class TestClassify:
         # "URGENT!!" is not a priority. Storing it would produce a ticket no
         # filter matches and no dashboard counts.
         generator.answer = json.dumps(
-            {"department_id": tenant_a.department_a, "priority": "URGENT!!", "confidence": 1}
+            {
+                "department_id": tenant_a.department_a,
+                "priority": "URGENT!!",
+                "confidence": 1,
+            }
         )
 
         response = await servicer.Classify(
@@ -688,9 +700,7 @@ class TestEveryCopilotPromptIsBounded:
                     title="Cannot log in",
                     body="Password reset loops",
                     departments=[
-                        rag_pb2.DepartmentOption(
-                            id=tenant_a.department_a, name="IT"
-                        )
+                        rag_pb2.DepartmentOption(id=tenant_a.department_a, name="IT")
                     ],
                 ),
                 FakeServicerContext(tenant_a.outsider()),
@@ -937,9 +947,7 @@ class TestSuggestedArticles:
             servicer, tenant_a.outsider(), generator, title="handbook", body="passage"
         )
 
-        assert [article.document_id for article in response.articles] == [
-            document_id
-        ]
+        assert [article.document_id for article in response.articles] == [document_id]
 
     async def test_2_the_next_steps_are_UNCHANGED(
         self, servicer, tenant_a, generator, seed
