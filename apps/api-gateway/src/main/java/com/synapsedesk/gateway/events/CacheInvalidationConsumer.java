@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.events;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.config.StoreProperties;
 import com.synapsedesk.gateway.contracts.Subjects;
-import com.synapsedesk.gateway.lease.LeaseParticipant;
+import com.synapsedesk.gateway.runtime.RuntimeParticipant;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -47,12 +47,10 @@ import tools.jackson.databind.ObjectMapper;
  * `realtime.contract-spec.ts`'s existing frame-count rows already prove that
  * shape), but no row here can prove a queue group wrong, and none claims to.
  *
- * <p><b>3. A standby holds no subscription.</b> {@link #activate} opens the
- * connection and subscribes; {@link #deactivate} closes it. Nothing is
- * created until the lease says so, and nothing survives losing it — a
- * standby reaching into shared state while claiming to serve nothing is
- * exactly what the gateway's own standby contract forbids elsewhere too
- * (see {@code GatewayLeaseService}'s own docblock).
+ * <p><b>3. The subscription lives between {@link #activate} and
+ * {@link #deactivate}.</b> {@link #activate} opens the connection and
+ * subscribes; {@link #deactivate} closes it. {@code RuntimeParticipants} calls
+ * them at boot and shutdown, and retries the first while NATS is unreachable.
  *
  * <p><b>4. The envelope.</b> A Nest {@code ClientProxy.emit(pattern, event)}
  * — what every publisher here actually calls — puts the message on the wire
@@ -66,7 +64,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 @Order(0)
-public class CacheInvalidationConsumer implements LeaseParticipant {
+public class CacheInvalidationConsumer implements RuntimeParticipant {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     CacheInvalidationConsumer.class

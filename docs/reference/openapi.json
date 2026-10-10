@@ -39256,7 +39256,7 @@
       "get": {
         "tags": ["Ops"],
         "summary": "Readiness — should traffic reach THIS instance?",
-        "description": "`ready` gates on Redis, on whether this instance is draining, and on this instance holding the implementation lease — a warm STANDBY answers 503 here and 200 on `/health`. Peer gRPC health is REPORTED under `peers` and deliberately does not gate: every instance sees the same peer down, so gating would remove all of them and turn one service outage into a total one. A partial outage should look partial. Returns 503 when not ready — a probe reads the status line, not the body.",
+        "description": "`ready` is false only while this instance is draining. Redis is REPORTED under `dependencies` and does not gate: every instance shares it, so gating would turn a Redis outage into a total one, while the routes keep serving without it. Peer gRPC health is REPORTED under `peers` and deliberately does not gate: every instance sees the same peer down, so gating would remove all of them and turn one service outage into a total one. A partial outage should look partial. Returns 503 when not ready — a probe reads the status line, not the body.",
         "operationId": "HealthController_readiness",
         "responses": {
           "200": {

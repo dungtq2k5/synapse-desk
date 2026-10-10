@@ -22,10 +22,14 @@ spring:
     name: api-gateway
   data:
     redis:
-      # Every gateway pod must use the same instance: the implementation
-      # lease is held here, and a pod pointed at a different Redis would not
-      # be excluded by the others' entries — it would serve beside them.
+      # Every gateway pod must use the same instance: the rate limits, the
+      # response cache, the tenant status and the socket adapter's channels
+      # are shared through it.
       url: ${REDIS_URL}
+      # Every request touches Redis (the rate limiter), so a Redis that hangs
+      # must not hold a request longer than this; each caller then falls back.
+      timeout: 1s
+      connect-timeout: 1s
   main:
     banner-mode: 'off'
   graphql:

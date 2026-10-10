@@ -6,9 +6,9 @@ import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
  * One reason this instance may not be ready, and how it appears under
  * `dependencies`.
  *
- * <p>An interface so that readiness stays a LIST of local conditions rather
- * than a growing method: Redis reachability and the implementation lease each
- * arrive in their own step and each contributes one of these.
+ * <p>An interface so that readiness stays a LIST of conditions rather than a
+ * growing method. One that only reports, such as {@link RedisReadiness},
+ * answers {@link #isReady} with true.
  *
  * <p><b>A peer is never a gate.</b> Every instance sees the same peer down, so
  * gating on one would remove all of them and turn one service's outage into a

@@ -20,10 +20,7 @@ import org.springframework.context.annotation.Bean;
  * websocket-only transport.
  *
  * <p><b>Not started here.</b> Constructing the bean does not bind the port —
- * {@link RealtimeGateway} starts and stops it as a {@code LeaseParticipant},
- * so a standby replica holds this bean without ever opening a socket, the
- * same "nothing exists until the lease says so" rule
- * {@code CacheInvalidationConsumer} follows for its NATS subscription.
+ * {@link RealtimeGateway} starts and stops it as a {@code RuntimeParticipant}.
  *
  * <p>Its own port, not `server.port`: netty-socketio is a standalone
  * Netty server that cannot bind the port Tomcat already holds. See
@@ -46,10 +43,16 @@ public class RealtimeServerConfig {
    * context close; nothing in {@code SocketIOServer}'s own start/stop
    * lifecycle touches this client, so it is safe across repeated
    * activate/deactivate cycles.
+   *
+   * <p><b>Lazy, so the gateway boots with Redis down.</b> An eager client
+   * connects inside this method, and a refused connection failed the whole
+   * context: every route, not just the sockets. Lazily, it connects on first use,
+   * which is the socket server's start, and that is retried until Redis answers.
    */
   @Bean
   public RedissonClient redissonClient(StoreProperties store) {
     Config config = new Config();
+    config.setLazyInitialization(true);
     config.useSingleServer().setAddress(store.redisUrl());
 
     return Redisson.create(config);

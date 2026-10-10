@@ -9,8 +9,8 @@ import com.synapsedesk.gateway.auth.JwtVerifier;
 import com.synapsedesk.gateway.config.JwtProperties;
 import com.synapsedesk.gateway.contracts.RealtimeEvents;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
-import com.synapsedesk.gateway.lease.LeaseParticipant;
 import com.synapsedesk.gateway.metrics.GatewayMetrics;
+import com.synapsedesk.gateway.runtime.RuntimeParticipant;
 import io.grpc.stub.MetadataUtils;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import java.util.Arrays;
@@ -30,11 +30,9 @@ import synapsedesk.ticket.MessageServiceGrpc;
 /**
  * The handshake, the identity rooms and the socket server's own lifecycle.
  *
- * <p><b>No `lease.isActive()` guard, and that is not an omission.</b> The
- * bound state IS the standby distinction: {@link #activate} is the only thing that
- * starts {@link SocketIOServer#start()}, so a standby holds this bean without
- * ever opening a port, and no socket can reach {@link #onConnect} in the
- * first place.
+ * <p><b>{@link #activate} is the only thing that starts
+ * {@link SocketIOServer#start()}</b>, so no socket can reach {@link #onConnect}
+ * before it has run.
  *
  * <p><b>No explicit "is this a 2FA challenge token" check either.</b>
  * {@link JwtVerifier#verifyAccess} already rejects a challenge token before
@@ -48,7 +46,7 @@ import synapsedesk.ticket.MessageServiceGrpc;
  */
 @Component
 @Order(0)
-public class RealtimeGateway implements LeaseParticipant {
+public class RealtimeGateway implements RuntimeParticipant {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     RealtimeGateway.class

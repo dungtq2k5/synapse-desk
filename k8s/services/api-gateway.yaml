@@ -25,8 +25,7 @@ spec:
         app.kubernetes.io/name: api-gateway
     spec:
       # Longer than (readiness periodSeconds x failureThreshold) plus the
-      # in-flight drain — and it also has to cover the lease's step-down, which
-      # stops consuming before releasing its entry.
+      # in-flight drain, and the NATS consumers' and socket server's stop after it.
       terminationGracePeriodSeconds: 45
       # Nothing in this pod talks to the Kubernetes API, so the token that
       # would otherwise be mounted is a credential with no reader and a real

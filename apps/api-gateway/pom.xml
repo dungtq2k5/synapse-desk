@@ -126,10 +126,8 @@
       <artifactId>micrometer-registry-prometheus</artifactId>
     </dependency>
     <!--
-      Redis: the implementation lease, and later the response cache, the
-      throttler counters and the socket adapter's channels. Lettuce (Boot's
-      default) rather than Jedis — the lease's refresh runs on a timer and a
-      blocking pool would hold a thread per beat.
+      Redis: the response cache, the throttler counters, the tenant status
+      and presence. Lettuce, Boot's default.
     -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -174,7 +172,7 @@
       dependency tree — it pulls nothing under `org.redisson`), so this is
       declared explicitly rather than inherited. `RealtimeServerConfig`
       wires a `RedissonStoreFactory` from it, pointed at the same Redis the
-      lease and cache already use.
+      cache and throttler already use.
     -->
     <dependency>
       <groupId>org.redisson</groupId>
@@ -265,9 +263,10 @@
 
       <!--
         **`*IT` needs a real Redis; `*Test` needs nothing.** The same split the
-        Node side has between `npm test` and `npm run test:e2e:gateway`: the
-        lease's claim is a Lua script, and a fake that "runs" it would be a
-        reimplementation of Redis, which is the one thing it must not be. So
+        services have between `npm test` and their e2e runs: these rows assert
+        what Redis itself does (the cache's wire format, an outage), and a fake
+        would be a reimplementation of Redis, which is the one thing it must
+        not be. So
         those rows run under failsafe, in `verify`, and `./mvnw test` stays
         runnable on a machine with nothing started.
       -->

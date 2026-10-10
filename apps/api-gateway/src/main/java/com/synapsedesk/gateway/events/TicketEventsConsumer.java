@@ -3,10 +3,10 @@ package com.synapsedesk.gateway.events;
 import com.synapsedesk.gateway.config.StoreProperties;
 import com.synapsedesk.gateway.contracts.RealtimeEvents;
 import com.synapsedesk.gateway.contracts.Subjects;
-import com.synapsedesk.gateway.lease.LeaseParticipant;
 import com.synapsedesk.gateway.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.realtime.RealtimeRelay;
 import com.synapsedesk.gateway.realtime.RealtimeRooms;
+import com.synapsedesk.gateway.runtime.RuntimeParticipant;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 @Order(10)
-public class TicketEventsConsumer implements LeaseParticipant {
+public class TicketEventsConsumer implements RuntimeParticipant {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     TicketEventsConsumer.class

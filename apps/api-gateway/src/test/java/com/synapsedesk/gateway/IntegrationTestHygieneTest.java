@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * Every failsafe class that boots a full Spring context closes it again.
  *
  * <p>Spring caches a booted context for the rest of the JVM. A full gateway
- * context takes the Redis lease, which activates a
+ * context starts its {@code RuntimeParticipants}, which subscribes a
  * {@code CacheInvalidationConsumer} on the shared NATS broker — so a cached
  * one stays subscribed and silently evicts keys for every later class in the
  * run. {@code CacheInvalidationConsumerIT} asserts a key SURVIVES after
@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * misfiled as a load flake for exactly that reason before it was bisected, by
  * pairing it with each other IT, and found to be deterministic.
  * {@code @DirtiesContext(classMode = AFTER_CLASS)} closes the context, which
- * runs the lease's {@code @PreDestroy}.
+ * stops the participants and closes the subscription.
  *
  * <p><b>Scope is the failsafe classes, by the same names failsafe uses</b> —
  * {@code IT*}, {@code *IT}, {@code *ITCase}. The {@code @SpringBootTest}
@@ -90,7 +90,7 @@ class IntegrationTestHygieneTest {
     assertThat(offenders)
       .as(
         "failsafe classes that boot a full context without @DirtiesContext — " +
-          "each leaves a lease-holding consumer cached for the rest of the run"
+          "each leaves a subscribed consumer cached for the rest of the run"
       )
       .isEmpty();
   }

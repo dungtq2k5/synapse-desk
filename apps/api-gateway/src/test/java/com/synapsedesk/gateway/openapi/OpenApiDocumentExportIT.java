@@ -29,10 +29,10 @@ import org.springframework.test.context.ContextConfiguration;
  * comparison are {@code scripts/export-openapi.mjs}'s.
  *
  * <p><b>Closes its context when it finishes.</b> Spring caches a booted context
- * for the rest of the JVM, and this one holds the gateway lease with a live
- * cache-invalidation consumer on the shared broker — which silently evicts the
- * key {@code CacheInvalidationConsumerIT} asserts survives. Closing it runs the
- * lease's {@code @PreDestroy}, so nothing is left subscribed for the next class.
+ * for the rest of the JVM, and this one has a live cache-invalidation consumer
+ * on the shared broker — which silently evicts the key
+ * {@code CacheInvalidationConsumerIT} asserts survives. Closing it stops the
+ * consumer, so nothing is left subscribed for the next class.
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,

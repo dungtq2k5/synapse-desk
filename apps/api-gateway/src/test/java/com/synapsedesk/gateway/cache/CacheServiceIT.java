@@ -26,7 +26,7 @@ import tools.jackson.databind.ObjectMapper;
  * through the HTTP surface: the real {@link CacheService} on one side, and the
  * keyspace's exact wire format, hand-written here, on the other.
  *
- * <p>An `IT`, connected the same way {@code GatewayLeaseIT} is: a real Redis
+ * <p>An `IT`, connected to infrastructure outside this process: a real Redis
  * via `REDIS_URL`, started outside this process and outliving it — the
  * "containers outlive a gateway process" requirement is satisfied by not
  * needing a gateway process at all.

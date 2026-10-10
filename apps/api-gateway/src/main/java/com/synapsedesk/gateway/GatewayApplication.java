@@ -7,10 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 /**
  * The Java gateway's entry point.
  *
- * <p>Deliberately bare at this step: it boots, and nothing else. Routing,
- * the envelope, the error mapping and the lease arrive in their own steps,
- * each with the test that holds them — a skeleton that already carried half a
- * gateway would be a skeleton nobody could review.
+ * <p>Deliberately bare: it boots, and every feature arrives as its own
+ * component, each with the test that holds it.
  *
  * <p><b>No {@code .env} loading, here or anywhere in this module.</b> Spring
  * does not read {@code .env} files (measured), and nothing

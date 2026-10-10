@@ -32,25 +32,8 @@ import org.springframework.test.context.ContextConfiguration;
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class OpsRoutesTest {
 
-  /**
-   * **The lease is stubbed here, and the real one has its own IT.**
-   *
-   * <p>Without Redis this process is a STANDBY, which is correct — and it
-   * makes `/health/ready` 503, which is what this row would then measure
-   * instead of what it is about. The rows about routing need a steady answer,
-   * and the claim, refresh, fence and release are exercised against a real
-   * Redis in `GatewayLeaseIT`.
-   */
-  @org.springframework.test.context.bean.override.mockito.MockitoBean
-  private com.synapsedesk.gateway.lease.GatewayLeaseService lease;
-
   @Value("${local.server.port}")
   private int port;
-
-  @org.junit.jupiter.api.BeforeEach
-  void holdTheLease() {
-    org.mockito.Mockito.when(lease.isReady()).thenReturn(true);
-  }
 
   @Autowired
   private DrainState drain;

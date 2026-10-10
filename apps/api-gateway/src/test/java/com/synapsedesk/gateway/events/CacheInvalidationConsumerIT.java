@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
  * `CacheInvalidationConsumer` against a REAL NATS broker and a REAL Redis —
  * the row that proves {@link CacheInvalidationConsumer#deactivate} actually
  * stops consumption, not merely that its code compiles. Connected the same
- * way {@code CacheServiceIT}/{@code GatewayLeaseIT} are: real infrastructure
+ * way {@code CacheServiceIT} is: real infrastructure
  * started outside this process, read from the shared environment.
  */
 class CacheInvalidationConsumerIT {
