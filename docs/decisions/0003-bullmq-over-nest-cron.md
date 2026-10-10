@@ -21,4 +21,4 @@ A job is a plain method taking an explicit window — no `@Cron`. Scheduling is 
 - Anything derived from a job carries a freshness field (`dataThrough`), so a dashboard of zeros says *why*.
 - An end-to-end test must drive the scheduler **and** read the endpoint. Every other test passes against empty tables.
 
-Code: `apps/*/src/modules/scheduler/`, `apps/*/src/modules/job-runs/`. Related: [0002](./0002-every-mocked-rpc-needs-an-owner-test.md).
+Code: `services/*/src/modules/scheduler/`, `services/*/src/modules/job-runs/`. Related: [0002](./0002-every-mocked-rpc-needs-an-owner-test.md).

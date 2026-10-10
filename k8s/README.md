@@ -41,16 +41,16 @@ Nothing in `generated/` carries a real value.
   | `storage-service-files` | `serviceAccountKey.json` | `/app/services/storage-service/serviceAccountKey.json` |
   | `notification-service-files` | `serviceAccountKey.json` (optional — FCM) | `/app/services/notification-service/serviceAccountKey.json` |
 
-  **Three Firebase service accounts, three variable names, two directory conventions.** auth's is under `secrets/`; storage's and notification's are at the package root. The paths above are not a convention to remember — they are each service's own `*_PATH` value resolved against `WORKDIR` (`/app/apps/${SERVICE}`), and the spec derives them the same way rather than trusting this table.
+  **Three Firebase service accounts, three variable names, two directory conventions.** auth's is under `secrets/`; storage's and notification's are at the package root. The paths above are not a convention to remember — they are each service's own `*_PATH` value resolved against `WORKDIR` (`/app/services/${SERVICE}`), and the spec derives them the same way rather than trusting this table.
 
 **The registry host is the other value you must change.** Every application image is `us-central1-docker.pkg.dev/synapsedesk/services/<name>:<git-sha>`. The host and project are a stand-in for yours; the **tag is not** — it is the commit these manifests were written against, and CD rewrites it per deploy. `image-contract.spec.ts` refuses `:latest`, refuses a missing tag, and refuses an unqualified `synapsedesk/…` name (which would resolve to Docker Hub, where these images are not). A placeholder like `IMAGE_TAG` would have to be special-cased by that check, which is how a guard learns to ignore what it guards.
 
 ## Before the first apply
 
-**The migrations exist** — `apps/*/prisma/migrations/0_init/migration.sql`, one per schema-owning service, generated as a diff against nothing:
+**The migrations exist** — `services/*/prisma/migrations/0_init/migration.sql`, one per schema-owning service, generated as a diff against nothing:
 
 ```sh
-# per service, from apps/<service>
+# per service, from services/<service>
 npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script \
   > prisma/migrations/0_init/migration.sql
 ```
@@ -62,7 +62,7 @@ npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script \
 **Baseline every database that already has the tables.** A development database was built by `db push` and has no `_prisma_migrations` row, so `migrate deploy` would try to run `0_init` and fail on the first `CREATE TABLE`. Record it as applied instead — this runs no SQL:
 
 ```sh
-# per service, from apps/<service>, once per EXISTING database
+# per service, from services/<service>, once per EXISTING database
 npx prisma migrate resolve --applied 0_init
 ```
 

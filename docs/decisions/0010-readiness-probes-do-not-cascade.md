@@ -1,6 +1,6 @@
 # 0010 — A readiness probe never gates on a peer
 
-**Status:** accepted · **Code:** `apps/*/src/modules/ops/`
+**Status:** accepted · **Code:** `services/*/src/modules/ops/`
 
 ## Decision
 
