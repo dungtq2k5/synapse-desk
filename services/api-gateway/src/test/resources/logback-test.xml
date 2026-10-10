@@ -1,0 +1,20 @@
+<!--
+  Test runs print results and failures, not application logs. Logback picks
+  this file over the default on the test classpath, so `mvnw test` and
+  `mvnw verify` are quiet; the jar the contract harness starts is unaffected.
+
+  TEST_LOG_LEVEL turns logging back on for debugging a failure:
+    TEST_LOG_LEVEL=INFO ./mvnw verify
+-->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern
+      >%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="${TEST_LOG_LEVEL:-OFF}">
+    <appender-ref ref="CONSOLE" />
+  </root>
+</configuration>
