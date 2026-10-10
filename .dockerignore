@@ -66,3 +66,21 @@ docs
 # Deployment manifests. Nothing in any stage COPYs them, and the context is
 # uploaded to the daemon before the first instruction runs.
 k8s
+
+# Files no build reads. The Node build's first stage is `COPY . .`, so any
+# file left in the context is in that layer's cache key: an edit to the README
+# or the spell-check list would rebuild every Node image.
+.prettierrc
+.prettierignore
+.editorconfig
+LICENSE
+.gitattributes
+.gitignore
+README.md
+.demo-seed
+cspell.json
+.markdownlint-cli2.jsonc
+.git-blame-ignore-revs
+graphify-out/
+.scannerwork/
+sonar-project.properties
