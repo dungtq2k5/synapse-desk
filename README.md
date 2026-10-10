@@ -19,22 +19,26 @@ Documents are uploaded, parsed, chunked and embedded; questions are answered by 
 
 ## What is in here
 
-A Turborepo monorepo. The npm workspaces are `apps/*` and `libs/*`; everything else is deliberately outside them.
+A Turborepo monorepo in three parts: `services/` holds the backends, `packages/` holds the code they share, and `apps/` is kept for clients. The npm workspaces are `services/*` and `packages/*`; `apps/*` joins them with its first client, since a workspace glob that matches nothing fails `publish-safety.spec.ts`. Everything else is deliberately outside them.
 
 | Service | Port | Speaks | Owns |
 | :--- | :--- | :--- | :--- |
-| [`api-gateway`](apps/api-gateway/) | `3000`, Socket.IO on `3001` | HTTP, GraphQL, WebSocket | The only public surface, in Spring Boot. Auth, cache, rate limits, fan-out |
-| [`auth-service`](apps/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
-| [`ticket-service`](apps/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
-| [`storage-service`](apps/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
-| [`ingestion-service`](apps/ingestion-service/) | `5004` | gRPC | Documents, parsing, OCR, chunking, embedding, quotas |
-| [`notification-service`](apps/notification-service/) | `5005` | gRPC | Email, SMS, push, in-app, webhooks |
-| [`rag-service`](apps/rag-service/) | `50255` | gRPC | Python. Retrieval, reranking, generation, injection defence |
+| [`api-gateway`](services/api-gateway/) | `3000`, Socket.IO on `3001` | HTTP, GraphQL, WebSocket | The only public surface, in Spring Boot. Auth, cache, rate limits, fan-out |
+| [`auth-service`](services/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
+| [`ticket-service`](services/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
+| [`storage-service`](services/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
+| [`ingestion-service`](services/ingestion-service/) | `5004` | gRPC | Documents, parsing, OCR, chunking, embedding, quotas |
+| [`notification-service`](services/notification-service/) | `5005` | gRPC | Email, SMS, push, in-app, webhooks |
+| [`rag-service`](services/rag-service/) | `50255` | gRPC | Python. Retrieval, reranking, generation, injection defence |
 
 | Also | What it is |
 | :--- | :--- |
-| [`libs/common`](libs/common/) | Contracts, constants and configs every Node service imports |
-| [`libs/grpc-proto`](libs/grpc-proto/) | The `.proto` files and their generated types |
+| [`packages/contracts`](packages/contracts/) | Browser-safe: event names and shapes, enum values, limits, permission codes |
+| [`packages/core`](packages/core/) | Browser-safe pure functions: email normalisation, masking, limit comparison, job staleness |
+| [`packages/nest-common`](packages/nest-common/) | Server code the TypeScript services share: NATS and JetStream, publishers, tenant scope, the SSRF guard |
+| [`packages/grpc-proto`](packages/grpc-proto/) | The `.proto` files and their generated types |
+| [`packages/testing`](packages/testing/) | Helpers the test suites share; never shipped |
+| [`packages/config`](packages/config/) | The repo-wide guard specs |
 | [`k8s/`](k8s/) | Deployments, Services, StatefulSets, Ingress, NetworkPolicy |
 | [`docker/`](docker/) | The Dockerfiles and the image checks |
 | [`scripts/`](scripts/) | Key generation, seeding, schema verification, generators |
@@ -103,7 +107,7 @@ docker compose --profile observability down         # the teardown; see below
 
 Then `http://localhost:9090` — `/targets`, `/rules` (18 today, 9 jobs x 2) and `/alerts`.
 
-**Set `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env` first.** It defaults to `127.0.0.1` and should, but a container scraping the host then reaches a socket that is not listening for it: the target reads `DOWN` on `/targets` and nothing on that page points at a bind address. It is the one failure worth knowing in advance.
+**Set `METRICS_HOST = 0.0.0.0` in `services/api-gateway/.env` first.** It defaults to `127.0.0.1` and should, but a container scraping the host then reaches a socket that is not listening for it: the target reads `DOWN` on `/targets` and nothing on that page points at a bind address. It is the one failure worth knowing in advance.
 
 **Teardown needs the flag even though startup does not.** `docker compose down` does **not** stop a profiled service — it removes the other eight, leaves this one running holding `synapsedesk-network`, prints `Resource is still in use`, and exits `0`. Only `--profile observability down` reaches it.
 
@@ -121,14 +125,14 @@ npm run keys:test-tls          # the self-signed pair the e2e receivers listen w
 
 | File | Who holds it |
 | :--- | :--- |
-| `apps/auth-service/secrets/jwt-access.key` | auth-service — the only service that may **mint** a token |
-| `apps/auth-service/secrets/jwt-2fa.key` | auth-service |
-| `apps/api-gateway/secrets/jwt-access.pub` | api-gateway — can only **verify** |
-| `apps/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
+| `services/auth-service/secrets/jwt-access.key` | auth-service — the only service that may **mint** a token |
+| `services/auth-service/secrets/jwt-2fa.key` | auth-service |
+| `services/api-gateway/secrets/jwt-access.pub` | api-gateway — can only **verify** |
+| `services/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
 
-`keys:service-account` writes `apps/storage-service/serviceAccountKey.json` and `apps/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. It is idempotent — it exits 0 when the file exists.
+`keys:service-account` writes `services/storage-service/serviceAccountKey.json` and `services/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. It is idempotent — it exits 0 when the file exists.
 
-`keys:test-tls` writes `receiver-key.pem` and `receiver-cert.pem` into `apps/notification-service/test/fixtures/` and `apps/storage-service/test/fixtures/`. Two e2e suites start a real `https` server on an ephemeral port — the outbound-webhook sender and the remote-source fetcher — and `createServer` needs the pair on disk. Nothing verifies the certificate (the sender's dev hatch relaxes that for a localhost receiver, which is self-signed by nature), so it is generated rather than committed. Skip it and `npm run test:e2e` fails with `ENOENT … receiver-key.pem` before its first assertion. Idempotent: it exits 0 unless the pair is missing or expired, and `-- --force` replaces it.
+`keys:test-tls` writes `receiver-key.pem` and `receiver-cert.pem` into `services/notification-service/test/fixtures/` and `services/storage-service/test/fixtures/`. Two e2e suites start a real `https` server on an ephemeral port — the outbound-webhook sender and the remote-source fetcher — and `createServer` needs the pair on disk. Nothing verifies the certificate (the sender's dev hatch relaxes that for a localhost receiver, which is self-signed by nature), so it is generated rather than committed. Skip it and `npm run test:e2e` fails with `ENOENT … receiver-key.pem` before its first assertion. Idempotent: it exits 0 unless the pair is missing or expired, and `-- --force` replaces it.
 
 Real Google credentials are needed only for real Google sign-in and a real Storage bucket, neither of which local development requires.
 
@@ -166,16 +170,16 @@ Also worth setting now, though nothing refuses to boot without them:
 npm run setup:py
 ```
 
-Creates `apps/rag-service/.venv` and installs both requirement files. `turbo run dev` launches rag-service from that venv, so it has to exist before step 8.
+Creates `services/rag-service/.venv` and installs both requirement files. `turbo run dev` launches rag-service from that venv, so it has to exist before step 8.
 
 ### 7. Build, then push the schema
 
 ```sh
-npm run build      # libs first — the services resolve @synapsedesk/common from its dist/
+npm run build      # packages first — the services resolve them from their dist/
 npm run db:push    # prisma db push, then the objects Prisma cannot express
 ```
 
-**Build before pushing.** `db:push` chains `db:schema`, which boots a Nest entry point that imports `@synapsedesk/common` from `libs/common/dist`. On a fresh clone that directory does not exist yet.
+**Build before pushing.** `db:push` chains `db:schema`, which boots a Nest entry point that imports the shared packages from their `dist/`. On a fresh clone those directories do not exist yet.
 
 `db:push` is two steps on purpose: `prisma db push` creates every table and **none** of the partial indexes, so `schema-apply` follows with the objects the schema language has no syntax for — extensions, GIN indexes, and the partial unique indexes that make email uniqueness per-tenant. A database with the tables and without those looks correct and quietly permits what they refuse.
 
@@ -193,7 +197,7 @@ The nightly chunk-usage projection adds to counters from a cursor and refuses to
 npm run dev
 ```
 
-`turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `libs/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
+`turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `packages/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
 
 On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in.
 
@@ -220,7 +224,7 @@ npm run seed:demo:apply
 
 `stripe:provision` reads `STRIPE_RESTRICT_KEY` and `STRIPE_WEBHOOK_URL` from the **root** `.env`. A restricted key (`rk_test_…`) scoped to Products, Prices, Billing Portal and Webhook Endpoints (read **and** write — the dry run lists before it decides) is all it needs; a full `sk_` reaches much further than the job.
 
-Two things only `--apply` does, and the portal depends on the first: it creates the **marked** portal configuration (`metadata.synapsedesk_portal`) that `createPortalSession` insists on — until it exists, opening the billing portal is refused with a message naming this script — and it creates the Stripe webhook endpoint, printing its signing secret **exactly once**; put that in `apps/auth-service/.env` as `STRIPE_WEBHOOK_SECRET`.
+Two things only `--apply` does, and the portal depends on the first: it creates the **marked** portal configuration (`metadata.synapsedesk_portal`) that `createPortalSession` insists on — until it exists, opening the billing portal is refused with a message naming this script — and it creates the Stripe webhook endpoint, printing its signing secret **exactly once**; put that in `services/auth-service/.env` as `STRIPE_WEBHOOK_SECRET`.
 
 ## Running the tests
 
@@ -240,7 +244,7 @@ npm run test:e2e         # six suites, sequential
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares.
 
-Several of the specs under `libs/common/src/configs/` are contract guards rather than unit tests — they check the manifests against the application, the images against the Dockerfiles, the env schemas against the `.env.example` files, and the flow documents against the symbols they cite. A `.env.example` that gains a key without a schema entry fails there.
+The specs under `packages/config/src/` are contract guards rather than unit tests — they check the manifests against the application, the images against the Dockerfiles, the env schemas against the `.env.example` files, and the flow documents against the symbols they cite. A `.env.example` that gains a key without a schema entry fails there.
 
 ## Docker images
 
@@ -272,7 +276,7 @@ To run a locally built image against the Compose stack, generate the per-service
 
 ```sh
 node scripts/generate-docker-env.mjs
-docker run --network synapsedesk-network --env-file apps/api-gateway/.env.docker api-gateway
+docker run --network synapsedesk-network --env-file services/api-gateway/.env.docker api-gateway
 ```
 
 ## Kubernetes

@@ -2,7 +2,7 @@
 
 Real-time in SynapseDesk is one Socket.IO namespace on the API gateway. This document is the contract: what to connect to, what you are subscribed to without asking, what you may send, what arrives, and the handful of behaviours that will cost you an afternoon if you assume the obvious thing.
 
-Everything here is generated from the declarations themselves — `libs/common/src/contracts/realtime.contract.ts` holds the event names and the room shapes (shared: the contract harness reads them, and the gateway's `RealtimeEvents.java` is generated from them), `RealtimeServerConfig.java` and `WsEventLimits.java` hold the gateway's own limits and timings, and `SocketHandshakes.java` holds the handshake. **If this document and those files disagree, they are right and this is stale**; please report it.
+Everything here is generated from the declarations themselves — `packages/contracts/src/contracts/realtime.contract.ts` holds the event names and the room shapes (shared: the contract harness reads them, and the gateway's `RealtimeEvents.java` is generated from them), `RealtimeServerConfig.java` and `WsEventLimits.java` hold the gateway's own limits and timings, and `SocketHandshakes.java` holds the handshake. **If this document and those files disagree, they are right and this is stale**; please report it.
 
 ---
 

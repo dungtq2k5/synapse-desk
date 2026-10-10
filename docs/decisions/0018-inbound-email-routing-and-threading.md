@@ -1,6 +1,6 @@
 # 0018 — Inbound email: token in the local part, authoritative threading
 
-**Status:** accepted · **Code:** `worker/`, `apps/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/`, `organizations.inbound_token`
+**Status:** accepted · **Code:** `worker/`, `services/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/`, `organizations.inbound_token`
 
 ## Decision
 

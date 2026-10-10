@@ -1,6 +1,6 @@
 # 0028 — The OpenAPI envelope is a per-route decorator, not a global wrapper
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/main/java/com/synapsedesk/gateway/openapi/` (`ApiErrors.java`, `ErrorEnvelopeOperationCustomizer.java`)
+**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/openapi/` (`ApiErrors.java`, `ErrorEnvelopeOperationCustomizer.java`)
 
 ## Decision
 
