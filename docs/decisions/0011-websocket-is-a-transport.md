@@ -1,6 +1,6 @@
 # 0011 — WebSocket is a transport, not a second write path
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/modules/realtime/`
+**Status:** accepted · **Code:** `services/api-gateway/src/modules/realtime/`
 
 ## Decision
 

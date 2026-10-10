@@ -1,6 +1,6 @@
 # 0012 — Cache keys start with the tenant id, and not via `@nestjs/cache-manager`
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/cache/`
+**Status:** accepted · **Code:** `services/api-gateway/src/common/cache/`
 
 ## Decision
 

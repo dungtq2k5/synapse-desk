@@ -16,7 +16,7 @@ Without them, the OCR suites **skip with a reason** rather than failing. That is
 
 ### Extra languages
 
-The OCR language set is `OCR_LANGUAGES` in `@synapsedesk/common` — eight, ISO 639-1. Tesseract's own codes differ (`vi` is `vie`, `zh` is `chi_sim`) and its Debian packages differ again (`tesseract-ocr-chi-sim`, hyphen where the code has an underscore); `TESSERACT_CODE_BY_LANGUAGE` is the only mapping, and the package names live in the Dockerfile. To exercise a non-English document locally:
+The OCR language set is `OCR_LANGUAGES` in `@synapsedesk/contracts` — eight, ISO 639-1. Tesseract's own codes differ (`vi` is `vie`, `zh` is `chi_sim`) and its Debian packages differ again (`tesseract-ocr-chi-sim`, hyphen where the code has an underscore); `TESSERACT_CODE_BY_LANGUAGE` is the only mapping, and the package names live in the Dockerfile. To exercise a non-English document locally:
 
 ```bash
 sudo apt-get install -y tesseract-ocr-vie tesseract-ocr-jpn tesseract-ocr-chi-sim

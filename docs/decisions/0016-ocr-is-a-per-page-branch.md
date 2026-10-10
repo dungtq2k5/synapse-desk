@@ -1,6 +1,6 @@
 # 0016 — OCR is a per-page branch, and the offline requirement bends but does not break
 
-**Status:** accepted · **Code:** `apps/ingestion-service/src/modules/ingestion/ocr.service.ts`, `document-parser.service.ts`
+**Status:** accepted · **Code:** `services/ingestion-service/src/modules/ingestion/ocr.service.ts`, `document-parser.service.ts`
 
 ## Decision
 

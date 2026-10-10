@@ -1,6 +1,6 @@
 # 0017 — An attachment must reach retrieval, not only generation
 
-**Status:** accepted · **Code:** `apps/rag-service/`, `ticket_messages`
+**Status:** accepted · **Code:** `services/rag-service/`, `ticket_messages`
 
 ## Decision
 

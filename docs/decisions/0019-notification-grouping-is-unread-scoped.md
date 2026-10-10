@@ -1,6 +1,6 @@
 # 0019 — Notification grouping is scoped to unread
 
-**Status:** accepted · **Code:** `apps/notification-service/`, `notifications.group_key`
+**Status:** accepted · **Code:** `services/notification-service/`, `notifications.group_key`
 
 ## Decision
 

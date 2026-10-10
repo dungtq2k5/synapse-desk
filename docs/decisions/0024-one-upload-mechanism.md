@@ -1,6 +1,6 @@
 # 0024 — One upload mechanism: presign → confirm, with a `PendingUpload` record
 
-**Status:** accepted · **Code:** `apps/storage-service/`
+**Status:** accepted · **Code:** `services/storage-service/`
 
 ## Decision
 

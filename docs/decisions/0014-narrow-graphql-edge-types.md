@@ -1,6 +1,6 @@
 # 0014 — Narrow GraphQL edge types, not field guards
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/modules/*/dto/graphql/`
+**Status:** accepted · **Code:** `services/api-gateway/src/modules/*/dto/graphql/`
 
 ## Decision
 

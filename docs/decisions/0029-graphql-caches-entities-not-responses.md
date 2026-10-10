@@ -1,6 +1,6 @@
 # 0029 — GraphQL caches entities, not responses, and the session key is never the token
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/graphql/loaders/`
+**Status:** accepted · **Code:** `services/api-gateway/src/common/graphql/loaders/`
 
 ## Decision
 

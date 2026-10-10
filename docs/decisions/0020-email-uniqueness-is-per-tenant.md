@@ -1,6 +1,6 @@
 # 0020 — Email uniqueness is per-tenant, enforced twice
 
-**Status:** accepted · **Code:** `applyPartialIndexes()` in `apps/auth-service/src/modules/prisma/database.seeder.ts`
+**Status:** accepted · **Code:** `applyPartialIndexes()` in `services/auth-service/src/modules/prisma/database.seeder.ts`
 
 ## Decision
 

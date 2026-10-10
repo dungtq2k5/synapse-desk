@@ -1,6 +1,6 @@
 # 0006 — Greeting detection runs first, and the reply is canned
 
-**Status:** accepted · **Code:** `apps/rag-service/`
+**Status:** accepted · **Code:** `services/rag-service/`
 
 ## Decision
 

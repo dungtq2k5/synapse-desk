@@ -1,6 +1,6 @@
 # 0037 — Operational worklists follow the document boundary
 
-**Status:** accepted · **Code:** `apps/ingestion-service/src/common/document-visibility.ts`
+**Status:** accepted · **Code:** `services/ingestion-service/src/common/document-visibility.ts`
 
 ## Decision
 

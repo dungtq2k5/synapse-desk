@@ -1,6 +1,6 @@
 # 0018 — Inbound email: token in the local part, authoritative threading
 
-**Status:** accepted · **Code:** `worker/`, `apps/api-gateway/src/modules/inbound-email/`, `organizations.inbound_token`
+**Status:** accepted · **Code:** `worker/`, `services/api-gateway/src/modules/inbound-email/`, `organizations.inbound_token`
 
 ## Decision
 

@@ -1,6 +1,6 @@
 # 0022 — Cross-service references have no FK; validate at write time over gRPC
 
-**Status:** accepted · **Code:** `apps/ticket-service/`
+**Status:** accepted · **Code:** `services/ticket-service/`
 
 ## Decision
 

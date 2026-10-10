@@ -1,6 +1,6 @@
 # 0025 — Chunk usage is a projection, not a query over the ledger
 
-**Status:** accepted · **Code:** `apps/ingestion-service/`
+**Status:** accepted · **Code:** `services/ingestion-service/`
 
 ## Decision
 

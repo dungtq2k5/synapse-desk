@@ -1,6 +1,6 @@
 # 0031 — The gateway defines narrow DTOs; it never republishes a proto type
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/modules/tickets/`
+**Status:** accepted · **Code:** `services/api-gateway/src/modules/tickets/`
 
 ## Decision
 

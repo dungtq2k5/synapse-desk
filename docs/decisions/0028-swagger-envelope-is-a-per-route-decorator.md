@@ -1,6 +1,6 @@
 # 0028 — The OpenAPI envelope is a per-route decorator, not a global wrapper
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/decorators/`
+**Status:** accepted · **Code:** `services/api-gateway/src/common/decorators/`
 
 ## Decision
 

@@ -1,6 +1,6 @@
 # 0033 — One Redis instance, `noeviction`, and three connections that stay separate
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/redis/redis.service.ts`, `docker-compose.yml`
+**Status:** accepted · **Code:** `services/api-gateway/src/common/redis/redis.service.ts`, `docker-compose.yml`
 
 ## Decision
 

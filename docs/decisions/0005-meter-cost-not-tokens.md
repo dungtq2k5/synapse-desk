@@ -1,6 +1,6 @@
 # 0005 — Meter `estimated_cost_micros`, never raw tokens
 
-**Status:** accepted · **Code:** `ai_generations`, `libs/common/src/configs/ai-pricing.config.ts`
+**Status:** accepted · **Code:** `ai_generations`, `packages/contracts/src/configs/ai-pricing.config.ts`
 
 ## Decision
 

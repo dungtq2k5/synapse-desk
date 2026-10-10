@@ -1,6 +1,6 @@
 # 0045 — URI versioning is on, at `v1`, and no path moved to turn it on
 
-**Status:** accepted · **Supersedes the mechanism half of:** [0032](./0032-unversioned-breaking-changes-are-counted.md) · **Code:** `apps/api-gateway/src/main.ts`, `apps/api-gateway/src/modules/health/ops-routes.ts`
+**Status:** accepted · **Supersedes the mechanism half of:** [0032](./0032-unversioned-breaking-changes-are-counted.md) · **Code:** `services/api-gateway/src/main.ts`, `services/api-gateway/src/modules/health/ops-routes.ts`
 
 ## Decision
 

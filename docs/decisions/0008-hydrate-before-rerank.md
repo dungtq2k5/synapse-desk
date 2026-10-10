@@ -1,6 +1,6 @@
 # 0008 — Hydrate the candidate pool before reranking
 
-**Status:** accepted · **Code:** `apps/rag-service/`
+**Status:** accepted · **Code:** `services/rag-service/`
 
 ## Decision
 

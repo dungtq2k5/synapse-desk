@@ -80,7 +80,7 @@ Each job writes a heartbeat on success. The gateway exports `job_last_success_ti
 **That file is generated**, from `SCHEDULED_JOBS`:
 
 ```sh
-npm run build -w @synapsedesk/common && node scripts/generate-job-alerts.mjs
+npm run build -w @synapsedesk/contracts -w @synapsedesk/core && node scripts/generate-job-alerts.mjs
 ```
 
 The build comes first because the generator reads the **built** lib; a stale one silently emits the old job list. Adding a member to `SCHEDULED_JOBS` leaves the alert file a job short until it is regenerated.
@@ -92,7 +92,7 @@ docker compose --profile observability up -d prometheus   # localhost:9090
 docker compose --profile observability down               # a bare `down` leaves it running
 ```
 
-It needs `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env`: the listener defaults to loopback, so a container scraping the host otherwise finds nothing and the target reads `DOWN`.
+It needs `METRICS_HOST = 0.0.0.0` in `services/api-gateway/.env`: the listener defaults to loopback, so a container scraping the host otherwise finds nothing and the target reads `DOWN`.
 
 **`k8s/` has none**, deliberately — see `k8s/README.md`'s *What is deliberately not here*. Production collection is a decision about retention and on-call routing rather than a manifest, and it belongs to whoever has an on-call to route to.
 

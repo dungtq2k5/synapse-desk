@@ -1,6 +1,6 @@
 # 0036 — Scope fan-out order is asymmetric, and restrictions are synchronous
 
-**Status:** accepted · **Code:** `apps/ingestion-service/src/modules/ingestion/scope-writer.service.ts`
+**Status:** accepted · **Code:** `services/ingestion-service/src/modules/ingestion/scope-writer.service.ts`
 
 ## Decision
 

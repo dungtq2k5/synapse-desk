@@ -1,6 +1,6 @@
 # 0034 — The cache read-repopulate race is accepted, not fixed
 
-**Status:** accepted · **Code:** `apps/api-gateway/src/common/cache/cache.service.ts` (`wrap`)
+**Status:** accepted · **Code:** `services/api-gateway/src/common/cache/cache.service.ts` (`wrap`)
 
 ## Decision
 

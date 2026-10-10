@@ -17,12 +17,12 @@ Every rule here exists because getting it wrong produces a failure that is *sile
 
 ## 1. The Golden Rules
 
-1. **Search `libs/` before you write a helper.** If two services need it, it belongs in `libs/common` or `libs/grpc-proto` — not copied. (§3)
+1. **Search `packages/` before you write a helper.** If two services need it, it belongs in a shared package — `contracts`, `core`, `nest-common` or `grpc-proto` — not copied. (§3)
 2. **Never trust the client for identity or tenancy.** `user_id`, `organization_id`, `department_ids` and `permission_codes` come from the JWT via `@CurrentUser()`, never from a path, body or query. (§4)
 3. **Never trust the client for provenance either.** `ip` / `userAgent` are *observed* by the gateway (`RequestOrigin`), never claimed by the caller. (§4.3)
 4. **Every Prisma query on a soft-deletable table filters `deletedAt: null`.** Prisma cannot do this for you. (§7.1)
 5. **Every unique constraint on a soft-deletable table is enforced in code, not in the schema.** (§7.2)
-6. **Never declare an `enum` in `schema.prisma`.** Enumerated columns are `String`; the values live in `@synapsedesk/common`. (§7.3, [ADR 0001](./decisions/0001-no-prisma-enums.md))
+6. **Never declare an `enum` in `schema.prisma`.** Enumerated columns are `String`; the values live in `@synapsedesk/contracts`. (§7.3, [ADR 0001](./decisions/0001-no-prisma-enums.md))
 7. **Controllers return raw data.** `TransformInterceptor` owns the envelope. (§5.1)
 8. **Every gRPC call goes through `BaseGrpcClient.call()`** — that is what supplies the deadline and packs the metadata. (§6.3)
 9. **Choose the hash by how the value is looked up**, not by habit. (§8.1)
@@ -53,39 +53,43 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 - A gateway **`*-grpc.client.ts` MUST return proto types only** — it never imports a DTO or a mapper. Conversion is the **mapper's** job and the **service's** to invoke (§6.3).
 - A service **`*-grpc.controller.ts` MUST be a thin adapter**: unpack metadata, delegate, return the proto message. No queries, no branching.
 - A service **`*.service.ts` MUST NOT know about HTTP.** It throws `RpcException` with a gRPC `status`, never `BadRequestException`. (§6.4)
-- **`libs/` MUST NOT import from `apps/`.** Ever.
-- `libs/common` **MUST NOT** import `@grpc/grpc-js` types into domain declarations — `libs/grpc-proto` is where the wire lives.
+- **`packages/` MUST NOT import from `services/` or `apps/`.** Ever.
+- **`@synapsedesk/contracts` and `@synapsedesk/core` MUST NOT import a Node built-in, NestJS, gRPC or any other server package**, `import type` included — a browser imports them. `core` may import `contracts`, and nothing else of ours. `browser-safe.spec.ts` holds both. `packages/grpc-proto` is where the wire lives.
 - **A provider that holds a connection MUST be an `@Injectable` class implementing `OnModuleDestroy`, registered with `useClass`.** Nest calls lifecycle hooks only on providers it instantiated from a class; a value returned by `useFactory` is just a value, so implementing the interface on it does nothing and no warning is issued. The connection is then never closed on `app.close()` — one leak per restart in production, and a test run that passes and then hangs with no output. `common/redis/redis.service.ts` is the reference.
 
 ### 2.2 Where a new file goes
 
 | You are adding… | Put it in |
 | :--- | :--- |
-| A type or constant two services need | `libs/common/src/configs/*.config.ts` |
-| A NATS message shape | `libs/common/src/contracts/*.contract.ts` |
-| A proto enum ↔ domain enum bridge | `libs/grpc-proto/src/mappers/` |
-| A gRPC DI token / path / channel option | `libs/grpc-proto/src/constants.ts` |
+| A type or constant two services need | `packages/contracts/src/configs/*.config.ts` |
+| A NATS message shape | `packages/contracts/src/contracts/*.contract.ts` |
+| A pure function two services need | `packages/core/src/utils/` |
+| Server code two services need — NestJS, NATS, Redis | `packages/nest-common/src/` |
+| A helper the test suites share | `packages/testing/src/` |
+| A guard that reads the repository | `packages/config/src/` |
+| A proto enum ↔ domain enum bridge | `packages/grpc-proto/src/mappers/` |
+| A gRPC DI token / path / channel option | `packages/grpc-proto/src/constants.ts` |
 | A pure function used by one service only | `apps/<svc>/src/common/utils/utils.ts` |
-| A gateway guard / interceptor / decorator | `apps/api-gateway/src/common/<kind>/` |
-| A REST request/response shape | `apps/api-gateway/src/modules/<mod>/dto/rest/` |
-| A GraphQL request/response shape | `apps/api-gateway/src/modules/<mod>/dto/graphql/` — **independent of the REST DTO** (§12.2) |
+| A gateway guard / interceptor / decorator | `services/api-gateway/src/common/<kind>/` |
+| A REST request/response shape | `services/api-gateway/src/modules/<mod>/dto/rest/` |
+| A GraphQL request/response shape | `services/api-gateway/src/modules/<mod>/dto/graphql/` — **independent of the REST DTO** (§12.2) |
 
 ---
 
 ## 3. Shared Libraries — Use Them
 
-These libraries exist so services agree with each other on the wire and on shared domain values. Entry points: `libs/common/src/main.ts`, `libs/grpc-proto/src/index.ts`.
+These libraries exist so services agree with each other on the wire and on shared domain values. Each package's entry point is its `src/index.ts`: `contracts`, `core`, `nest-common` and `grpc-proto`.
 
 Import by package name, **never by relative path across app boundaries**:
 
 ```ts
-import { RequestContext, PermissionCode } from '@synapsedesk/common';
+import { RequestContext, PermissionCode } from '@synapsedesk/contracts';
 import { toTimestamp, GRPC_DEADLINE_MS } from '@synapsedesk/grpc-proto';
 ```
 
-**MUST NOT:** hand-roll a `new Date(seconds * 1000)`, write a `{ seconds, nanos }` literal, cast a proto enum to a domain enum, or build a bare `new Metadata()` outside `libs/grpc-proto`.
+**MUST NOT:** hand-roll a `new Date(seconds * 1000)`, write a `{ seconds, nanos }` literal, cast a proto enum to a domain enum, or build a bare `new Metadata()` outside `packages/grpc-proto`.
 
-**MUST:** call `normalizeEmail()` at every email entry point. One path that skips it makes `JOHN@acme.com` a second account.
+**MUST:** call `normalizeEmail()` (`@synapsedesk/core`) at every email entry point. One path that skips it makes `JOHN@acme.com` a second account.
 
 ### 3.1 Adding to a shared library
 
@@ -227,7 +231,7 @@ Order matters — Nest runs guards left to right.
 - `@RequirePermission(...)` is **ANY**, not ALL. For a route needing two distinct grants, stack the guard twice.
 - The tuple type makes `@RequirePermission()` a compile error — empty metadata would read as "no permission required".
 - `isSuperAdmin` bypasses `PermissionGuard` entirely.
-- **`PERMISSION_CODES` in `libs/common` is the single source of truth**: it derives the `PermissionCode` union *and* seeds the `permissions` table. Adding one means editing that array, `PERMISSION_NAMES`, the relevant `SYSTEM_ROLE_PERMISSIONS`, and [api-endpoints-plan.md §9](./api-endpoints-plan.md).
+- **`PERMISSION_CODES` in `@synapsedesk/contracts` is the single source of truth**: it derives the `PermissionCode` union *and* seeds the `permissions` table. Adding one means editing that array, `PERMISSION_NAMES`, the relevant `SYSTEM_ROLE_PERMISSIONS`, and [api-endpoints-plan.md §9](./api-endpoints-plan.md).
 
 ### 5.5 Cookies
 
@@ -250,7 +254,7 @@ Routes are `/api/v1/…` because the global prefix is `api` and Nest URI version
 
 ### 6.1 Contract first
 
-`.proto` files live in `libs/grpc-proto/src/proto/<package-path>/`. Change the proto → `npm run proto:generate` → fix both ends. **Never hand-edit `src/generated/`.**
+`.proto` files live in `packages/grpc-proto/src/proto/<package-path>/`. Change the proto → `npm run proto:generate` → fix both ends. **Never hand-edit `src/generated/`.**
 
 - The directory path **MUST** equal the package name with dots as slashes: `package synapsedesk.auth` ⇒ `proto/synapsedesk/auth/`. `buf lint` enforces this. Protobuf's type namespace is flat and global, so a bare `package auth` claims that name process-wide.
 - Tooling is `buf` (an npm devDependency), **not** a system `protoc`.
@@ -280,7 +284,7 @@ A client speaks **proto**. A mapper turns proto into **DTO**. A service composes
 | Layer | Returns | May import |
 | :--- | :--- | :--- |
 | `*-grpc.client.ts` | the generated proto message | `@synapsedesk/grpc-proto` — **never** `dto/`, **never** a mapper |
-| `*.mapper.ts` | a REST/GraphQL DTO | proto types, DTOs, `libs/` bridges |
+| `*.mapper.ts` | a REST/GraphQL DTO | proto types, DTOs, `packages/` bridges |
 | `*.service.ts` | a DTO | the client and the mapper |
 | `*.controller.ts` | whatever the service returned | the service — **never** a client, **never** a mapper |
 
@@ -317,7 +321,7 @@ Services throw `RpcException({ code: status.X, message })`. The gateway maps:
 
 ### 6.5 proto ↔ domain conversion
 
-Mappers live in `libs/grpc-proto/src/mappers/`, named per §12.1.
+Mappers live in `packages/grpc-proto/src/mappers/`, named per §12.1.
 
 - `Timestamp` is `{ seconds, nanos }`. Use the mappers.
 - ts-proto types every **message-valued** field as `T | undefined`. That is its convention, **not** permission to omit them. For a non-optional proto field use **`requireProtoTimestamp(v, 'field')`**.
@@ -380,14 +384,14 @@ model UserInvitation {
 
 // ✓ ALWAYS
 model UserInvitation {
-  /// InvitationStatus in @synapsedesk/common. Deliberately a String, not a
+  /// InvitationStatus in @synapsedesk/contracts. Deliberately a String, not a
   /// Prisma enum — see development-conventions §7.3.
   status String @default("PENDING") @db.VarChar(50)
 }
 ```
 
 ```ts
-// libs/common/src/configs/app.config.ts — the single source of truth
+// packages/contracts/src/configs/auth.config.ts — the single source of truth
 export enum InvitationStatus {
   PENDING = 'PENDING',
   ACCEPTED = 'ACCEPTED',
@@ -485,7 +489,7 @@ It belongs here rather than in a RAG document because it is the input-validation
 
 ## 9. NATS Conventions
 
-Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **discriminated unions**. NATS is untyped on the wire: a publisher that renames a field fails *silently* — the message is delivered, the consumer reads `undefined`, and the email goes out saying "Hello undefined". Both ends importing the same declaration turns that into a compile error.
+Subjects and payloads live in `packages/contracts/src/contracts/*.contract.ts` as **discriminated unions**. NATS is untyped on the wire: a publisher that renames a field fails *silently* — the message is delivered, the consumer reads `undefined`, and the email goes out saying "Hello undefined". Both ends importing the same declaration turns that into a compile error.
 
 - Fire-and-forget for side effects, never request/response: `emit()` on the core transport, `JetStreamPublisher.publish()` on the durable subjects.
 - **MUST NOT** `await` a notification publish in a request path.
@@ -508,7 +512,7 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 
 - Every env var **MUST** be declared in the service's `common/config(s)/env.validation.ts` Joi schema.
 - Read with `getOrThrow<T>()`, never `process.env.X` in application code, and **read once in the constructor** into a `private readonly`.
-- Magic numbers and literal unions go in a topic-named `common/config(s)/<topic>.config.ts`, not inline. Cross-service values go in `libs/common/src/configs/<topic>.config.ts`.
+- Magic numbers and literal unions go in a topic-named `common/config(s)/<topic>.config.ts`, not inline. Cross-service values go in `packages/contracts/src/configs/<topic>.config.ts`.
 - `.env` is git-ignored. **Every service MUST ship an `env.example`** (plus `serviceAccountKey.json.example` where applicable).
 - The only pre-`ConfigModule` `process.env` reads are in `main.ts`, where transport options are computed before DI exists.
 
@@ -663,8 +667,8 @@ export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
 | Layer | Proves | Database | Runs in |
 | :--- | :--- | :--- | :--- |
 | **Unit** | One class's logic in isolation — branches, edge cases, error paths | Never real; `PrismaService` is a mock | `*.spec.ts` beside the source |
-| **E2E — auth-service** | A service's Prisma queries against a **real** Postgres — tenant scoping, soft-delete filters, partial unique indexes, transactions | Real, reset between tests | `apps/auth-service/test/*.e2e-spec.ts` |
-| **E2E — api-gateway** | The gateway's full HTTP stack — guards, pipes, filters, interceptors, cookies, the envelope | None (gateway owns no database) | `apps/api-gateway/test/*.e2e-spec.ts` |
+| **E2E — auth-service** | A service's Prisma queries against a **real** Postgres — tenant scoping, soft-delete filters, partial unique indexes, transactions | Real, reset between tests | `services/auth-service/test/*.e2e-spec.ts` |
+| **E2E — api-gateway** | The gateway's full HTTP stack — guards, pipes, filters, interceptors, cookies, the envelope | None (gateway owns no database) | `services/api-gateway/test/*.e2e-spec.ts` |
 
 **"E2E" covers both**: no mock stands between the test and what a real request actually does inside that service.
 
@@ -710,7 +714,7 @@ const module: TestingModule = await Test.createTestingModule({
 
 ### 13.3 E2E (auth-service) — real Postgres, reset between tests
 
-**Point at a dedicated test database, never the dev one.** `apps/auth-service/.env.test` sets `DATABASE_URL` to a separate database. A suite that can reach the developer's own data is one typo away from truncating it.
+**Point at a dedicated test database, never the dev one.** `services/auth-service/.env.test` sets `DATABASE_URL` to a separate database. A suite that can reach the developer's own data is one typo away from truncating it.
 
 ```ts
 export async function bootstrapE2eTest(): Promise<E2eFixture> {
@@ -835,7 +839,7 @@ cookies, socket frames, published NATS messages, the metrics port.
 | The behaviour is about | Suite |
 | :--- | :--- |
 | a wire fact — a header, a cookie flag, an envelope field, a frame, a metric name | `test/gateway-contract/` |
-| routing, guards composing, DI wiring, a mapper's shape | `apps/api-gateway/test/` (13.4) |
+| routing, guards composing, DI wiring, a mapper's shape | `services/api-gateway/test/` (13.4) |
 | several real services together | `test/system/` |
 
 Two things follow from "as a process". It boots the build, so
@@ -988,7 +992,7 @@ Two failure modes this ordering exists to prevent:
 
 ### Reuse
 
-- [ ] Searched `libs/` before writing any helper; anything cross-service lives there.
+- [ ] Searched `packages/` before writing any helper; anything cross-service lives there.
 - [ ] Any source scan added carries a corpus floor AND a pattern-fires test, and guards a property that has no runtime expression — or is paired with the test that does (§13.8).
 - [ ] No duplicated enum, timestamp conversion, metadata key, or hashing helper.
 
@@ -1024,7 +1028,7 @@ Two failure modes this ordering exists to prevent:
 - [ ] Ordering constraints encoded as **one job calling several in sequence**, never two cron entries minutes apart.
 - [ ] An **end-to-end test drives the scheduler and reads the endpoint.**
 - [ ] Anything derived from the job carries a freshness field (`dataThrough`).
-- [ ] **Something ALERTS when it stops.** Adding a member to `SCHEDULED_JOBS` leaves `docker/prometheus/job-alerts.yml` a job short until it is regenerated — `npm run build -w @synapsedesk/common && node scripts/generate-job-alerts.mjs`. The build comes first because the generator reads the BUILT lib, and a stale one silently emits the old job list.
+- [ ] **Something ALERTS when it stops.** Adding a member to `SCHEDULED_JOBS` leaves `docker/prometheus/job-alerts.yml` a job short until it is regenerated — `npm run build -w @synapsedesk/contracts -w @synapsedesk/core && node scripts/generate-job-alerts.mjs`. The build comes first because the generator reads the BUILT lib, and a stale one silently emits the old job list.
 
 ### Surface
 
