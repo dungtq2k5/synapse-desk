@@ -1,6 +1,6 @@
 # 0044 — Expand and contract, never in one release
 
-**Status:** accepted · **Code:** `apps/*/prisma/migrations/`, `libs/common/src/configs/schema-contract.spec.ts` · **Follows:** [ADR 0042](./0042-schema-reaches-production-through-migrate-deploy.md), [ADR 0043](./0043-the-cluster-shape.md)
+**Status:** accepted · **Code:** `apps/*/prisma/migrations/`, `packages/config/src/schema-contract.spec.ts` · **Follows:** [ADR 0042](./0042-schema-reaches-production-through-migrate-deploy.md), [ADR 0043](./0043-the-cluster-shape.md)
 
 ## Decision
 

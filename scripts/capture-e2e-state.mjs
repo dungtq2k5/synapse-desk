@@ -60,7 +60,7 @@ const redisDbs = () => {
     '--others',
     '--exclude-standard',
     '--',
-    'apps/*/.env.test',
+    'services/*/.env.test',
   ])
     .split('\n')
     .filter(Boolean);

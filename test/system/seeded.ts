@@ -10,7 +10,7 @@
 
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient as AuthPrisma } from '../../apps/auth-service/src/generated/prisma/client';
+import { PrismaClient as AuthPrisma } from '../../services/auth-service/src/generated/prisma/client';
 import { REPO_ROOT } from './services';
 
 /**
@@ -28,13 +28,13 @@ const RECIPE = [
 /** Tenant count, or 0 — the one question both callers below ask. */
 async function tenantCount(): Promise<number> {
   const parsed = config({
-    path: `${REPO_ROOT}/apps/auth-service/.env`,
+    path: `${REPO_ROOT}/services/auth-service/.env`,
     processEnv: {},
   });
   const connectionString = parsed.parsed?.DATABASE_URL;
 
   if (!connectionString) {
-    throw new Error('No DATABASE_URL in apps/auth-service/.env');
+    throw new Error('No DATABASE_URL in services/auth-service/.env');
   }
 
   const prisma = new AuthPrisma({

@@ -1,0 +1,38 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // **Emptied for SWC, and it is load-bearing rather than tidying.**
+    //
+    // The root config maps `@synapsedesk/common` and `@synapsedesk/grpc-proto`
+    // to `libs/*/src`, so editors and `tsc --noEmit` resolve them to SOURCE and
+    // nothing has to be built first. `tsc` never acts on that at emit time — it
+    // leaves the import specifier alone and Node resolves it through the
+    // workspace symlink in `node_modules/@synapsedesk`.
+    //
+    // **SWC does the opposite: it REWRITES an aliased specifier to a relative
+    // path.** `@nestjs/cli` hands it `jsc.paths` verbatim from this file, so
+    // `import ... from '@synapsedesk/grpc-proto'` was emitted as
+    // `require("../../../packages/grpc-proto/src")` — a path outside `dist`, since
+    // SWC only compiles `sourceRoot`. The service built cleanly and died at
+    // startup with `Cannot find module '../../../packages/grpc-proto/src'`.
+    //
+    // Empty here and untouched in `tsconfig.json`, so the alias keeps working
+    // for the IDE, jest and `npm run typecheck` while the emitted `require`
+    // stays a bare specifier that the symlink resolves.
+    //
+    // **`typeCheck` is now true, so this file DOES feed type resolution** — and
+    // with no `paths`, `@synapsedesk/*` resolves the way Node will at runtime:
+    // through the workspace symlink to `libs/*/dist/*.d.ts`, the compiled
+    // contract, rather than to source. That is the stricter of the two readings
+    // and the one that matches the image.
+    //
+    // Its one consequence: a BARE `npm run build -w @synapsedesk/<svc>` now
+    // fails on a fresh clone with `Cannot find module '@synapsedesk/common'`,
+    // because the lib has no `dist` yet. Every real entry point goes through
+    // turbo, whose `build` has `dependsOn: ["^build"]`, so the libs are always
+    // built first — `npm run build`, and the image's
+    // `turbo run build --filter="@synapsedesk/<svc>..."` alike.
+    "paths": {}
+  },
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
+}

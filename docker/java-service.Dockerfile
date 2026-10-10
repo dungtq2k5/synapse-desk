@@ -7,7 +7,7 @@
 # **It reads two things from OUTSIDE the module**, and that is deliberate:
 # the protos, shared with the other services, and the published GraphQL
 # schema in `docs/reference/`. So the build context is the REPOSITORY ROOT,
-# not `apps/api-gateway`.
+# not `services/api-gateway`.
 
 # Pinned to a full version for the reason `image-contract.spec.ts` states: a
 # floating tag makes the image a function of the pull date. Both are read by
@@ -28,21 +28,21 @@ WORKDIR /build
 # **The manifest first, and its dependencies resolved alone.** Layer caching:
 # `pom.xml` changes rarely and the dependency download is the slow half, so a
 # source-only change must not re-pay it.
-COPY apps/api-gateway/pom.xml apps/api-gateway/pom.xml
-COPY apps/api-gateway/.mvn apps/api-gateway/.mvn
-COPY apps/api-gateway/mvnw apps/api-gateway/mvnw
-RUN cd apps/api-gateway && mvn -q -B dependency:go-offline -DskipTests
+COPY services/api-gateway/pom.xml services/api-gateway/pom.xml
+COPY services/api-gateway/.mvn services/api-gateway/.mvn
+COPY services/api-gateway/mvnw services/api-gateway/mvnw
+RUN cd services/api-gateway && mvn -q -B dependency:go-offline -DskipTests
 
 # The two inputs from other workspaces, then the sources — see the note at
 # the top.
-COPY libs/grpc-proto/src/proto libs/grpc-proto/src/proto
+COPY packages/grpc-proto/src/proto packages/grpc-proto/src/proto
 COPY docs/reference/schema.gql docs/reference/schema.gql
-COPY apps/api-gateway/src apps/api-gateway/src
+COPY services/api-gateway/src services/api-gateway/src
 
 # `-DskipTests`: the tests are `./mvnw verify`'s job, and CI has already run
 # them. An image build that re-ran them would fail here for reasons that have
 # nothing to do with the image — a missing Redis, most obviously.
-RUN cd apps/api-gateway && mvn -q -B package -DskipTests
+RUN cd services/api-gateway && mvn -q -B package -DskipTests
 
 # --------------------------------------------------------------- runtime
 FROM eclipse-temurin:${JRE_VERSION} AS runtime
@@ -69,7 +69,7 @@ USER gateway
 
 WORKDIR /app
 COPY --from=build --chown=gateway:gateway \
-  /build/apps/api-gateway/target/*.jar /app/gateway.jar
+  /build/services/api-gateway/target/*.jar /app/gateway.jar
 
 # The jar is renamed on copy so this line carries no version — the version
 # lives in `pom.xml`, and repeating it here is a second place to change it.

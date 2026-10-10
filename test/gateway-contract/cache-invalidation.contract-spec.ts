@@ -16,7 +16,7 @@ import {
   DOCUMENT_PATTERNS,
   OrgStatus,
   TICKET_PATTERNS,
-} from '@synapsedesk/common';
+} from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { type Gateway, startGateway } from './gateway';
 import { type Peers, startPeers } from './peers';

@@ -31,7 +31,7 @@ import { dirname, resolve } from 'node:path';
 
 const OUT = resolve(
   process.cwd(),
-  process.argv[2] ?? 'apps/storage-service/serviceAccountKey.json',
+  process.argv[2] ?? 'services/storage-service/serviceAccountKey.json',
 );
 
 if (existsSync(OUT) && !process.argv.includes('--force')) {

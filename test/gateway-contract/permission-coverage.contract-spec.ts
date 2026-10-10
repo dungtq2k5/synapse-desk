@@ -132,7 +132,7 @@ const javaSources = (() => {
       else if (entry.name.endsWith('.java')) files.push(path);
     }
   };
-  walk(join(REPO_ROOT, 'apps/api-gateway/src/main/java'));
+  walk(join(REPO_ROOT, 'services/api-gateway/src/main/java'));
 
   return files.map((file) => readFileSync(file, 'utf8')).join('\n');
 })();

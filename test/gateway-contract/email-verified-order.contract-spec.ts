@@ -39,7 +39,7 @@ const RESEND = 'POST /api/v1/users/invitations/{id}/resend';
 
 describe('the routes that need a verified email', () => {
   it('are exactly the two named here', () => {
-    const guarded = globSync('apps/api-gateway/src/main/java/**/*.java', {
+    const guarded = globSync('services/api-gateway/src/main/java/**/*.java', {
       cwd: REPO_ROOT,
     }).flatMap((file) =>
       readFileSync(join(REPO_ROOT, file), 'utf8')

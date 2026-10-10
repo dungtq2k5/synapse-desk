@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { faker } from '@faker-js/faker';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import { DEFAULT_SEED, parseArgs } from './args';
 import { SEED_EDGES, STEPS } from './registry';
 import { PROFILES, bytesFor, countFor, type Profile } from './profiles';
@@ -219,8 +219,8 @@ describe('the demo seeder', () => {
 
     // Vacuity floor: a rewritten config with one entry must not pass, and the
     // entries the rest of the repo depends on are still there.
-    expect(include).toContain('libs/*/src/**/*');
-    expect(include).toContain('apps/*/src/**/*');
+    expect(include).toContain('packages/*/src/**/*');
+    expect(include).toContain('services/*/src/**/*');
     expect(include.length).toBeGreaterThanOrEqual(4);
 
     // And no second command claiming to do the same job — one named "typecheck

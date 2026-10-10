@@ -1,0 +1,45 @@
+{
+  "name": "@synapsedesk/storage-service",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "nest start",
+    "start:prod": "node dist/src/main.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.21.0",
+    "@grpc/grpc-js": "^1.14.1",
+    "@grpc/proto-loader": "^0.8.0",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/microservices": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "@synapsedesk/contracts": "*",
+    "@synapsedesk/core": "*",
+    "@synapsedesk/grpc-proto": "*",
+    "@synapsedesk/nest-common": "*",
+    "dotenv": "^17.4.2",
+    "firebase-admin": "^14.2.0",
+    "ioredis": "^6.0.0",
+    "joi": "^18.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.5.0",
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "^11.1.28",
+    "@synapsedesk/testing": "*",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.13.3",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^6.0.3"
+  }
+}

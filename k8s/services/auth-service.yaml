@@ -103,13 +103,13 @@ spec:
             failureThreshold: 3
           volumeMounts:
             # `JWT_*_PRIVATE_KEY_PATH` and `FIREBASE_SERVICE_ACCOUNT_PATH` are
-            # all `./secrets/…` here, against `WORKDIR=/app/apps/auth-service`.
+            # all `./secrets/…` here, against `WORKDIR=/app/services/auth-service`.
             # auth is the service whose Firebase key is UNDER `secrets/`;
             # storage's and notification's sit at their package root. Three
             # variable names, two directory conventions — the check derives this
             # path from the ConfigMap rather than trusting the list.
             - name: auth-secrets
-              mountPath: /app/apps/auth-service/secrets
+              mountPath: /app/services/auth-service/secrets
               readOnly: true
           resources:
             requests:

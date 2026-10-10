@@ -1,6 +1,6 @@
 # 0015 — Direct prompt injection: regex, a cheap LLM, and a nonce boundary
 
-**Status:** accepted · **Code:** `apps/rag-service/`
+**Status:** accepted · **Code:** `services/rag-service/`
 
 ## Decision
 

@@ -12,6 +12,10 @@ node_modules/
 # formatting it only produces a diff that comes straight back on the next run.
 # ESLint already skips these via the `**/generated/**` ignore in eslint.config.mjs.
 **/generated/
+# The Java constants `npm run java:contracts` writes. `--check` compares them
+# byte for byte with the generator's output, so a formatter that rewraps them
+# makes the check fail on files nobody edited.
+services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts/
 
 # Lockfiles. npm owns their formatting and rewrites them wholesale on every
 # install; prettier reformatting one produces a diff that comes straight back,
@@ -28,7 +32,7 @@ package-lock.json
 # models, protobuf and grpc stubs) plus surefire's XML reports, every one of
 # them rewritten by `./mvnw`. `**/generated/` above does NOT cover them — the
 # path component is `generated-sources`, not `generated` — and prettier does not
-# read `.gitignore`, so `apps/api-gateway/.gitignore` does not reach here.
+# read `.gitignore`, so `services/api-gateway/.gitignore` does not reach here.
 target/
 
 # pytest's JUnit report, written by `npm run test:py -- --junitxml=pytest.xml`.

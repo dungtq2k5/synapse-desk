@@ -1,6 +1,6 @@
 # 0035 — The OCR language cap is four, and it is a CPU bound
 
-**Status:** accepted · **Code:** `libs/common/src/configs/document.config.ts`
+**Status:** accepted · **Code:** `packages/contracts/src/configs/document.config.ts`
 
 ## Decision
 

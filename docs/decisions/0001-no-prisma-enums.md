@@ -4,11 +4,11 @@
 
 ## Decision
 
-No `enum` block in any `schema.prisma`. An enumerated column is `String @db.VarChar(50)`; the values live in `@synapsedesk/common` as a TypeScript enum, and the service layer constrains them.
+No `enum` block in any `schema.prisma`. An enumerated column is `String @db.VarChar(50)`; the values live in `@synapsedesk/contracts` as a TypeScript enum, and the service layer constrains them.
 
 ## Why
 
-- **It creates a third source of truth**: The value set already exists twice — as a TS enum in `libs/common` (which the services branch on) and as a numeric proto enum on the wire. A Postgres type makes three, and it's **totally useless**.
+- **It creates a third source of truth**: The value set already exists twice — as a TS enum in `@synapsedesk/contracts` (which the services branch on) and as a numeric proto enum on the wire. A Postgres type makes three, and it's **totally useless**.
 - **Database level mainly for storing not for validate**: Database is a place to store data, not to validate it. Validation should be done at the application level.
 
 ## Consequences

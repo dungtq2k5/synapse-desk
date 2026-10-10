@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient as AuthPrisma } from '../../apps/auth-service/src/generated/prisma/client';
+import { PrismaClient as AuthPrisma } from '../../services/auth-service/src/generated/prisma/client';
 import { REPO_ROOT } from './services';
 
 /** The one password every demo user shares — `seed-demo/steps/auth.step.ts`. */
@@ -71,7 +71,7 @@ export async function seededActors(): Promise<{
   if (!tenant) throw new Error('The demo manifest lists no tenants');
 
   const parsed = config({
-    path: `${REPO_ROOT}/apps/auth-service/.env`,
+    path: `${REPO_ROOT}/services/auth-service/.env`,
     processEnv: {},
   });
   const connectionString = parsed.parsed?.DATABASE_URL;

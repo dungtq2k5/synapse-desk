@@ -10,7 +10,7 @@
 
 ### 0.1 Request scoping (non-negotiable)
 
-Per RDM §1.1, every authenticated request carries a JWT with `user_id`, `organization_id`, `is_super_admin`, and the user's `department_ids`. A gateway guard resolves this into a `RequestContext` (`libs/common/src/context/`) and it is forwarded on every gRPC call as metadata. **No endpoint accepts `organizationId` as a client-supplied parameter** — the only exceptions are the `/platform/*` Super Admin routes, where the tenant is an explicit path segment.
+Per RDM §1.1, every authenticated request carries a JWT with `user_id`, `organization_id`, `is_super_admin`, and the user's `department_ids`. A gateway guard resolves this into a `RequestContext` (`packages/contracts/src/configs/identity.config.ts`) and it is forwarded on every gRPC call as metadata. **No endpoint accepts `organizationId` as a client-supplied parameter** — the only exceptions are the `/platform/*` Super Admin routes, where the tenant is an explicit path segment.
 
 ### 0.2 Auth column legend
 
@@ -421,7 +421,7 @@ No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internall
 
 ### 3.1 Documents — `/documents`
 
-> **Built.** Documents are stored in Firebase Storage through `storage-service`, using the one upload mechanism every file in this system uses — presign, `PUT` straight to the bucket, then confirm ([ADR 0024](./decisions/0024-one-upload-mechanism.md)); file bytes never pass through an application server. **The upload policy is not a second list.** `storage-service`'s `DOCUMENT` purpose reads `ALLOWED_DOCUMENT_MIME_TYPES` and `MAX_DOCUMENT_BYTES` from `libs/common` — the same two constants the gateway validates `POST /documents/presign` against — so the service that signs the URL and the route that asks for it cannot disagree about what is accepted. Change the types or the size cap in `libs/common`, and both follow.
+> **Built.** Documents are stored in Firebase Storage through `storage-service`, using the one upload mechanism every file in this system uses — presign, `PUT` straight to the bucket, then confirm ([ADR 0024](./decisions/0024-one-upload-mechanism.md)); file bytes never pass through an application server. **The upload policy is not a second list.** `storage-service`'s `DOCUMENT` purpose reads `ALLOWED_DOCUMENT_MIME_TYPES` and `MAX_DOCUMENT_BYTES` from `@synapsedesk/contracts` — the same two constants the gateway validates `POST /documents/presign` against — so the service that signs the URL and the route that asks for it cannot disagree about what is accepted. Change the types or the size cap in `@synapsedesk/contracts`, and both follow.
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
@@ -636,7 +636,7 @@ REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the
 
 ### 8.1 NATS domain events
 
-**gRPC for synchronous cross-service reads, NATS for background triggers** (notifications, sends, side effects). Every subject below is declared in a `*_PATTERNS` constant under `libs/common/src/contracts/` — that file is the registry, and a subject that is not in one does not exist. Durability differs per subject: see [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md).
+**gRPC for synchronous cross-service reads, NATS for background triggers** (notifications, sends, side effects). Every subject below is declared in a `*_PATTERNS` constant under `packages/contracts/src/contracts/` — that file is the registry, and a subject that is not in one does not exist. Durability differs per subject: see [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md).
 
 | Subject | Publisher | Consumers |
 | :--- | :--- | :--- |
@@ -659,7 +659,7 @@ REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the
 | `notification.created` | notification-service | WS fan-out to `user:{id}` (`notification:new`). Written first, emitted fire-and-forget, so a disconnected user still finds the row on next load |
 | `notification.updated` | notification-service | WS fan-out (`notification:updated`) — an existing row was **coalesced**, same group key, higher count |
 | `notification.read` | notification-service | WS fan-out (`notification:read`) — read/archive state changed, so a dismissal on one device clears the badge on another |
-| `audit.record` | any service (via `AuditPublisher`, `libs/common/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`) |
+| `audit.record` | any service (via `AuditPublisher`, `packages/contracts/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`) |
 | `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete), ingestion-service (document replace) | storage-service (async object delete) |
 | ~~`quota.exceeded`~~ | — | **Not a subject.** The quota signal is a notification _type_ (`quota.threshold` in `NOTIFICATION_TYPES`, RDM Table 23), delivered through `notification.in_app.create` like any other. There is no publisher and no `*_PATTERNS` entry — it was specified here and never built |
 | `billing.entitlements_changed` | auth-service (Stripe webhook) | ingestion-service (invalidate the cached settings/tier for that tenant — a stale cache keeps a downgraded tenant on the premium model), analytics, audit |

@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { ops } from './client';
 import { REPO_ROOT, SERVICES, targetIsLocal } from './services';
 import { portsStillHeld } from './stack';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { compareAlphabetically } from '@synapsedesk/core';
 
 /**
  * Local-only checks skip — with the reason in the name — when `SMOKE_BASE_URL`

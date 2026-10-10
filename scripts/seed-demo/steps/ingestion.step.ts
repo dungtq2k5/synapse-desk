@@ -9,13 +9,13 @@
  */
 
 import { faker } from '@faker-js/faker';
-import { DocumentStatus } from '@synapsedesk/common';
+import { DocumentStatus } from '@synapsedesk/contracts';
 import {
   buildTenant,
   createChunks,
   createDocument,
-} from '../../../apps/ingestion-service/test/factories';
-import type { PrismaService } from '../../../apps/ingestion-service/src/modules/prisma/prisma.service';
+} from '../../../services/ingestion-service/test/factories';
+import type { PrismaService } from '../../../services/ingestion-service/src/modules/prisma/prisma.service';
 import type { ManifestTenant } from '../manifest';
 import type { Profile } from '../profiles';
 import { tenantsOf, type SeedStep } from '../registry';

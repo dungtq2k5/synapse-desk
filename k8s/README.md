@@ -13,7 +13,7 @@ k8s/
   generated/         ConfigMaps and Secret SKELETONS — do not edit
 ```
 
-`libs/common/src/configs/manifest-contract.spec.ts` checks these files against the application: probe ports against each `.env.example`, ConfigMap keys against each Joi schema, secret mount paths against the `*_PATH` values that resolve them, and ingestion's memory limit against the two constants that determine it.
+`packages/config/src/manifest-contract.spec.ts` checks these files against the application: probe ports against each `.env.example`, ConfigMap keys against each Joi schema, secret mount paths against the `*_PATH` values that resolve them, and ingestion's memory limit against the two constants that determine it.
 
 ## Regenerating `generated/`
 
@@ -36,10 +36,10 @@ Nothing in `generated/` carries a real value.
 
   | Secret | contents | mounted at |
   | :--- | :--- | :--- |
-  | `api-gateway-jwt-public` | `jwt-access.pub`, `jwt-2fa.pub` | `/app/apps/api-gateway/secrets/` |
-  | `auth-service-files` | `jwt-access.key`, `jwt-2fa.key`, `serviceAccountKey.json` | `/app/apps/auth-service/secrets/` |
-  | `storage-service-files` | `serviceAccountKey.json` | `/app/apps/storage-service/serviceAccountKey.json` |
-  | `notification-service-files` | `serviceAccountKey.json` (optional — FCM) | `/app/apps/notification-service/serviceAccountKey.json` |
+  | `api-gateway-jwt-public` | `jwt-access.pub`, `jwt-2fa.pub` | `/app/services/api-gateway/secrets/` |
+  | `auth-service-files` | `jwt-access.key`, `jwt-2fa.key`, `serviceAccountKey.json` | `/app/services/auth-service/secrets/` |
+  | `storage-service-files` | `serviceAccountKey.json` | `/app/services/storage-service/serviceAccountKey.json` |
+  | `notification-service-files` | `serviceAccountKey.json` (optional — FCM) | `/app/services/notification-service/serviceAccountKey.json` |
 
   **Three Firebase service accounts, three variable names, two directory conventions.** auth's is under `secrets/`; storage's and notification's are at the package root. The paths above are not a convention to remember — they are each service's own `*_PATH` value resolved against `WORKDIR` (`/app/apps/${SERVICE}`), and the spec derives them the same way rather than trusting this table.
 
@@ -71,7 +71,7 @@ A fresh production database needs none of this; it runs `0_init` for real.
 **Seed the projection cursor, once per database — the other once-per-database step, and the other one nothing in the code will do for you.** `chunk-usage-projection` adds to counters over the interval since its cursor and refuses to invent one (`ProjectionCursorMissingError`), because seeding it means resetting every `document_chunks` row, and that `UPDATE` row-locks the table every upload writes to — not a thing the 02:00 job should do to live traffic. So it is an operator command, run against the ingestion database after the schema exists and before the first nightly run:
 
 ```sh
-# from apps/ingestion-service, once per database
+# from services/ingestion-service, once per database
 npm run projection:backfill
 ```
 

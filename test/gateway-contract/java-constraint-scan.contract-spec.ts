@@ -101,7 +101,7 @@ describe('scanJava on a hostile fixture', () => {
 describe('the real Java sources', () => {
   it('yield at least the 23 constrained request fields measured when this was written', () => {
     const found = scanJavaDirectory(
-      join(REPO_ROOT, 'apps/api-gateway/src/main/java'),
+      join(REPO_ROOT, 'services/api-gateway/src/main/java'),
     );
     const requestFields = new Set(
       found

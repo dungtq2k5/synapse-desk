@@ -96,7 +96,7 @@ spec:
             # unlike auth's. `subPath` because mounting a directory here would
             # bury the application.
             - name: fcm-service-account
-              mountPath: /app/apps/notification-service/serviceAccountKey.json
+              mountPath: /app/services/notification-service/serviceAccountKey.json
               subPath: serviceAccountKey.json
               readOnly: true
           resources:

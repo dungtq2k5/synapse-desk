@@ -27,7 +27,7 @@ ci-artifacts/
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/
 
-# Python. `apps/rag-service/.gitignore` already covers its own subtree; these
+# Python. `services/rag-service/.gitignore` already covers its own subtree; these
 # are here so the next Python thing added anywhere else starts out ignored
 # rather than being discovered later.
 __pycache__/
@@ -65,9 +65,9 @@ docker/firebase/*.log
 # `outDir`/`rootDir` mismatch emits `.js` and `.d.ts` beside the `.ts` they came from).
 # Ignored rather than merely deleted because eslint's type-aware rules fail on
 # a stray `.d.ts` with a parsing error that names the file but not the cause.
-libs/*/src/**/*.js
-libs/*/src/**/*.js.map
-libs/*/src/**/*.d.ts
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
 
 # Derived: the demo seeder's manifest. A committed one goes stale the first
 # time somebody reseeds, and a stale manifest names ids that no longer exist.

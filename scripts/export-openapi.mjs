@@ -6,7 +6,7 @@
  *   node scripts/export-openapi.mjs --check    # compare, write nothing, exit 1 on drift
  *
  * **Reads the document the gateway SERVES**, which `OpenApiDocumentExportIT` saves
- * to `apps/api-gateway/target/openapi-java.json`. Run it through `npm run
+ * to `services/api-gateway/target/openapi-java.json`. Run it through `npm run
  * openapi:export` / `npm run openapi:check`, which delete that file and produce it
  * again in the same command: run bare, this refuses only a file that is absent,
  * because a stale one cannot be told apart by its age.
@@ -36,7 +36,7 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
-const SERVED = join(ROOT, 'apps/api-gateway/target/openapi-java.json');
+const SERVED = join(ROOT, 'services/api-gateway/target/openapi-java.json');
 const OUTPUT = join(ROOT, OPENAPI_OUTPUT);
 
 if (!existsSync(SERVED)) {

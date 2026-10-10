@@ -28,12 +28,12 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 
-const {
-  SCHEDULED_JOBS,
-  expectedIntervalMs,
-  SCHEDULE_CRON,
-  compareAlphabetically,
-} = await import(join(ROOT, 'libs/common/dist/main.js'));
+const { SCHEDULED_JOBS, SCHEDULE_CRON } = await import(
+  join(ROOT, 'packages/contracts/dist/index.js')
+);
+const { expectedIntervalMs, compareAlphabetically } = await import(
+  join(ROOT, 'packages/core/dist/index.js')
+);
 
 /** Twice the interval, matching `STALENESS_FACTOR` in `job-staleness.ts`. */
 const STALENESS_FACTOR = 2;

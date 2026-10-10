@@ -34,5 +34,5 @@ The backend's own half of the contract is tested: concatenated tokens reproduce 
 ## See also
 
 - [development-conventions.md §8.5](../development-conventions.md) — the rule this page implements
-- `apps/rag-service/eval/run.py` — the eval harness that scores `renders_as_markdown`
-- `apps/rag-service/tests/test_hostile_output_e2e.py` — the ten hostile responses
+- `services/rag-service/eval/run.py` — the eval harness that scores `renders_as_markdown`
+- `services/rag-service/tests/test_hostile_output_e2e.py` — the ten hostile responses

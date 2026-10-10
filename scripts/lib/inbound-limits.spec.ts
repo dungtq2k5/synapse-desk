@@ -5,28 +5,28 @@ import { join } from 'node:path';
 /**
  * The gateway's inbound-email limits equal the shared ones they copy.
  *
- * `InboundLimits.java` repeats `libs/common`'s attachment vocabulary (the
+ * `InboundLimits.java` repeats `packages/contracts`'s attachment vocabulary (the
  * allowlist, the file-name and per-message bounds), which the generated Java
  * vocabulary does not carry, so a copy is unavoidable — and a copy that nothing
  * compares is right on the day it is written. This is the comparison.
  *
- * **Scanned from the Java file toward `libs/common`**, never the reverse: every
- * integer Java declares either equals its `libs/common` counterpart or is named in
+ * **Scanned from the Java file toward `packages/contracts`**, never the reverse: every
+ * integer Java declares either equals its `packages/contracts` counterpart or is named in
  * {@link GATEWAY_OWNED} as the gateway's own, so a new one is neither until someone
  * decides. The allowlist is compared as a set in both directions, so a type added
  * on either side fails.
  */
-describe('InboundLimits.java against libs/common', () => {
+describe('InboundLimits.java against packages/contracts', () => {
   const ROOT = join(__dirname, '../..');
   const java = readFileSync(
     join(
       ROOT,
-      'apps/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/InboundLimits.java',
+      'services/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/InboundLimits.java',
     ),
     'utf8',
   );
-  const common = createRequire(join(ROOT, 'libs/common/dist/main.js'))(
-    join(ROOT, 'libs/common/dist/main.js'),
+  const common = createRequire(join(ROOT, 'packages/contracts/dist/index.js'))(
+    join(ROOT, 'packages/contracts/dist/index.js'),
   ) as Record<string, unknown>;
 
   /** Every `public static final int NAME = N;` in the Java file. */
@@ -52,7 +52,7 @@ describe('InboundLimits.java against libs/common', () => {
     'MAX_INBOUND_BODY_LENGTH',
   ]);
 
-  it("**every integer the Java file declares equals its libs/common counterpart, or is the gateway's own**", () => {
+  it("**every integer the Java file declares equals its packages/contracts counterpart, or is the gateway's own**", () => {
     const ints = javaInts();
     const compared = Object.keys(ints).filter(
       (name) => !GATEWAY_OWNED.has(name),

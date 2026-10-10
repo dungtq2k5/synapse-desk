@@ -13,18 +13,18 @@ import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { REPO_ROOT } from './paths';
 import { isLocalDatabase, readDatabaseUrl, redact } from '../database-url.mjs';
-import { PrismaClient as AuthPrismaClient } from '../../apps/auth-service/src/generated/prisma/client';
-import { PrismaClient as TicketPrismaClient } from '../../apps/ticket-service/src/generated/prisma/client';
-import { PrismaClient as IngestionPrismaClient } from '../../apps/ingestion-service/src/generated/prisma/client';
-import type { PrismaService as AuthPrismaService } from '../../apps/auth-service/src/modules/prisma/prisma.service';
-import type { PrismaService as TicketPrismaService } from '../../apps/ticket-service/src/modules/prisma/prisma.service';
-import type { PrismaService as IngestionPrismaService } from '../../apps/ingestion-service/src/modules/prisma/prisma.service';
+import { PrismaClient as AuthPrismaClient } from '../../services/auth-service/src/generated/prisma/client';
+import { PrismaClient as TicketPrismaClient } from '../../services/ticket-service/src/generated/prisma/client';
+import { PrismaClient as IngestionPrismaClient } from '../../services/ingestion-service/src/generated/prisma/client';
+import type { PrismaService as AuthPrismaService } from '../../services/auth-service/src/modules/prisma/prisma.service';
+import type { PrismaService as TicketPrismaService } from '../../services/ticket-service/src/modules/prisma/prisma.service';
+import type { PrismaService as IngestionPrismaService } from '../../services/ingestion-service/src/modules/prisma/prisma.service';
 
 /** Where each service's dev connection string lives. */
 const ENV_FILES: Record<'auth' | 'ticket' | 'ingestion', string> = {
-  auth: 'apps/auth-service/.env',
-  ticket: 'apps/ticket-service/.env',
-  ingestion: 'apps/ingestion-service/.env',
+  auth: 'services/auth-service/.env',
+  ticket: 'services/ticket-service/.env',
+  ingestion: 'services/ingestion-service/.env',
 };
 
 /**

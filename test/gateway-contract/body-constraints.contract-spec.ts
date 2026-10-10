@@ -85,7 +85,7 @@ const sentence = (name: string): string => {
   const source = readFileSync(
     join(
       REPO_ROOT,
-      'apps/api-gateway/src/main/java/com/synapsedesk/gateway/openapi/ConstraintPublishingCustomizer.java',
+      'services/api-gateway/src/main/java/com/synapsedesk/gateway/openapi/ConstraintPublishingCustomizer.java',
     ),
     'utf8',
   );
@@ -131,7 +131,7 @@ const reachedFromARequest = (schema: string) =>
  * parameter, or a class that is no published schema).
  */
 const found: Found[] = scanJavaDirectory(
-  join(REPO_ROOT, 'apps/api-gateway/src/main/java'),
+  join(REPO_ROOT, 'services/api-gateway/src/main/java'),
 ).map((constraint) => ({
   schema: constraint.className,
   property: constraint.property,

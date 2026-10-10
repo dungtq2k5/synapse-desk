@@ -1,0 +1,225 @@
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
+import {
+  PROJECTION_LAG_MS,
+  ROLLUP_TRAILING_DAYS,
+  SCHEDULED_JOBS,
+  SCHEDULER_QUEUE,
+} from '@synapsedesk/contracts';
+import { formatErrorMsg, JobRunRecorder } from '@synapsedesk/nest-common';
+import { PrismaService } from '../prisma/prisma.service';
+import { ChunkUsageProjection } from '../scheduled/chunk-usage.projection';
+import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
+import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
+import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
+import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
+import { ScopeReconcileSweep } from '../ingestion/scope-reconcile.sweep';
+import { IngestionReconcileSweep } from '../ingestion/ingestion-reconcile.sweep';
+
+/**
+ * The thing that was missing
+ *
+ * Six jobs in this service were written correctly and called by nothing. This
+ * class is the caller, and it is deliberately thin: it decides WHEN and in what
+ * ORDER, and contains no logic of its own. The jobs stay plain methods taking
+ * explicit windows, which is what keeps them testable without waiting on a
+ * clock.
+ *
+ * **The ordering inside `ledger.daily` is a correctness constraint, not a
+ * preference.** Encoded as one job calling three in sequence rather than as
+ * three cron entries minutes apart — see `JOB_SEQUENCES`. Two cron entries
+ * work until the first job takes longer than the gap between them, and then
+ * they fail by destroying data the next one had not read.
+ */
+@Processor(SCHEDULER_QUEUE.ingestion, {
+  // One at a time. These are bulk sweeps over a tenant's history; running the
+  // hourly and the daily concurrently would put them in contention for exactly
+  // the rows they are both rewriting.
+  concurrency: 1,
+})
+export class SchedulerProcessor extends WorkerHost {
+  private readonly logger = new Logger(SchedulerProcessor.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projection: ChunkUsageProjection,
+    private readonly draftSweep: DiscardedDraftSweep,
+    private readonly quota: QuotaReconciliationJob,
+    private readonly flags: DocumentFlagWriter,
+    private readonly aiRollup: AiGenerationRollupJob,
+    private readonly reconcile: IngestionReconcileSweep,
+    private readonly runs: JobRunRecorder,
+    private readonly scopeReconcile: ScopeReconcileSweep,
+  ) {
+    super();
+  }
+
+  async process(job: Job): Promise<void> {
+    switch (job.name) {
+      case SCHEDULED_JOBS.LEDGER_HOURLY:
+        return this.runs.track(job.name, () => this.hourly());
+      case SCHEDULED_JOBS.LEDGER_DAILY:
+        return this.runs.track(job.name, () => this.daily());
+      case SCHEDULED_JOBS.INGESTION_RECONCILE:
+        // Tracked like the others even though it usually finds nothing: a
+        // sweep that only writes a heartbeat when it has work reports
+        // `never-ran` on a healthy system, which is the one thing
+        // `/platform/jobs` exists to distinguish.
+        return this.runs.track(job.name, async () => {
+          await this.reconcile.sweep();
+        });
+      case SCHEDULED_JOBS.SCOPE_RECONCILE:
+        // Tracked unconditionally, same reason as the reconcile above: a sweep
+        // that heartbeats only when it finds drift reports `never-ran` on a
+        // healthy system.
+        return this.runs.track(job.name, async () => {
+          await this.scopeReconcile.sweep();
+        });
+
+      default:
+        // **A defect, not routine cross-talk** — and the difference is what
+        // makes throwing correct now.
+        //
+        // This branch used to `return`, which reported SUCCESS to BullMQ for
+        // work nobody did — and it fired constantly, because all three services
+        // shared one queue and each one received the other two's jobs. Every
+        // stolen run was marked complete and its schedule advanced.
+        //
+        // With one queue per service a job can only arrive at its owner, so a
+        // name this build does not know is what the old comment always claimed
+        // it was: a repeat entry left by an older deploy. It belongs in
+        // `failed`, where it is visible and queryable, and where it stops
+        // pretending the schedule ran.
+        //
+        // Retrying cannot bury the real jobs: the repeat entry carries
+        // `attempts: 3` with exponential backoff, so this exhausts and stops
+        // rather than looping.
+        throw new Error(`Unknown scheduled job '${job.name}'`);
+    }
+  }
+
+  /**
+   * Hourly: draft outcomes, then quota drift.
+   *
+   * Both correct a divergence that GROWS with time, which is why they are not
+   * daily. An unswept draft is a denominator that overstates acceptance for
+   * every hour it sits there, and counter drift is a budget gate deciding
+   * against a number nobody has checked against the ledger.
+   *
+   * Unordered relative to each other — they touch different things — but run in
+   * sequence anyway so one long sweep cannot overlap the other.
+   */
+  private async hourly(): Promise<void> {
+    await this.step('discarded-draft-sweep', async () => {
+      const swept = await this.draftSweep.sweep();
+
+      return `${swept} draft(s) marked discarded`;
+    });
+
+    await this.step('quota-reconcile', async () => {
+      const reconciled = await this.quota.reconcileAll();
+
+      return `${reconciled} tenant(s) reconciled`;
+    });
+  }
+
+  /**
+   * Daily: **projection → rollup → flags**, and the order is load-bearing.
+   *
+   *   1. `ChunkUsageProjection` first. It reads the retrieved/cited chunk id
+   *      arrays on `ai_generations`, which ledger retention will eventually
+   *      drop — anything that runs after retention reads nothing, permanently.
+   *   2. `AiGenerationRollupJob` second, for the same reason: it aggregates the
+   *      same rows retention removes.
+   *   3. `DocumentFlagWriter` LAST, because `UNRETRIEVED` and `UNCITED` are
+   *      computed from the counters step 1 writes. Flagging first means
+   *      flagging against yesterday's numbers.
+   *
+   * When retention is built it goes at the END of this method and nowhere else.
+   *
+   * **Steps 1 and 2 have the same re-run semantics by opposite mechanisms.**
+   * The rollup deletes and re-inserts, so recomputing an interval it already
+   * covered is free; the projection ADDS, so it cannot recompute and takes a
+   * cursor instead.
+   *
+   * **What that does NOT buy is sequencing.** `step()` catches and does not
+   * rethrow, so every step runs whatever the one before it did — a projection
+   * that throws still lets `document-flags` compute against counters this run
+   * did not write. The cursor makes those counters STALE rather than wrong,
+   * and the next run closes the gap however long the outage; nothing here
+   * makes the three steps atomic, and a reader looking for that should not
+   * infer it from the ordering above.
+   */
+  private async daily(): Promise<void> {
+    await this.step('chunk-usage-projection', async () => {
+      // **Cursor-driven, so it gets an upper bound and finds its own lower
+      // one.** It ADDS to the chunk counters, so an interval overlapping its
+      // predecessor counts a generation twice. The lag is what a cursor needs
+      // and a window does not: see `PROJECTION_LAG_MS`.
+      const updated = await this.projection.project(
+        new Date(Date.now() - PROJECTION_LAG_MS),
+      );
+
+      return `${updated} chunk counter(s) updated`;
+    });
+
+    await this.step('ai-generation-rollup', async () => {
+      // Window-driven, and correctly so: this step deletes and re-inserts, so
+      // recomputing a day it already had is free and a wide window only
+      // self-heals a missed night. `AiGenerationRollupJob.run` builds the
+      // window itself from `days`.
+      const outcome = await this.aiRollup.run(new Date(), ROLLUP_TRAILING_DAYS);
+
+      return `${outcome.tenants} tenant(s), ${outcome.rows} row(s)`;
+    });
+
+    // Per tenant, because `detect()` is scoped to one. Tenants are read from
+    // the documents table rather than from auth-service: a tenant with no
+    // documents has nothing to flag, and asking auth-service would add a
+    // cross-service dependency to a job that does not need one.
+    await this.step('document-flags', async () => {
+      const tenants = await this.prisma.document.groupBy({
+        by: ['organizationId'],
+        where: { deletedAt: null },
+      });
+
+      let flagged = 0;
+      for (const tenant of tenants) {
+        flagged += await this.flags.detect(tenant.organizationId);
+      }
+
+      return `${flagged} flag(s) across ${tenants.length} tenant(s)`;
+    });
+  }
+
+  /**
+   * Runs one step, logs its outcome, and **does not let a failure stop the
+   * sequence**.
+   *
+   * A step that throws is logged and the next one still runs test
+   * 5. The alternative would let one bad tenant's projection cost that night's
+   * rollup and flags as well, turning a small fault into a missing day.
+   *
+   * The order still holds under failure: a failed projection means the rollup
+   * runs against stale counters, which is worse than nothing only if it also
+   * hides. It does not — the error is logged and the heartbeat records it.
+   */
+  private async step(name: string, run: () => Promise<string>): Promise<void> {
+    const startedAt = Date.now();
+
+    try {
+      // Each STEP gets its own heartbeat row as well as the job's. The job's
+      // row would otherwise read "succeeded" for a night in which the
+      // projection failed and only the rollup ran — which is the difference
+      // between "we have numbers" and "we have the right numbers".
+      const summary = await this.runs.track(name, run);
+
+      this.logger.log(`${name}: ${summary} (${Date.now() - startedAt}ms)`);
+    } catch (error) {
+      this.logger.error(
+        `${name} FAILED after ${Date.now() - startedAt}ms: ${formatErrorMsg(error)}`,
+      );
+    }
+  }
+}

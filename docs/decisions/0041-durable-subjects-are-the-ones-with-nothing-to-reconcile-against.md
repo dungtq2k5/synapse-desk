@@ -1,6 +1,6 @@
 # 0041 — Durable subjects are the ones with nothing to reconcile against
 
-**Status:** accepted · **Code:** `libs/common/src/jetstream/jetstream.config.ts`, `libs/common/src/jetstream/jetstream-bootstrap.ts`, `audit.consumer.ts`, `notifications.controller.ts`
+**Status:** accepted · **Code:** `packages/nest-common/src/jetstream/jetstream.config.ts`, `packages/nest-common/src/jetstream/jetstream-bootstrap.ts`, `audit.consumer.ts`, `notifications.controller.ts`
 
 ## Decision
 

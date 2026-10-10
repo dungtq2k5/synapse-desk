@@ -1,6 +1,6 @@
 # 0038 — Permissions are a compile-time artifact, not data
 
-**Status:** accepted · **Code:** `libs/common/src/configs/rbac.config.ts`
+**Status:** accepted · **Code:** `packages/contracts/src/configs/rbac.config.ts`
 
 ## Decision
 

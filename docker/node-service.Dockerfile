@@ -22,8 +22,8 @@
 # rather than anything that hints at the real one.
 #
 #     docker run --rm --network synapsedesk-network \
-#       --env-file apps/auth-service/.env.docker \
-#       -v "$PWD/apps/auth-service/secrets:/app/apps/auth-service/secrets:ro" \
+#       --env-file services/auth-service/.env.docker \
+#       -v "$PWD/services/auth-service/secrets:/app/services/auth-service/secrets:ro" \
 #       synapsedesk/auth-service
 #
 # The mount target is `$WORKDIR/secrets`, because the key paths in the env
@@ -31,7 +31,7 @@
 # `turbo run dev` uses in the package directory, which is why one value works
 # in both places. storage-service is the odd one out: its credential is
 # `./serviceAccountKey.json` at the package ROOT, not under `secrets/`, so its
-# mount is `-v .../serviceAccountKey.json:/app/apps/storage-service/serviceAccountKey.json:ro`.
+# mount is `-v .../serviceAccountKey.json:/app/services/storage-service/serviceAccountKey.json:ro`.
 # `.env.docker` is GENERATED from `.env` by `scripts/generate-docker-env.mjs`
 # (host addresses swapped for compose service names) and is gitignored — see
 # that script's header for why generated-not-tracked is the drift answer.
@@ -39,7 +39,7 @@
 # `rag-service` is Python and has its own file; it is the one service where the
 # stages genuinely differ.
 
-# 22.12 is the FLOOR, not a preference — `apps/ingestion-service/package.json`
+# 22.12 is the FLOOR, not a preference — `services/ingestion-service/package.json`
 # pins `engines.node: >=22.12` because `pdfjs-dist` is ESM-only and is loaded
 # through `createRequire`, which needs a Node that can `require()` ESM. Running
 # the image on 22.11 fails at the first PDF, not at boot.
@@ -189,7 +189,7 @@ RUN npx turbo run build --filter="@synapsedesk/${SERVICE}..."
 # the per-service check is blind to spec and harness files — and the measured
 # case is exactly there: notification's `test/utils/bootstrap.ts` imported
 # `@nestjs/testing` undeclared, and a full image run was what caught it. The
-# root config includes `apps/*/test/**` and resolves `@synapsedesk/*` to SOURCE
+# root config includes `services/*/test/**` and resolves `@synapsedesk/*` to SOURCE
 # through `paths`, where the per-service pass resolves to the built `.d.ts`.
 # Two corpora, two resolution modes; a green build is not a green typecheck.
 #
@@ -242,22 +242,26 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 # `node_modules/@synapsedesk/common` to `././libs/common`, so a runtime image
 # that copied only `apps/` would carry a symlink pointing at nothing — and the
 # failure is a module-not-found at boot, after the image has been pushed.
-COPY --from=build /app/libs/common/package.json ./libs/common/
-COPY --from=build /app/libs/common/dist ./libs/common/dist
-COPY --from=build /app/libs/grpc-proto/package.json ./libs/grpc-proto/
+COPY --from=build /app/packages/contracts/package.json ./packages/contracts/
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build /app/packages/core/package.json ./packages/core/
+COPY --from=build /app/packages/core/dist ./packages/core/dist
+COPY --from=build /app/packages/nest-common/package.json ./packages/nest-common/
+COPY --from=build /app/packages/nest-common/dist ./packages/nest-common/dist
+COPY --from=build /app/packages/grpc-proto/package.json ./packages/grpc-proto/
 # `dist/proto` carries the.proto FILES, not just the compiled types. gRPC's
 # loader reads them at startup, so an image without them fails to boot rather
 # than failing on the first call — see `scripts/copy-protos.mjs`.
-COPY --from=build /app/libs/grpc-proto/dist ./libs/grpc-proto/dist
+COPY --from=build /app/packages/grpc-proto/dist ./packages/grpc-proto/dist
 
-COPY --from=build /app/apps/${SERVICE}/package.json ./apps/${SERVICE}/
-COPY --from=build /app/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
+COPY --from=build /app/services/${SERVICE}/package.json ./services/${SERVICE}/
+COPY --from=build /app/services/${SERVICE}/dist ./services/${SERVICE}/dist
 
 # **One entrypoint name for two compiler layouts**, resolved at BUILD time.
 #
 # A service compiled with SWC emits `dist/src/main.js`. One compiled with `tsc`
-# and path aliases into `libs/*/src` has its common source root moved, and
-# emits `dist/apps/<service>/src/main.js` instead.
+# and path aliases into `packages/*/src` has its common source root moved, and
+# emits `dist/services/<service>/src/main.js` instead.
 #
 # A single hardcoded ENTRY served one of those and silently broke the other. A
 # second build-arg would work and is a footgun: the wrong default builds a
@@ -265,9 +269,9 @@ COPY --from=build /app/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
 # layout matching NEITHER fails the build, which is the one place a mistake is
 # still cheap.
 RUN set -eu; \
-    cd "/app/apps/${SERVICE}"; \
+    cd "/app/services/${SERVICE}"; \
     if   [ -f dist/src/main.js ];                    then target=dist/src/main.js; \
-    elif [ -f "dist/apps/${SERVICE}/src/main.js" ];  then target="dist/apps/${SERVICE}/src/main.js"; \
+    elif [ -f "dist/services/${SERVICE}/src/main.js" ];  then target="dist/services/${SERVICE}/src/main.js"; \
     else echo "No compiled entrypoint for ${SERVICE} — was it built?" >&2; exit 1; fi; \
     ln -s "$target" entry.js; \
     echo "Entrypoint for ${SERVICE}: $target"
@@ -279,7 +283,7 @@ USER node
 # Secrets are MOUNTED, never copied: JWT keys and the Firebase service account
 # are gitignored and must not be baked into a layer that anyone who can pull the
 # image can extract. The paths come from each service's own `*_KEY_PATH` config.
-WORKDIR /app/apps/${SERVICE}
+WORKDIR /app/services/${SERVICE}
 
 # Not `npm start`: npm forks a shell that does not forward SIGTERM, so the
 # process never sees the signal `enableShutdownHooks()` is waiting for and the
@@ -290,7 +294,7 @@ WORKDIR /app/apps/${SERVICE}
 # var at build time and exec'd through it. `entry.js` is the symlink resolved
 # above; Node follows it and resolves the module's own `require`s from the real
 # path, so relative imports inside `dist` are unaffected.
-ENV ENTRY=/app/apps/${SERVICE}/entry.js
+ENV ENTRY=/app/services/${SERVICE}/entry.js
 CMD ["sh", "-c", "exec node \"$ENTRY\""]
 
 # --------------------------------------------------------------- runtime-ocr
@@ -416,10 +420,10 @@ USER node
 # fourth place to keep that fact.
 FROM build AS migrate
 ARG SERVICE
-WORKDIR /app/apps/${SERVICE}
+WORKDIR /app/services/${SERVICE}
 
 RUN test -f prisma/schema.prisma \
-  || (echo "migrate target needs apps/${SERVICE}/prisma/schema.prisma — this service owns no schema and needs no init container" \
+  || (echo "migrate target needs services/${SERVICE}/prisma/schema.prisma — this service owns no schema and needs no init container" \
       && false)
 
 # The schema-object step's entrypoint, checked HERE rather than discovered at
@@ -428,7 +432,7 @@ RUN test -f prisma/schema.prisma \
 # the gate above already refuses it, so one path is correct rather than lucky —
 # and this line is what makes that a build failure if it stops being true.
 RUN test -f dist/src/schema-apply.js \
-  || (echo "migrate target needs apps/${SERVICE}/dist/src/schema-apply.js — see src/schema-apply.ts" \
+  || (echo "migrate target needs services/${SERVICE}/dist/src/schema-apply.js — see src/schema-apply.ts" \
       && false)
 
 USER node

@@ -80,10 +80,10 @@ const CHECKS = [
 ];
 
 for (const file of [
-  '../apps/auth-service/.env',
-  '../apps/auth-service/.env.test',
-  '../apps/ingestion-service/.env',
-  '../apps/ingestion-service/.env.test',
+  '../services/auth-service/.env',
+  '../services/auth-service/.env.test',
+  '../services/ingestion-service/.env',
+  '../services/ingestion-service/.env.test',
 ]) {
   // Each URL is read in its own pass, because `loadEnvFile` does not overwrite
   // and both files name the same variable.

@@ -60,7 +60,7 @@ export default async function globalSetup(): Promise<void> {
   // `build`, which keeps `npm test` runnable without a JDK. Its `start:prod`
   // runs the jar, so the jar is built here.
   execFileSync('./mvnw', ['-q', 'package', '-DskipTests'], {
-    cwd: join(REPO_ROOT, 'apps/api-gateway'),
+    cwd: join(REPO_ROOT, 'services/api-gateway'),
     stdio: 'inherit',
   });
 

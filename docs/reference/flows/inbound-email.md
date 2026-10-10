@@ -55,7 +55,7 @@ sequenceDiagram
 | gateway — loop guards | same, step 0 | refusing mail that would loop |
 | ticket-service | create/append; `IngestAttachment` | the ticket, the message, the thread; authorising a write under a ticket's prefix |
 | storage-service | `IngestFromUrl`, `remote-source.fetcher.ts` | fetching the bytes through the SSRF guard and landing them under `pending/` |
-| `libs/common` | `guarded-target.ts` | the one SSRF control, shared with outbound webhooks |
+| `@synapsedesk/nest-common` | `guarded-target.ts` | the one SSRF control, shared with outbound webhooks |
 | `provision-resend.mjs` | `scripts/` | creating the webhook; reading its signing secret back |
 | `resend-preflight.mjs` | `scripts/` | reading what a real account returns — headers, `received_for`, download hosts, expiry — without printing values |
 

@@ -1,0 +1,433 @@
+import { Injectable } from '@nestjs/common';
+import {
+  AiGenerationPurpose,
+  addAiStats,
+  AiStatSums,
+  AnalyticsGranularity,
+  CallerContext,
+  DocumentFlagType,
+  ANALYTICS_TOP_N,
+  draftAcceptanceRate,
+  EMPTY_AI_STATS,
+  attachmentGroundedRate,
+  emptyRetrievalRate,
+  failureRate,
+  Mean,
+  meanLatencyMs,
+  Rate,
+} from '@synapsedesk/contracts';
+import {
+  bucketKey,
+  granularityOf,
+  newestComputedAt,
+  parseAnalyticsRange,
+  requireTenant,
+} from '@synapsedesk/nest-common';
+import {
+  AiUsageRequest,
+  AiUsageResponse,
+  DocumentAnalyticsRequest,
+  DocumentAnalyticsResponse,
+  KnowledgeGapsRequest,
+  KnowledgeGapsResponse,
+  AiMeanValue,
+  AiRateValue,
+  toProtoTimestamp,
+  toProtoAiModelTier,
+  toProtoDocumentFlagType,
+} from '@synapsedesk/grpc-proto';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
+
+// `ReadonlySet<string>` but BUILT from enum members, and both halves matter:
+// `row.purpose` is a Prisma `VarChar` so `has()` must take a string, while a
+// renamed enum member still fails to compile here. Typing the Set as the enum
+// would force a cast; string literals would silently match no row and report an
+// empty-retrieval rate of zero for a tenant whose rate is not zero.
+/** The purposes that ANSWER a question — the only ones an empty retrieval means anything for. */
+const ANSWERING_PURPOSES: ReadonlySet<string> = new Set([
+  AiGenerationPurpose.CHAT_ANSWER,
+  AiGenerationPurpose.DRAFT,
+]);
+
+/** A rollup row with its dimensions. */
+type AiDailyRow = AiStatSums & {
+  day: Date;
+  purpose: string;
+  modelName: string;
+  computedAt: Date;
+};
+
+/**
+ * AI spend and corpus health.
+ *
+ * **Reads `ai_generation_daily_stats`, never `ai_generations`.** That table is
+ * retention-rolled (RDM Table 29): raw rows aggregate away after ~90 days, so a
+ * query against them would report a shrinking spend for a tenant whose usage is
+ * flat, and no error anywhere.
+ *
+ * The two document endpoints are the exception and read `document_chunks`
+ * counters directly — those are a PROJECTION maintained by
+ * `ChunkUsageProjection` for exactly this reason, so they survive
+ * retention too.
+ */
+@Injectable()
+export class AiAnalyticsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authReference: AuthReferenceService,
+  ) {}
+
+  async getAiUsage(
+    request: AiUsageRequest,
+    context: CallerContext,
+  ): Promise<AiUsageResponse> {
+    const organizationId = requireTenant(context);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
+
+    const [rows, entitlement, tier, dataThrough] = await Promise.all([
+      this.dailyRows(organizationId, range),
+      // The budget the spend is measured AGAINST, fetched here so a caller does
+      // not need a second round trip to render a progress bar. A number with no
+      // ceiling beside it is one nobody can act on.
+      this.authReference.getAiEntitlement(context),
+      this.authReference.getAiModelTier(context),
+      this.dataThrough(organizationId),
+    ]);
+
+    const totals = sumAll(rows);
+
+    return {
+      points: [...bucketByDay(rows, granularityOf(request.granularity))].map(
+        ([day, stats]) => ({
+          day,
+          generations: stats.generations,
+          costMicros: stats.costMicros,
+        }),
+      ),
+      // **The per-purpose split is the point**: it shows a tenant
+      // where the budget actually goes, which is rarely where they assume —
+      // embeddings and review passes are usually the surprise.
+      byPurpose: slice(
+        rows,
+        (row) => row.purpose,
+        (row) => ({
+          purpose: row.purpose,
+          modelName: '',
+        }),
+      ),
+      byModel: slice(
+        rows,
+        (row) => row.modelName,
+        (row) => ({
+          purpose: '',
+          modelName: row.modelName,
+        }),
+      ),
+      totalCostMicros: totals.costMicros,
+      totalGenerations: totals.generations,
+      monthlyBudgetMicros: Number(entitlement.budgetMicros),
+      aiModelTier: toProtoAiModelTier(tier),
+      draftAcceptance: toAiRateValue(draftAcceptanceRate(totals)),
+      emptyRetrievalRate: toAiRateValue(
+        emptyRetrievalRate(sumAll(answeringOnly(rows))),
+      ),
+      computedAt: latestComputedAt(rows),
+      dataThrough,
+    };
+  }
+
+  /**
+   * The content backlog.
+   *
+   * Two signals that answer different questions and are useless apart: the
+   * empty-retrieval RATE says how often the corpus had nothing, and the
+   * document flags say which documents are the problem.
+   */
+  async getKnowledgeGaps(
+    request: KnowledgeGapsRequest,
+    context: CallerContext,
+  ): Promise<KnowledgeGapsResponse> {
+    const organizationId = requireTenant(context);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
+
+    const rows = answeringOnly(await this.dailyRows(organizationId, range));
+    const totals = sumAll(rows);
+
+    const flags = await this.prisma.documentFlag.findMany({
+      where: {
+        organizationId,
+        resolvedAt: null,
+        // The two flags that mean "the corpus is not answering". `OUTDATED` and
+        // `DUPLICATE` are corpus HYGIENE, which is a different backlog and
+        // would bury these under noise.
+        flagType: {
+          in: [DocumentFlagType.UNRETRIEVED, DocumentFlagType.UNCITED],
+        },
+        document: { deletedAt: null },
+      },
+      include: { document: { select: { title: true } } },
+      orderBy: { detectedAt: 'desc' },
+      take: clampLimit(request.limit),
+    });
+
+    return {
+      emptyRetrievals: totals.emptyRetrievals,
+      answeringGenerations: totals.generations,
+      // Attachment-free only. `emptyRetrievals` above stays the TOTAL, so the
+      // two numbers are readable together rather than one silently redefining
+      // the other.
+      emptyRetrievalRate: toAiRateValue(emptyRetrievalRate(totals)),
+      // **Reported, not excluded.** Dropping these rows would fix the rate and
+      // lose the number that says a corpus is being routed around.
+      attachmentGroundedRate: toAiRateValue(attachmentGroundedRate(totals)),
+      attachmentEmptyRetrievals: totals.attachmentEmptyRetrievals,
+      flags: flags.map((flag) => ({
+        documentId: flag.documentId,
+        documentTitle: flag.document.title,
+        flagType: toProtoDocumentFlagType(flag.flagType),
+        detail: flag.detail,
+      })),
+      dataThrough: await this.dataThrough(organizationId),
+    };
+  }
+
+  /**
+   * Corpus health from the chunk counters.
+   *
+   * **`UNRETRIEVED` and `UNCITED` are DIFFERENT findings** (RDM Table 27) and
+   * are returned as separate lists. A document nobody's question came near may
+   * simply be mis-titled; one retrieved twenty times and cited never is
+   * actively displacing the sources that would have answered. Folding them into
+   * one "unused" list is how the second, worse problem hides inside the first.
+   *
+   * No date range: these are lifetime counters on the chunk rows, and a
+   * "documents never retrieved in March" list would flag every document written
+   * in April.
+   */
+  async getDocumentAnalytics(
+    request: DocumentAnalyticsRequest,
+    context: CallerContext,
+  ): Promise<DocumentAnalyticsResponse> {
+    const organizationId = requireTenant(context);
+    const limit = clampLimit(request.limit);
+
+    const rows = await this.prisma.$queryRawUnsafe<
+      {
+        document_id: string;
+        title: string;
+        retrieval_count: number;
+        citation_count: number;
+        chunk_count: number;
+      }[]
+    >(
+      `
+      SELECT d.id AS document_id,
+             d.title,
+             COALESCE(SUM(c.retrieval_count), 0)::int AS retrieval_count,
+             COALESCE(SUM(c.citation_count), 0)::int AS citation_count,
+             COUNT(c.id)::int AS chunk_count
+      FROM documents d
+      LEFT JOIN document_chunks c
+        ON c.document_id = d.id AND c.is_deleted = false
+      WHERE d.organization_id = $1::uuid AND d.deleted_at IS NULL
+      GROUP BY d.id, d.title
+      `,
+      organizationId,
+    );
+
+    const documents = rows.map((row) => ({
+      documentId: row.document_id,
+      title: row.title,
+      retrievalCount: row.retrieval_count,
+      citationCount: row.citation_count,
+      chunkCount: row.chunk_count,
+    }));
+
+    return {
+      mostCited: [...documents]
+        .filter((document) => document.citationCount > 0)
+        .sort((left, right) => right.citationCount - left.citationCount)
+        .slice(0, limit),
+      neverRetrieved: documents
+        .filter((document) => document.retrievalCount === 0)
+        .slice(0, limit),
+      retrievedNeverCited: documents
+        .filter(
+          (document) =>
+            document.retrievalCount > 0 && document.citationCount === 0,
+        )
+        .sort((left, right) => right.retrievalCount - left.retrievalCount)
+        .slice(0, limit),
+    };
+  }
+
+  /**
+   * **The last day `ai_generation_daily_stats` covers**.
+   *
+   * See the note on ticket-service's equivalent: this is what lets a dashboard
+   * of zeros say *why* it is zero. Tenant-wide and not clipped to the requested
+   * range, deliberately.
+   *
+   * This service and ticket-service answer independently and can legitimately
+   * disagree — they are rolled up by two different schedulers, and one being
+   * down is precisely the condition worth surfacing rather than smoothing over.
+   */
+  private async dataThrough(
+    organizationId: string,
+  ): Promise<string | undefined> {
+    const newest = await this.prisma.aiGenerationDailyStat.findFirst({
+      where: { organizationId },
+      orderBy: { day: 'desc' },
+      select: { day: true },
+    });
+
+    return newest ? newest.day.toISOString().slice(0, 10) : undefined;
+  }
+
+  private async dailyRows(
+    organizationId: string,
+    range: { from: Date; to: Date },
+  ): Promise<AiDailyRow[]> {
+    const rows = await this.prisma.aiGenerationDailyStat.findMany({
+      where: { organizationId, day: { gte: range.from, lte: range.to } },
+      orderBy: { day: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      day: row.day,
+      purpose: row.purpose,
+      modelName: row.modelName,
+      computedAt: row.computedAt,
+      generations: row.generations,
+      // BigInt on the way out of Postgres and Number here: the wire carries
+      // int64, and a tenant's quarterly micros stay far inside the 53-bit
+      // range a double represents exactly.
+      promptTokens: Number(row.promptTokens),
+      completionTokens: Number(row.completionTokens),
+      costMicros: Number(row.costMicros),
+      latencyMsSum: Number(row.latencyMsSum),
+      latencyCount: row.latencyCount,
+      failures: row.failures,
+      emptyRetrievals: row.emptyRetrievals,
+      attachmentGenerations: row.attachmentGenerations,
+      attachmentEmptyRetrievals: row.attachmentEmptyRetrievals,
+      draftsAccepted: row.draftsAccepted,
+      draftsEdited: row.draftsEdited,
+      draftsDiscarded: row.draftsDiscarded,
+    }));
+  }
+}
+
+/**
+ * Empty retrievals only mean something for a purpose that ANSWERS.
+ *
+ * An embedding retrieves nothing by definition, and a classification retrieves
+ * nothing on purpose — counting them would make the knowledge-gap rate track
+ * ingestion volume rather than corpus coverage.
+ */
+function answeringOnly(rows: AiDailyRow[]): AiDailyRow[] {
+  return rows.filter((row) => ANSWERING_PURPOSES.has(row.purpose));
+}
+
+function sumAll(rows: AiStatSums[]): AiStatSums {
+  return rows.reduce((total, row) => addAiStats(total, row), EMPTY_AI_STATS);
+}
+
+/** Groups by one dimension, summing counters — never averaging rates. */
+function slice(
+  rows: AiDailyRow[],
+  keyOf: (row: AiDailyRow) => string,
+  labelOf: (row: AiDailyRow) => { purpose: string; modelName: string },
+) {
+  const grouped = new Map<
+    string,
+    { label: { purpose: string; modelName: string }; stats: AiStatSums }
+  >();
+
+  for (const row of rows) {
+    const key = keyOf(row);
+    const existing = grouped.get(key);
+
+    grouped.set(key, {
+      label: existing?.label ?? labelOf(row),
+      stats: addAiStats(existing?.stats ?? EMPTY_AI_STATS, row),
+    });
+  }
+
+  return (
+    [...grouped.values()]
+      .map(({ label, stats }) => ({
+        ...label,
+        generations: stats.generations,
+        promptTokens: stats.promptTokens,
+        completionTokens: stats.completionTokens,
+        costMicros: stats.costMicros,
+        latencyMs: toAiMeanValue(meanLatencyMs(stats)),
+        failureRate: toAiRateValue(failureRate(stats)),
+      }))
+      // Most expensive first: the question this answers is "where does the money
+      // go", and an alphabetical list makes the reader find that out themselves.
+      .sort((left, right) => right.costMicros - left.costMicros)
+  );
+}
+
+function bucketByDay(
+  rows: AiDailyRow[],
+  granularity: AnalyticsGranularity,
+): Map<string, AiStatSums> {
+  const buckets = new Map<string, AiStatSums>();
+
+  for (const row of rows) {
+    const key = bucketKey(row.day, granularity);
+    buckets.set(key, addAiStats(buckets.get(key) ?? EMPTY_AI_STATS, row));
+  }
+
+  return buckets;
+}
+
+/**
+ * Bounded, and defaulted when a client sends 0 — proto3 has no "absent" int.
+ *
+ * The bounds come from `ANALYTICS_TOP_N` rather than being written here, so
+ * this and the two gateway DTOs cannot disagree. This is the copy that matters:
+ * the gateway validates before its own calls, but this method is reachable from
+ * any service over gRPC, where nothing validated anything.
+ */
+function clampLimit(limit: number | undefined): number {
+  if (!limit || limit <= 0) return ANALYTICS_TOP_N.DEFAULT;
+
+  return Math.min(limit, ANALYTICS_TOP_N.MAX);
+}
+
+/**
+ * How fresh this dashboard is, on the wire.
+ *
+ * The fold is shared; the proto conversion stays here because `libs/` cannot
+ * import `packages/grpc-proto`.
+ */
+function latestComputedAt(rows: AiDailyRow[]) {
+  const newest = newestComputedAt(rows);
+
+  return newest ? toProtoTimestamp(newest) : undefined;
+}
+
+function toAiRateValue(value: Rate): AiRateValue {
+  return {
+    rate: value.rate ?? undefined,
+    numerator: value.numerator,
+    denominator: value.denominator,
+  };
+}
+
+function toAiMeanValue(value: Mean): AiMeanValue {
+  return { mean: value.mean ?? undefined, count: value.count };
+}

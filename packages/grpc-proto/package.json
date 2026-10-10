@@ -1,0 +1,31 @@
+{
+  "name": "@synapsedesk/grpc-proto",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/copy-protos.mjs dist/proto",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "proto:generate": "buf generate && node ../../scripts/generate-python-protos.mjs",
+    "proto:lint": "buf lint",
+    "proto:breaking": "buf breaking --against '../../.git#branch=main,subdir=packages/grpc-proto'",
+    "clean": "rimraf dist *.tsbuildinfo",
+    "lint": "eslint \"src/**/*.ts\"",
+    "proto:check": "buf generate && node ../../scripts/generate-python-protos.mjs --check && git diff --exit-code -- src/generated"
+  },
+  "devDependencies": {
+    "@grpc/proto-loader": "^0.8.1",
+    "@types/node": "^24.13.3",
+    "ts-proto": "^2.12.0"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/microservices": "^11.1.28",
+    "@synapsedesk/contracts": "*",
+    "@synapsedesk/nest-common": "*",
+    "rxjs": "^7.8.2"
+  }
+}

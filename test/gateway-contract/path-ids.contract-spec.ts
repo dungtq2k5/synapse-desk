@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sign } from 'jsonwebtoken';
-import { OrgStatus } from '@synapsedesk/common';
+import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { Session } from './client';
 import { type Gateway, GATEWAY_ENV, REPO_ROOT, startGateway } from './gateway';

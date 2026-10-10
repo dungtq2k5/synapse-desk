@@ -1,6 +1,6 @@
 # 0007 — A model name may appear in exactly one place
 
-**Status:** accepted · **Code:** `libs/common/src/configs/ai-settings.config.ts`, `apps/rag-service/rag_service/settings.py`, enforced by `scripts/check-model-literals.mjs`
+**Status:** accepted · **Code:** `packages/contracts/src/configs/ai-settings.config.ts`, `services/rag-service/rag_service/settings.py`, enforced by `scripts/check-model-literals.mjs`
 
 ## Decision
 

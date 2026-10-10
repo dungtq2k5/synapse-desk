@@ -1,10 +1,10 @@
 /**
- * Writes `libs/common`'s shared vocabulary into Java constants.
+ * Writes `packages/contracts`'s shared vocabulary into Java constants.
  *
  *   node scripts/export-java-contracts.mjs          # write
  *   node scripts/export-java-contracts.mjs --check  # compare, write nothing, exit 1 on drift
  *
- * It reads the BUILT library (`libs/common/dist`), the same artifact the
+ * It reads the BUILT library (`packages/contracts/dist`), the same artifact the
  * services load, so what it publishes is what runs rather than what the
  * sources say. Run it through `npm run java:contracts` / `java:contracts:check`,
  * which build first — the shape `openapi:export` already has.
@@ -23,18 +23,18 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
 const OUTPUT_DIR = join(
   ROOT,
-  'apps/api-gateway/src/main/java/com/synapsedesk/gateway/contracts',
+  'services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts',
 );
 const RELATIVE =
-  'apps/api-gateway/src/main/java/com/synapsedesk/gateway/contracts';
+  'services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts';
 const COMMAND = 'npm run java:contracts';
 
 const require = createRequire(import.meta.url);
-const BUILT = join(ROOT, 'libs/common/dist/main.js');
+const BUILT = join(ROOT, 'packages/contracts/dist/index.js');
 
 if (!existsSync(BUILT)) {
   console.error(
-    `libs/common is not built (${BUILT} is absent).\nBuild it: npm run build:libs`,
+    `packages/contracts is not built (${BUILT} is absent).\nBuild it: npm run build:libs`,
   );
   process.exit(1);
 }
@@ -84,7 +84,7 @@ for (const [name, source] of Object.entries(files)) {
 
 if (drifted.length) {
   console.error(
-    `${RELATIVE} has drifted from libs/common: ${drifted.join(', ')}.\n` +
+    `${RELATIVE} has drifted from packages/contracts: ${drifted.join(', ')}.\n` +
       `Regenerate it: ${COMMAND}`,
   );
   process.exit(1);

@@ -13,7 +13,7 @@
  * Reads `STRIPE_RESTRICT_KEY` from the repo-root `.env`, which is where it
  * lives: root `.env` is docker-compose's file and this script is the only other
  * thing run from the repo root. `STRIPE_SECRET_KEY` is the fallback and belongs
- * to auth-service, whose `ConfigModule` loads `apps/auth-service/.env`.
+ * to auth-service, whose `ConfigModule` loads `services/auth-service/.env`.
  *
  * **A RESTRICTED key (`rk_…`) scoped to Products, Prices, Billing Portal and
  * Webhook Endpoints (READ AND WRITE) is all this needs.** Read is not optional
@@ -53,7 +53,7 @@ const ROOT = join(HERE, '..');
  * equal to `STRIPE_API_VERSION`. An import would be invisible to that regex.
  */
 const { STRIPE_ENTITLEMENT_EVENTS, STRIPE_DUNNING_EVENTS } = await import(
-  join(ROOT, 'libs/common/dist/main.js')
+  join(ROOT, 'packages/contracts/dist/index.js')
 );
 
 // --------------------------------- REVIEW THESE BEFORE `--apply`. Amounts are in the currency's smallest unit.
@@ -323,7 +323,7 @@ async function main() {
         console.log(
           `webhook: created ${endpoint.id} with ${enabledEvents.length} event type(s)\n\n` +
             `  STRIPE_WEBHOOK_SECRET = ${endpoint.secret}\n\n` +
-            '  ^ Put this in apps/auth-service/.env NOW. Stripe returns the\n' +
+            '  ^ Put this in services/auth-service/.env NOW. Stripe returns the\n' +
             '    signing secret ONLY at creation — it is not readable later,\n' +
             '    and losing it means deleting this endpoint and making another.\n',
         );

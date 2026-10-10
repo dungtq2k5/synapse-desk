@@ -9,7 +9,7 @@ import {
 /**
  * The Java contracts generator, without building anything.
  *
- * The script itself reads the BUILT `libs/common` and writes files; these rows
+ * The script itself reads the BUILT `packages/contracts` and writes files; these rows
  * are about the decisions it makes with whatever it is handed.
  */
 describe('the Java contracts generator', () => {

@@ -5,10 +5,10 @@
   // flag demands noEmit, which would break `nest build`. They are tooling
   // config, not part of the compiled program.
   "include": [
-    "apps/*/src/**/*",
-    "apps/*/test/**/*",
-    "apps/*/prisma.config.ts",
-    "libs/*/src/**/*",
+    "services/*/src/**/*",
+    "services/*/test/**/*",
+    "services/*/prisma.config.ts",
+    "packages/*/src/**/*",
     // The demo seeder. In the root program because `tsx` does not typecheck —
     // a wrong enum member is `undefined` at runtime, which once wrote 200
     // documents with the column default and reported success. Left out, every
@@ -52,7 +52,7 @@
     //
     // **No type coverage is lost, because jest was never the typechecker that
     // counts.** THIS file is (`npm run typecheck`, the `static` job), and its
-    // `include` above covers `apps/*/test/**/*` as well as every source
+    // `include` above covers `services/*/test/**/*` as well as every source
     // directory — which is the property `typecheck-coverage.spec.ts` exists to
     // keep true. One `api-gateway` exception, argued in its own tsconfig.
     "isolatedModules": true,
@@ -80,10 +80,12 @@
     "noImplicitAny": false,
     "types": ["node", "jest"],
     "paths": {
-      "@synapsedesk/common": ["libs/common/src/main.ts"],
-      "@synapsedesk/common/*": ["libs/common/src/*"],
-      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src/index.ts"],
-      "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
+      "@synapsedesk/contracts": ["packages/contracts/src/index.ts"],
+      "@synapsedesk/core": ["packages/core/src/index.ts"],
+      "@synapsedesk/nest-common": ["packages/nest-common/src/index.ts"],
+      "@synapsedesk/testing/*": ["packages/testing/src/*"],
+      "@synapsedesk/grpc-proto": ["packages/grpc-proto/src/index.ts"],
+      "@synapsedesk/grpc-proto/*": ["packages/grpc-proto/src/*"]
     }
   }
 }

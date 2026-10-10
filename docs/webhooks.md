@@ -2,7 +2,7 @@
 
 SynapseDesk can POST a signed JSON event to an HTTPS endpoint you register whenever something happens in your organization — a ticket assigned, an SLA breached, an import finished. This document is the contract: what you receive, how to verify it, how retries behave, and the handful of behaviours that will cost you an afternoon if you assume the obvious thing.
 
-Everything here mirrors the code's own declarations — `libs/common/src/contracts/webhook.contract.ts` holds the payload type, the signing scheme, and every constant quoted below. **If this document and that file disagree, it is right and this is stale**; please report it.
+Everything here mirrors the code's own declarations — `packages/nest-common/src/contracts/webhook.contract.ts` holds the payload type, the signing scheme, and every constant quoted below. **If this document and that file disagree, it is right and this is stale**; please report it.
 
 ---
 
@@ -95,7 +95,7 @@ function verify(secret, header, rawBody, toleranceSeconds = 300) {
 }
 ```
 
-This mirrors `verifyWebhookSignature` in `libs/common/src/contracts/webhook.contract.ts`, which is unit-tested against the real signer — if you translate it to another language, translate *that* function.
+This mirrors `verifyWebhookSignature` in `packages/nest-common/src/contracts/webhook.contract.ts`, which is unit-tested against the real signer — if you translate it to another language, translate *that* function.
 
 ### During secret rotation
 
