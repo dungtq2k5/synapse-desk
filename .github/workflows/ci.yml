@@ -82,6 +82,17 @@ jobs:
       # of markdown coverage. Why the house config exists at all, and the
       # before-figures that justify it, live in `.markdownlint-cli2.jsonc`.
       - run: npm run lint
+
+      # `format:check` formats Python too, with the service venv's Ruff. Only
+      # Ruff is installed here, at the version `requirements-dev.txt` pins, read
+      # from that file so CI and a laptop cannot format differently.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: ruff
+        run: |
+          python -m venv services/rag-service/.venv
+          services/rag-service/.venv/bin/pip install -q "$(grep -E '^ruff==' services/rag-service/requirements-dev.txt)"
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run proto:lint
