@@ -134,7 +134,9 @@ class TestClamps:
     def test_a_per_surface_override_is_clamped_too(self):
         # The co-pilot legitimately raises retries; it must not be able to buy
         # an unbounded review loop by passing a large number.
-        assert with_co_rag_retries(resolve_ai_settings("FAST"), 2).co_rag_max_retries == 2
+        assert (
+            with_co_rag_retries(resolve_ai_settings("FAST"), 2).co_rag_max_retries == 2
+        )
         assert (
             with_co_rag_retries(resolve_ai_settings("FAST"), 99).co_rag_max_retries
             == CLAMPS["co_rag_max_retries"][1]

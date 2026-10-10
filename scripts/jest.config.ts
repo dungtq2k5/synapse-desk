@@ -21,6 +21,7 @@ const config: Config = {
   // The base's mappers are written for a project two levels down
   // (`services/<name>`); this one is one level down, so they are restated rather
   // than spread — a `../../libs` from here resolves outside the repository.
+  setupFiles: ['<rootDir>/../packages/testing/src/quiet-logs.ts'],
   moduleNameMapper: {
     '^@synapsedesk/contracts$': '<rootDir>/../packages/contracts/src/index.ts',
     '^@synapsedesk/core$': '<rootDir>/../packages/core/src/index.ts',

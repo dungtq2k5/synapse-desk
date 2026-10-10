@@ -135,7 +135,9 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
             #
             # A genuinely missing index is caught by the test that asserts all
             # five exist, not by this line.
-            logger.debug("Payload index %s already present or unsupported: %s", field_name, error)
+            logger.debug(
+                "Payload index %s already present or unsupported: %s", field_name, error
+            )
 
 
 async def _assert_model_matches(client: AsyncQdrantClient) -> None:

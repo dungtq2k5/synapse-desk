@@ -101,9 +101,8 @@ class TestEveryEntryPointGoesThroughTheBoundary:
         builders = [
             _relative(path)
             for path in _python_sources()
-            if "tenant_scope(" in _strip_comments_and_docstrings(
-                path.read_text(encoding="utf-8")
-            )
+            if "tenant_scope("
+            in _strip_comments_and_docstrings(path.read_text(encoding="utf-8"))
             and _relative(path) != "retrieval/tenant_scope.py"
         ]
 

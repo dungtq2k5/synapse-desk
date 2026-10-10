@@ -176,7 +176,7 @@ def source_files(directory: str) -> list[pathlib.Path]:
     ]
 
 
-def main() -> int: # NOSONAR
+def main() -> int:  # NOSONAR
     owner = build_owner_index()
     failures: list[str] = []
     checked = 0
@@ -204,7 +204,7 @@ def main() -> int: # NOSONAR
                     (
                         found
                         for candidate in (
-                            ".".join(parts[: length])
+                            ".".join(parts[:length])
                             for length in range(len(parts), 0, -1)
                         )
                         if (found := resolve(candidate, owner))

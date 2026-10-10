@@ -122,15 +122,11 @@ class TestTheGrpcCeilingMatchesTheTypeScriptHalf:
             / "constants.ts"
         ).read_text()
 
-        block = re.search(
-            r"GRPC_CHANNEL_OPTIONS\s*=\s*\{(.*?)\}", source, re.DOTALL
-        )
+        block = re.search(r"GRPC_CHANNEL_OPTIONS\s*=\s*\{(.*?)\}", source, re.DOTALL)
         assert block, "GRPC_CHANNEL_OPTIONS not found — has it moved?"
 
         found: dict[str, int] = {}
-        for name, expression in re.findall(
-            r"(\w+):\s*([0-9_ */]+),", block.group(1)
-        ):
+        for name, expression in re.findall(r"(\w+):\s*([0-9_ */]+),", block.group(1)):
             # `10 * 1024 * 1024` and `30_000` both appear; both are arithmetic
             # over integer literals and nothing else.
             found[name] = int(eval(expression.replace("_", "")))

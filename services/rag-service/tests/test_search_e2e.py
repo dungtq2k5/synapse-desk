@@ -49,9 +49,7 @@ class TestSearchIsolation:
             department_ids=[tenant_a.department_a],
         )
 
-        response = await search(
-            SHARED_TEXT, tenant_a.member_of(tenant_a.department_b)
-        )
+        response = await search(SHARED_TEXT, tenant_a.member_of(tenant_a.department_b))
 
         assert list(response.chunks) == []
 
@@ -68,7 +66,7 @@ class TestSearchIsolation:
         # "this request was malformed".
         from rag_service.common.caller_context import CallerContext
 
-        with pytest.raises(FakeAbort) as raised: # NOSONAR
+        with pytest.raises(FakeAbort) as raised:  # NOSONAR
             await search(SHARED_TEXT, CallerContext(organization_id=None, sub="u"))
 
         assert raised.value.code.name == "FAILED_PRECONDITION"
@@ -263,7 +261,9 @@ class TestFusion:
         lexical = self._chunk("l")
         arms = {"semantic": [semantic], "lexical": [lexical]}
 
-        favour_semantic = reciprocal_rank_fusion(arms, {"semantic": 0.9, "lexical": 0.1})
+        favour_semantic = reciprocal_rank_fusion(
+            arms, {"semantic": 0.9, "lexical": 0.1}
+        )
         favour_lexical = reciprocal_rank_fusion(arms, {"semantic": 0.1, "lexical": 0.9})
 
         assert favour_semantic[0].chunk.vector_point_id == "s"
@@ -345,7 +345,7 @@ class TestRerankSkip:
 
 
 class TestUnderReturn:
-    """"fewer than k" is NOT "nothing relevant"."""
+    """ "fewer than k" is NOT "nothing relevant"."""
 
     async def test_an_under_returning_arm_triggers_a_RELAXED_retry(
         self, servicer, seed, tenant_a, monkeypatch

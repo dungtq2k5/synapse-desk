@@ -161,9 +161,7 @@ class TestWhatTheTierMustNotChange:
         assert [model for _, model in generator.calls] == [settings.cheap_model]
         assert settings.cheap_model != settings.generation_model
 
-    async def test_2b_reformulation_also_stays_on_the_cheap_model(
-        self, ledger, budget
-    ):
+    async def test_2b_reformulation_also_stays_on_the_cheap_model(self, ledger, budget):
         generator = FixedGenerator()
         settings = resolve_ai_settings("QUALITY")
         pipeline = PreprocessPipeline(generator, ledger, RecordingQuota())
@@ -261,7 +259,9 @@ class TestDowngrade:
         resolver._resolve_tier = resolve_tier  # type: ignore[method-assign]
 
         before = await resolver.settings_for("org-a")
-        assert before.generation_model == resolve_ai_settings("QUALITY").generation_model
+        assert (
+            before.generation_model == resolve_ai_settings("QUALITY").generation_model
+        )
 
         # The webhook writes the column and emits `billing.entitlements_changed`.
         tier["value"] = "FAST"

@@ -191,7 +191,9 @@ class TestRetrievalHitRate:
         # categories in the golden set rather than retrieval quality — so
         # ADDING a doc-missing question would "lower retrieval".
         assert (
-            outcome(question={"category": "doc-missing", "expect": "DOC_MISSING"}).retrieval_hit
+            outcome(
+                question={"category": "doc-missing", "expect": "DOC_MISSING"}
+            ).retrieval_hit
             is None
         )
 
@@ -307,7 +309,9 @@ class TestTheMarkdownContract:
         # where the answer should be. Models asked for markdown do this
         # surprisingly often.
         assert (
-            outcome(answer="```\nYou can carry over 5 days [1].\n```").renders_as_markdown
+            outcome(
+                answer="```\nYou can carry over 5 days [1].\n```"
+            ).renders_as_markdown
             is False
         )
 
@@ -316,7 +320,9 @@ class TestTheMarkdownContract:
         # page heading, so an `<h1>` breaks the document outline and is
         # enormous in most themes.
         assert (
-            outcome(answer="# Leave policy\n\nYou carry over 5 days [1].").renders_as_markdown
+            outcome(
+                answer="# Leave policy\n\nYou carry over 5 days [1]."
+            ).renders_as_markdown
             is False
         )
 

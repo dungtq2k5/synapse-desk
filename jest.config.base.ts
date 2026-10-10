@@ -55,6 +55,9 @@ const baseConfig: Config = {
     String.raw`\.e2e-spec\.ts$`,
   ],
 
+  // Nest's logger off unless `TEST_LOGS=1`; see the file.
+  setupFiles: ['<rootDir>/../../packages/testing/src/quiet-logs.ts'],
+
   transform: {
     // `.mjs` included for the same reason as `moduleFileExtensions` above: the
     // previous pattern matched `.ts` and `.js` only, so an ESM-only dependency

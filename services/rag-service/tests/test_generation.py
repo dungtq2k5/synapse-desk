@@ -30,9 +30,7 @@ from rag_service.settings import resolve_ai_settings
 
 CYCLE = datetime(2026, 8, 1, tzinfo=timezone.utc)
 
-SCREENSHOT = Attachment(
-    mime_type="image/png", data=b"\x89PNG", file_name="error.png"
-)
+SCREENSHOT = Attachment(mime_type="image/png", data=b"\x89PNG", file_name="error.png")
 
 
 def chunk(index: int, title: str = "Handbook", page: int | None = 4) -> HydratedChunk:

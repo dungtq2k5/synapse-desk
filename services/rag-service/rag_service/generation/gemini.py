@@ -86,9 +86,7 @@ class GeminiGenerator:
             completion_tokens=completion_tokens,
         )
 
-    async def generate(
-        self, prompt: Prompt, model: str, max_output_tokens: int
-    ):
+    async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):
         """The unary form, for the preprocessing steps.
 
         Built on the streaming one so there is a single provider call path —

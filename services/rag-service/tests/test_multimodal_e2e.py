@@ -64,9 +64,7 @@ def live_pipeline(ledger):
 
 @pytest.fixture
 def budget():
-    return BudgetState(
-        organization_id="org", cycle_start=CYCLE, allows_embedding=True
-    )
+    return BudgetState(organization_id="org", cycle_start=CYCLE, allows_embedding=True)
 
 
 @pytest.fixture

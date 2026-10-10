@@ -90,16 +90,12 @@ def settings():
 
 @pytest.fixture
 def budget():
-    return BudgetState(
-        organization_id="org", cycle_start=CYCLE, allows_embedding=True
-    )
+    return BudgetState(organization_id="org", cycle_start=CYCLE, allows_embedding=True)
 
 
 @pytest.fixture
 def at_cap_budget():
-    return BudgetState(
-        organization_id="org", cycle_start=CYCLE, allows_embedding=False
-    )
+    return BudgetState(organization_id="org", cycle_start=CYCLE, allows_embedding=False)
 
 
 class TestLayerOne:
@@ -134,7 +130,10 @@ class TestLayerOne:
         # the refund policy?" gets "Hi! How can I help?" in response to having
         # asked exactly that.
         assert detect_greeting_layer_one("hi, what's the refund policy?") is None
-        assert detect_greeting_layer_one("thanks — but how do I reset my password?") is None
+        assert (
+            detect_greeting_layer_one("thanks — but how do I reset my password?")
+            is None
+        )
 
     def test_an_empty_message_is_not_a_greeting(self):
         assert detect_greeting_layer_one("") is None

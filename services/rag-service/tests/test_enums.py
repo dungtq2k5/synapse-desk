@@ -41,13 +41,17 @@ def ts_enum_members(name: str) -> set[str]:
     found, which fails the test rather than passing it silently.
     """
     source = TS_ENUM_SOURCE.read_text()
-    block = re.search(rf"export enum {name} {{(.*?)^}}", source, re.DOTALL | re.MULTILINE)
+    block = re.search(
+        rf"export enum {name} {{(.*?)^}}", source, re.DOTALL | re.MULTILINE
+    )
 
     assert block is not None, f"{name} not found in {TS_ENUM_SOURCE}"
 
     return {
         value
-        for _, value in re.findall(r"^\s*(\w+)\s*=\s*'([^']+)',", block.group(1), re.MULTILINE)
+        for _, value in re.findall(
+            r"^\s*(\w+)\s*=\s*'([^']+)',", block.group(1), re.MULTILINE
+        )
     }
 
 
