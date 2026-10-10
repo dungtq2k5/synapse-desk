@@ -5,7 +5,7 @@ import { AiGenerationPurpose, AiGenerationStatus } from './document.config';
 describe('The AI ledger enums (unit)', () => {
   /**
    * The TypeScript half of the enum-parity check. The Python half is
-   * `apps/rag-service/tests/test_enums.py`.
+   * `services/rag-service/tests/test_enums.py`.
    *
    * The proto is read as TEXT rather than through the generated module: the
    * generated TS enum is a projection of the same file, so comparing the two

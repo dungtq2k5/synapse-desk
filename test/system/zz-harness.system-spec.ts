@@ -174,17 +174,22 @@ describe('The harness', () => {
     // not the other fails here in whichever direction it was forgotten.
     const ports = SERVICES.map((service) => service.port);
 
-    const launchable = readdirSync(join(REPO_ROOT, 'apps')).filter((app) => {
-      try {
-        const pkg = JSON.parse(
-          readFileSync(join(REPO_ROOT, 'apps', app, 'package.json'), 'utf8'),
-        ) as { scripts?: Record<string, string> };
+    const launchable = readdirSync(join(REPO_ROOT, 'services')).filter(
+      (app) => {
+        try {
+          const pkg = JSON.parse(
+            readFileSync(
+              join(REPO_ROOT, 'services', app, 'package.json'),
+              'utf8',
+            ),
+          ) as { scripts?: Record<string, string> };
 
-        return Boolean(pkg.scripts?.['start:prod']);
-      } catch {
-        return false;
-      }
-    });
+          return Boolean(pkg.scripts?.['start:prod']);
+        } catch {
+          return false;
+        }
+      },
+    );
 
     expect(launchable.length).toBeGreaterThanOrEqual(7);
     expect(SERVICES).toHaveLength(launchable.length);

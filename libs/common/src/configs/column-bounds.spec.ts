@@ -66,7 +66,7 @@ function declaredWidth(pairing: Pairing): number {
   const schema = readFileSync(
     join(
       __dirname,
-      '../../../../apps',
+      '../../../../services',
       pairing.service,
       'prisma/schema.prisma',
     ),

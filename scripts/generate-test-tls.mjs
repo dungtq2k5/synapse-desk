@@ -45,8 +45,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Every fixture directory that holds a receiver pair, in repo-relative form. */
 const TARGETS = [
-  'apps/notification-service/test/fixtures',
-  'apps/storage-service/test/fixtures',
+  'services/notification-service/test/fixtures',
+  'services/storage-service/test/fixtures',
 ];
 
 const KEY = 'receiver-key.pem';

@@ -40,7 +40,7 @@ describe('the OpenAPI export — the pure half', () => {
       // The built gateway resolves `@synapsedesk/common` and `grpc-proto` to
       // each library's own `dist/`; a gateway-only build is not enough.
       expect(RUNTIME_OUTPUTS).toEqual([
-        'apps/api-gateway/dist/apps/api-gateway/src/main.js',
+        'services/api-gateway/dist/services/api-gateway/src/main.js',
         'libs/common/dist/main.js',
         'libs/grpc-proto/dist/index.js',
       ]);

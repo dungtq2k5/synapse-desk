@@ -144,15 +144,17 @@ const EXPORTED_CLASS = /^export (?:abstract )?class (\w+)/gm;
  * none of that and works the same on a machine without them.
  */
 const CLASSES = new Set(
-  [join(ROOT, 'apps/api-gateway/src'), join(ROOT, 'libs/common/src')].flatMap(
-    (root) =>
-      readdirSync(root, { recursive: true, encoding: 'utf8' })
-        .filter((entry) => entry.endsWith('.ts'))
-        .flatMap((entry) =>
-          [
-            ...readFileSync(join(root, entry), 'utf8').matchAll(EXPORTED_CLASS),
-          ].map((match) => match[1]),
-        ),
+  [
+    join(ROOT, 'services/api-gateway/src'),
+    join(ROOT, 'libs/common/src'),
+  ].flatMap((root) =>
+    readdirSync(root, { recursive: true, encoding: 'utf8' })
+      .filter((entry) => entry.endsWith('.ts'))
+      .flatMap((entry) =>
+        [
+          ...readFileSync(join(root, entry), 'utf8').matchAll(EXPORTED_CLASS),
+        ].map((match) => match[1]),
+      ),
   ),
 );
 
@@ -306,12 +308,12 @@ const plan = loadPlan();
 // lookup, no shell string built from a path. `sort()` because `readdirSync`
 // gives no ordering guarantee and a migration should touch files in a stable
 // order — a re-run that differs only in sequence is a diff nobody can read.
-const files = readdirSync(join(ROOT, 'apps/api-gateway/src'), {
+const files = readdirSync(join(ROOT, 'services/api-gateway/src'), {
   recursive: true,
   encoding: 'utf8',
 })
   .filter((entry) => entry.endsWith('.controller.ts'))
-  .map((entry) => join(ROOT, 'apps/api-gateway/src', entry))
+  .map((entry) => join(ROOT, 'services/api-gateway/src', entry))
   .sort();
 
 let annotated = 0;

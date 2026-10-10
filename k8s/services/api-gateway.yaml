@@ -90,11 +90,11 @@ spec:
             failureThreshold: 3
           volumeMounts:
             # `JWT_*_PUBLIC_KEY_PATH` is `./secrets/*.pub` and `WORKDIR` is
-            # `/app/apps/api-gateway`, so this is where those relative paths
+            # `/app/services/api-gateway`, so this is where those relative paths
             # resolve. The gateway holds the PUBLIC halves only — it verifies
             # and never mints.
             - name: jwt-public
-              mountPath: /app/apps/api-gateway/secrets
+              mountPath: /app/services/api-gateway/secrets
               readOnly: true
           resources:
             requests:

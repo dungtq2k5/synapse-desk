@@ -20,7 +20,7 @@
  *     is the floor whenever the gate's precondition is present, and the
  *     allowance only opens for the specific thing that is genuinely absent.
  *
- *     node scripts/check-pytest-skips.mjs apps/rag-service/pytest.xml
+ *     node scripts/check-pytest-skips.mjs services/rag-service/pytest.xml
  */
 
 import { readFileSync } from 'node:fs';

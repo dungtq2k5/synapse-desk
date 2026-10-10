@@ -77,7 +77,7 @@ const apply = process.argv.includes('--apply');
 
 // The root `.env` holds the Stripe key; auth-service's holds the database it
 // writes to. Both, because this script is the one place the two meet.
-for (const file of ['../.env', '../apps/auth-service/.env']) {
+for (const file of ['../.env', '../services/auth-service/.env']) {
   try {
     process.loadEnvFile(new URL(file, import.meta.url));
   } catch {

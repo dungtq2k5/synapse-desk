@@ -3,10 +3,10 @@ import type { Config } from 'jest';
 /**
  * Shared jest setup, spread by each workspace's own `jest.config.ts`.
  *
- * Every path below is written relative to a PROJECT directory (`apps/<name>` or
+ * Every path below is written relative to a PROJECT directory (`services/<name>` or
  * `libs/<name>`), because each config sets `rootDir: __dirname`. Writing them as
  * if `<rootDir>` were the repo root — which the previous version did — silently
- * resolves `@synapsedesk/common` to `apps/auth-service/libs/common`, i.e. nothing.
+ * resolves `@synapsedesk/common` to `services/auth-service/libs/common`, i.e. nothing.
  */
 const baseConfig: Config = {
   // `mjs` is here for `pdfjs-dist`, which ships ESM-only and names its files
@@ -95,7 +95,7 @@ const baseConfig: Config = {
   coveragePathIgnorePatterns: ['/node_modules/', '/generated/'],
 
   // `passWithNoTests` is deliberately NOT here: it's a root-only option, and
-  // this object gets spread into every apps/*/jest.config.ts, which run under
+  // this object gets spread into every services/*/jest.config.ts, which run under
   // `--projects` (multi-project mode). There, each project config is validated
   // against a stricter per-project schema that rejects root-only options —
   // "not supported in an individual project configuration". Passed as the

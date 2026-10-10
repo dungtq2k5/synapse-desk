@@ -25,27 +25,27 @@ describe('transport-class gRPC errors are marked or named', () => {
    * The generic message is the right answer for each if it ever surfaces.
    */
   const INTERNAL: Readonly<Record<string, string>> = {
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the storage quota':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the storage quota':
       'a service-to-service check the user cannot act on',
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the analytics range limit':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the analytics range limit':
       'a service-to-service check the user cannot act on',
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the document count limit':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the document count limit':
       'a service-to-service check the user cannot act on',
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the document size limit':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the document size limit':
       'a service-to-service check the user cannot act on',
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the AI allowance':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the AI allowance':
       'a service-to-service check the user cannot act on',
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the request against the identity service':
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the request against the identity service':
       'names an internal service',
-    'apps/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the analytics range limit':
+    'services/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the analytics range limit':
       'a service-to-service check the user cannot act on',
-    'apps/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the attachment limits':
+    'services/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the attachment limits':
       'a service-to-service check the user cannot act on',
-    'apps/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the request against the identity service':
+    'services/ticket-service/src/modules/auth-client/auth-reference.service.ts|Could not verify the request against the identity service':
       'names an internal service',
-    'apps/storage-service/src/modules/storage/storage.service.ts|The source could not be stored':
+    'services/storage-service/src/modules/storage/storage.service.ts|The source could not be stored':
       'storage-service is never the gateway’s direct peer',
-    'apps/ticket-service/src/modules/storage-client/storage-reference.service.ts|Ingest did not finish within':
+    'services/ticket-service/src/modules/storage-client/storage-reference.service.ts|Ingest did not finish within':
       'exposes an internal deadline',
   };
 
@@ -71,7 +71,7 @@ describe('transport-class gRPC errors are marked or named', () => {
       };
     });
 
-  const sites = repoFiles('apps/*/src/**')
+  const sites = repoFiles('services/*/src/**')
     .filter((file) => file.endsWith('.ts') && !file.endsWith('.spec.ts'))
     .flatMap((file) =>
       sitesIn(file, stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))),

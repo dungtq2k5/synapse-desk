@@ -125,7 +125,7 @@ describe('scanClasses on a hostile fixture', () => {
 });
 
 describe('the real DTO sources', () => {
-  const root = join(REPO_ROOT, 'apps/api-gateway/src/modules');
+  const root = join(REPO_ROOT, 'services/api-gateway/src/modules');
   const files = dtoFiles(root);
   const properties = scanDtoDirectory(root).flatMap((c) => c.properties);
 

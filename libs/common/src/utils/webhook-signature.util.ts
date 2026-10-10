@@ -2,7 +2,7 @@
  * Constant-time comparison and HMAC verification for webhook signatures.
  *
  * **Here rather than in a service, because the gateway needs it too.**
- * `safeCompareHex` lived only in `apps/auth-service/src/common/utils/crypto.ts`,
+ * `safeCompareHex` lived only in `services/auth-service/src/common/utils/crypto.ts`,
  * which is where Stripe's signature is checked; the inbound-email route
  * verifies at the EDGE, and a gateway cannot import a service's private
  * utility.

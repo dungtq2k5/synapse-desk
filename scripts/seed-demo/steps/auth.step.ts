@@ -17,8 +17,8 @@ import {
   createUser,
   findSystemRole,
   hashTestPassword,
-} from '../../../apps/auth-service/test/factories';
-import type { PrismaService } from '../../../apps/auth-service/src/modules/prisma/prisma.service';
+} from '../../../services/auth-service/test/factories';
+import type { PrismaService } from '../../../services/auth-service/src/modules/prisma/prisma.service';
 import type { ManifestTenant } from '../manifest';
 import type { SeedStep } from '../registry';
 import { bytesFor, countFor, type Profile } from '../profiles';

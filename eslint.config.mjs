@@ -22,6 +22,10 @@ export default defineConfig(
       // loading needs, which no lint project parses, and the sequencer is
       // plain CommonJS.
       'test/system/jest*.config.ts',
+      // And each workspace's own: a service's config spreads this one, and
+      // resolves these patterns from its own folder.
+      '**/jest.config.ts',
+      '**/jest.e2e.config.ts',
       'test/system/sequencer.cjs',
     ],
   },
@@ -38,7 +42,7 @@ export default defineConfig(
       parserOptions: {
         project: [
           './tsconfig.json',
-          './apps/*/tsconfig.json',
+          './services/*/tsconfig.json',
           './libs/*/tsconfig.json',
           // The demo seeder. `scripts/` is neither an app nor a lib, and the
           // root tsconfig does not include it — without this entry every file

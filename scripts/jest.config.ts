@@ -7,7 +7,7 @@ import baseConfig from '../jest.config.base.ts';
  * The demo seeder's unit tests.
  *
  * Its own project because `scripts/` is neither an app nor a lib, and the
- * default run globs `apps/*` and `libs/*`.
+ * default run globs `services/*` and `libs/*`.
  *
  * **Nothing here touches a database.** The seeder writes to the DEV databases
  * and a test that seeded one would be writing outside the boundary every suite
@@ -19,7 +19,7 @@ const config: Config = {
   ...baseConfig,
   displayName: 'scripts',
   // The base's mappers are written for a project two levels down
-  // (`apps/<name>`); this one is one level down, so they are restated rather
+  // (`services/<name>`); this one is one level down, so they are restated rather
   // than spread — a `../../libs` from here resolves outside the repository.
   moduleNameMapper: {
     '^@synapsedesk/common$': '<rootDir>/../libs/common/src/main.ts',

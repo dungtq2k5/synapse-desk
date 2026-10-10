@@ -39,7 +39,7 @@ describe('model JobRun is identical across the three schemas', () => {
    */
   const fieldsOf = (service: string): string[] => {
     const schema = readFileSync(
-      join(__dirname, '../../../../apps', service, 'prisma/schema.prisma'),
+      join(__dirname, '../../../../services', service, 'prisma/schema.prisma'),
       'utf8',
     );
 

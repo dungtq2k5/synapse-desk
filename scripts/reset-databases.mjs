@@ -74,9 +74,9 @@ if (testOnly && devOnly) {
 // Discovered rather than listed, for the reason `reset-jetstream.mjs` reads the
 // live stream list: a service added later is included without anyone
 // remembering this file, and a service removed cannot leave a stale entry.
-const services = readdirSync(join(REPO_ROOT, 'apps'))
+const services = readdirSync(join(REPO_ROOT, 'services'))
   .filter((name) =>
-    existsSync(join(REPO_ROOT, 'apps', name, 'prisma/schema.prisma')),
+    existsSync(join(REPO_ROOT, 'services', name, 'prisma/schema.prisma')),
   )
   .sort();
 
@@ -98,19 +98,22 @@ for (const service of services) {
       : ['.env', '.env.test'];
 
   for (const envFile of envFiles) {
-    const fileUrl = new URL(`../apps/${service}/${envFile}`, import.meta.url);
+    const fileUrl = new URL(
+      `../services/${service}/${envFile}`,
+      import.meta.url,
+    );
     const url = readDatabaseUrl(fileUrl);
 
     if (!url) {
       console.error(
-        `No DATABASE_URL in apps/${service}/${envFile}. Refusing to guess.`,
+        `No DATABASE_URL in services/${service}/${envFile}. Refusing to guess.`,
       );
       process.exit(1);
     }
 
     if (!isLocalDatabase(url)) {
       console.error(
-        `apps/${service}/${envFile} points at ${redact(url)}, which is not this machine.\n` +
+        `services/${service}/${envFile} points at ${redact(url)}, which is not this machine.\n` +
           'Refusing. This script has no --force: a remote database is not something it should reach.',
       );
       process.exit(1);
@@ -139,7 +142,7 @@ for (const { service, envFile, url } of targets) {
       'npx', // NOSONAR
       args,
       {
-        cwd: join(REPO_ROOT, 'apps', service),
+        cwd: join(REPO_ROOT, 'services', service),
         stdio: ['ignore', 'ignore', 'pipe'],
         encoding: 'utf8',
       },

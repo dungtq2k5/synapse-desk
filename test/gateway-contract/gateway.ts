@@ -128,7 +128,12 @@ function environmentFor(overrides: Record<string, string>): NodeJS.ProcessEnv {
 /** The built gateway, started exactly as `start:prod` starts it. */
 const COMMAND = {
   command: process.execPath,
-  args: [join(REPO_ROOT, 'apps/api-gateway/dist/apps/api-gateway/src/main.js')],
+  args: [
+    join(
+      REPO_ROOT,
+      'services/api-gateway/dist/services/api-gateway/src/main.js',
+    ),
+  ],
 };
 
 /** Refuses to start against a build that does not exist. */

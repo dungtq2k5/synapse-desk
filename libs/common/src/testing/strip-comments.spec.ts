@@ -35,7 +35,7 @@ describe('stripComments', () => {
     // The include glob carries both block delimiters inside a STRING, and the
     // stripper eats everything between them — measured first as
     // `typecheck-coverage.spec.ts` failing every directory at once.
-    expect(stripComments('"apps/*/src/**/*"')).not.toContain('src');
+    expect(stripComments('"services/*/src/**/*"')).not.toContain('src');
   });
 
   it('5. **a block-comment OPENER inside a line comment opens nothing**', () => {

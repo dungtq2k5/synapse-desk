@@ -10,7 +10,7 @@ cspell.json
 # The SDL the Node gateway writes on every boot (`autoSchemaFile`). The
 # tracked contract is `docs/reference/schema.gql`, which its e2e suite holds
 # this generated copy equal to.
-apps/api-gateway/src/schema.gql
+services/api-gateway/src/schema.gql
 # Generated per-service container env — `scripts/generate-docker-env.mjs`
 # rewrites `.env`'s host addresses to compose service names. Generated, never
 # tracked: a tracked copy would be a third hand-maintained value-set outside
@@ -31,7 +31,7 @@ ci-artifacts/
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/
 
-# Python. `apps/rag-service/.gitignore` already covers its own subtree; these
+# Python. `services/rag-service/.gitignore` already covers its own subtree; these
 # are here so the next Python thing added anywhere else starts out ignored
 # rather than being discovered later.
 __pycache__/

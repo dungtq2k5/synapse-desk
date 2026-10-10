@@ -14,12 +14,12 @@ import { join } from 'node:path';
 describe('Size comparisons go through the guard', () => {
   const REPO = join(__dirname, '../../../..');
   const SERVICES = [
-    'apps/api-gateway/src',
-    'apps/auth-service/src',
-    'apps/ingestion-service/src',
-    'apps/storage-service/src',
-    'apps/ticket-service/src',
-    'apps/notification-service/src',
+    'services/api-gateway/src',
+    'services/auth-service/src',
+    'services/ingestion-service/src',
+    'services/storage-service/src',
+    'services/ticket-service/src',
+    'services/notification-service/src',
   ];
 
   /**
@@ -41,7 +41,7 @@ describe('Size comparisons go through the guard', () => {
    * pattern-matched so that adding one is a decision somebody made.
    */
   const SANCTIONED = new Set<string>([
-    'apps/api-gateway/src/modules/ingestion-jobs/ingestion-job.mapper.ts',
+    'services/api-gateway/src/modules/ingestion-jobs/ingestion-job.mapper.ts',
   ]);
 
   const sources = (): string[] => {

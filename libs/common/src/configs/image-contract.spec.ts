@@ -104,7 +104,7 @@ describe('the image contract (static half)', () => {
      * TWINLESS shape, so a hole cannot dress up as an exemption.
      */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
-      'apps/rag-service':
+      'services/rag-service':
         'Python — pip has no workspace hoisting to hide an undeclared ' +
         'import, and requirements.txt was audited for exactly that (its ' +
         'google-genai and flashrank docblocks are that audit)',
@@ -112,7 +112,9 @@ describe('the image contract (static half)', () => {
 
     const workspaces = (): string[] =>
       repoFiles('*/*/package.json')
-        .filter((file) => /^(apps|libs)\/[^/]+\/package\.json$/.test(file))
+        .filter((file) =>
+          /^(apps|services|libs)\/[^/]+\/package\.json$/.test(file),
+        )
         .map((file) => file.slice(0, -'/package.json'.length))
         .filter((workspace) => !(workspace in GUARDED_ELSEWHERE))
         .sort();
@@ -137,8 +139,8 @@ describe('the image contract (static half)', () => {
 
       // DIRECTORY pathspecs, filtered in JS. The exact rule, measured: in a
       // git pathspec without `:(glob)`, `*` is plain fnmatch and CROSSES `/`
-      // (`apps/*/src/*.ts` -> 643 files), while `a/**/b` is special-cased to
-      // require at least one intervening component (`apps/*/src/**/*.ts` ->
+      // (`services/*/src/*.ts` -> 643 files), while `a/**/b` is special-cased to
+      // require at least one intervening component (`services/*/src/**/*.ts` ->
       // 631, zero directly in `src/`) — so `**` is NARROWER than the `*`
       // beside it, the opposite of shell globstar and `.gitignore`, which is
       // where the intuition comes from. The first version of this corpus used
@@ -181,7 +183,7 @@ describe('the image contract (static half)', () => {
     // resolve. Types are build-time input; `--omit=dev` is the line that
     // makes the distinction matter.
     const manifests = repoFiles('*/*/package.json').filter((file) =>
-      /^(apps|libs)\/[^/]+\/package\.json$/.test(file),
+      /^(apps|services|libs)\/[^/]+\/package\.json$/.test(file),
     );
     expect(manifests.length).toBeGreaterThanOrEqual(8);
 
@@ -210,7 +212,7 @@ describe('the image contract (static half)', () => {
      * typecheck covers them and that is exactly where the measured case
      * lived. The legitimate cross-workspace channel is `@synapsedesk/*`.
      */
-    it.each(['apps', 'libs'])('%s', (top) => {
+    it.each(['services', 'libs'])('%s', (top) => {
       // `src/**` + JS filter, and the spelling is measured: `${top}/*/src`
       // matches NOTHING (a pathspec with a wildcard is not a prefix), and
       // `src/**/*.ts` misses files directly in `src/` — the same git `**`
@@ -226,7 +228,7 @@ describe('the image contract (static half)', () => {
 
       const offenders: string[] = [];
       for (const file of files) {
-        const workspaceDepth = 2; // apps/<name>/…
+        const workspaceDepth = 2; // services/<name>/…
         const fileDepth = file.split('/').length - 1 - workspaceDepth;
         const stripped = stripComments(read(file));
 
@@ -589,13 +591,13 @@ describe('the image contract (static half)', () => {
     // `scripts/generate-docker-env.mjs` (host addresses swapped for compose
     // service names), it cannot drift by construction — provided it stays
     // untracked, which is what this pins.
-    expect(repoFiles('apps/*/.env.docker')).toEqual([]);
+    expect(repoFiles('services/*/.env.docker')).toEqual([]);
 
     let ignored = true;
     try {
       execFileSync(
         'git',
-        ['check-ignore', '-q', 'apps/auth-service/.env.docker'],
+        ['check-ignore', '-q', 'services/auth-service/.env.docker'],
         { cwd: REPO_ROOT },
       );
     } catch {

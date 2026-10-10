@@ -59,7 +59,7 @@ export function parseSetCookie(line: string): {
  * and the version the gateway pins.
  *
  * Built here rather than imported: `apiBasePath` lives in the gateway's own
- * `ops-routes.ts`, and a harness that reached into `apps/api-gateway/src` for
+ * `ops-routes.ts`, and a harness that reached into `services/api-gateway/src` for
  * it would be reading the implementation it is supposed to treat as a black
  * box. `API_VERSION` is a
  * constant of the contract, so a bump is a deliberate edit in both places, and

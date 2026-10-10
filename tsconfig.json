@@ -5,9 +5,9 @@
   // flag demands noEmit, which would break `nest build`. They are tooling
   // config, not part of the compiled program.
   "include": [
-    "apps/*/src/**/*",
-    "apps/*/test/**/*",
-    "apps/*/prisma.config.ts",
+    "services/*/src/**/*",
+    "services/*/test/**/*",
+    "services/*/prisma.config.ts",
     "libs/*/src/**/*",
     // The demo seeder. In the root program because `tsx` does not typecheck —
     // a wrong enum member is `undefined` at runtime, which once wrote 200
@@ -52,7 +52,7 @@
     //
     // **No type coverage is lost, because jest was never the typechecker that
     // counts.** THIS file is (`npm run typecheck`, the `static` job), and its
-    // `include` above covers `apps/*/test/**/*` as well as every source
+    // `include` above covers `services/*/test/**/*` as well as every source
     // directory — which is the property `typecheck-coverage.spec.ts` exists to
     // keep true. One `api-gateway` exception, argued in its own tsconfig.
     "isolatedModules": true,

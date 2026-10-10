@@ -33,7 +33,7 @@ WORKDIR /app
 
 # Requirements before source, for the same layer-caching reason as the Node
 # image: a change to a servicer must not re-resolve torch.
-COPY apps/rag-service/requirements.txt ./
+COPY services/rag-service/requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefix=/install -r requirements.txt
 
@@ -66,7 +66,7 @@ ENV BUILD_SHA=$GIT_SHA \
 # day an entry point is added, that shebang points at a path absent from this
 # image and the failure is `No such file or directory` at exec.
 COPY --from=deps /install /usr/local
-COPY apps/rag-service/rag_service ./rag_service
+COPY services/rag-service/rag_service ./rag_service
 
 # Non-root, created here because the Python base image has no unprivileged user
 # of its own — unlike `node`.

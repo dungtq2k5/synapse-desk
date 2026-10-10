@@ -220,7 +220,7 @@ describe('the demo seeder', () => {
     // Vacuity floor: a rewritten config with one entry must not pass, and the
     // entries the rest of the repo depends on are still there.
     expect(include).toContain('libs/*/src/**/*');
-    expect(include).toContain('apps/*/src/**/*');
+    expect(include).toContain('services/*/src/**/*');
     expect(include.length).toBeGreaterThanOrEqual(4);
 
     // And no second command claiming to do the same job — one named "typecheck

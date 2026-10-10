@@ -21,8 +21,8 @@
   },
   "include": [
     "seed-demo/**/*.ts",
-    "../apps/*/src/**/*",
-    "../apps/*/test/**/*",
+    "../services/*/src/**/*",
+    "../services/*/test/**/*",
     "../libs/*/src/**/*"
   ],
   // `jest.config.ts` imports `../jest.config.base.ts` by its `.ts` extension —

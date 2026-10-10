@@ -77,8 +77,8 @@ describe('The two alert mechanisms', () => {
     // One producer per dimension, none of them hand-rolling a command. A
     // second copy of the publish logic is a second chance to generate an id.
     const producers = [
-      'apps/ingestion-service/src/modules/documents/documents.service.ts',
-      'apps/auth-service/src/modules/organizations/organizations.service.ts',
+      'services/ingestion-service/src/modules/documents/documents.service.ts',
+      'services/auth-service/src/modules/organizations/organizations.service.ts',
     ].map((path) => readFileSync(join(REPO, path), 'utf8'));
 
     for (const source of producers) {
@@ -125,10 +125,10 @@ describe('The two alert mechanisms', () => {
       /seatsInUse\([^)]*\)[\s\S]{0,80}?>=?[\s\S]{0,40}?maxAgentSeats/;
 
     const candidates = [
-      'apps/auth-service/src/modules/invitations/invitations.service.ts',
-      'apps/auth-service/src/modules/users/users.service.ts',
-      'apps/auth-service/src/modules/platform/platform.service.ts',
-      'apps/auth-service/src/modules/organizations/organizations.service.ts',
+      'services/auth-service/src/modules/invitations/invitations.service.ts',
+      'services/auth-service/src/modules/users/users.service.ts',
+      'services/auth-service/src/modules/platform/platform.service.ts',
+      'services/auth-service/src/modules/organizations/organizations.service.ts',
     ].map((path) => ({
       path,
       source: readFileSync(join(REPO, path), 'utf8'),
@@ -139,8 +139,8 @@ describe('The two alert mechanisms', () => {
     // Corpus floor: two known refusal sites today. Zero would make the loop
     // below pass over nothing, which is how a scan stops scanning.
     expect(refusals.map(({ path }) => path)).toEqual([
-      'apps/auth-service/src/modules/invitations/invitations.service.ts',
-      'apps/auth-service/src/modules/users/users.service.ts',
+      'services/auth-service/src/modules/invitations/invitations.service.ts',
+      'services/auth-service/src/modules/users/users.service.ts',
     ]);
 
     for (const { path, source } of refusals) {

@@ -108,7 +108,7 @@ const reachedFromARequest = (schema: string) =>
  * all: a query-string DTO or the inbound-mail DTO, whose fields these rows do not send).
  */
 const found: Found[] = scanDtoDirectory(
-  join(REPO_ROOT, 'apps/api-gateway/src/modules'),
+  join(REPO_ROOT, 'services/api-gateway/src/modules'),
 ).flatMap((dto) =>
   dto.properties.flatMap((property) =>
     property.decorators

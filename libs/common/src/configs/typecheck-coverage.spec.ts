@@ -58,8 +58,8 @@ describe('every TypeScript directory is inside a typecheck', () => {
    *
    * **Top-level is also this rule's honest scope.** Both directories that
    * motivated it were NEW top-level trees; a file dodging the globs INSIDE a
-   * claimed top — `apps/x/jest.config.ts` sits outside `apps/x/src` and
-   * `apps/x/test` — passes here. That is the per-file version of the problem
+   * claimed top — `services/x/jest.config.ts` sits outside `services/x/src` and
+   * `services/x/test` — passes here. That is the per-file version of the problem
    * and a different, much noisier rule.
    */
   const topOf = (file: string): string => file.split('/')[0];
@@ -73,7 +73,7 @@ describe('every TypeScript directory is inside a typecheck', () => {
   const claimedTops = (): Set<string> => {
     // **TypeScript's own JSONC parser, not a comment-strip.** The first version
     // stripped comments by regex before `JSON.parse` — and the block-comment
-    // pattern ate the GLOBS: `"apps/*/src/**/*"` contains `/*` and `*/`, so the
+    // pattern ate the GLOBS: `"services/*/src/**/*"` contains `/*` and `*/`, so the
     // include list came back as `apps*` and this test failed every directory at
     // once. A comment-stripper cannot be pointed at a file whose strings
     // contain comment delimiters, and tsconfig globs always do.
@@ -114,7 +114,7 @@ describe('every TypeScript directory is inside a typecheck', () => {
     const claimed = claimedTops();
 
     expect(files.length).toBeGreaterThan(500);
-    expect(claimed.has('apps')).toBe(true);
+    expect(claimed.has('services')).toBe(true);
     expect(claimed.has('test')).toBe(true);
     // And the pattern finds the two directories that motivated the rule.
     expect(files.some((file) => file.startsWith('scripts/seed-demo/'))).toBe(

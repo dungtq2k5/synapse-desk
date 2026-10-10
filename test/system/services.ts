@@ -58,37 +58,37 @@ export type ServiceSpec = {
 export const SERVICES: readonly ServiceSpec[] = [
   {
     pkg: '@synapsedesk/auth-service',
-    dir: 'apps/auth-service',
+    dir: 'services/auth-service',
     port: 5001,
     probe: { kind: 'grpc' },
   },
   {
     pkg: '@synapsedesk/ticket-service',
-    dir: 'apps/ticket-service',
+    dir: 'services/ticket-service',
     port: 5002,
     probe: { kind: 'grpc' },
   },
   {
     pkg: '@synapsedesk/ingestion-service',
-    dir: 'apps/ingestion-service',
+    dir: 'services/ingestion-service',
     port: 5004,
     probe: { kind: 'grpc' },
   },
   {
     pkg: '@synapsedesk/notification-service',
-    dir: 'apps/notification-service',
+    dir: 'services/notification-service',
     port: 5005,
     probe: { kind: 'grpc' },
   },
   {
     pkg: '@synapsedesk/storage-service',
-    dir: 'apps/storage-service',
+    dir: 'services/storage-service',
     port: 50253,
     probe: { kind: 'grpc' },
   },
   {
     pkg: '@synapsedesk/rag-service',
-    dir: 'apps/rag-service',
+    dir: 'services/rag-service',
     port: 50255,
     probe: { kind: 'grpc' },
     // **Named, because this is the one that will not come up.** It needs a
@@ -99,7 +99,7 @@ export const SERVICES: readonly ServiceSpec[] = [
   },
   {
     pkg: '@synapsedesk/api-gateway',
-    dir: 'apps/api-gateway',
+    dir: 'services/api-gateway',
     port: 3000,
     // **The one HTTP probe, and it proves less than it looks.** ADR 0010: the
     // gateway's readiness deliberately does NOT cascade, because a probe that

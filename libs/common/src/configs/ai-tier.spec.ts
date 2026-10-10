@@ -102,7 +102,7 @@ describe('The AI tier (unit)', () => {
       const source = readFileSync(
         join(
           REPO_ROOT,
-          'apps/ticket-service/src/modules/ai-client/rag-client.service.ts',
+          'services/ticket-service/src/modules/ai-client/rag-client.service.ts',
         ),
         'utf8',
       );

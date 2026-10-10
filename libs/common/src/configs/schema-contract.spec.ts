@@ -84,7 +84,7 @@ describe('the schema contract', () => {
     // points at the file rather than at the rule that stopped mattering.
     expect(read('.dockerignore')).toMatch(/^\*\*\/\.env\.\*$/m);
 
-    const buildConfigs = repoFiles('apps/*/tsconfig.build.json');
+    const buildConfigs = repoFiles('services/*/tsconfig.build.json');
     expect(buildConfigs.length).toBeGreaterThanOrEqual(6);
 
     for (const file of buildConfigs) {
@@ -107,12 +107,16 @@ describe('the schema contract', () => {
     // objects, removed by the setting a careful operator reaches for. They no
     // longer declare it; auth does, and `required()` like its peers, because
     // an unset seeding flag should stop a service rather than choose for it.
-    const seeders = repoFiles('apps/*/src/modules/prisma/database.seeder.ts');
+    const seeders = repoFiles(
+      'services/*/src/modules/prisma/database.seeder.ts',
+    );
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
     for (const seeder of seeders) {
       const service = seeder.split('/')[1];
-      const schema = repoFiles(`apps/${service}/src/**/env.validation.ts`)[0];
+      const schema = repoFiles(
+        `services/${service}/src/**/env.validation.ts`,
+      )[0];
       const declared = /SEED_ON_BOOTSTRAP:/.test(read(schema));
 
       // `seedRows` exists only where there are rows to seed.
@@ -157,7 +161,9 @@ describe('the schema contract', () => {
     // A source regex is brittle and this one earns it: it is the only check
     // covering all four services at once, and the edit it catches is the edit
     // a refactor would make.
-    const seeders = repoFiles('apps/*/src/modules/prisma/database.seeder.ts');
+    const seeders = repoFiles(
+      'services/*/src/modules/prisma/database.seeder.ts',
+    );
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
     for (const seeder of seeders) {
@@ -185,7 +191,7 @@ describe('the schema contract', () => {
 
   describe("**the migrations exist and stay out of the seeder's territory**", () => {
     const withSchema = (): string[] =>
-      repoFiles('apps/*/prisma/schema.prisma')
+      repoFiles('services/*/prisma/schema.prisma')
         .map((file) => file.split('/')[1])
         .sort();
 
@@ -203,7 +209,7 @@ describe('the schema contract', () => {
      */
     const seederObjects = (service: string): string[] => {
       const source = stripComments(
-        read(`apps/${service}/src/modules/prisma/database.seeder.ts`),
+        read(`services/${service}/src/modules/prisma/database.seeder.ts`),
       );
 
       return [
@@ -245,7 +251,7 @@ describe('the schema contract', () => {
       const extensions = withSchema()
         .map((service) =>
           stripComments(
-            read(`apps/${service}/src/modules/prisma/database.seeder.ts`),
+            read(`services/${service}/src/modules/prisma/database.seeder.ts`),
           ),
         )
         .join('\n')
@@ -260,7 +266,7 @@ describe('the schema contract', () => {
       // non-zero, so the init container holds the pod at `Init:Error` forever —
       // the safe failure, and a slow way to discover a missing directory.
       const migrations = repoFiles(
-        `apps/${service}/prisma/migrations/*/migration.sql`,
+        `services/${service}/prisma/migrations/*/migration.sql`,
       );
 
       expect(migrations.length).toBeGreaterThanOrEqual(1);
@@ -286,7 +292,7 @@ describe('the schema contract', () => {
         expect(forbidden.length).toBeGreaterThanOrEqual(4);
 
         const sql = repoFiles(
-          `apps/${service}/prisma/migrations/*/migration.sql`,
+          `services/${service}/prisma/migrations/*/migration.sql`,
         )
           .map((file) => `${file}\n${read(file)}`)
           .join('\n');
@@ -323,7 +329,7 @@ describe('the schema contract', () => {
      * is the exact shape of ADR 0042's finding, one environment over.
      */
     const withSchema = (): string[] =>
-      repoFiles('apps/*/prisma/schema.prisma')
+      repoFiles('services/*/prisma/schema.prisma')
         .map((file) => file.split('/')[1])
         .sort();
 
@@ -332,7 +338,7 @@ describe('the schema contract', () => {
     });
 
     it.each(withSchema())('%s', (service) => {
-      const entrypoint = `apps/${service}/src/schema-apply.ts`;
+      const entrypoint = `services/${service}/src/schema-apply.ts`;
       expect(repoFiles(entrypoint)).toEqual([entrypoint]);
 
       // The entrypoint must reach the DDL, not merely exist.
@@ -343,7 +349,7 @@ describe('the schema contract', () => {
       // The development caller. `db:push` alone leaves a database with every
       // table and none of the objects.
       const scripts = (
-        JSON.parse(read(`apps/${service}/package.json`)) as {
+        JSON.parse(read(`services/${service}/package.json`)) as {
           scripts: Record<string, string>;
         }
       ).scripts;
@@ -375,14 +381,16 @@ describe('the schema contract', () => {
     // `.env.example` is the contract a deployer follows; `.env.test` is
     // tracked and rides into `.env.docker` through the generator.
     const published = [
-      parseEnvFile(read('apps/auth-service/.env.example')).SUPER_ADMIN_PASSWORD,
-      parseEnvFile(read('apps/auth-service/.env.test')).SUPER_ADMIN_PASSWORD,
+      parseEnvFile(read('services/auth-service/.env.example'))
+        .SUPER_ADMIN_PASSWORD,
+      parseEnvFile(read('services/auth-service/.env.test'))
+        .SUPER_ADMIN_PASSWORD,
     ];
 
     expect(published.filter(Boolean)).toHaveLength(2);
 
     const schema = read(
-      'apps/auth-service/src/common/configs/env.validation.ts',
+      'services/auth-service/src/common/configs/env.validation.ts',
     );
 
     for (const password of published) {

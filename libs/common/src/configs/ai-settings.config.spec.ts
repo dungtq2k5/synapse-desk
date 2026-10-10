@@ -163,7 +163,7 @@ describe('B AI settings (unit)', () => {
 
   describe('cross-language contract', () => {
     // The Python half of this same assertion lives in
-    // `apps/rag-service/tests/test_settings.py`; between them, a value changed
+    // `services/rag-service/tests/test_settings.py`; between them, a value changed
     // on one side and not the other fails that side's own suite.
     it('11. Matches the SHARED contract fixture the Python resolver also reads', () => {
       expect(CHEAP_MODEL).toBe(contract.cheapModel);

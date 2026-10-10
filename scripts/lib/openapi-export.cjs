@@ -29,7 +29,7 @@ const EXPORT_COMMAND = 'npm run openapi:export';
 const BUILD_COMMAND = 'turbo run build --filter=@synapsedesk/api-gateway...';
 
 /** The env file the export boots from — tracked, and Joi-valid because e2e boots from it. */
-const EXPORT_ENV_FILE = 'apps/api-gateway/.env.test';
+const EXPORT_ENV_FILE = 'services/api-gateway/.env.test';
 
 /**
  * Every build output the export requires at runtime.
@@ -39,7 +39,7 @@ const EXPORT_ENV_FILE = 'apps/api-gateway/.env.test';
  * library's own `dist/` — not the copies `nest build` emits beside the gateway.
  */
 const RUNTIME_OUTPUTS = [
-  'apps/api-gateway/dist/apps/api-gateway/src/main.js',
+  'services/api-gateway/dist/services/api-gateway/src/main.js',
   'libs/common/dist/main.js',
   'libs/grpc-proto/dist/index.js',
 ];

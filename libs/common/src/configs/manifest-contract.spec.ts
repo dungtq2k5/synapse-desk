@@ -83,16 +83,16 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    repoFiles('apps/*/package.json')
+    repoFiles('services/*/package.json')
       .map((file) => file.split('/')[1])
       .sort();
 
   const documented = (service: string): Set<string> =>
-    envDocumentedKeys(read(`apps/${service}/.env.example`));
+    envDocumentedKeys(read(`services/${service}/.env.example`));
 
   const envValue = (service: string, key: string): string | undefined => {
     const match = new RegExp(`^#?\\s*${key}\\s*=(.*)$`, 'm').exec(
-      read(`apps/${service}/.env.example`),
+      read(`services/${service}/.env.example`),
     );
 
     return match?.[1].trim();
@@ -397,13 +397,13 @@ describe('the manifest contract', () => {
 
     /** rag-service declares its variables in Python; its guard is pytest. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
-      'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
+      'rag-service': 'pytest: services/rag-service/tests/test_env_contract.py',
     };
 
     const schemaFiles = (): Map<string, string> => {
       const map = new Map<string, string>();
 
-      for (const file of repoFiles('apps/*/src/**/env.validation.ts')) {
+      for (const file of repoFiles('services/*/src/**/env.validation.ts')) {
         map.set(file.split('/')[1], file);
       }
 
@@ -453,7 +453,7 @@ describe('the manifest contract', () => {
       // than a Joi schema — but the manifest half of the question is identical
       // and there is no reason for the one non-Node service to be exempt from
       // it.
-      const source = read('apps/rag-service/rag_service/config.py');
+      const source = read('services/rag-service/rag_service/config.py');
       const keys = new Set(
         [...source.matchAll(/["']([A-Z][A-Z0-9_]{2,})["']/g)].map(
           (match) => match[1],
@@ -524,7 +524,7 @@ describe('the manifest contract', () => {
     // Derived rather than asserted from the list above: the services whose Joi
     // schema NAMES the variable are the services that must hold it, so a third
     // consumer added later fails here instead of shipping with no Secret.
-    const declaring = repoFiles('apps/*/src/**/env.validation.ts')
+    const declaring = repoFiles('services/*/src/**/env.validation.ts')
       .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
       .map((file) => file.split('/')[1])
       .sort();
@@ -554,7 +554,7 @@ describe('the manifest contract', () => {
     const concurrency = Number(
       /concurrency:\s*(\d+)/.exec(
         read(
-          'apps/ingestion-service/src/modules/ingestion/ingestion.worker.ts',
+          'services/ingestion-service/src/modules/ingestion/ingestion.worker.ts',
         ),
       )?.[1],
     );
@@ -584,7 +584,7 @@ describe('the manifest contract', () => {
     // `secrets/`, storage's and notification's at the package root — and the
     // first draft of the table listing them put auth's in the wrong one.
     //
-    // `WORKDIR` is `/app/apps/${SERVICE}`, so a relative `./secrets/x.key`
+    // `WORKDIR` is `/app/services/${SERVICE}`, so a relative `./secrets/x.key`
     // resolves there; the mount is either that directory or that exact file via
     // `subPath`. Derived, so a path changed in `.env.example` and not in the
     // Deployment goes red instead of failing at `readFileSync` on boot.
@@ -598,7 +598,7 @@ describe('the manifest contract', () => {
         if (!key.endsWith('_PATH') || !value.startsWith('./')) continue;
 
         checked += 1;
-        const resolved = `/app/apps/${service}/${value.slice(2)}`;
+        const resolved = `/app/services/${service}/${value.slice(2)}`;
         const directory = resolved.slice(0, resolved.lastIndexOf('/'));
 
         const mounts = containersOf(deployments().get(service) as Doc).flatMap(
@@ -625,7 +625,7 @@ describe('the manifest contract', () => {
 
   // ------------------------------------------------- 7. generated stays generated
 
-  it('7. **`k8s/generated/` is a function of `apps/*/.env.example`**', () => {
+  it('7. **`k8s/generated/` is a function of `services/*/.env.example`**', () => {
     // Same shape as `job-alerts.spec.ts`: the generator's own `--check` mode is
     // the authority, so this cannot drift from it by reimplementing the rule.
     // A ConfigMap edited by hand is a value the next regeneration silently
@@ -650,7 +650,7 @@ describe('the manifest contract', () => {
     // container on one of them would run `migrate deploy` against nothing and
     // hold the pod at `Init:Error` forever.
     const withSchema = new Set(
-      repoFiles('apps/*/prisma/schema.prisma').map(
+      repoFiles('services/*/prisma/schema.prisma').map(
         (file) => file.split('/')[1],
       ),
     );

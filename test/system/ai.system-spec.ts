@@ -31,7 +31,7 @@ import { REPO_ROOT } from './services';
  */
 function aiConfigured(): boolean {
   const parsed = config({
-    path: `${REPO_ROOT}/apps/ingestion-service/.env`,
+    path: `${REPO_ROOT}/services/ingestion-service/.env`,
     processEnv: {},
   });
 

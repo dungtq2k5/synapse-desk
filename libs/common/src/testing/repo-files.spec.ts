@@ -9,7 +9,11 @@ import { REPO_ROOT, repoFiles } from './repo-files';
  */
 describe('repoFiles is the only way a spec lists the repository', () => {
   const specs = (): string[] =>
-    repoFiles('apps/**/*.spec.ts', 'libs/**/*.spec.ts', 'scripts/**/*.spec.ts');
+    repoFiles(
+      'services/**/*.spec.ts',
+      'libs/**/*.spec.ts',
+      'scripts/**/*.spec.ts',
+    );
 
   it('finds the specs it is about — the pattern-fires floor', () => {
     expect(specs().length).toBeGreaterThan(50);

@@ -24,7 +24,7 @@
  * STARTING with a line comment is dropped whole.
  *
  * **Not for files whose STRINGS carry comment delimiters.** A tsconfig's globs
- * are the measured case: `"apps/STAR/src/DOUBLESTAR/STAR"` spelled with real
+ * are the measured case: `"services/STAR/src/DOUBLESTAR/STAR"` spelled with real
  * asterisks contains both delimiters, and the block pattern ate the middle of
  * every include entry — parse JSONC with `ts.parseConfigFileTextToJson`
  * instead. Over source code the same hazard is a string literal containing

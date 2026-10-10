@@ -14,8 +14,8 @@ import {
   buildMessage,
   buildTenant,
   buildTicket,
-} from '../../../apps/ticket-service/test/factories';
-import type { PrismaService } from '../../../apps/ticket-service/src/modules/prisma/prisma.service';
+} from '../../../services/ticket-service/test/factories';
+import type { PrismaService } from '../../../services/ticket-service/src/modules/prisma/prisma.service';
 import type { ManifestTenant } from '../manifest';
 import type { Profile } from '../profiles';
 import { tenantsOf, type SeedStep } from '../registry';

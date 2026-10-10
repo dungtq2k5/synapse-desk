@@ -59,7 +59,7 @@ spec:
             # `docker/node-service.Dockerfile` already names as the exception to
             # the `secrets/` convention.
             - name: storage-service-account
-              mountPath: /app/apps/storage-service/serviceAccountKey.json
+              mountPath: /app/services/storage-service/serviceAccountKey.json
               subPath: serviceAccountKey.json
               readOnly: true
           resources:

@@ -16,7 +16,7 @@
  * other composition root calls, the same `buildOpenApiDocument` the served page
  * uses, then `close`.
  *
- * **`apps/api-gateway/.env.test` is authoritative.** Its values are ASSIGNED
+ * **`services/api-gateway/.env.test` is authoritative.** Its values are ASSIGNED
  * over `process.env`, so a cookie name exported in a shell or in CI cannot reach
  * the published file. A key the document reads that is NOT in that file would
  * still come from the root `.env`; every key it reads today is Joi-required, so
@@ -49,7 +49,10 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
-const GATEWAY_DIST = join(ROOT, 'apps/api-gateway/dist/apps/api-gateway/src');
+const GATEWAY_DIST = join(
+  ROOT,
+  'services/api-gateway/dist/services/api-gateway/src',
+);
 const OUTPUT = join(ROOT, OPENAPI_OUTPUT);
 
 const missing = missingOutputs(ROOT);
@@ -93,7 +96,7 @@ async function exportDocument() {
 
     const document = buildOpenApiDocument(app, configService);
     document.info.version = JSON.parse(
-      readFileSync(join(ROOT, 'apps/api-gateway/package.json'), 'utf8'),
+      readFileSync(join(ROOT, 'services/api-gateway/package.json'), 'utf8'),
     ).version;
     canonicalizeEnums(document);
 

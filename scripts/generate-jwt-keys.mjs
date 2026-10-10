@@ -71,7 +71,7 @@ const TARGETS = PAIRS.flatMap((pair) => [
 const force = process.argv.includes('--force');
 
 const existing = TARGETS.map((t) =>
-  join(repoRoot, 'apps', t.app, 'secrets', t.file),
+  join(repoRoot, 'services', t.app, 'secrets', t.file),
 ).filter(existsSync);
 
 if (existing.length && !force) {
@@ -98,7 +98,7 @@ const generated = new Map(
 );
 
 for (const target of TARGETS) {
-  const dir = join(repoRoot, 'apps', target.app, 'secrets');
+  const dir = join(repoRoot, 'services', target.app, 'secrets');
   const path = join(dir, target.file);
   const { privateKey, publicKey } = generated.get(target.pair);
 
@@ -109,7 +109,7 @@ for (const target of TARGETS) {
   if (target.kind === 'private') chmodSync(path, 0o600);
 
   console.log(
-    `${target.pair.padEnd(6)} ${target.kind.padEnd(7)} -> apps/${target.app}/secrets/${target.file}`,
+    `${target.pair.padEnd(6)} ${target.kind.padEnd(7)} -> services/${target.app}/secrets/${target.file}`,
   );
 }
 

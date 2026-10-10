@@ -43,17 +43,17 @@ describe('the environment contract', () => {
    * rag-service declares its variables in `rag_service/config.py` — required
    * vs optional is `os.environ[...]` vs `.get(..., default)`, at the
    * declaration site — and its guard is
-   * `apps/rag-service/tests/test_env_contract.py`, because a TypeScript test
+   * `services/rag-service/tests/test_env_contract.py`, because a TypeScript test
    * parsing Python source would be the only thing crossing the toolchain
    * line this repository keeps everywhere else (`lint:py`, `test:py`).
    */
   const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
-    'rag-service': 'pytest: apps/rag-service/tests/test_env_contract.py',
+    'rag-service': 'pytest: services/rag-service/tests/test_env_contract.py',
   };
 
-  /** apps/<service> for every workspace under apps/. */
+  /** services/<service> for every workspace under services/. */
   const services = (): string[] =>
-    repoFiles('apps/*/package.json')
+    repoFiles('services/*/package.json')
       .map((file) => file.split('/')[1])
       .sort();
 
@@ -61,7 +61,7 @@ describe('the environment contract', () => {
   const schemaFiles = (): Map<string, string> => {
     const map = new Map<string, string>();
 
-    for (const file of repoFiles('apps/*/src/**/env.validation.ts')) {
+    for (const file of repoFiles('services/*/src/**/env.validation.ts')) {
       map.set(file.split('/')[1], file);
     }
 
@@ -90,11 +90,11 @@ describe('the environment contract', () => {
   };
 
   const exampleKeys = (service: string): Set<string> => {
-    const path = join(REPO_ROOT, 'apps', service, '.env.example');
+    const path = join(REPO_ROOT, 'services', service, '.env.example');
 
     if (!existsSync(path)) {
       throw new Error(
-        `apps/${service}/.env.example does not exist — every validated ` +
+        `services/${service}/.env.example does not exist — every validated ` +
           'variable must be documented there',
       );
     }
@@ -106,7 +106,7 @@ describe('the environment contract', () => {
     // The corpus floor. The gateway's schema already sits at a different path
     // (`common/config/` vs `common/configs/`) and is still found — though NOT
     // because `**` is generous: in a git pathspec `a/**/b` requires at least
-    // one intervening component, so a schema moved to `apps/x/src/` directly
+    // one intervening component, so a schema moved to `services/x/src/` directly
     // would be MISSED by the glob above. What holds then is this very
     // assertion: `covered` is compared against the real service list, so the
     // dropped service goes red — reading as "schema missing", which is close
@@ -156,7 +156,7 @@ describe('the environment contract', () => {
     // (Untracked `.env` files carry more of these; they are a developer's own
     // and do not exist in CI, so no test can hold them — their cleanup was a
     // one-time manual pass.)
-    const envFiles = repoFiles('apps/*/.env*');
+    const envFiles = repoFiles('services/*/.env*');
 
     // The corpus floor: seven services × (.env.example + .env.test).
     expect(envFiles.length).toBeGreaterThanOrEqual(14);
@@ -184,7 +184,7 @@ describe('the environment contract', () => {
     // place a real secret may live, since .env.test is tracked) — so its
     // ignoredness is a security property, asserted rather than assumed.
     for (const service of services()) {
-      const path = `apps/${service}/.env.test.local`;
+      const path = `services/${service}/.env.test.local`;
 
       let ignored = true;
       try {
@@ -233,7 +233,7 @@ describe('the environment contract', () => {
     /** `KEY = value` from an example file, values trimmed, comments skipped. */
     const valueOf = (service: string, key: string): string | undefined => {
       const source = readFileSync(
-        join(REPO_ROOT, `apps/${service}/.env.example`),
+        join(REPO_ROOT, `services/${service}/.env.example`),
         'utf8',
       );
 
@@ -356,7 +356,7 @@ describe('the environment contract', () => {
 
     const envOf = (service: string, file: string): Record<string, string> =>
       parseEnvFile(
-        readFileSync(join(REPO_ROOT, 'apps', service, file), 'utf8'),
+        readFileSync(join(REPO_ROOT, 'services', service, file), 'utf8'),
       );
 
     it.each(FILES)(

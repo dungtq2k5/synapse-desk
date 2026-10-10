@@ -142,7 +142,7 @@ echo "   ok — all seven built"
 # (pdfjs-dist) have no require export and would false-fail.
 echo "3. every declared dependency resolves inside the runtime image"
 for service in "${NODE_SERVICES[@]}"; do
-  docker run --rm -w "/app/apps/$service" --entrypoint node \
+  docker run --rm -w "/app/services/$service" --entrypoint node \
     "synapsedesk/$service" \
     --input-type=module -e '
       import { readFileSync } from "node:fs";

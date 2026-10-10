@@ -39,7 +39,7 @@ const RESEND = 'POST /api/v1/users/invitations/{id}/resend';
 describe('the routes that need a verified email', () => {
   it('are exactly the two named here', () => {
     const guarded = globSync(
-      'apps/api-gateway/src/modules/**/*.controller.ts',
+      'services/api-gateway/src/modules/**/*.controller.ts',
       {
         cwd: REPO_ROOT,
       },

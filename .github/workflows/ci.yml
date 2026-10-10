@@ -343,8 +343,8 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            apps/rag-service/requirements.txt
-            apps/rag-service/requirements-dev.txt
+            services/rag-service/requirements.txt
+            services/rag-service/requirements-dev.txt
 
       # `test_multimodal_e2e.py` carries TWO skip marks: one on GEMINI_API_KEY
       # and one on `poppler_available()`. A runner holding the secret and no
@@ -358,7 +358,7 @@ jobs:
       - run: npm run typecheck:py
 
       # **The pytest suites are not unit tests, and this job used to run them
-      # as if they were.** `conftest.py` loads `apps/rag-service/.env.test` —
+      # as if they were.** `conftest.py` loads `services/rag-service/.env.test` —
       # tracked, so the addresses were always here — and its `qdrant` and
       # `pool` fixtures connect EAGERLY, with no skip mark to fall back on.
       # Measured with the three stores unreachable, which is what this job was:
@@ -398,4 +398,4 @@ jobs:
       # the known floor.
       - name: skips are accounted for
         if: always()
-        run: node scripts/check-pytest-skips.mjs apps/rag-service/pytest.xml
+        run: node scripts/check-pytest-skips.mjs services/rag-service/pytest.xml

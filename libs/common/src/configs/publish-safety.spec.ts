@@ -100,7 +100,7 @@ describe('nothing here can be published, and the licence is one string', () => {
     const pyprojects = repoFiles('*pyproject.toml');
 
     // The floor: a glob that matched nothing would report a compliant tree.
-    expect(pyprojects).toContain('apps/rag-service/pyproject.toml');
+    expect(pyprojects).toContain('services/rag-service/pyproject.toml');
 
     const wrong = pyprojects
       .map((file) => ({

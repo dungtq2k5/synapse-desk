@@ -212,7 +212,7 @@ describe('GraphQL permission coverage — every root field is gated as the table
         else if (entry.name.endsWith('.resolver.ts')) files.push(path);
       }
     };
-    walk(join(REPO_ROOT, 'apps/api-gateway/src/modules'));
+    walk(join(REPO_ROOT, 'services/api-gateway/src/modules'));
 
     return files.map((file) => readFileSync(file, 'utf8')).join('\n');
   })();

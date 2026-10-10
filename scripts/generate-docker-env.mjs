@@ -68,7 +68,7 @@ const SUBSTITUTIONS = [
 let generated = 0;
 
 for (const service of SERVICES) {
-  const source = join(REPO_ROOT, 'apps', service, '.env');
+  const source = join(REPO_ROOT, 'services', service, '.env');
 
   if (!existsSync(source)) {
     console.warn(`skip ${service}: no .env to generate from`);
@@ -85,11 +85,11 @@ for (const service of SERVICES) {
     '# do not track. Host addresses are rewritten to compose service names.\n\n';
 
   writeFileSync(
-    join(REPO_ROOT, 'apps', service, '.env.docker'),
+    join(REPO_ROOT, 'services', service, '.env.docker'),
     banner + content,
   );
   generated += 1;
-  console.log(`apps/${service}/.env.docker`);
+  console.log(`services/${service}/.env.docker`);
 }
 
 if (generated === 0) {

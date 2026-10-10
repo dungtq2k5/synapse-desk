@@ -103,7 +103,7 @@ async function main() {
     console.log(
       `webhook: created ${created.id} for ${EVENTS.join(', ')}\n\n` +
         `  RESEND_WEBHOOK_SECRET = ${created.signing_secret}\n\n` +
-        '  ^ Put this in apps/api-gateway/.env. It can be read back later with\n' +
+        '  ^ Put this in services/api-gateway/.env. It can be read back later with\n' +
         '    `node scripts/provision-resend.mjs --print-secret`.\n',
     );
     return;

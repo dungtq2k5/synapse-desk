@@ -122,7 +122,7 @@ const controllerSources = (() => {
       else if (entry.name.endsWith('.controller.ts')) files.push(path);
     }
   };
-  walk(join(REPO_ROOT, 'apps/api-gateway/src/modules'));
+  walk(join(REPO_ROOT, 'services/api-gateway/src/modules'));
 
   return files.map((file) => readFileSync(file, 'utf8')).join('\n');
 })();

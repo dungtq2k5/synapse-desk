@@ -25,13 +25,13 @@ describe('The analytics window resolves identically in both services', () => {
   const REPO = join(__dirname, '../../../..');
 
   const GUARDS = [
-    'apps/ingestion-service/src/modules/analytics/ai-analytics.service.ts',
-    'apps/ticket-service/src/modules/analytics/analytics.service.ts',
+    'services/ingestion-service/src/modules/analytics/ai-analytics.service.ts',
+    'services/ticket-service/src/modules/analytics/analytics.service.ts',
   ];
 
   const RESOLVERS = [
-    'apps/ingestion-service/src/modules/auth-client/auth-reference.service.ts',
-    'apps/ticket-service/src/modules/auth-client/auth-reference.service.ts',
+    'services/ingestion-service/src/modules/auth-client/auth-reference.service.ts',
+    'services/ticket-service/src/modules/auth-client/auth-reference.service.ts',
   ];
 
   const read = (path: string): string => readFileSync(join(REPO, path), 'utf8');

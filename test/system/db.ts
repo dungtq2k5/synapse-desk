@@ -12,7 +12,7 @@
 
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient as NotificationPrisma } from '../../apps/notification-service/src/generated/prisma/client';
+import { PrismaClient as NotificationPrisma } from '../../services/notification-service/src/generated/prisma/client';
 import { REPO_ROOT } from './services';
 
 /**
@@ -24,13 +24,13 @@ import { REPO_ROOT } from './services';
  */
 function databaseUrl(service: string): string {
   const parsed = config({
-    path: `${REPO_ROOT}/apps/${service}/.env`,
+    path: `${REPO_ROOT}/services/${service}/.env`,
     processEnv: {},
   });
 
   const url = parsed.parsed?.DATABASE_URL;
   if (!url) {
-    throw new Error(`No DATABASE_URL in apps/${service}/.env`);
+    throw new Error(`No DATABASE_URL in services/${service}/.env`);
   }
 
   return url;

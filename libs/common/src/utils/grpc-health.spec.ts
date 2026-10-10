@@ -109,11 +109,11 @@ describe('GrpcHealthService', () => {
    */
   describe('6. no service probes ANOTHER service', () => {
     const OPS_MODULES = [
-      'apps/auth-service/src/modules/ops/ops.module.ts',
-      'apps/ticket-service/src/modules/ops/ops.module.ts',
-      'apps/ingestion-service/src/modules/ops/ops.module.ts',
-      'apps/notification-service/src/modules/ops/ops.module.ts',
-      'apps/storage-service/src/modules/ops/ops.module.ts',
+      'services/auth-service/src/modules/ops/ops.module.ts',
+      'services/ticket-service/src/modules/ops/ops.module.ts',
+      'services/ingestion-service/src/modules/ops/ops.module.ts',
+      'services/notification-service/src/modules/ops/ops.module.ts',
+      'services/storage-service/src/modules/ops/ops.module.ts',
     ];
 
     /**
@@ -160,9 +160,9 @@ describe('GrpcHealthService', () => {
       // `main.ts` calls `createMicroservice` is a gRPC service and must be
       // probeable. A new service is covered the moment it exists, which is
       // precisely when the omission would otherwise be made.
-      const grpcServices = readdirSync(join(REPO_ROOT, 'apps'))
+      const grpcServices = readdirSync(join(REPO_ROOT, 'services'))
         .filter((app) => {
-          const main = join(REPO_ROOT, 'apps', app, 'src/main.ts');
+          const main = join(REPO_ROOT, 'services', app, 'src/main.ts');
           return (
             existsSync(main) &&
             readFileSync(main, 'utf8').includes('createMicroservice')
@@ -174,7 +174,9 @@ describe('GrpcHealthService', () => {
       expect(
         grpcServices.filter(
           (service) =>
-            !OPS_MODULES.some((path) => path.startsWith(`apps/${service}/`)),
+            !OPS_MODULES.some((path) =>
+              path.startsWith(`services/${service}/`),
+            ),
         ),
       ).toEqual([]);
     });

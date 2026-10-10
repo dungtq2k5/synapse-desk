@@ -57,7 +57,7 @@ describe('mapper functions name their return type verbatim', () => {
    * service is a different animal and its name answers to nothing here.
    */
   const mapperFiles = (): string[] =>
-    repoFiles('apps/**/*.mapper.ts', 'libs/**/*.mapper.ts');
+    repoFiles('services/**/*.mapper.ts', 'libs/**/*.mapper.ts');
 
   /**
    * The name §12 requires for a given return annotation.
@@ -196,7 +196,7 @@ describe('mapper functions name their return type verbatim', () => {
     // combination somebody believed in.
     const probe = join(
       REPO_ROOT,
-      'apps/api-gateway/src/modules/platform/unstaged-probe.mapper.ts',
+      'services/api-gateway/src/modules/platform/unstaged-probe.mapper.ts',
     );
 
     try {
