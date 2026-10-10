@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.5.0",
+    "@nestjs/common": "^11.1.28",
     "@nestjs/microservices": "^11.1.28",
     "@synapsedesk/contracts": "*",
     "bullmq": "^5.81.3"
