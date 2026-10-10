@@ -586,7 +586,7 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited in Redis (`WsThrot
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
 | GET | `/health` | Liveness. | PUBLIC |
-| GET | `/health/ready` | Readiness — Postgres, Redis, NATS, gRPC peers, Qdrant. | PUBLIC |
+| GET | `/health/ready` | Readiness — `ready` is false only while this instance drains for shutdown. Redis is reported under `dependencies` and the gRPC peers under `peers`; neither decides it (ADR 0010). | PUBLIC |
 | GET | `/version` | Build SHA + semver. | PUBLIC |
 | GET | `/metrics` | Prometheus scrape. **Its own listener on a separate internal port, not a route on the public app** — that is what makes "unreachable from the internet" a property of this process rather than of an Nginx config in another repository. Started _before_ the public listener, so a scraper never finds the app serving traffic while the metrics port still refuses. | internal |
 | GET | `/docs` · `/docs-json` | Swagger UI / OpenAPI spec. **[ADR 0028](./decisions/0028-swagger-envelope-is-a-per-route-decorator.md)** — the CLI plugin (which turns 50 files of hand annotation into one config block), the two envelope decorators, and the four cookie auth schemes this API actually uses. Gate exposure on validated config, never on an inline `NODE_ENV` check. | PUBLIC in non-prod |

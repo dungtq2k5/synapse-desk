@@ -285,19 +285,21 @@ So a list that only needs to know *which* agent, not their name, should ask for 
 
 ```json
 { "errors": [{
-  "message": "Query is nested 9 levels deep, exceeding the maximum of 7."
+  "message": "Query is nested 9 levels deep, exceeding the maximum of 7.",
+  "extensions": { "classification": "ExecutionAborted", "code": "QUERY_TOO_DEEP", "depth": 9, "maxDepth": 7 }
 }]}
 ```
 
 ```json
 { "errors": [{
-  "message": "Query is too complex: 3400 exceeds the maximum of 2000. Request fewer items, or fewer fields that resolve across services."
+  "message": "Query is too complex: 3400 exceeds the maximum of 2000. Request fewer items, or fewer fields that resolve across services.",
+  "extensions": { "classification": "ExecutionAborted", "code": "QUERY_TOO_COMPLEX", "cost": 3400, "maxComplexity": 2000 }
 }]}
 ```
 
-Both arrive as **HTTP 200** with the error in `errors` and no `data`: the query is refused after validation and before any resolver runs, so no peer was called. **There is no machine-readable code** — `extensions` carries none, so the message is the only thing that tells the two apart (known gap 57). A client that branches on the status code sees a success.
+Both arrive as **HTTP 200** with the error in `errors` and no `data`: the query is refused after validation and before any resolver runs, so no peer was called. **Branch on `extensions.code`** — not on the status, which reads as a success, and not on the message text. `classification` is graphql-java's own and is the same for any aborted execution; `code` is the one that says which limit fired.
 
-**What to do about each:** too deep means restructure — you almost certainly want a second query rather than a deeper one. Too complex means ask for fewer items or drop a cross-service edge; the numbers in the message tell you how far over you are.
+**What to do about each:** `QUERY_TOO_DEEP` means restructure — you almost certainly want a second query rather than a deeper one. `QUERY_TOO_COMPLEX` means ask for fewer items or drop a cross-service edge; the numbers in `extensions` tell you how far over you are.
 
 ---
 
