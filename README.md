@@ -142,7 +142,7 @@ Each service loads `.env` from its **own** directory, validated by a Joi schema 
 ```sh
 for s in api-gateway auth-service ticket-service ingestion-service \
          notification-service storage-service rag-service; do
-  cp "apps/$s/.env.example" "apps/$s/.env"
+  cp "services/$s/.env.example" "services/$s/.env"
 done
 ```
 

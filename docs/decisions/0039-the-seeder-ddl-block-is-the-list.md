@@ -1,6 +1,6 @@
 # 0039 — The seeder's DDL block is the list of hand-written SQL
 
-**Status:** accepted · **Supersedes the enumeration in:** `development-conventions.md` §7 · **Code:** `apps/*/src/modules/prisma/database.seeder.ts`
+**Status:** accepted · **Supersedes the enumeration in:** `development-conventions.md` §7 · **Code:** `services/*/src/modules/prisma/database.seeder.ts`
 
 ## Decision
 

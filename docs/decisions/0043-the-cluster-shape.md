@@ -1,6 +1,6 @@
 # 0043 — The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx`
 
-**Status:** accepted · **Code:** `k8s/`, `scripts/generate-k8s-config.mjs`, `apps/*/src/schema-apply.ts`, `packages/config/src/manifest-contract.spec.ts` · **Closes:** ADR 0042's _"where the step runs"_
+**Status:** accepted · **Code:** `k8s/`, `scripts/generate-k8s-config.mjs`, `services/*/src/schema-apply.ts`, `packages/config/src/manifest-contract.spec.ts` · **Closes:** ADR 0042's _"where the step runs"_
 
 ## Decision
 

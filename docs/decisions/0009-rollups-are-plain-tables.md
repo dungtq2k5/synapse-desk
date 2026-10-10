@@ -1,6 +1,6 @@
 # 0009 — Analytics rollups are plain tables written by idempotent jobs
 
-**Status:** accepted · **Code:** `apps/*/src/modules/*/`*`rollup`*`.job.ts`
+**Status:** accepted · **Code:** `services/*/src/modules/*/`*`rollup`*`.job.ts`
 
 ## Decision
 
