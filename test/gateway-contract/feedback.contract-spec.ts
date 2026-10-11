@@ -187,4 +187,30 @@ describe('feedback', () => {
       expect(call.request).toMatchObject({ citationAccurate: true });
     },
   );
+
+  rowFor('Feedback')(
+    '**`1.0` is the thumb `1`**: a rating is compared as a number, not as text',
+    async () => {
+      // Raw text, because `JSON.stringify(1.0)` is `1`: a client in a language
+      // whose numbers keep their decimals sends `1.0`, and JSON says it is the
+      // same number.
+      peers.ticket.on('FeedbackService/SubmitFeedback').reply(wireFeedback(1));
+
+      const response = await fetch(
+        `${gateway.baseUrl}${API}/messages/${MESSAGE}/feedback`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+          },
+          body: '{"rating":1.0}',
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const [call] = peers.ticket.calls('FeedbackService/SubmitFeedback');
+      expect(call.request).toMatchObject({ rating: 1 });
+    },
+  );
 });
