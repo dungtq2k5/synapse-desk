@@ -492,6 +492,8 @@ export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
 
 **The e2e suites run with `--runInBand`, always** — each service's shares one Postgres database. Parallel workers racing on it produce the "fails only sometimes, never under a debugger" symptom. Bake it into the npm script, not into someone's memory.
 
+**Test output is results, not logs.** `packages/testing/src/quiet-logs.ts`, which every Jest project loads through `jest.config.base.ts`, switches Nest's logger off for the run — including the error lines Nest's testing logger would still print — and the gateway's `logback-test.xml` keeps its Maven tests quiet the same way. `TEST_LOGS=1` and `TEST_LOG_LEVEL=INFO` turn them back on. Assert on what the code returns, sends or records, never on what it printed.
+
 ### 13.1 Naming
 
 - **Files.** `*.spec.ts` (unit), `*.e2e-spec.ts` (either e2e flavour — the directory says which).
@@ -753,6 +755,8 @@ npm run openapi:check    # builds the gateway with its libs, then compares docs/
 npm run test             # unit
 npm run test:e2e         # the suites for the services you touched
 ```
+
+`npm run check` runs `lint`, `lint:py`, `format:check`, `typecheck` and `typecheck:py` in one command — convenient, but in a different order and without the tests, so it does not replace the list above.
 
 `openapi:check` runs the turbo build itself: the export reads the BUILT
 gateway and the libraries' own `dist/`, and a stale build cannot be told from

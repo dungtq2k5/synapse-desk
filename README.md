@@ -170,7 +170,7 @@ Also worth setting now, though nothing refuses to boot without them:
 npm run setup:py
 ```
 
-Creates `services/rag-service/.venv` and installs both requirement files. `turbo run dev` launches rag-service from that venv, so it has to exist before step 8.
+Creates `services/rag-service/.venv`, installs `requirements.lock` with every hash checked, then the development tools from `requirements-dev.txt`. `turbo run dev` launches rag-service from that venv, so it has to exist before step 8 — and `npm run format`, `format:check` and `check` run Ruff from it, so they need it too. After changing `requirements.txt`, `npm run lock:py` regenerates the lock; it needs [`uv`](https://docs.astral.sh/uv/).
 
 ### 7. Build, then push the schema
 
@@ -231,9 +231,12 @@ Two things only `--apply` does, and the portal depends on the first: it creates 
 ```sh
 npm test                 # unit, every workspace
 npm run test:py          # pytest, rag-service
-npm run lint             # eslint + the model-literal check
-npm run typecheck        # tsc --noEmit
+npm run check            # lint, lint:py, format:check, typecheck, typecheck:py
 ```
+
+Tests print their results, not the services' logs. When a failure needs the logs, `TEST_LOGS=1 npm test` brings the Nest logs back, and `TEST_LOG_LEVEL=INFO` does the same for the gateway's Maven tests.
+
+CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit, Python and gateway jobs write; `sonar-project.properties` says what is analysed and what counts toward coverage.
 
 End-to-end suites need the stack up and their own databases. `prisma db push` creates a missing database on connect, so this is the whole preparation:
 
