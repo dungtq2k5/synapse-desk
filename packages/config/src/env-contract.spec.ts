@@ -128,6 +128,15 @@ describe('the environment contract', () => {
     expect(schemaFiles().size).toBeGreaterThanOrEqual(5);
   });
 
+  it('every guard named elsewhere is a file in the repository', () => {
+    // The labels are read by nobody else, so a guard that moved or was deleted
+    // would leave this one pointing at nothing while it still passed.
+    for (const guard of Object.values(GUARDED_ELSEWHERE)) {
+      const path = guard.slice(guard.indexOf(': ') + 2);
+      expect(repoFiles(path)).toEqual([path]);
+    }
+  });
+
   describe.each([...schemaFiles().entries()])('%s', (service, schema) => {
     it('parses at least ten schema keys — the pattern-fires floor', () => {
       // A formatting change that broke the key regex would empty the set and

@@ -443,6 +443,15 @@ describe('the manifest contract', () => {
       ).toEqual(services());
     });
 
+    it('every guard named elsewhere is a file in the repository', () => {
+      // The labels are read by nobody else, so a guard that moved or was deleted
+      // would leave this one pointing at nothing while it still passed.
+      for (const guard of Object.values(GUARDED_ELSEWHERE)) {
+        const path = guard.slice(guard.indexOf(': ') + 2);
+        expect(repoFiles(path)).toEqual([path]);
+      }
+    });
+
     it.each([...schemaFiles().entries()])('%s', (service, schema) => {
       const keys = schemaKeys(schema);
       expect(keys.size).toBeGreaterThanOrEqual(10);
