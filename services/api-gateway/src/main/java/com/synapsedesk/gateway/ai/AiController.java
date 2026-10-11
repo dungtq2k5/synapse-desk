@@ -1,9 +1,13 @@
 package com.synapsedesk.gateway.ai;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.openapi.ApiErrors;
+import com.synapsedesk.gateway.common.security.RequirePermission;
+import com.synapsedesk.gateway.common.web.ApiPaths;
+import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.model.AiClassificationResponseDto;
 import com.synapsedesk.gateway.model.AiDraftResponseDto;
 import com.synapsedesk.gateway.model.AiSuggestionResponseDto;
@@ -13,10 +17,6 @@ import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.DraftCitationResponseDto;
 import com.synapsedesk.gateway.model.GenerateDraftDto;
 import com.synapsedesk.gateway.model.SuggestedArticleResponseDto;
-import com.synapsedesk.gateway.openapi.ApiErrors;
-import com.synapsedesk.gateway.security.RequirePermission;
-import com.synapsedesk.gateway.web.ApiPaths;
-import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -59,7 +59,7 @@ import synapsedesk.ticket.Common.TicketPriority;
  * ticket-service's own decision, forwarded as-is; the gateway does not
  * branch on it. The billing 402 the other three writes can answer arrives
  * as a gRPC `PERMISSION_DENIED` carrying a {@code [http:402]} marker, which
- * {@link com.synapsedesk.gateway.error.GrpcStatusMapping} already resolves
+ * {@link com.synapsedesk.gateway.common.error.GrpcStatusMapping} already resolves
  * generically — no route-specific handling needed here.
  *
  * <p><b>Migrated off `AiApi`.</b> `getSummary`/`generateSummary` shared ONE

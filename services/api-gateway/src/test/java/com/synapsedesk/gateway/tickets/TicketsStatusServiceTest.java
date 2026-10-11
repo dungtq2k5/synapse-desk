@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.model.BulkTicketPriorityDto;
 import com.synapsedesk.gateway.model.BulkTicketStatusDto;
 import com.synapsedesk.gateway.model.BulkTicketStatusResponseDto;

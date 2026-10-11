@@ -1,24 +1,24 @@
 package com.synapsedesk.gateway.knowledge;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.openapi.ApiErrors;
+import com.synapsedesk.gateway.common.throttle.RouteThrottle;
+import com.synapsedesk.gateway.common.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.common.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.common.web.ApiPaths;
+import com.synapsedesk.gateway.common.web.ApiResponse;
+import com.synapsedesk.gateway.common.web.PageMeta;
+import com.synapsedesk.gateway.common.web.PagedData;
+import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.model.KnowledgeArticleDetailResponseDto;
 import com.synapsedesk.gateway.model.KnowledgeArticleResponseDto;
 import com.synapsedesk.gateway.model.KnowledgeAskDto;
 import com.synapsedesk.gateway.model.KnowledgeAskResponseDto;
 import com.synapsedesk.gateway.model.KnowledgeSearchDto;
 import com.synapsedesk.gateway.model.KnowledgeSearchResponseDto;
-import com.synapsedesk.gateway.openapi.ApiErrors;
-import com.synapsedesk.gateway.throttle.RouteThrottle;
-import com.synapsedesk.gateway.throttle.ThrottleOverride;
-import com.synapsedesk.gateway.throttle.ThrottlerTiers;
-import com.synapsedesk.gateway.web.ApiPaths;
-import com.synapsedesk.gateway.web.ApiResponse;
-import com.synapsedesk.gateway.web.PageMeta;
-import com.synapsedesk.gateway.web.PagedData;
-import com.synapsedesk.gateway.web.SortDirection;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -75,7 +75,7 @@ import synapsedesk.rag.RagServiceGrpc;
  * <p><b>{@code ask} refuses at the AI cap; {@code search} degrades.</b> A
  * generated answer has no degraded form, so rag-service raises a gRPC
  * {@code PERMISSION_DENIED} carrying an {@code [http:402]} marker for
- * `ask` — {@link com.synapsedesk.gateway.error.GrpcStatusMapping} already
+ * `ask` — {@link com.synapsedesk.gateway.common.error.GrpcStatusMapping} already
  * maps that marker generically, so nothing route-specific is needed here.
  * `search` instead returns 200 with {@code degraded: LEXICAL_ONLY} set.
  *

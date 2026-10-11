@@ -8,9 +8,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.model.BackfillJobDto;
 import com.synapsedesk.gateway.model.JobHealthResponseDto;
 import com.synapsedesk.gateway.model.JobRunStatusResponseDto;

@@ -9,8 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.model.ChangePlanDto;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

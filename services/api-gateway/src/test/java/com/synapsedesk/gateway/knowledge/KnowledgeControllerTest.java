@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.model.KnowledgeAskDto;
 import com.synapsedesk.gateway.model.KnowledgeSearchDto;
 import java.math.BigDecimal;
@@ -61,7 +61,7 @@ class KnowledgeControllerTest {
     when(ragStub.withDeadlineAfter(anyLong(), any())).thenReturn(ragStub);
     when(ragStub.withInterceptors(any())).thenReturn(ragStub);
     when(currentUser.require(any())).thenReturn(
-      new com.synapsedesk.gateway.auth.RequestContext(
+      new com.synapsedesk.gateway.common.auth.RequestContext(
         "agent-1",
         "org-1",
         false,

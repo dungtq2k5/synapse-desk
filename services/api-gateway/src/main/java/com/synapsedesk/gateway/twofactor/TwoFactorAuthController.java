@@ -1,14 +1,25 @@
 package com.synapsedesk.gateway.twofactor;
 
-import com.synapsedesk.gateway.auth.CookieWriter;
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
-import com.synapsedesk.gateway.lifecycle.OrgAccess;
-import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
+import com.synapsedesk.gateway.common.auth.CookieWriter;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestOrigin;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
+import com.synapsedesk.gateway.common.openapi.ApiErrors;
+import com.synapsedesk.gateway.common.openapi.RouteSecurity;
+import com.synapsedesk.gateway.common.openapi.RouteSecurity;
+import com.synapsedesk.gateway.common.security.TwoFactorEnrolmentGuard;
+import com.synapsedesk.gateway.common.security.TwoFactorEnrolmentGuard.Enrollee;
+import com.synapsedesk.gateway.common.throttle.AuthThrottle;
+import com.synapsedesk.gateway.common.throttle.RouteThrottle;
+import com.synapsedesk.gateway.common.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.common.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.common.web.ApiPaths;
+import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.model.ActivateTwoFactorDto;
 import com.synapsedesk.gateway.model.AuthenticateTwoFactorDto;
 import com.synapsedesk.gateway.model.BackupCodesResponseDto;
@@ -17,17 +28,6 @@ import com.synapsedesk.gateway.model.DisableTwoFactorDto;
 import com.synapsedesk.gateway.model.GenerateTwoFactorResponseDto;
 import com.synapsedesk.gateway.model.RegenerateBackupCodesDto;
 import com.synapsedesk.gateway.model.TwoFactorAuthenticatedResponseDto;
-import com.synapsedesk.gateway.openapi.ApiErrors;
-import com.synapsedesk.gateway.openapi.RouteSecurity;
-import com.synapsedesk.gateway.openapi.RouteSecurity;
-import com.synapsedesk.gateway.security.TwoFactorEnrolmentGuard;
-import com.synapsedesk.gateway.security.TwoFactorEnrolmentGuard.Enrollee;
-import com.synapsedesk.gateway.throttle.AuthThrottle;
-import com.synapsedesk.gateway.throttle.RouteThrottle;
-import com.synapsedesk.gateway.throttle.ThrottleOverride;
-import com.synapsedesk.gateway.throttle.ThrottlerTiers;
-import com.synapsedesk.gateway.web.ApiPaths;
-import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -106,14 +106,14 @@ public class TwoFactorAuthController {
 
   private final TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub;
   private final CurrentUser currentUser;
-  private final com.synapsedesk.gateway.auth.JwtVerifier verifier;
+  private final com.synapsedesk.gateway.common.auth.JwtVerifier verifier;
   private final CookieWriter cookies;
   private final TwoFactorEnrolmentGuard enrolment;
 
   public TwoFactorAuthController(
     TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub,
     CurrentUser currentUser,
-    com.synapsedesk.gateway.auth.JwtVerifier verifier,
+    com.synapsedesk.gateway.common.auth.JwtVerifier verifier,
     CookieWriter cookies,
     TwoFactorEnrolmentGuard enrolment
   ) {

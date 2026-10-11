@@ -8,8 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.graphql.PermissionCatalogueGqlDto;
 import com.synapsedesk.gateway.graphql.PermissionCatalogueLoaderConfig;
 import graphql.GraphQLContext;

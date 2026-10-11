@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.realtime;
 
-import com.synapsedesk.gateway.config.ThrottleProperties;
+import com.synapsedesk.gateway.common.config.ThrottleProperties;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

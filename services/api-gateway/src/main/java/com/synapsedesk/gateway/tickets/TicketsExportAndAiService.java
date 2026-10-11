@@ -1,12 +1,12 @@
 package com.synapsedesk.gateway.tickets;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.model.CreateTicketExportDto;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.ExportResponseDto;
 import com.synapsedesk.gateway.model.SimilarTicketResponseDto;
-import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.util.List;

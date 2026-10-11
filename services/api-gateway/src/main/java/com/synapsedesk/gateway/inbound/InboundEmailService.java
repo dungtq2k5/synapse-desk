@@ -1,9 +1,9 @@
 package com.synapsedesk.gateway.inbound;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.RequestOrigin;
-import com.synapsedesk.gateway.config.InboundEmailProperties;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestOrigin;
+import com.synapsedesk.gateway.common.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.inbound.InboundEmail.RemoteAttachment;
 import com.synapsedesk.gateway.inbound.InboundEmail.UploadedAttachment;
 import com.synapsedesk.gateway.inbound.InboundPublisher.Reason;

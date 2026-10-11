@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.model.CreateTicketExportDto;
 import java.util.List;
 import java.util.Map;

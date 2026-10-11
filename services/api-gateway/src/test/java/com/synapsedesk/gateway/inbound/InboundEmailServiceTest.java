@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.config.InboundEmailProperties;
 import com.synapsedesk.gateway.inbound.InboundEmail.RemoteAttachment;
 import com.synapsedesk.gateway.inbound.InboundEmailService.AcceptOptions;
 import com.synapsedesk.gateway.inbound.InboundEmailService.RemoteAttachmentSource;

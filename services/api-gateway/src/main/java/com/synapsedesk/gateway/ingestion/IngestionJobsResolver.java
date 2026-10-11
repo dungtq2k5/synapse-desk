@@ -1,12 +1,12 @@
 package com.synapsedesk.gateway.ingestion;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.documents.DocumentGqlDto;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.security.RequirePermission;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import java.util.concurrent.CompletableFuture;
@@ -99,7 +99,7 @@ public class IngestionJobsResolver {
         .stream()
         .map(IngestionJobMapper::toIngestionJobGqlDto)
         .toList(),
-      new com.synapsedesk.gateway.graphql.PageMetaGqlDto(
+      new com.synapsedesk.gateway.common.graphql.PageMetaGqlDto(
         meta.getTotalItems(),
         meta.getItemCount(),
         meta.getItemsPerPage(),

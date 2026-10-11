@@ -1,5 +1,7 @@
 package com.synapsedesk.gateway.web;
 
+import com.synapsedesk.gateway.common.web.EnumParameterConverters;
+
 /**
  * The {@code fileType} filter of the document and chunk lists, exactly as the
  * published contract's enum lists it: {@code bin}, {@code docx}, {@code md},

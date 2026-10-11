@@ -1,8 +1,8 @@
 package com.synapsedesk.gateway.realtime;
 
 import com.corundumstudio.socketio.SocketIOClient;
-import com.synapsedesk.gateway.auth.JwtPrincipal;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.JwtPrincipal;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import java.util.List;
 
 /**

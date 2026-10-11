@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import com.synapsedesk.gateway.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.config.InboundEmailProperties;
 import com.synapsedesk.gateway.inbound.ResendInboundClient.Failure;
 import java.io.IOException;
 import java.net.InetSocketAddress;

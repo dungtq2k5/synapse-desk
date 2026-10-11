@@ -7,8 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.config.StoreProperties;
-import com.synapsedesk.gateway.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.config.StoreProperties;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import com.synapsedesk.gateway.realtime.RealtimeRelay;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +33,7 @@ class TicketEventsConsumerTest {
   private final TicketEventsConsumer consumer = new TicketEventsConsumer(
     store,
     relay,
-    mock(com.synapsedesk.gateway.metrics.GatewayMetrics.class),
+    mock(com.synapsedesk.gateway.common.metrics.GatewayMetrics.class),
     JSON
   );
 

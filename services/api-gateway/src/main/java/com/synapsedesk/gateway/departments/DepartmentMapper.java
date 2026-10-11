@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.departments;
 
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Department.DepartmentResponse;
 

@@ -2,8 +2,8 @@ package com.synapsedesk.gateway.analytics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.config.SharedEnvironment;
+import com.synapsedesk.gateway.common.cache.CacheService;
+import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * `RecordComponent`-based creator, not the getter/setter path those beans
  * use) round-trips a nested record graph — a list of records inside a
  * record inside a record — byte-identical to what {@code produce} returned,
- * against a REAL Redis, same as {@link com.synapsedesk.gateway.cache.CacheServiceIT}.
+ * against a REAL Redis, same as {@link com.synapsedesk.gateway.common.cache.CacheServiceIT}.
  */
 class AnalyticsCacheRoundTripIT {
 

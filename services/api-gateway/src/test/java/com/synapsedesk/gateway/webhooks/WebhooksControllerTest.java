@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestOrigin;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestOrigin;
+import com.synapsedesk.gateway.common.web.CachedBodyRequest;
 import com.synapsedesk.gateway.inbound.ResendInboundService;
-import com.synapsedesk.gateway.web.CachedBodyRequest;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;

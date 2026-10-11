@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.tickets;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

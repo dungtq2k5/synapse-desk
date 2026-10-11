@@ -1,9 +1,9 @@
 package com.synapsedesk.gateway.realtime;
 
 import com.corundumstudio.socketio.SocketIOClient;
-import com.synapsedesk.gateway.auth.JwtPrincipal;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.JwtPrincipal;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import io.grpc.stub.MetadataUtils;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;

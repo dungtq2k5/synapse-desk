@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.platformjobs;
 
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import java.time.Instant;

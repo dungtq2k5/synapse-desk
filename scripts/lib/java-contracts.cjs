@@ -96,7 +96,7 @@ function renderClass(group, common) {
     lines.push('');
   }
 
-  return `package com.synapsedesk.gateway.contracts;
+  return `package com.synapsedesk.gateway.common.contracts;
 
 /**
  * ${group.purpose}

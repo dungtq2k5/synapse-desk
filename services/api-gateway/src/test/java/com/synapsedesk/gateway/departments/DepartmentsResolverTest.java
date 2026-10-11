@@ -6,9 +6,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;

@@ -3,8 +3,8 @@ package com.synapsedesk.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.synapsedesk.gateway.config.SharedEnvironment;
-import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
+import com.synapsedesk.gateway.common.config.SharedEnvironment;
+import com.synapsedesk.gateway.common.config.SharedEnvironmentInitializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;

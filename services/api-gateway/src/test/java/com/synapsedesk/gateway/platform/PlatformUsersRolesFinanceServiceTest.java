@@ -10,8 +10,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.model.FinanceRevenueResponseDto;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

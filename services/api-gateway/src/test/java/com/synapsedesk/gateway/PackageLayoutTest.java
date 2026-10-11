@@ -87,8 +87,12 @@ class PackageLayoutTest {
 
   @Test
   void commonNeverReferencesAModule() throws IOException {
+    List<Path> common = javaFiles(GATEWAY.resolve("common"));
+    // The floor: the infrastructure lives in common/, so a scan of nothing fails.
+    assertThat(common).hasSizeGreaterThan(100);
+
     List<String> offenders = new ArrayList<>();
-    for (Path file : javaFiles(GATEWAY.resolve("common"))) {
+    for (Path file : common) {
       if (MODULES_REFERENCE.matcher(code(file)).find()) {
         offenders.add(MODULE.relativize(file).toString());
       }

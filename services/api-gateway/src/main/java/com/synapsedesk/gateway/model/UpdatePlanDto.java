@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
-import com.synapsedesk.gateway.validation.Matches;
+import com.synapsedesk.gateway.common.validation.Matches;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;

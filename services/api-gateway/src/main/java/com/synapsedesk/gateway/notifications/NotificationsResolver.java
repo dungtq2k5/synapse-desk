@@ -1,11 +1,11 @@
 package com.synapsedesk.gateway.notifications;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.graphql.GraphqlLimits;
-import com.synapsedesk.gateway.graphql.UserSummaryGqlDto;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.graphql.GraphqlLimits;
+import com.synapsedesk.gateway.common.graphql.UserSummaryGqlDto;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import io.grpc.stub.MetadataUtils;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;

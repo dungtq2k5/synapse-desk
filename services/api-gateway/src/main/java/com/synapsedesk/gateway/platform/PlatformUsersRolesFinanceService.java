@@ -1,9 +1,12 @@
 package com.synapsedesk.gateway.platform;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.web.ApiResponse;
+import com.synapsedesk.gateway.common.web.PageMeta;
+import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.model.BillingEventPointResponseDto;
 import com.synapsedesk.gateway.model.BillingEventsResponseDto;
 import com.synapsedesk.gateway.model.CreateGlobalRoleDto;
@@ -16,9 +19,6 @@ import com.synapsedesk.gateway.model.FinanceTenantCountsResponseDto;
 import com.synapsedesk.gateway.model.PlatformMetricsResponseDto;
 import com.synapsedesk.gateway.model.PlatformUserResponseDto;
 import com.synapsedesk.gateway.model.RoleResponseDto;
-import com.synapsedesk.gateway.web.ApiResponse;
-import com.synapsedesk.gateway.web.PageMeta;
-import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;

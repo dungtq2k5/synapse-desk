@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.ops;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.HttpProbe;
-import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
+import com.synapsedesk.gateway.common.config.SharedEnvironmentInitializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

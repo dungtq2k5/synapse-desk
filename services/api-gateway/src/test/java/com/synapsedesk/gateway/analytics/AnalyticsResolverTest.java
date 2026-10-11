@@ -7,11 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.cache.CacheService;
+import com.synapsedesk.gateway.common.graphql.UserSummaryGqlDto;
 import com.synapsedesk.gateway.documents.DocumentGqlDto;
-import com.synapsedesk.gateway.graphql.UserSummaryGqlDto;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;

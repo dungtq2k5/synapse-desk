@@ -3,8 +3,8 @@ package com.synapsedesk.gateway.inbound;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.synapsedesk.gateway.config.SharedEnvironment;
-import com.synapsedesk.gateway.config.StoreProperties;
+import com.synapsedesk.gateway.common.config.SharedEnvironment;
+import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.inbound.InboundPublisher.Reason;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;

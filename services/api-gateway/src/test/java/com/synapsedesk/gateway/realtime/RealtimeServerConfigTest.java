@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.corundumstudio.socketio.SocketIOServer;
-import com.synapsedesk.gateway.config.RealtimeProperties;
+import com.synapsedesk.gateway.common.config.RealtimeProperties;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
 

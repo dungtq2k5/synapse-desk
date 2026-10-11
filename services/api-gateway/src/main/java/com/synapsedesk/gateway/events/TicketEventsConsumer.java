@@ -1,12 +1,13 @@
 package com.synapsedesk.gateway.events;
 
-import com.synapsedesk.gateway.config.StoreProperties;
-import com.synapsedesk.gateway.contracts.RealtimeEvents;
-import com.synapsedesk.gateway.contracts.Subjects;
-import com.synapsedesk.gateway.metrics.GatewayMetrics;
+import com.synapsedesk.gateway.common.config.StoreProperties;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.contracts.Subjects;
+import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
+import com.synapsedesk.gateway.common.nats.NatsEnvelope;
+import com.synapsedesk.gateway.common.runtime.RuntimeParticipant;
 import com.synapsedesk.gateway.realtime.RealtimeRelay;
 import com.synapsedesk.gateway.realtime.RealtimeRooms;
-import com.synapsedesk.gateway.runtime.RuntimeParticipant;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;

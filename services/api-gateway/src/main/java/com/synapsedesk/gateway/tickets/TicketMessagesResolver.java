@@ -1,9 +1,9 @@
 package com.synapsedesk.gateway.tickets;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.graphql.UserSummaryGqlDto;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.graphql.UserSummaryGqlDto;
 import java.util.concurrent.CompletableFuture;
 import org.dataloader.DataLoader;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;

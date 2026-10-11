@@ -9,11 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.cache.CacheService;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.cache.CacheService;
+import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.web.DepartmentSortField;
-import com.synapsedesk.gateway.web.SortDirection;
 import java.util.List;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;

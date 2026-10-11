@@ -1,11 +1,11 @@
 package com.synapsedesk.gateway.departments;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.security.RequirePermission;
 import io.grpc.stub.MetadataUtils;
 import java.util.concurrent.TimeUnit;
 import org.springframework.graphql.data.method.annotation.Argument;

@@ -1,9 +1,9 @@
 package com.synapsedesk.gateway.platformjobs;
 
-import com.synapsedesk.gateway.auth.RequestOrigin;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
-import com.synapsedesk.gateway.metrics.GatewayMetrics;
-import com.synapsedesk.gateway.metrics.GatewayMetrics.JobSuccess;
+import com.synapsedesk.gateway.common.auth.RequestOrigin;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
+import com.synapsedesk.gateway.common.metrics.GatewayMetrics.JobSuccess;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;

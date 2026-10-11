@@ -2,8 +2,8 @@ package com.synapsedesk.gateway.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.synapsedesk.gateway.validation.ParityTable;
-import com.synapsedesk.gateway.validation.StrictIso8601;
+import com.synapsedesk.gateway.common.validation.ParityTable;
+import com.synapsedesk.gateway.common.validation.StrictIso8601;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.roles;
 
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import java.util.List;
 
 /** `RolePage` — `Query.roles`'s return type. */

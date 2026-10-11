@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.inbound;
 
-import com.synapsedesk.gateway.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.config.InboundEmailProperties;
 import com.synapsedesk.gateway.inbound.ResendPayloads.AttachmentList;
 import com.synapsedesk.gateway.inbound.ResendPayloads.Email;
 import java.io.IOException;

@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.inbound;
 
-import com.synapsedesk.gateway.validation.StrictIso8601;
+import com.synapsedesk.gateway.common.validation.StrictIso8601;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

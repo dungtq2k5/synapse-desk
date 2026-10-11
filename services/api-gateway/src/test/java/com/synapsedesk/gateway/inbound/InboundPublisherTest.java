@@ -2,7 +2,7 @@ package com.synapsedesk.gateway.inbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.synapsedesk.gateway.config.StoreProperties;
+import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.inbound.InboundPublisher.Reason;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

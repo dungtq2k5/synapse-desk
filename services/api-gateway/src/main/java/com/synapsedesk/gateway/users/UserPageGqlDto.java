@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.users;
 
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import java.util.List;
 
 /** `UserPage` — `Query.users`'s return type. */

@@ -10,7 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.config.InboundEmailProperties;
+import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.inbound.InboundEmailService.AcceptOptions;
 import com.synapsedesk.gateway.inbound.InboundEmailService.RemoteAttachmentSource;
 import com.synapsedesk.gateway.inbound.ResendInboundClient.Failure;
@@ -18,7 +19,6 @@ import com.synapsedesk.gateway.inbound.ResendInboundClient.Result;
 import com.synapsedesk.gateway.inbound.ResendPayloads.AttachmentList;
 import com.synapsedesk.gateway.inbound.ResendPayloads.AttachmentSource;
 import com.synapsedesk.gateway.inbound.ResendPayloads.Email;
-import com.synapsedesk.gateway.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.webhooks.ResendWebhookAcknowledgementDto;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;

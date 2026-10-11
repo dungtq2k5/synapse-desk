@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.inbound;
 
-import com.synapsedesk.gateway.config.JsIsoFormat;
-import com.synapsedesk.gateway.config.StoreProperties;
+import com.synapsedesk.gateway.common.config.JsIsoFormat;
+import com.synapsedesk.gateway.common.config.StoreProperties;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import io.nats.client.Options;

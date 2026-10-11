@@ -1,10 +1,13 @@
 package com.synapsedesk.gateway.platform;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
-import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.common.web.ApiResponse;
+import com.synapsedesk.gateway.common.web.PageMeta;
+import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.model.OffboardOrganizationDto;
@@ -14,9 +17,6 @@ import com.synapsedesk.gateway.model.PlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.model.ResetBillingCycleDto;
 import com.synapsedesk.gateway.model.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
-import com.synapsedesk.gateway.web.ApiResponse;
-import com.synapsedesk.gateway.web.PageMeta;
-import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;

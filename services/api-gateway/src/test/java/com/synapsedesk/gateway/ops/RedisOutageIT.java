@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import com.synapsedesk.gateway.GatewayApplication;
 import com.synapsedesk.gateway.HttpProbe;
-import com.synapsedesk.gateway.config.SharedEnvironment;
+import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

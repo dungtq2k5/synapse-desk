@@ -9,7 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.model.UpdateTicketDto;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.realtime;
 
-import com.synapsedesk.gateway.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import java.util.Map;
 
 /**

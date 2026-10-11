@@ -8,7 +8,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import graphql.GraphQLContext;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

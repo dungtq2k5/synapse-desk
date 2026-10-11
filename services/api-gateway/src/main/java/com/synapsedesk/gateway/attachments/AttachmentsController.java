@@ -1,15 +1,15 @@
 package com.synapsedesk.gateway.attachments;
 
-import com.synapsedesk.gateway.auth.CurrentRequest;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.CurrentRequest;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.openapi.ApiErrors;
+import com.synapsedesk.gateway.common.security.RequirePermission;
+import com.synapsedesk.gateway.common.web.ApiPaths;
+import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.model.DownloadDocumentResponseDto;
-import com.synapsedesk.gateway.openapi.ApiErrors;
-import com.synapsedesk.gateway.security.RequirePermission;
-import com.synapsedesk.gateway.web.ApiPaths;
-import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;

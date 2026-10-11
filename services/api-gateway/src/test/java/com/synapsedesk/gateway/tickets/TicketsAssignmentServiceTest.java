@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.model.AssignTicketDto;
 import com.synapsedesk.gateway.model.AssignTicketToSelfDto;
 import com.synapsedesk.gateway.model.MarkTicketReadDto;

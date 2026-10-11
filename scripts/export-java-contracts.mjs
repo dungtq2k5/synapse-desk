@@ -23,10 +23,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHECK = process.argv.includes('--check');
 const OUTPUT_DIR = join(
   ROOT,
-  'services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts',
+  'services/api-gateway/src/main/java/com/synapsedesk/gateway/common/contracts',
 );
 const RELATIVE =
-  'services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts';
+  'services/api-gateway/src/main/java/com/synapsedesk/gateway/common/contracts';
 const COMMAND = 'npm run java:contracts';
 
 const require = createRequire(import.meta.url);

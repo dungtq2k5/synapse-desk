@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.documents;
 
-import com.synapsedesk.gateway.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
 import java.util.List;
 
 /** `DocumentPage` — `Query.documents`'s return type. */

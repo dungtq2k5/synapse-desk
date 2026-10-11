@@ -11,7 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.corundumstudio.socketio.HandshakeData;
 import com.corundumstudio.socketio.SocketIOClient;
-import com.synapsedesk.gateway.auth.JwtPrincipal;
+import com.synapsedesk.gateway.common.auth.JwtPrincipal;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -126,7 +126,7 @@ class AiStreamServiceTest {
 
     verify(client, timeout(2000)).sendEvent(
       org.mockito.ArgumentMatchers.eq(
-        com.synapsedesk.gateway.contracts.RealtimeEvents.REALTIME_EVENTS_AI_STREAM_DONE
+        com.synapsedesk.gateway.common.contracts.RealtimeEvents.REALTIME_EVENTS_AI_STREAM_DONE
       ),
       any()
     );
@@ -158,7 +158,7 @@ class AiStreamServiceTest {
     ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
     verify(client, timeout(2000)).sendEvent(
       org.mockito.ArgumentMatchers.eq(
-        com.synapsedesk.gateway.contracts.RealtimeEvents.REALTIME_EVENTS_AI_STREAM_DONE
+        com.synapsedesk.gateway.common.contracts.RealtimeEvents.REALTIME_EVENTS_AI_STREAM_DONE
       ),
       payload.capture()
     );

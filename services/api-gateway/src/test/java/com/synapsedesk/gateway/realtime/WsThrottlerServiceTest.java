@@ -10,8 +10,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.config.ThrottleProperties;
-import com.synapsedesk.gateway.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.config.ThrottleProperties;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;

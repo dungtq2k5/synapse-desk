@@ -8,8 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.departments.DepartmentGqlDto;
 import com.synapsedesk.gateway.graphql.DepartmentsLoaderConfig;
 import graphql.GraphQLContext;
@@ -235,7 +235,7 @@ class UsersResolverTest {
 
     List<String> overCapped = java.util.stream.IntStream.range(
       0,
-      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST + 10
+      com.synapsedesk.gateway.common.graphql.GraphqlLimits.MAX_EDGE_LIST + 10
     )
       .mapToObj(i -> "dept-" + i)
       .toList();
@@ -270,14 +270,14 @@ class UsersResolverTest {
     List<DepartmentGqlDto> result = future.get(5, TimeUnit.SECONDS);
 
     assertThat(result).hasSize(
-      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST
+      com.synapsedesk.gateway.common.graphql.GraphqlLimits.MAX_EDGE_LIST
     );
 
     ArgumentCaptor<ListDepartmentsByIdsRequest> captor =
       ArgumentCaptor.forClass(ListDepartmentsByIdsRequest.class);
     verify(departmentStub, times(1)).listDepartmentsByIds(captor.capture());
     assertThat(captor.getValue().getDepartmentIdsCount()).isEqualTo(
-      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST
+      com.synapsedesk.gateway.common.graphql.GraphqlLimits.MAX_EDGE_LIST
     );
   }
 

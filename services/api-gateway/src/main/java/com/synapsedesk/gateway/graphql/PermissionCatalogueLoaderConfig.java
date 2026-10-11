@@ -1,7 +1,8 @@
 package com.synapsedesk.gateway.graphql;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.graphql.UsersLoaderConfig;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.roles.PermissionGqlDto;
 import com.synapsedesk.gateway.roles.RoleMapper;
 import io.grpc.stub.MetadataUtils;

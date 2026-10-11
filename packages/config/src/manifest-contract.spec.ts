@@ -410,7 +410,7 @@ describe('the manifest contract', () => {
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {
       'api-gateway':
-        'JUnit: services/api-gateway/src/test/java/com/synapsedesk/gateway/config/EnvBindingContractTest.java',
+        'JUnit: services/api-gateway/src/test/java/com/synapsedesk/gateway/common/config/EnvBindingContractTest.java',
       'rag-service': 'pytest: services/rag-service/tests/test_env_contract.py',
     };
 

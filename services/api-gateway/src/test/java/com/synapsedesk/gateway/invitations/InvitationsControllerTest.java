@@ -9,14 +9,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.CookieWriter;
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.auth.GuestCheck;
-import com.synapsedesk.gateway.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.CookieWriter;
+import com.synapsedesk.gateway.common.auth.CurrentUser;
+import com.synapsedesk.gateway.common.auth.GuestCheck;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.security.RequirePermission;
+import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.model.AcceptInvitationDto;
-import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.InvitationSortField;
-import com.synapsedesk.gateway.web.SortDirection;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -65,7 +65,7 @@ class InvitationsControllerTest {
       currentUser,
       guestCheck,
       cookies,
-      mock(com.synapsedesk.gateway.cache.CacheService.class)
+      mock(com.synapsedesk.gateway.common.cache.CacheService.class)
     );
   }
 
@@ -101,7 +101,7 @@ class InvitationsControllerTest {
   @Test
   void acceptSignsInOnSuccessAndSurfacesSkippedAssignmentsAsAWarning() {
     when(currentUser.origin(any())).thenReturn(
-      new com.synapsedesk.gateway.auth.RequestOrigin("127.0.0.1", "test")
+      new com.synapsedesk.gateway.common.auth.RequestOrigin("127.0.0.1", "test")
     );
     when(stub.acceptInvitation(any())).thenReturn(
       AcceptInvitationResponse.newBuilder()
@@ -172,7 +172,7 @@ class InvitationsControllerTest {
           .filter(method -> method.getName().equals(name))
           .allMatch(method ->
             method.isAnnotationPresent(
-              com.synapsedesk.gateway.security.RequireVerifiedEmail.class
+              com.synapsedesk.gateway.common.security.RequireVerifiedEmail.class
             )
           )
       ).isTrue();

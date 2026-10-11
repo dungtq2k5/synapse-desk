@@ -15,7 +15,7 @@ node_modules/
 # The Java constants `npm run java:contracts` writes. `--check` compares them
 # byte for byte with the generator's output, so a formatter that rewraps them
 # makes the check fail on files nobody edited.
-services/api-gateway/src/main/java/com/synapsedesk/gateway/contracts/
+services/api-gateway/src/main/java/com/synapsedesk/gateway/common/contracts/
 
 # Lockfiles. npm owns their formatting and rewrites them wholesale on every
 # install; prettier reformatting one produces a diff that comes straight back,

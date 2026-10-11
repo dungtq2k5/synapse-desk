@@ -9,9 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
+import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
 import java.util.ArrayList;

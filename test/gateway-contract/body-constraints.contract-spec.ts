@@ -85,7 +85,7 @@ const sentence = (name: string): string => {
   const source = readFileSync(
     join(
       REPO_ROOT,
-      'services/api-gateway/src/main/java/com/synapsedesk/gateway/openapi/ConstraintPublishingCustomizer.java',
+      'services/api-gateway/src/main/java/com/synapsedesk/gateway/common/openapi/ConstraintPublishingCustomizer.java',
     ),
     'utf8',
   );

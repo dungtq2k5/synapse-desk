@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.web;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.common.web.EnumParameterConverters;
 
 /**
  * The {@code type} filter of the notifications list, exactly as the published

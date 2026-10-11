@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.corundumstudio.socketio.HandshakeData;
 import com.corundumstudio.socketio.SocketIOClient;
-import com.synapsedesk.gateway.auth.JwtPrincipal;
+import com.synapsedesk.gateway.common.auth.JwtPrincipal;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import java.net.InetSocketAddress;
 import java.util.List;

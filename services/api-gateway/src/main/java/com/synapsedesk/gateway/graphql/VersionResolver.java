@@ -1,8 +1,8 @@
 package com.synapsedesk.gateway.graphql;
 
-import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.lifecycle.OrgAccess;
-import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
+import com.synapsedesk.gateway.common.config.RuntimeProperties;
+import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Controller;
  * <p>
  * Not named `*Resolver`... it is, deliberately, even though it carries no
  * `@RequirePermission` —
- * {@link com.synapsedesk.gateway.security.GraphqlPermissionAspect}
+ * {@link com.synapsedesk.gateway.common.security.GraphqlPermissionAspect}
  * only advises methods that carry the annotation, so an unguarded resolver
  * costs nothing extra by matching the pointcut's class-name half.
  */
