@@ -1,15 +1,15 @@
 package com.synapsedesk.gateway.modules.tickets;
 
 import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.web.ApiResponse;
-import com.synapsedesk.gateway.model.AssignTicketDto;
-import com.synapsedesk.gateway.model.AssignTicketToSelfDto;
-import com.synapsedesk.gateway.model.AssignmentResponseDto;
-import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.model.MarkTicketReadDto;
-import com.synapsedesk.gateway.model.MarkTicketReadResponseDto;
-import com.synapsedesk.gateway.model.TicketStatusChangeResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketToSelfDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignmentResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.MarkTicketReadDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.MarkTicketReadResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.TicketStatusChangeResponseDto;
 import io.grpc.stub.MetadataUtils;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

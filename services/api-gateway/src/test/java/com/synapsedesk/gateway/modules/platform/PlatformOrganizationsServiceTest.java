@@ -12,8 +12,8 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
-import com.synapsedesk.gateway.model.CreatePlatformOrganizationDto;
-import com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizationDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlatformOrganizationDto;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -237,7 +237,7 @@ class PlatformOrganizationsServiceTest {
     service.updateOrganization(
       context(),
       "org-9",
-      new com.synapsedesk.gateway.model.UpdatePlatformOrganizationDto()
+      new com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlatformOrganizationDto()
     );
 
     verify(statuses).invalidate("org-9");
@@ -246,9 +246,10 @@ class PlatformOrganizationsServiceTest {
   @Test
   void settingAStatusDropsItsCachedStatus() {
     when(stub.setOrganizationStatus(any())).thenReturn(reply());
-    var dto = new com.synapsedesk.gateway.model.SetOrganizationStatusDto();
+    var dto =
+      new com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto();
     dto.setStatus(
-      com.synapsedesk.gateway.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+      com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto.StatusEnum.FROZEN
     );
     dto.setReason("suspected fraud");
 
@@ -263,7 +264,8 @@ class PlatformOrganizationsServiceTest {
       synapsedesk.auth.Platform.OffboardOrganizationResponse.getDefaultInstance()
     );
 
-    var dto = new com.synapsedesk.gateway.model.OffboardOrganizationDto();
+    var dto =
+      new com.synapsedesk.gateway.modules.platform.dto.rest.OffboardOrganizationDto();
     dto.setReason("contract ended");
 
     service.offboard(context(), "org-9", dto);
@@ -285,9 +287,10 @@ class PlatformOrganizationsServiceTest {
     when(stub.setOrganizationStatus(any())).thenThrow(
       io.grpc.Status.FAILED_PRECONDITION.asRuntimeException()
     );
-    var dto = new com.synapsedesk.gateway.model.SetOrganizationStatusDto();
+    var dto =
+      new com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto();
     dto.setStatus(
-      com.synapsedesk.gateway.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+      com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto.StatusEnum.FROZEN
     );
     dto.setReason("suspected fraud");
 

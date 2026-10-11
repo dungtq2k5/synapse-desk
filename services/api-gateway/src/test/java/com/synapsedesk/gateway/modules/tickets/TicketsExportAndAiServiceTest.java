@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.model.CreateTicketExportDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketExportDto;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;

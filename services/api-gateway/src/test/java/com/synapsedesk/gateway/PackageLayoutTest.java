@@ -152,8 +152,9 @@ class PackageLayoutTest {
    */
   @Test
   void noTwoPublishedClassesShareASimpleName() throws IOException {
-    List<Path> published = new ArrayList<>(javaFiles(GATEWAY.resolve("model")));
-    published.addAll(javaFiles(GATEWAY.resolve("common/dto")));
+    List<Path> published = new ArrayList<>(
+      javaFiles(GATEWAY.resolve("common/dto"))
+    );
     for (Path module : directories(GATEWAY.resolve("modules"))) {
       published.addAll(javaFiles(module.resolve("dto")));
     }

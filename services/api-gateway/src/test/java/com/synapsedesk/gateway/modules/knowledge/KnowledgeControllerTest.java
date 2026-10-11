@@ -11,8 +11,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
-import com.synapsedesk.gateway.model.KnowledgeAskDto;
-import com.synapsedesk.gateway.model.KnowledgeSearchDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeAskDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeSearchDto;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

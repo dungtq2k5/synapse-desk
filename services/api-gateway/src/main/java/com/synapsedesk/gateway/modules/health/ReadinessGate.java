@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.modules.health;
 
-import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.modules.health.dto.rest.ReadinessDependenciesResponseDto;
 
 /**
  * One reason this instance may not be ready, and how it appears under

@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.modules.health;
 
-import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto;
-import com.synapsedesk.gateway.model.ReadinessDependenciesResponseDto.RedisEnum;
+import com.synapsedesk.gateway.modules.health.dto.rest.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.modules.health.dto.rest.ReadinessDependenciesResponseDto.RedisEnum;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;

@@ -1,13 +1,13 @@
 package com.synapsedesk.gateway.modules.knowledge;
 
-import com.synapsedesk.gateway.model.CitationResponseDto;
-import com.synapsedesk.gateway.model.KnowledgeArticleBlockResponseDto;
-import com.synapsedesk.gateway.model.KnowledgeArticleDetailResponseDto;
-import com.synapsedesk.gateway.model.KnowledgeArticleResponseDto;
-import com.synapsedesk.gateway.model.KnowledgeAskResponseDto;
-import com.synapsedesk.gateway.model.KnowledgeSearchResponseDto;
-import com.synapsedesk.gateway.model.PaginationMetaDataResponseDto;
-import com.synapsedesk.gateway.model.RetrievedChunkResponseDto;
+import com.synapsedesk.gateway.common.dto.CitationResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleBlockResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleDetailResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeAskResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeSearchResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.PaginationMetaDataResponseDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.RetrievedChunkResponseDto;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;

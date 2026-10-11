@@ -3,7 +3,7 @@ package com.synapsedesk.gateway.modules.ingestionjobs;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.model.IngestionJobResponseDto;
+import com.synapsedesk.gateway.modules.ingestionjobs.dto.rest.IngestionJobResponseDto;
 import org.junit.jupiter.api.Test;
 import synapsedesk.ingestion.Document.IngestionJobResponse;
 import synapsedesk.ingestion.Document.IngestionJobStatus;

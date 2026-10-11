@@ -15,7 +15,7 @@ import com.synapsedesk.gateway.common.auth.GuestCheck;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.common.web.SortDirection;
-import com.synapsedesk.gateway.model.AcceptInvitationDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.AcceptInvitationDto;
 import com.synapsedesk.gateway.modules.invitations.dto.rest.InvitationSortField;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
@@ -148,7 +148,7 @@ class InvitationsControllerTest {
     );
     Method accept = InvitationsController.class.getMethod(
       "invitationsControllerAcceptV1",
-      com.synapsedesk.gateway.model.AcceptInvitationDto.class
+      com.synapsedesk.gateway.modules.invitations.dto.rest.AcceptInvitationDto.class
     );
 
     assertThat(

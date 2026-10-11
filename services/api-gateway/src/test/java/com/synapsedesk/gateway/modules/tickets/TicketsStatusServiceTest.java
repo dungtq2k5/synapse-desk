@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.model.BulkTicketPriorityDto;
-import com.synapsedesk.gateway.model.BulkTicketStatusDto;
-import com.synapsedesk.gateway.model.BulkTicketStatusResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.BulkTicketPriorityDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.BulkTicketStatusDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.BulkTicketStatusResponseDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

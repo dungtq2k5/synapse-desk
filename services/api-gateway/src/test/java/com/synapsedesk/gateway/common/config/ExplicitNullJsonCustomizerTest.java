@@ -2,9 +2,9 @@ package com.synapsedesk.gateway.common.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.synapsedesk.gateway.model.CreateUserDto;
-import com.synapsedesk.gateway.model.KnowledgeSearchDto;
-import com.synapsedesk.gateway.model.MarkManyReadDto;
+import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeSearchDto;
+import com.synapsedesk.gateway.modules.notifications.dto.rest.MarkManyReadDto;
+import com.synapsedesk.gateway.modules.users.dto.rest.CreateUserDto;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -82,10 +82,11 @@ class ExplicitNullJsonCustomizerTest {
   @Test
   void anExplicitNullBooleanKeepsItsDefault() throws Exception {
     // `true` by default: a null read as false would make the document private.
-    com.synapsedesk.gateway.model.ConfirmDocumentDto dto = mapper.readValue(
-      "{\"isOrganizationWide\":null}",
-      com.synapsedesk.gateway.model.ConfirmDocumentDto.class
-    );
+    com.synapsedesk.gateway.modules.documents.dto.rest.ConfirmDocumentDto dto =
+      mapper.readValue(
+        "{\"isOrganizationWide\":null}",
+        com.synapsedesk.gateway.modules.documents.dto.rest.ConfirmDocumentDto.class
+      );
 
     assertThat(dto.getIsOrganizationWide()).isTrue();
   }

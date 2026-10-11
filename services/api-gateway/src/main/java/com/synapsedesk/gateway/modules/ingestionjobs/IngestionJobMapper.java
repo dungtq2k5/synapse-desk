@@ -1,8 +1,8 @@
 package com.synapsedesk.gateway.modules.ingestionjobs;
 
-import com.synapsedesk.gateway.model.IngestionJobResponseDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobGqlDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobStatusGql;
+import com.synapsedesk.gateway.modules.ingestionjobs.dto.rest.IngestionJobResponseDto;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;

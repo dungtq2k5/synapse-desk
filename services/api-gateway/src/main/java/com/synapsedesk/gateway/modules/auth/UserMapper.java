@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.modules.auth;
 
 import com.google.protobuf.Timestamp;
-import com.synapsedesk.gateway.model.UserResponseDto;
+import com.synapsedesk.gateway.common.dto.UserResponseDto;
 import java.net.URI;
 import java.time.Instant;
 import java.time.OffsetDateTime;

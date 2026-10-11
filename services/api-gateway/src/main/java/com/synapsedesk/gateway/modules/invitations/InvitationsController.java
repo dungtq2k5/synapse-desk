@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.common.auth.GuestCheck;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import com.synapsedesk.gateway.common.cache.CacheService;
+import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
@@ -23,20 +24,19 @@ import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.SortDirection;
-import com.synapsedesk.gateway.model.AcceptInvitationDto;
-import com.synapsedesk.gateway.model.CreateInvitationsDto;
-import com.synapsedesk.gateway.model.CreateInvitationsResponseDto;
-import com.synapsedesk.gateway.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.model.FailedInvitationResponseDto;
-import com.synapsedesk.gateway.model.InvitationPreviewRowResponseDto;
-import com.synapsedesk.gateway.model.InvitationResponseDto;
-import com.synapsedesk.gateway.model.LoginResponseDto;
-import com.synapsedesk.gateway.model.PreviewInvitationResponseDto;
-import com.synapsedesk.gateway.model.PreviewInvitationsDto;
-import com.synapsedesk.gateway.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.modules.auth.UserMapper;
+import com.synapsedesk.gateway.modules.auth.dto.rest.LoginResponseDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.AcceptInvitationDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.CreateInvitationsDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.CreateInvitationsResponseDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.FailedInvitationResponseDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.InvitationPreviewRowResponseDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.InvitationResponseDto;
 import com.synapsedesk.gateway.modules.invitations.dto.rest.InvitationSortField;
 import com.synapsedesk.gateway.modules.invitations.dto.rest.InvitationStatusFilter;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.PreviewInvitationResponseDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.PreviewInvitationsDto;
+import com.synapsedesk.gateway.modules.invitations.dto.rest.PreviewInvitationsResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -508,7 +508,7 @@ public class InvitationsController {
   }
 
   private static InviteUserInput toInviteUserInput(
-    com.synapsedesk.gateway.model.InviteUserDto draft
+    com.synapsedesk.gateway.modules.invitations.dto.rest.InviteUserDto draft
   ) {
     InviteUserInput.Builder wire = InviteUserInput.newBuilder()
       .setEmail(draft.getEmail())
@@ -524,7 +524,7 @@ public class InvitationsController {
   }
 
   private static InviteUserInput toPreviewInviteUserInput(
-    com.synapsedesk.gateway.model.PreviewInviteUserDto draft
+    com.synapsedesk.gateway.modules.invitations.dto.rest.PreviewInviteUserDto draft
   ) {
     InviteUserInput.Builder wire = InviteUserInput.newBuilder()
       .setEmail(draft.getEmail())

@@ -12,7 +12,7 @@ import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.web.ApiResponse;
-import com.synapsedesk.gateway.model.PermissionResponseDto;
+import com.synapsedesk.gateway.modules.roles.dto.rest.PermissionResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.function.Supplier;

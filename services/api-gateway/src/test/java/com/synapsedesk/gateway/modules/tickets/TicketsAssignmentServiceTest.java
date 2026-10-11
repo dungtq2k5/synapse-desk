@@ -11,9 +11,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.model.AssignTicketDto;
-import com.synapsedesk.gateway.model.AssignTicketToSelfDto;
-import com.synapsedesk.gateway.model.MarkTicketReadDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketToSelfDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.MarkTicketReadDto;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;

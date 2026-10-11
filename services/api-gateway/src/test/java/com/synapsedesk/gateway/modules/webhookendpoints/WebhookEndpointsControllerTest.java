@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.model.UpdateWebhookEndpointDto;
+import com.synapsedesk.gateway.modules.webhookendpoints.dto.rest.UpdateWebhookEndpointDto;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.model.FinanceRevenueResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.FinanceRevenueResponseDto;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
