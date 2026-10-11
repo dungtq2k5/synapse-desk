@@ -49,7 +49,7 @@ venv/
 **/src/generated/prisma/
 
 # Credentials (regenerate keys with `scripts/generate-jwt-keys.mjs`)
-secrets/
+secrets
 *.key
 *.pem
 **/serviceAccountKey.json
