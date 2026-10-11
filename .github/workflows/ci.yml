@@ -124,17 +124,25 @@ jobs:
   # developer's machine, where a warm `~/.m2` and a running compose stack were
   # already there.
   #
-  # It needs a JDK, and Redis and NATS on their default ports for
-  # `openapi:check`'s IT; the contract harness starts its own on ephemeral
-  # ports.
+  # The harness starts its own Redis and NATS on ephemeral ports.
+  #
+  # **Four runners, one shard each** (`--shard=k/4`). The serial suite is about
+  # 21 minutes on a laptop and outlasted 30 on a runner. A shard on its own
+  # runner shares nothing with the others, so `CONTRACT_SHARD`'s port blocks
+  # are not needed. Every gateway's output is kept as an artifact when a shard
+  # fails: the test's error shows only the tail of it.
   #
   # **Java 21, not whatever the runner defaults to.** It is what `pom.xml`
   # targets; every local run used a newer JDK, which compiles `--release 21`
   # fine and would never notice an API used beyond it.
   contract:
-    name: contract (gateway)
+    name: contract (gateway, ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -158,26 +166,19 @@ jobs:
       - name: JWT keys
         run: npm run keys:generate -- --force
 
-      # The contract harness starts its own Redis and NATS on ephemeral ports.
-      # The ITs `openapi:check` runs do not: they read `.env.example`'s
-      # `localhost:6379` / `localhost:4222`, so those two — and only those two,
-      # as the rag job does for its stores — come from compose.
-      - name: stack env
-        run: cp .env.example .env
-      - name: start the stores the ITs read
-        run: docker compose up -d --wait redis nats
-
-      - run: npm run test:contract:java
-      # The committed OpenAPI document is what this gateway serves, and a
-      # valid OpenAPI 3.1 document.
-      - run: npm run openapi:check
+      - run: npm run test:contract:java -- --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: contract-logs-${{ matrix.shard }}
+          path: /tmp/contract-*/
 
   # **Surefire's unit rows AND failsafe's ITs** — the suites that, before
   # `contract` existed, only ran on a laptop. Their own job, not a step after
   # the contract harness: the two together outlasted one 30-minute budget on a
   # runner (the unsharded harness alone is about 21 minutes on a laptop).
-  # Maven compiles the gateway itself, so no npm install: the key script uses
-  # node builtins only. The ITs read `.env.example`'s Redis and NATS.
+  # It also runs `openapi:check`, whose IT needs the same Redis and NATS: the
+  # ITs read `.env.example`'s `localhost:6379` / `localhost:4222`.
   gateway-java-verify:
     name: verify (gateway)
     runs-on: ubuntu-latest
@@ -187,18 +188,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          cache: npm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: services/api-gateway/pom.xml
+      # `openapi:check`'s compare step uses prettier and ajv.
+      - run: npm ci --ignore-scripts
       - name: JWT keys
         run: npm run keys:generate -- --force
       - name: stack env
         run: cp .env.example .env
       - name: start the stores the ITs read
         run: docker compose up -d --wait redis nats
+      # The committed OpenAPI document is what this gateway serves, and a
+      # valid OpenAPI 3.1 document.
+      - run: npm run openapi:check
       - run: npm run test:e2e:gateway-java
 
       # For Sonar: the compiled classes its Java rules read, and JaCoCo's report
