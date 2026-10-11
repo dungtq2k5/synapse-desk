@@ -186,6 +186,7 @@ jobs:
           path: |
             services/api-gateway/target/classes
             services/api-gateway/target/site/jacoco/jacoco.xml
+          if-no-files-found: error
 
   # -------------------------------------------------------- gateway images
   #
