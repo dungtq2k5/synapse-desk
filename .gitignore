@@ -15,6 +15,9 @@ cspell.json
 *.tsbuildinfo
 .claude/
 coverage/
+# pytest-cov output: the XML report Sonar reads, and coverage.py's data file.
+services/rag-service/coverage.xml
+services/rag-service/.coverage
 
 # CI run artifacts. `pytest.xml` is the JUnit report the python job hands to
 # `scripts/check-pytest-skips.mjs`; `ci-artifacts/` is where the e2e job's
@@ -74,3 +77,8 @@ packages/*/src/**/*.d.ts
 .demo-seed/
 
 graphify-out/
+
+# SonarCloud
+.env.sonar
+.mcp.json
+.sonar-config.json

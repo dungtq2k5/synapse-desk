@@ -98,13 +98,10 @@ describe('JetStream bootstrap (e2e)', () => {
     // consumer's methods directly and would pass against a process subscribed to
     // nothing at all.
     const received = new Promise<string>((resolve) => {
-      const subscription = nc.subscribe(TICKET_PATTERNS.assigned);
-      void (async () => {
-        for await (const message of subscription) {
-          resolve(message.string());
-          break;
-        }
-      })();
+      nc.subscribe(TICKET_PATTERNS.assigned, {
+        max: 1,
+        callback: (_error, message) => resolve(message.string()),
+      });
     });
 
     // A tick for the subscription to register with the server.

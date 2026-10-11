@@ -101,7 +101,19 @@ if (!databaseUrl) {
 // key and a test key differ by four characters in a file nobody reads twice.
 const mode = key.includes('_live_') ? 'LIVE' : 'TEST';
 console.log(`stripe:   ${mode}`);
-console.log(`database: ${databaseUrl.replace(/:[^:@/]*@/, ':***@')}\n`);
+// Host, port and database only: never the credentials, whatever characters
+// the password holds.
+let target;
+try {
+  target = new URL(databaseUrl);
+} catch {
+  // Not the error itself: Node's ERR_INVALID_URL carries the input, password included.
+  console.error(
+    'DATABASE_URL is not a valid URL (percent-encode reserved characters in the password).',
+  );
+  process.exit(1);
+}
+console.log(`database: ${target.host}${target.pathname}\n`);
 
 if (mode === 'LIVE' && apply) {
   console.warn(

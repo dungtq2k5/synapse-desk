@@ -46,7 +46,7 @@ boot() { # image
       docker rm -f "$NAME" >/dev/null
       return
     fi
-    if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != true ]; then
+    if [[ "$(docker inspect -f '{{.State.Running}}' "$NAME")" != true ]]; then
       docker logs "$NAME" >&2
       fail "$1 exited before answering /health"
     fi

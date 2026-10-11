@@ -86,3 +86,5 @@ cspell.json
 graphify-out/
 .scannerwork/
 sonar-project.properties
+.mcp.json
+.sonar-config.json

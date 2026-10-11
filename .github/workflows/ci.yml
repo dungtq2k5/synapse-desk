@@ -244,7 +244,12 @@ jobs:
       - name: OCR binaries
         run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
-      - run: npm test
+      # Coverage for Sonar: one lcov for every project, at the repository root.
+      - run: npm test -- --coverage --coverageReporters=lcov --coverageDirectory=coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage/lcov.info
 
   # ------------------------------------------------------------------- e2e
   #
@@ -432,7 +437,7 @@ jobs:
       - name: tests
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: npm run test:py -- --junitxml=pytest.xml -rs
+        run: npm run test:py -- --junitxml=pytest.xml -rs --cov=rag_service --cov-report=xml:coverage.xml
 
       # **The half that works with or without a key.** A test that quietly
       # stops running is the vacuity class arriving through a skip rather than
@@ -442,3 +447,39 @@ jobs:
       - name: skips are accounted for
         if: always()
         run: node scripts/check-pytest-skips.mjs services/rag-service/pytest.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python
+          path: services/rag-service/coverage.xml
+
+  # ----------------------------------------------------------------- sonar
+  #
+  # SonarCloud analysis, with the coverage the unit and python jobs wrote.
+  # Skipped when SONAR_TOKEN is absent (a fork's pull request), rather than
+  # failing a job the contributor cannot fix. Needs SonarCloud's Automatic
+  # Analysis switched off: the two refuse to run on one project.
+  sonar:
+    name: sonar
+    runs-on: ubuntu-latest
+    needs: [unit, python]
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          # Full history: blame decides which lines are new code.
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          name: coverage-unit
+          path: coverage
+      - uses: actions/download-artifact@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          name: coverage-python
+          path: services/rag-service
+      - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        if: env.SONAR_TOKEN != ''

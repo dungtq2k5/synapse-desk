@@ -27,5 +27,9 @@
   "prettier.documentSelectors": ["**/*.java", "**/*.xml"],
   "java.format.enabled": false,
   "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "sonarlint.connectedMode.project": {
+    "connectionId": "dungtq2k5",
+    "projectKey": "dungtq2k5_synapse-desk"
+  }
 }
