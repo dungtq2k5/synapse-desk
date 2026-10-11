@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * No workspace can be published, and every manifest names the same licence.
@@ -62,13 +62,15 @@ describe('nothing here can be published, and the licence is one string', () => {
    */
   const manifests = (): string[] => repoFiles('package.json', '*/package.json');
 
-  const parse = (file: string): Record<string, unknown> =>
-    JSON.parse(read(file)) as Record<string, unknown>;
+  const parse = (text: string): Record<string, unknown> =>
+    JSON.parse(text) as Record<string, unknown>;
 
   it('**1. every manifest is `private: true`**', () => {
-    const publishable = manifests()
-      .filter((file) => parse(file).private !== true)
-      .map((file) => `${file}: private=${String(parse(file).private)}`);
+    const publishable = readListed(manifests())
+      .filter(({ text }) => parse(text).private !== true)
+      .map(
+        ({ path, text }) => `${path}: private=${String(parse(text).private)}`,
+      );
 
     expect(publishable).toEqual([]);
   });
@@ -78,9 +80,11 @@ describe('nothing here can be published, and the licence is one string', () => {
     // scanner that walks workspaces per-package all report the same answer.
     // A manifest with no `license` is reported as UNLICENSED, which for an
     // AGPL project is the opposite of what it says on the tin.
-    const wrong = manifests()
-      .filter((file) => parse(file).license !== LICENSE)
-      .map((file) => `${file}: license=${String(parse(file).license)}`);
+    const wrong = readListed(manifests())
+      .filter(({ text }) => parse(text).license !== LICENSE)
+      .map(
+        ({ path, text }) => `${path}: license=${String(parse(text).license)}`,
+      );
 
     expect(wrong).toEqual([]);
   });
@@ -102,13 +106,13 @@ describe('nothing here can be published, and the licence is one string', () => {
     // The floor: a glob that matched nothing would report a compliant tree.
     expect(pyprojects).toContain('services/rag-service/pyproject.toml');
 
-    const wrong = pyprojects
-      .map((file) => ({
+    const wrong = readListed(pyprojects)
+      .map(({ path: file, text }) => ({
         file,
         // PEP 639's bare SPDX string. The deprecated PEP 621 table form
         // (`license = { text = "…" }`) deliberately does NOT match — it would
         // be a finding, not a pass.
-        declared: /^license\s*=\s*"([^"]*)"/m.exec(read(file))?.[1],
+        declared: /^license\s*=\s*"([^"]*)"/m.exec(text)?.[1],
       }))
       .filter(({ declared }) => declared !== LICENSE)
       .map(({ file, declared }) => `${file}: license=${String(declared)}`);
@@ -140,7 +144,7 @@ describe('nothing here can be published, and the licence is one string', () => {
     // A pathspec that matched nothing would report a compliant tree. The floor
     // is derived from the declared globs rather than hard-coded, so a third
     // workspace glob cannot slip past the corpus itself.
-    const globs = (parse('package.json').workspaces ?? []) as string[];
+    const globs = (parse(read('package.json')).workspaces ?? []) as string[];
     const found = manifests();
 
     expect(globs.length).toBeGreaterThan(0);

@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * An `@` in a doc comment is a TAG, whatever it was meant to be.
@@ -29,8 +27,6 @@ import { repoFiles } from '@synapsedesk/testing/repo-files';
  * whitespace.
  */
 describe('doc comments do not open accidental JSDoc tags', () => {
-  const REPO_ROOT = join(__dirname, '../../..');
-
   /**
    * Every tag this repo legitimately writes.
    *
@@ -75,9 +71,7 @@ describe('doc comments do not open accidental JSDoc tags', () => {
   it('**1. no doc line opens a tag this repo did not mean**', () => {
     const violations: string[] = [];
 
-    for (const file of documentedFiles()) {
-      const source = readFileSync(join(REPO_ROOT, file), 'utf8');
-
+    for (const { path: file, text: source } of readListed(documentedFiles())) {
       for (const hit of strayTags(source)) {
         violations.push(
           `${file}:${hit} — backtick it, or the description ends here`,

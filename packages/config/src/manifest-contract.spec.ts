@@ -4,7 +4,11 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import {
+  readListed,
+  readRepoFiles,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -53,17 +57,17 @@ describe('the manifest contract', () => {
    * the ingress checks are about.
    */
   const manifests = (): { file: string; doc: Doc }[] =>
-    repoFiles('k8s')
-      .filter((file) => file.endsWith('.yaml'))
-      .flatMap((file) =>
-        // Split BEFORE parsing: `load` throws on a multi-document stream, and
-        // every service file here is a Deployment and a Service in one.
-        read(file)
-          .split(/^---$/m)
-          .map((chunk) => load(chunk, { json: true }) as Doc | undefined)
-          .filter((doc): doc is Doc => Boolean(doc))
-          .map((doc) => ({ file, doc })),
-      );
+    readListed(
+      repoFiles('k8s').filter((file) => file.endsWith('.yaml')),
+    ).flatMap(({ path: file, text }) =>
+      // Split BEFORE parsing: `load` throws on a multi-document stream, and
+      // every service file here is a Deployment and a Service in one.
+      text
+        .split(/^---$/m)
+        .map((chunk) => load(chunk, { json: true }) as Doc | undefined)
+        .filter((doc): doc is Doc => Boolean(doc))
+        .map((doc) => ({ file, doc })),
+    );
 
   const byKind = (kind: string): { file: string; doc: Doc }[] =>
     manifests().filter(({ doc }) => doc.kind === kind);
@@ -413,15 +417,17 @@ describe('the manifest contract', () => {
     const schemaFiles = (): Map<string, string> => {
       const map = new Map<string, string>();
 
-      for (const file of repoFiles('services/*/src/**/env.validation.ts')) {
-        map.set(file.split('/')[1], file);
+      for (const { path, text } of readRepoFiles(
+        'services/*/src/**/env.validation.ts',
+      )) {
+        map.set(path.split('/')[1], text);
       }
 
       return map;
     };
 
-    const schemaKeys = (repoRelative: string): Set<string> => {
-      const source = stripComments(read(repoRelative));
+    const schemaKeys = (schema: string): Set<string> => {
+      const source = stripComments(schema);
       const keys = new Set<string>();
 
       for (const match of source.matchAll(/^ {2}([A-Z][A-Z0-9_]*):/gm)) {
@@ -437,8 +443,8 @@ describe('the manifest contract', () => {
       ).toEqual(services());
     });
 
-    it.each([...schemaFiles().entries()])('%s', (service, schemaPath) => {
-      const keys = schemaKeys(schemaPath);
+    it.each([...schemaFiles().entries()])('%s', (service, schema) => {
+      const keys = schemaKeys(schema);
       expect(keys.size).toBeGreaterThanOrEqual(10);
 
       const configMap = byKind('ConfigMap').find(
@@ -536,12 +542,12 @@ describe('the manifest contract', () => {
     // hold it, so a third consumer added later fails here instead of shipping
     // with no Secret.
     const declaring = [
-      ...repoFiles('services/*/src/**/env.validation.ts')
-        .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
-        .map((file) => file.split('/')[1]),
-      ...repoFiles('services/*/src/main/resources/application.yaml')
-        .filter((file) => read(file).includes(`\${${KEY}`))
-        .map((file) => file.split('/')[1]),
+      ...readRepoFiles('services/*/src/**/env.validation.ts')
+        .filter(({ text }) => stripComments(text).includes(`${KEY}:`))
+        .map(({ path }) => path.split('/')[1]),
+      ...readRepoFiles('services/*/src/main/resources/application.yaml')
+        .filter(({ text }) => text.includes(`\${${KEY}`))
+        .map(({ path }) => path.split('/')[1]),
     ].sort();
 
     expect(declaring).toEqual(HOLDERS);
