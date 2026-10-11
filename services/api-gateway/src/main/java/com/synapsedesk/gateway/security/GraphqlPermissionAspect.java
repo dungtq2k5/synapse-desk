@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -52,16 +51,17 @@ public class GraphqlPermissionAspect {
   // `PermissionInterceptor`. Matching both here would run the check twice
   // for a REST route and mean two mechanisms enforce one rule, which is the
   // "one file keeps the stub" shape this plan's own §2 warns against.
+  //
+  // The annotation is bound as the advice's parameter, so its type is the
+  // compiler's to check: a class name in the expression that stops resolving
+  // makes Spring drop the advice without an error.
   @Around(
-    "execution(* com.synapsedesk.gateway..*Resolver.*(..)) " +
-      "&& @annotation(com.synapsedesk.gateway.security.RequirePermission)"
+    "execution(* com.synapsedesk.gateway..*Resolver.*(..)) && @annotation(required)"
   )
-  public Object enforce(ProceedingJoinPoint joinPoint) throws Throwable {
-    MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-    RequirePermission required = signature
-      .getMethod()
-      .getAnnotation(RequirePermission.class);
-
+  public Object enforce(
+    ProceedingJoinPoint joinPoint,
+    RequirePermission required
+  ) throws Throwable {
     HttpServletRequest request = (
       (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()
     ).getRequest();

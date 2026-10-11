@@ -7,7 +7,9 @@ import java.util.Optional;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
+import org.springframework.util.ClassUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -40,9 +42,11 @@ public class GraphqlLifecycleAspect {
     this.policy = policy;
   }
 
+  // No class of this gateway is named in the expression: a name that stops
+  // resolving makes Spring drop the advice without an error. A resolver is
+  // exempted the way a route is, with `@OrgAccessKind(OrgAccess.AUTH)`.
   @Around(
     "execution(* com.synapsedesk.gateway..*Resolver.*(..)) " +
-      "&& !within(com.synapsedesk.gateway.graphql.VersionResolver) " +
       "&& (@annotation(org.springframework.graphql.data.method.annotation.QueryMapping) " +
       "|| @annotation(org.springframework.graphql.data.method.annotation.MutationMapping) " +
       "|| @annotation(org.springframework.graphql.data.method.annotation.SchemaMapping))"
@@ -51,6 +55,13 @@ public class GraphqlLifecycleAspect {
     var attributes = RequestContextHolder.getRequestAttributes();
     if (attributes instanceof ServletRequestAttributes servlet) {
       HttpServletRequest request = servlet.getRequest();
+      OrgAccess kind = OrganizationLifecycleInterceptor.kindOf(
+        ((MethodSignature) joinPoint.getSignature()).getMethod(),
+        ClassUtils.getUserClass(joinPoint.getTarget()),
+        request.getMethod()
+      );
+      if (kind == OrgAccess.AUTH) return joinPoint.proceed();
+
       Optional<RequestContext> caller = currentUser.read(request);
 
       if (
@@ -59,10 +70,7 @@ public class GraphqlLifecycleAspect {
         caller.get().organizationId() != null &&
         !caller.get().organizationId().isEmpty()
       ) {
-        policy.require(
-          caller.get().organizationId(),
-          LifecyclePolicy.byVerb(request.getMethod())
-        );
+        policy.require(caller.get().organizationId(), kind);
       }
     }
 

@@ -1,6 +1,8 @@
 package com.synapsedesk.gateway.graphql;
 
 import com.synapsedesk.gateway.config.RuntimeProperties;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.stereotype.Controller;
 
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Controller;
  * costs nothing extra by matching the pointcut's class-name half.
  */
 @Controller
+@OrgAccessKind(OrgAccess.AUTH)
 public class VersionResolver {
 
   private final RuntimeProperties runtime;

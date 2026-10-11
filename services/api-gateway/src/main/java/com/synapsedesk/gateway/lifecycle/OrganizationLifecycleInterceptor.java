@@ -5,6 +5,7 @@ import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.web.ApplicationRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.lang.reflect.Method;
 import java.util.Optional;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
@@ -77,13 +78,21 @@ public class OrganizationLifecycleInterceptor implements HandlerInterceptor {
 
   /** The route's declared category (the method's, else its controller's), or the verb's. */
   static OrgAccess kindOf(HandlerMethod handler, String method) {
+    return kindOf(handler.getMethod(), handler.getBeanType(), method);
+  }
+
+  /**
+   * The same rule for any handler, a GraphQL resolver included: the method's
+   * {@link OrgAccessKind}, else its class's, else the verb's.
+   */
+  static OrgAccess kindOf(Method handler, Class<?> type, String method) {
     OrgAccessKind declared = AnnotatedElementUtils.findMergedAnnotation(
-      handler.getMethod(),
+      handler,
       OrgAccessKind.class
     );
     if (declared == null) {
       declared = AnnotatedElementUtils.findMergedAnnotation(
-        handler.getBeanType(),
+        type,
         OrgAccessKind.class
       );
     }
