@@ -3,12 +3,10 @@ package com.synapsedesk.gateway.common.security;
 import com.synapsedesk.gateway.common.lifecycle.OrganizationLifecycleInterceptor;
 import com.synapsedesk.gateway.common.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.common.throttle.ThrottlerInterceptor;
-import com.synapsedesk.gateway.common.web.EnumParameterConverters;
 import com.synapsedesk.gateway.common.web.PathIdInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.format.FormatterRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -50,11 +48,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     this.httpMetricsInterceptor = httpMetricsInterceptor;
     this.organizationLifecycleInterceptor = organizationLifecycleInterceptor;
     this.pathIdInterceptor = pathIdInterceptor;
-  }
-
-  @Override
-  public void addFormatters(FormatterRegistry registry) {
-    EnumParameterConverters.register(registry);
   }
 
   @Override

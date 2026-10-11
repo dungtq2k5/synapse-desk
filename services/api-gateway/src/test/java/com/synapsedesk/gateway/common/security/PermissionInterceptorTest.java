@@ -20,7 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * `PermissionInterceptor`, against a stand-in controller — no HTTP, no
  * Spring context, since what is under test is the enforcement logic itself,
- * not the wiring. {@link com.synapsedesk.gateway.feedback.FeedbackController}
+ * not the wiring. {@link com.synapsedesk.gateway.modules.feedback.FeedbackController}
  * exercises the real annotation over real HTTP (`feedback.contract-spec.ts`'s
  * two permission rows); this covers what that single route cannot: the
  * super-admin bypass and the ANY-of-multiple semantics, neither of which

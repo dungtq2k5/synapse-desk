@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import com.synapsedesk.gateway.common.web.ApiResponse;
-import com.synapsedesk.gateway.sessions.RevokedCountDto;
+import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountDto;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;

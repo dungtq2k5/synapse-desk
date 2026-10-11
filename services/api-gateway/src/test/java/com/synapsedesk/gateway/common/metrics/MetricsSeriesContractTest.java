@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.common.config.SharedEnvironmentInitializer;
-import com.synapsedesk.gateway.platformjobs.JobMetricsCollector;
+import com.synapsedesk.gateway.common.metrics.JobMetricsCollector;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

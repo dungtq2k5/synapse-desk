@@ -1,6 +1,6 @@
 package com.synapsedesk.gateway.common.metrics;
 
-import com.synapsedesk.gateway.platformjobs.JobMetricsCollector;
+import com.synapsedesk.gateway.common.metrics.JobMetricsCollector;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;

@@ -21,7 +21,7 @@ describe('InboundLimits.java against packages/contracts', () => {
   const java = readFileSync(
     join(
       ROOT,
-      'services/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/InboundLimits.java',
+      'services/api-gateway/src/main/java/com/synapsedesk/gateway/modules/inboundemail/InboundLimits.java',
     ),
     'utf8',
   );

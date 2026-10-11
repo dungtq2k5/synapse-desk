@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.common.graphql;
 
-import com.synapsedesk.gateway.graphql.PermissionCatalogueLoaderConfig;
 import java.util.Set;
 
 /**
@@ -43,7 +42,7 @@ public final class GraphqlLimits {
    *
    * <p>
    * {@code permissions} is deliberately NOT here: it resolves
-   * through {@link PermissionCatalogueLoaderConfig}, which is keyed by
+   * through {@code PermissionCatalogueLoaderConfig}, which is keyed by
    * TENANT and always a batch of one, so a hundred roles resolving it make
    * ONE call, not a hundred. Charging it {@link #CROSS_SERVICE_COST} would
    * price a single cached read the same as a hundred fan-out calls.

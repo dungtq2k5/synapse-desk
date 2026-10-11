@@ -1,0 +1,55 @@
+package com.synapsedesk.gateway.modules.auditlogs.dto.rest;
+
+/**
+ * The `action` filter of the tenant and platform audit-log lists, exactly as the published contract's enum lists it. A
+ * value outside it is refused with a 400 before any handler or peer runs, and the
+ * document publishes the enum from the type.
+ *
+ * <p>The constants are the wire values, so Spring converts the parameter by constant
+ * name. Named {@code ...Filter} so it never collides with the protobuf type of the
+ * same resource that the same controllers import.
+ */
+public enum AuditActionFilter {
+  DATA_EXPORT_REQUESTED,
+  DEPARTMENT_CREATED,
+  DEPARTMENT_DELETED,
+  DEPARTMENT_MEMBERS_ADDED,
+  DEPARTMENT_MEMBER_REMOVED,
+  DEPARTMENT_RESTORED,
+  DEPARTMENT_UPDATED,
+  DOCUMENT_FLAG_DELETED,
+  DOCUMENT_FLAG_DISMISSED,
+  DOCUMENT_FLAG_RESOLVED,
+  ORGANIZATION_OFFBOARD_REQUESTED,
+  ORGANIZATION_ONBOARDING_COMPLETED,
+  ORGANIZATION_SETTINGS_UPDATED,
+  ORGANIZATION_UPDATED,
+  PASSWORD_CHANGED,
+  PLATFORM_BILLING_CYCLE_RESET,
+  PLATFORM_GLOBAL_ROLE_CREATED,
+  PLATFORM_ORGANIZATION_CREATED,
+  PLATFORM_ORGANIZATION_OFFBOARDED,
+  PLATFORM_ORGANIZATION_RESTORED,
+  PLATFORM_ORGANIZATION_STATUS_CHANGED,
+  PLATFORM_ORGANIZATION_UPDATED,
+  PLATFORM_PLAN_APPLIED,
+  PLATFORM_PLAN_CREATED,
+  PLATFORM_PLAN_DELETED,
+  PLATFORM_PLAN_UPDATED,
+  ROLE_CREATED,
+  ROLE_DELETED,
+  ROLE_PERMISSIONS_UPDATED,
+  ROLE_UPDATED,
+  USER_AVATAR_UPDATED,
+  USER_CREATED,
+  USER_DELETED,
+  USER_DEPARTMENTS_UPDATED,
+  USER_LOCKED,
+  USER_LOGOUT_ALL,
+  USER_RESTORED,
+  USER_ROLES_UPDATED,
+  USER_SESSIONS_REVOKED,
+  USER_TWO_FACTOR_RESET,
+  USER_UNLOCKED,
+  USER_UPDATED,
+}
