@@ -47,7 +47,7 @@ public class FeedbackResponseDto {
     @JsonCreator
     public static RatingEnum fromValue(BigDecimal value) {
       for (RatingEnum b : RatingEnum.values()) {
-        if (b.value.equals(value)) {
+        if (b.value.compareTo(value) == 0) {
           return b;
         }
       }
