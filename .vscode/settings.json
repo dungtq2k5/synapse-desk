@@ -16,5 +16,9 @@
   "markdown.validate.enabled": true,
   "liveServer.settings.port": 5501,
   "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "sonarlint.connectedMode.project": {
+    "connectionId": "dungtq2k5",
+    "projectKey": "dungtq2k5_synapse-desk"
+  }
 }

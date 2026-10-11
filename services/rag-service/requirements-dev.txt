@@ -2,6 +2,7 @@
 
 pytest==8.3.4
 pytest-asyncio==0.25.0
+pytest-cov==7.1.0
 
 # Lints and import-sorts the Python half. Configured in pyproject under
 # [tool.ruff]; the rule set is deliberately narrow — see the comment there.
