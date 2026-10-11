@@ -32,7 +32,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { createWriteStream, mkdtempSync } from 'node:fs';
+import { createWriteStream, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +50,15 @@ const build = spawnSync('./mvnw', ['-q', 'package', '-DskipTests'], {
 if (build.status !== 0) {
   console.error('Building the gateway failed; the suite was not run.');
   process.exit(build.status ?? 1);
+}
+
+// Coverage on (`gateway.ts`): this run's data only. Emptied here, once, before
+// any shard starts; a second local run would otherwise merge the last one's.
+if (process.env.CONTRACT_JACOCO_AGENT) {
+  rmSync(join(ROOT, 'services/api-gateway/target/contract-jacoco'), {
+    recursive: true,
+    force: true,
+  });
 }
 
 const JEST = ['jest', '--config', 'test/gateway-contract/jest.config.ts'];
