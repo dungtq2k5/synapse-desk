@@ -813,7 +813,8 @@ def build_injection_guard(config: Config, metered) -> InjectionGuard:
     )
 
 
-async def build_dependencies(config: Config) -> Dependencies:
+# Real clients only; the tests build their own collaborators.
+async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cover
     """Constructs the real collaborators. Tests build their own.
 
     Which is why the key check lives HERE and not in `load_config`: the suite
@@ -970,7 +971,8 @@ async def _refresh_readiness(
         await asyncio.sleep(READINESS_REFRESH_SECONDS)
 
 
-async def serve() -> None:
+# The process's boot: runs only when the service starts.
+async def serve() -> None:  # pragma: no cover
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
     config = load_config()
@@ -1042,7 +1044,7 @@ async def serve() -> None:
         await server.stop(grace=5)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     asyncio.run(serve())
 
 

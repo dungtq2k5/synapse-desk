@@ -108,7 +108,7 @@ WORKDIR /app
 # and pinning converts that from luck into construction.
 # `image-contract.spec.ts` asserts this ARG equals the manifest.
 ARG NPM_VERSION=11.9.0
-RUN npm i -g "npm@${NPM_VERSION}"
+RUN npm i -g --ignore-scripts "npm@${NPM_VERSION}"
 
 # Manifests only, before the source. This layer is keyed on the pruned
 # lockfile, so an ordinary source change reuses the cached `npm ci` instead of
@@ -128,8 +128,13 @@ COPY --from=prune /app/out/json/ ./
 # No build toolchain (`build-base`, `python3`, `g++`) here, ON PURPOSE — the
 # classic Alpine native-module trap does not apply: both native packages in
 # the tree (`bcrypt` via prebuildify, `msgpackr-extract`) ship musl prebuilds.
-# Measured on this base: both install and load with a bare `npm ci`.
-RUN --mount=type=cache,target=/root/.npm npm ci
+#
+# **Install scripts off; nothing needs them.** Measured with every one skipped:
+# the native modules load from their prebuilds, `buf` and the SWC binary come
+# from platform packages, and the migrate image still carries the musl schema
+# engine `prisma migrate deploy` needs, because `prisma generate` in the build
+# stage fetches it.
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
 
 # --------------------------------------------------------------- build
 FROM deps AS build
@@ -207,14 +212,11 @@ RUN npm run typecheck
 # question worth a clean answer rather than a clever one.
 FROM deps AS prod-deps
 WORKDIR /app
-# **Without the root `prepare` script.** It installs git hooks with
-# `simple-git-hooks`, a devDependency that `--omit=dev` does not install, so
-# `npm ci` runs it and fails (`simple-git-hooks: not found`, exit 127) for
-# every service. `--ignore-scripts` would also skip the production
-# dependencies' own install scripts, which native modules need, so only the
-# one script goes, in this stage's copy of the manifest.
-RUN npm pkg delete scripts.prepare
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
+# **Install scripts off.** That also skips the root `prepare` script, which
+# installs git hooks with `simple-git-hooks`, a devDependency `--omit=dev` does
+# not install. The production dependencies need none: the native modules load
+# from their musl prebuilds, and the runtime Prisma client needs no engine.
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --ignore-scripts
 
 # --------------------------------------------------------------- runtime
 FROM node:${NODE_VERSION} AS runtime

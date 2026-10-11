@@ -1241,3 +1241,35 @@ async def test_BOTH_surfaces_state_the_attachment_rule_IDENTICALLY(generator, le
     # sentence, which is the only version of this that catches a reworded copy.
     assert ATTACHMENT_NOTE in standalone
     assert ATTACHMENT_NOTE in fused
+
+
+def test_build_injection_guard_wires_both_switches_from_config(config, caplog):
+    """The server's guard follows `INJECTION_REGEX_ENABLED` and
+    `INJECTION_LLM_ENABLED`, and says so when either layer is off."""
+    import dataclasses
+
+    from rag_service.preprocess.injection import LlmInjectionClassifier
+    from rag_service.server import build_injection_guard
+
+    on = build_injection_guard(
+        dataclasses.replace(
+            config, injection_regex_enabled=True, injection_llm_enabled=True
+        ),
+        metered=object(),
+    )
+    assert on.classifier_enabled
+    assert isinstance(on._classifier, LlmInjectionClassifier)
+    assert on._patterns_enabled
+
+    with caplog.at_level("WARNING"):
+        off = build_injection_guard(
+            dataclasses.replace(
+                config, injection_regex_enabled=False, injection_llm_enabled=False
+            ),
+            metered=object(),
+        )
+    assert not off.classifier_enabled
+    assert off._classifier is None
+    assert not off._patterns_enabled
+    assert "Layer A is not running" in caplog.text
+    assert "Layer B is not running" in caplog.text

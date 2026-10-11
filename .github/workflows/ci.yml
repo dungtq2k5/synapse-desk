@@ -51,7 +51,7 @@ jobs:
           # than it looks.
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # **Neither check below can run without the Prisma clients.** They are
       # generated into `**/src/generated/prisma/`, which `.gitignore` excludes,
@@ -114,7 +114,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
 
   # -------------------------------------------------------------- contract
@@ -147,7 +147,7 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: services/api-gateway/pom.xml
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
 
       # **Minted per run, as the e2e job does.** `JwtVerifier` reads the public
@@ -224,7 +224,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # The same gitignored Prisma clients `static` needs, for the same reason.
       - run: npm run db:generate
@@ -287,7 +287,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # docker-compose.yml resolves every `${VAR}` from the root `.env`, which
       # is gitignored — without this the postgres containers come up with no
@@ -406,7 +406,7 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            services/rag-service/requirements.txt
+            services/rag-service/requirements.lock
             services/rag-service/requirements-dev.txt
 
       # `test_multimodal_e2e.py` carries TWO skip marks: one on GEMINI_API_KEY
@@ -443,7 +443,7 @@ jobs:
       # to exist AND carry the schema — and the schema belongs to
       # ingestion-service, whose `db:test:push` both creates the database on
       # connect and applies it.
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run db:test:push:ingestion
 
       # The key is a repository secret, so it is absent on fork pull requests

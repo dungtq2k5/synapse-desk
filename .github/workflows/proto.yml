@@ -26,7 +26,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # Regenerates and diffs — a proto edited without regenerating leaves the
       # TypeScript describing the previous wire shape, which typechecks
