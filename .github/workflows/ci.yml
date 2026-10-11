@@ -436,6 +436,10 @@ jobs:
   sonar:
     name: sonar
     runs-on: ubuntu-latest
+    # SonarCloud's plan shows results for its main branch only, and that branch
+    # is `main-java`. An analysis of any other ref, a pull request included,
+    # is one the plan refuses, so it is not run.
+    if: github.ref_name == 'main-java'
     needs: [unit, python]
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
