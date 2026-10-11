@@ -254,11 +254,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
       # Coverage for Sonar: one lcov for every project, at the repository root.
-      - run: npm test -- --coverage --coverageReporters=lcov --coverageDirectory=coverage
+      # The directory must be ABSOLUTE: Jest resolves a relative one against the
+      # first project's folder, so `coverage` lands in services/api-gateway/.
+      - run: npm test -- --coverage --coverageReporters=lcov --coverageDirectory=${{ github.workspace }}/coverage
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-unit
           path: coverage/lcov.info
+          # The default only warns, which let a misplaced report pass here and
+          # fail later in `sonar` as "artifact not found".
+          if-no-files-found: error
 
   # ------------------------------------------------------------------- e2e
   #
@@ -461,6 +466,7 @@ jobs:
         with:
           name: coverage-python
           path: services/rag-service/coverage.xml
+          if-no-files-found: error
 
   # ----------------------------------------------------------------- sonar
   #
