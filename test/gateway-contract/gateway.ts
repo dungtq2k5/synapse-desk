@@ -18,12 +18,14 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import {
+  appendFileSync,
   createWriteStream,
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 
 export const REPO_ROOT = join(__dirname, '../..');
@@ -158,6 +160,34 @@ function environmentFor(overrides: Record<string, string>): NodeJS.ProcessEnv {
  * jar that exists. Exactly one match is required — two jars means a stale one
  * is lying around, and picking either is a coin toss about which code runs.
  */
+/** Where each launch's JaCoCo data goes when coverage is on. */
+export const COVERAGE_DIR = join(
+  REPO_ROOT,
+  'services/api-gateway/target/contract-jacoco',
+);
+
+/**
+ * The JVM arguments that put a launch under the JaCoCo agent, or none.
+ *
+ * Opt-in: only when `CONTRACT_JACOCO_AGENT` names the agent jar (CI's contract
+ * shards set it; `./mvnw dependency:copy@contract-agent` writes it). Each launch
+ * gets its own `.exec`, named by its port, because the gateways of one run exit
+ * at different times; and its name goes into `launches.txt`, so a launch whose
+ * file never appears (the agent writes on JVM exit) is visible as missing.
+ */
+function coverageArgs(port: number): string[] {
+  const agent = process.env.CONTRACT_JACOCO_AGENT;
+  if (!agent) return [];
+
+  const execFile = `gateway-${port}.exec`;
+  mkdirSync(COVERAGE_DIR, { recursive: true });
+  appendFileSync(join(COVERAGE_DIR, 'launches.txt'), `${execFile}\n`);
+
+  return [
+    `-javaagent:${resolve(REPO_ROOT, agent)}=destfile=${join(COVERAGE_DIR, execFile)},includes=com.synapsedesk.*`,
+  ];
+}
+
 function javaJar(): string {
   const target = join(REPO_ROOT, 'services/api-gateway/target');
   const jars = existsSync(target)
@@ -198,7 +228,7 @@ export async function startGateway(
     const port = await freePort();
     const metricsPort = await freePort();
     const wsPort = await freePort();
-    const child = spawn('java', ['-jar', jar], {
+    const child = spawn('java', [...coverageArgs(port), '-jar', jar], {
       cwd: REPO_ROOT,
       // Its own process group, so `kill(-pid)` reaches whatever it spawned.
       detached: true,

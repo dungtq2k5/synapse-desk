@@ -166,7 +166,23 @@ jobs:
       - name: JWT keys
         run: npm run keys:generate -- --force
 
+      # **The shard counts toward Java coverage.** Every gateway it launches runs
+      # under the JaCoCo agent the pom pins; `report-contract-coverage.sh` fails if
+      # a launch wrote no data, then reports against this shard's own classes
+      # (JaCoCo matches classes by their bytes). Sonar merges the four reports
+      # with `mvnw verify`'s.
+      - name: JaCoCo agent
+        working-directory: services/api-gateway
+        run: ./mvnw -q dependency:copy@contract-agent
       - run: npm run test:contract:java -- --shard=${{ matrix.shard }}/4
+        env:
+          CONTRACT_JACOCO_AGENT: services/api-gateway/target/jacoco-agent/jacocoagent.jar
+      - run: bash scripts/report-contract-coverage.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-contract-${{ matrix.shard }}
+          path: services/api-gateway/target/site/jacoco-contract/jacoco.xml
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -512,7 +528,7 @@ jobs:
     # is `main-java`. An analysis of any other ref, a pull request included,
     # is one the plan refuses, so it is not run.
     if: github.ref_name == 'main-java'
-    needs: [unit, python, gateway-java-verify]
+    needs: [unit, python, gateway-java-verify, contract]
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -536,5 +552,10 @@ jobs:
         with:
           name: coverage-java
           path: services/api-gateway/target
+      - uses: actions/download-artifact@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          pattern: coverage-contract-*
+          path: coverage-contract
       - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         if: env.SONAR_TOKEN != ''

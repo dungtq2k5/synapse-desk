@@ -56,6 +56,9 @@
     <grpc.version>1.78.0</grpc.version>
     <protobuf.version>4.33.0</protobuf.version>
 
+    <!-- The plugin below and the contract suite's agent, one version. -->
+    <jacoco.version>0.8.15</jacoco.version>
+
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -262,7 +265,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.15</version>
+        <version>${jacoco.version}</version>
         <executions>
           <execution>
             <id>prepare-agent</id>
@@ -276,6 +279,77 @@
             <goals>
               <goal>report</goal>
             </goals>
+          </execution>
+          <!--
+            The contract suite's coverage, run by name only (`phase` none):
+            `./mvnw jacoco:merge@contract-merge jacoco:report@contract-report`
+            after a run with `CONTRACT_JACOCO_AGENT` set. One `.exec` per gateway
+            launch, merged, then reported against this build's classes.
+          -->
+          <execution>
+            <id>contract-merge</id>
+            <phase>none</phase>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <configuration>
+              <fileSets>
+                <fileSet>
+                  <directory
+                  >${project.build.directory}/contract-jacoco</directory>
+                  <includes>
+                    <include>*.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+              <destFile
+              >${project.build.directory}/contract-jacoco.exec</destFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>contract-report</id>
+            <phase>none</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <dataFile
+              >${project.build.directory}/contract-jacoco.exec</dataFile>
+              <outputDirectory
+              >${project.build.directory}/site/jacoco-contract</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        The JaCoCo agent the contract harness launches the gateway with, run by
+        name only: `./mvnw dependency:copy@contract-agent` writes
+        `target/jacoco-agent/jacocoagent.jar`.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>contract-agent</id>
+            <phase>none</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.jacoco</groupId>
+                  <artifactId>org.jacoco.agent</artifactId>
+                  <version>${jacoco.version}</version>
+                  <classifier>runtime</classifier>
+                  <destFileName>jacocoagent.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory
+              >${project.build.directory}/jacoco-agent</outputDirectory>
+            </configuration>
           </execution>
         </executions>
       </plugin>
