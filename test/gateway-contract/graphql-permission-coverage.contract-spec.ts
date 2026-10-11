@@ -109,10 +109,12 @@ function matchingBraceSkippingDescriptions(
   openIndex: number,
 ): number {
   let depth = 0;
-  for (let index = openIndex; index < source.length; index++) {
+  let index = openIndex;
+  while (index < source.length) {
     if (source.startsWith('"""', index)) {
+      // Past the whole description, closing quotes included.
       const end = source.indexOf('"""', index + 3);
-      index = end < 0 ? source.length : end + 2;
+      index = end < 0 ? source.length : end + 3;
       continue;
     }
 
@@ -121,6 +123,7 @@ function matchingBraceSkippingDescriptions(
       depth--;
       if (depth === 0) return index;
     }
+    index++;
   }
 
   return -1;
