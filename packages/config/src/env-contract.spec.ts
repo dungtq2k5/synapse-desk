@@ -3,7 +3,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envDocumentedKeys, parseEnvFile } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import {
+  readListed,
+  readRepoFiles,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * The environment contract: the schema is the code, `.env.example` is the
@@ -57,12 +61,14 @@ describe('the environment contract', () => {
       .map((file) => file.split('/')[1])
       .sort();
 
-  /** service → its env.validation.ts path, from git rather than a guess. */
+  /** service → its env.validation.ts source, from git rather than a guess. */
   const schemaFiles = (): Map<string, string> => {
     const map = new Map<string, string>();
 
-    for (const file of repoFiles('services/*/src/**/env.validation.ts')) {
-      map.set(file.split('/')[1], file);
+    for (const { path, text } of readRepoFiles(
+      'services/*/src/**/env.validation.ts',
+    )) {
+      map.set(path.split('/')[1], text);
     }
 
     return map;
@@ -76,10 +82,8 @@ describe('the environment contract', () => {
    * NAMES a variable must not count as validating it — the lesson every scan
    * in this repo has re-learned once.
    */
-  const schemaKeys = (repoRelative: string): Set<string> => {
-    const source = stripComments(
-      readFileSync(join(REPO_ROOT, repoRelative), 'utf8'),
-    );
+  const schemaKeys = (schema: string): Set<string> => {
+    const source = stripComments(schema);
 
     const keys = new Set<string>();
     for (const match of source.matchAll(/^ {2}([A-Z][A-Z0-9_]*):/gm)) {
@@ -122,17 +126,17 @@ describe('the environment contract', () => {
     expect(schemaFiles().size).toBeGreaterThanOrEqual(6);
   });
 
-  describe.each([...schemaFiles().entries()])('%s', (service, schemaPath) => {
+  describe.each([...schemaFiles().entries()])('%s', (service, schema) => {
     it('parses at least ten schema keys — the pattern-fires floor', () => {
       // A formatting change that broke the key regex would empty the set and
       // make both directions below vacuously green. The smallest schema
       // (storage-service) holds 13 keys; ten is the floor with margin.
-      expect(schemaKeys(schemaPath).size).toBeGreaterThanOrEqual(10);
+      expect(schemaKeys(schema).size).toBeGreaterThanOrEqual(10);
     });
 
     it('**every validated variable is documented in .env.example**', () => {
       const documented = exampleKeys(service);
-      const missing = [...schemaKeys(schemaPath)].filter(
+      const missing = [...schemaKeys(schema)].filter(
         (key) => !documented.has(key),
       );
 
@@ -140,7 +144,7 @@ describe('the environment contract', () => {
     });
 
     it('**everything documented is real** — validated, or a named exemption', () => {
-      const validated = schemaKeys(schemaPath);
+      const validated = schemaKeys(schema);
       const phantom = [...exampleKeys(service)].filter(
         (key) => !validated.has(key) && !BUILD_INJECTED.has(key),
       );
@@ -161,10 +165,8 @@ describe('the environment contract', () => {
     // The corpus floor: seven services × (.env.example + .env.test).
     expect(envFiles.length).toBeGreaterThanOrEqual(14);
 
-    const offenders = envFiles.flatMap((file) => {
-      const content = readFileSync(join(REPO_ROOT, file), 'utf8');
-
-      return content
+    const offenders = readListed(envFiles).flatMap(({ path: file, text }) => {
+      return text
         .split('\n')
         .map((line, index) => ({ line, at: `${file}:${index + 1}` }))
         .filter(

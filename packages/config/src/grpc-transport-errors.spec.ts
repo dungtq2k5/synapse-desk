@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * Every transport-class gRPC error a service throws is a DECISION: either the
@@ -18,8 +16,6 @@ import { repoFiles } from '@synapsedesk/testing/repo-files';
  * without someone deciding which it is: marked, or added below with a reason.
  */
 describe('transport-class gRPC errors are marked or named', () => {
-  const REPO_ROOT = join(__dirname, '../../..');
-
   /**
    * Sites that stay UNMARKED on purpose, by file and the start of the message.
    * The generic message is the right answer for each if it ever surfaces.
@@ -71,11 +67,11 @@ describe('transport-class gRPC errors are marked or named', () => {
       };
     });
 
-  const sites = repoFiles('services/*/src/**')
-    .filter((file) => file.endsWith('.ts') && !file.endsWith('.spec.ts'))
-    .flatMap((file) =>
-      sitesIn(file, stripComments(readFileSync(join(REPO_ROOT, file), 'utf8'))),
-    );
+  const sites = readListed(
+    repoFiles('services/*/src/**').filter(
+      (file) => file.endsWith('.ts') && !file.endsWith('.spec.ts'),
+    ),
+  ).flatMap(({ path, text }) => sitesIn(path, stripComments(text)));
 
   const exemption = (site: Site) =>
     Object.keys(INTERNAL).find((key) => {

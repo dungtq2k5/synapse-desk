@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import ts from 'typescript';
 import { envDocumentedKeys, parseEnvFile } from '@synapsedesk/testing/env-file';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import {
+  readListed,
+  readRepoFiles,
+  type RepoFile,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * The CI contract's static half — what a file parse can decide about the
@@ -23,7 +28,7 @@ describe('the CI contract', () => {
   const read = (repoRelative: string): string =>
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
 
-  const workflows = (): string[] => repoFiles('.github/workflows/*.yml');
+  const workflows = (): RepoFile[] => readRepoFiles('.github/workflows/*.yml');
 
   // --------------------------------------------------- scripts the jobs name
 
@@ -38,13 +43,13 @@ describe('the CI contract', () => {
     const scriptNames = (): Set<string> => {
       const names = new Set<string>();
 
-      for (const manifest of [
+      for (const { text } of readListed([
         'package.json',
         ...repoFiles('*/*/package.json').filter((file) =>
           /^(apps|services|packages)\/[^/]+\/package\.json$/.test(file),
         ),
-      ]) {
-        const parsed = JSON.parse(read(manifest)) as {
+      ])) {
+        const parsed = JSON.parse(text) as {
           scripts?: Record<string, string>;
         };
         for (const name of Object.keys(parsed.scripts ?? {})) names.add(name);
@@ -70,9 +75,9 @@ describe('the CI contract', () => {
      * few lines down already strips YAML comments for the mirror-image reason;
      * this one did not, and the two disagreed about what a workflow says.
      */
-    const invocations = (file: string): string[] =>
+    const invocations = ({ text }: RepoFile): string[] =>
       [
-        ...read(file)
+        ...text
           .replace(/^[ \t]*#.*$/gm, '')
           .matchAll(/npm run ([a-z0-9:_-]+)/g),
       ].map((match) => match[1]);
@@ -88,12 +93,12 @@ describe('the CI contract', () => {
       expect(total.length).toBeGreaterThanOrEqual(5);
     });
 
-    it.each(workflows())('%s', (file) => {
+    it.each(workflows())('$path', (workflow) => {
       const declared = scriptNames();
 
-      expect(invocations(file).filter((name) => !declared.has(name))).toEqual(
-        [],
-      );
+      expect(
+        invocations(workflow).filter((name) => !declared.has(name)),
+      ).toEqual([]);
     });
   });
 
@@ -139,7 +144,7 @@ describe('the CI contract', () => {
       expect(workflows().length).toBeGreaterThanOrEqual(1);
     });
 
-    it.each(workflows())('%s', (file) => {
+    it.each(workflows())('$path', ({ path, text }) => {
       // **Comments stripped first, and the check found out why by failing on
       // its own subject matter.** The workflow documents this very list in a
       // header comment — the doc's instruction, because an absence and an
@@ -147,7 +152,7 @@ describe('the CI contract', () => {
       // over raw text reads the documentation of the rule as a violation of
       // it. Exactly the hazard `stripComments` exists for in source scans,
       // one file format over: a `#` line in YAML is a line comment.
-      const content = read(file).replace(/^[ \t]*#.*$/gm, '');
+      const content = text.replace(/^[ \t]*#.*$/gm, '');
 
       // Pattern-fires floor: a workflow with no steps left after stripping
       // means the strip ate the file, and every assertion below would be
@@ -156,7 +161,7 @@ describe('the CI contract', () => {
 
       const offenders = FORBIDDEN.filter(({ pattern }) =>
         pattern.test(content),
-      ).map(({ why }) => `${file}: ${why}`);
+      ).map(({ why }) => `${path}: ${why}`);
 
       expect(offenders).toEqual([]);
     });

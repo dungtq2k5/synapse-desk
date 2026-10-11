@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * Every class in `<entity>-response.dto.ts` ends `ResponseDto`.
@@ -23,8 +21,6 @@ import { repoFiles } from '@synapsedesk/testing/repo-files';
  * from.
  */
 describe('response DTO classes carry the ResponseDto suffix', () => {
-  const REPO_ROOT = join(__dirname, '../../..');
-
   /**
    * `export class Foo` — the declaration, not a reference to one.
    *
@@ -64,9 +60,7 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
   it('**1. every class in a response file is named for what it is**', () => {
     const violations: string[] = [];
 
-    for (const file of responseFiles()) {
-      const source = readFileSync(join(REPO_ROOT, file), 'utf8');
-
+    for (const { path: file, text: source } of readListed(responseFiles())) {
       for (const name of offenders(source)) {
         violations.push(`${file}: ${name} — expected a ResponseDto suffix`);
       }
@@ -97,9 +91,7 @@ describe('response DTO classes carry the ResponseDto suffix', () => {
     // anything acting on it.
     const violations: string[] = [];
 
-    for (const file of requestFiles()) {
-      const source = readFileSync(join(REPO_ROOT, file), 'utf8');
-
+    for (const { path: file, text: source } of readListed(requestFiles())) {
       for (const [, name] of source.matchAll(DECLARATION)) {
         if (!name.endsWith('ResponseDto')) continue;
 

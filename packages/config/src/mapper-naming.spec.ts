@@ -1,6 +1,6 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * `to<ReturnTypeName>` — the destination type's name, verbatim.
@@ -91,9 +91,7 @@ describe('mapper functions name their return type verbatim', () => {
   it('**1. every mapper carries its return type verbatim, suffix included**', () => {
     const violations: string[] = [];
 
-    for (const file of mapperFiles()) {
-      const source = readFileSync(join(REPO_ROOT, file), 'utf8');
-
+    for (const { path: file, text: source } of readListed(mapperFiles())) {
       for (const [, name, returnType] of source.matchAll(DECLARATION)) {
         const expected = expectedName(returnType);
         if (expected === null || name === expected) continue;

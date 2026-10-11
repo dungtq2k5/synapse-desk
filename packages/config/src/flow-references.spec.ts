@@ -1,6 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { basename } from 'node:path';
+import {
+  readListed,
+  readRepoFiles,
+  type RepoFile,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * Every symbol a flow document names still exists.
@@ -24,12 +28,7 @@ import { repoFiles } from '@synapsedesk/testing/repo-files';
  * zero keys.
  */
 describe('every symbol the flow documents cite exists', () => {
-  const REPO_ROOT = join(__dirname, '../../..');
-
-  const read = (repoRelative: string): string =>
-    readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
-
-  const flows = (): string[] => repoFiles('docs/reference/flows/*.md');
+  const flows = (): RepoFile[] => readRepoFiles('docs/reference/flows/*.md');
 
   /**
    * The extensions a flow document may cite — **named once**, because three
@@ -96,8 +95,8 @@ describe('every symbol the flow documents cite exists', () => {
     const declared = new Set<string>();
     const pattern = /\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)\b/g;
 
-    for (const file of sourceFiles()) {
-      for (const [, name] of read(file).matchAll(pattern)) declared.add(name);
+    for (const { text } of readListed(sourceFiles())) {
+      for (const [, name] of text.matchAll(pattern)) declared.add(name);
     }
 
     return declared;
@@ -106,7 +105,7 @@ describe('every symbol the flow documents cite exists', () => {
   it('**1. the corpus is the flows directory, and it is not empty**', () => {
     // THE floor that matters here. Every other contract spec reads files that
     // something else needs too; move this directory and nothing else notices.
-    const files = flows();
+    const files = flows().map(({ path }) => path);
 
     // Seven today: six flows plus the index. Jest prints the received number on
     // failure, which is the count this floor exists to make visible.
@@ -118,7 +117,9 @@ describe('every symbol the flow documents cite exists', () => {
   it('**2. …and the extractors can actually SEE a citation**', () => {
     // Pattern-fires. A matcher that stopped matching reports "no broken
     // citations", which is indistinguishable from a clean corpus.
-    const corpus = flows().map(read).join('\n');
+    const corpus = flows()
+      .map(({ text }) => text)
+      .join('\n');
 
     expect(citationsIn(corpus, FILE_CITATION).length).toBeGreaterThanOrEqual(
       10,
@@ -132,8 +133,8 @@ describe('every symbol the flow documents cite exists', () => {
     const tracked = trackedBasenames();
     const missing: string[] = [];
 
-    for (const file of flows()) {
-      for (const cited of citationsIn(read(file), FILE_CITATION)) {
+    for (const { path: file, text } of flows()) {
+      for (const cited of citationsIn(text, FILE_CITATION)) {
         if (!tracked.has(cited)) missing.push(`${basename(file)} → ${cited}`);
       }
     }
@@ -145,8 +146,8 @@ describe('every symbol the flow documents cite exists', () => {
     const declared = declaredConstants();
     const missing: string[] = [];
 
-    for (const file of flows()) {
-      for (const cited of citationsIn(read(file), CONST_CITATION)) {
+    for (const { path: file, text } of flows()) {
+      for (const cited of citationsIn(text, CONST_CITATION)) {
         if (!declared.has(cited)) missing.push(`${basename(file)} → ${cited}`);
       }
     }
@@ -159,8 +160,8 @@ describe('every symbol the flow documents cite exists', () => {
     // cannot be verified by anything, so it is refused rather than checked.
     const offenders: string[] = [];
 
-    for (const file of flows()) {
-      const hits = [...read(file).matchAll(LINE_CITATION)];
+    for (const { path: file, text } of flows()) {
+      const hits = [...text.matchAll(LINE_CITATION)];
       if (hits.length > 0) offenders.push(`${basename(file)}: ${hits[0][0]}`);
     }
 

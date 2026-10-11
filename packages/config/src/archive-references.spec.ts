@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * No tracked file cites `docs/archive`.
@@ -23,8 +21,6 @@ import { repoFiles } from '@synapsedesk/testing/repo-files';
  * it carries an env-file floor this cannot express.
  */
 describe('nothing tracked cites the archive', () => {
-  const REPO_ROOT = join(__dirname, '../../..');
-
   /**
    * The two shapes an archive reference takes.
    *
@@ -157,17 +153,9 @@ describe('nothing tracked cites the archive', () => {
   it('**1. no tracked file points at a plan nobody else can open**', () => {
     const violations: string[] = [];
 
-    for (const file of corpus()) {
-      let source: string;
-      try {
-        source = readFileSync(join(REPO_ROOT, file), 'utf8');
-      } catch {
-        // A binary or unreadable path is not a citation site.
-        continue;
-      }
-
-      for (const hit of citations(source)) {
-        violations.push(`${file}:${hit}`);
+    for (const { path, text } of readListed(corpus())) {
+      for (const hit of citations(text)) {
+        violations.push(`${path}:${hit}`);
       }
     }
 
@@ -255,16 +243,9 @@ describe('nothing tracked cites the archive', () => {
   it('**5. no tracked file carries a `FIXME` a tool wrote, not a person**', () => {
     const violations: string[] = [];
 
-    for (const file of corpus()) {
-      let source: string;
-      try {
-        source = readFileSync(join(REPO_ROOT, file), 'utf8');
-      } catch {
-        continue;
-      }
-
-      for (const hit of fixmes(source)) {
-        violations.push(`${file}:${hit}`);
+    for (const { path, text } of readListed(corpus())) {
+      for (const hit of fixmes(text)) {
+        violations.push(`${path}:${hit}`);
       }
     }
 

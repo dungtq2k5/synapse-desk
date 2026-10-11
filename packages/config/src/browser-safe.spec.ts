@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { REPO_ROOT, repoFiles } from '@synapsedesk/testing/repo-files';
+import {
+  readListed,
+  REPO_ROOT,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * `@synapsedesk/contracts` and `@synapsedesk/core` stay usable in a browser.
@@ -36,17 +40,17 @@ describe('contracts and core are browser-safe', () => {
   it.each(Object.keys(ALLOWED))(
     '`%s` imports nothing but itself (and what it may)',
     (pkg) => {
-      const files = repoFiles(`packages/${pkg}/src`).filter((file) =>
-        file.endsWith('.ts'),
+      const files = readListed(
+        repoFiles(`packages/${pkg}/src`).filter((file) => file.endsWith('.ts')),
       );
       // The pattern-fires floor: a pathspec that matched nothing would pass.
       expect(files.length).toBeGreaterThan(10);
 
-      const found = files.flatMap((file) =>
-        specifiers(readFileSync(join(REPO_ROOT, file), 'utf8'))
+      const found = files.flatMap(({ path, text }) =>
+        specifiers(text)
           .filter((spec) => !spec.startsWith('.'))
           .filter((spec) => !ALLOWED[pkg].has(spec))
-          .map((spec) => `${file}: ${spec}`),
+          .map((spec) => `${path}: ${spec}`),
       );
 
       expect(found).toEqual([]);

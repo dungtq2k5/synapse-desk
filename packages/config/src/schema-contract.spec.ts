@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import { parseEnvFile } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import {
+  readListed,
+  readRepoFiles,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * The schema-delivery contract: what may reach a production image, and what
@@ -65,15 +69,15 @@ describe('the schema contract', () => {
     // other floors here use.
     expect(corpus.length).toBeGreaterThanOrEqual(900);
 
-    const offenders = corpus.filter((file) => {
+    const offenders = readListed(
       // Binary and generated artefacts are not worth reading; none of them is
       // a place a database URL is written by hand.
-      if (!/\.(ts|mjs|js|json|ya?ml|sh|env|md|prisma|py)$/.test(file)) {
-        return false;
-      }
-
-      return /synapsedesk_[a-z]+_test/.test(read(file));
-    });
+      corpus.filter((file) =>
+        /\.(ts|mjs|js|json|ya?ml|sh|env|md|prisma|py)$/.test(file),
+      ),
+    )
+      .filter(({ text }) => /synapsedesk_[a-z]+_test/.test(text))
+      .map(({ path }) => path);
 
     expect(offenders).toEqual([]);
   });
@@ -87,8 +91,8 @@ describe('the schema contract', () => {
     const buildConfigs = repoFiles('services/*/tsconfig.build.json');
     expect(buildConfigs.length).toBeGreaterThanOrEqual(6);
 
-    for (const file of buildConfigs) {
-      const parsed = JSON.parse(stripComments(read(file))) as {
+    for (const { path: file, text } of readListed(buildConfigs)) {
+      const parsed = JSON.parse(stripComments(text)) as {
         exclude?: string[];
       };
 
@@ -112,24 +116,22 @@ describe('the schema contract', () => {
     );
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
-    for (const seeder of seeders) {
+    for (const { path: seeder, text: seederSource } of readListed(seeders)) {
       const service = seeder.split('/')[1];
-      const schema = repoFiles(
+      const schema = readRepoFiles(
         `services/${service}/src/**/env.validation.ts`,
-      )[0];
-      const declared = /SEED_ON_BOOTSTRAP:/.test(read(schema));
+      )[0].text;
+      const declared = /SEED_ON_BOOTSTRAP:/.test(schema);
 
       // `seedRows` exists only where there are rows to seed.
-      const seedsRows = /async seedRows\(/.test(read(seeder));
+      const seedsRows = /async seedRows\(/.test(seederSource);
 
       expect([service, declared]).toEqual([service, seedsRows]);
 
       if (declared) {
         expect([
           service,
-          /SEED_ON_BOOTSTRAP: Joi\.boolean\(\)\.required\(\)/.test(
-            read(schema),
-          ),
+          /SEED_ON_BOOTSTRAP: Joi\.boolean\(\)\.required\(\)/.test(schema),
         ]).toEqual([service, true]);
       }
     }
@@ -166,8 +168,8 @@ describe('the schema contract', () => {
     );
     expect(seeders.length).toBeGreaterThanOrEqual(4);
 
-    for (const seeder of seeders) {
-      const source = stripComments(read(seeder));
+    for (const { path: seeder, text } of readListed(seeders)) {
+      const source = stripComments(text);
       const hook =
         /async onApplicationBootstrap\([\s\S]*?\n {2}\}/.exec(source)?.[0] ??
         '';
@@ -265,12 +267,12 @@ describe('the schema contract', () => {
       // Check 3. `migrate deploy` with an empty `migrations/` directory exits
       // non-zero, so the init container holds the pod at `Init:Error` forever —
       // the safe failure, and a slow way to discover a missing directory.
-      const migrations = repoFiles(
+      const migrations = readRepoFiles(
         `services/${service}/prisma/migrations/*/migration.sql`,
       );
 
       expect(migrations.length).toBeGreaterThanOrEqual(1);
-      expect(read(migrations[0]).length).toBeGreaterThan(500);
+      expect(migrations[0].text.length).toBeGreaterThan(500);
     });
 
     it.each(withSchema())(
@@ -291,10 +293,10 @@ describe('the schema contract', () => {
         const forbidden = seederObjects(service);
         expect(forbidden.length).toBeGreaterThanOrEqual(4);
 
-        const sql = repoFiles(
+        const sql = readRepoFiles(
           `services/${service}/prisma/migrations/*/migration.sql`,
         )
-          .map((file) => `${file}\n${read(file)}`)
+          .map(({ path, text }) => `${path}\n${text}`)
           .join('\n');
 
         expect(sql.length).toBeGreaterThan(500);

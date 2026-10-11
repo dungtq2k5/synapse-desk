@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
-import { repoFiles } from '@synapsedesk/testing/repo-files';
+import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
 
 /**
  * The image contract's STATIC half — everything about the Docker build that a
@@ -163,8 +163,8 @@ describe('the image contract (static half)', () => {
       ].filter((file) => file.endsWith('.ts'));
 
       const used = new Map<string, string>();
-      for (const file of sources) {
-        for (const pkg of importsOf(read(file))) {
+      for (const { path: file, text } of readListed(sources)) {
+        for (const pkg of importsOf(text)) {
           if (!used.has(pkg)) used.set(pkg, file);
         }
       }
@@ -200,8 +200,8 @@ describe('the image contract (static half)', () => {
     );
     expect(manifests.length).toBeGreaterThanOrEqual(8);
 
-    const offenders = manifests.flatMap((file) => {
-      const manifest = JSON.parse(read(file)) as {
+    const offenders = readListed(manifests).flatMap(({ path: file, text }) => {
+      const manifest = JSON.parse(text) as {
         dependencies?: Record<string, string>;
       };
 
@@ -240,10 +240,10 @@ describe('the image contract (static half)', () => {
       expect(files.length).toBeGreaterThan(0);
 
       const offenders: string[] = [];
-      for (const file of files) {
+      for (const { path: file, text } of readListed(files)) {
         const workspaceDepth = 2; // services/<name>/…
         const fileDepth = file.split('/').length - 1 - workspaceDepth;
-        const stripped = stripComments(read(file));
+        const stripped = stripComments(text);
 
         for (const match of stripped.matchAll(
           /(?:from\s+|^\s*import\s+)['"]((?:\.\.\/)+[^'"]*)['"]/gm,
@@ -377,8 +377,8 @@ describe('the image contract (static half)', () => {
       /(\d+)\./.exec(range)?.[1];
 
     const declarations = (): { file: string; range: string }[] =>
-      manifests().flatMap((file) => {
-        const manifest = JSON.parse(read(file)) as {
+      readListed(manifests()).flatMap(({ path: file, text }) => {
+        const manifest = JSON.parse(text) as {
           dependencies?: Record<string, string>;
           devDependencies?: Record<string, string>;
         };
@@ -453,13 +453,13 @@ describe('the image contract (static half)', () => {
     };
 
     const mentions = (): { file: string; network: string }[] =>
-      repoFiles('*')
-        .filter((file) => /\.(mjs|ts|md|sh|ya?ml)$/.test(file))
-        .flatMap((file) =>
-          [...read(file).matchAll(/--network[= ]([A-Za-z0-9_.-]+)/g)].map(
-            ([, network]) => ({ file, network }),
-          ),
-        );
+      readListed(
+        repoFiles('*').filter((file) => /\.(mjs|ts|md|sh|ya?ml)$/.test(file)),
+      ).flatMap(({ path: file, text }) =>
+        [...text.matchAll(/--network[= ]([A-Za-z0-9_.-]+)/g)].map(
+          ([, network]) => ({ file, network }),
+        ),
+      );
 
     it('**1. no `--network` quotes a name compose does not create**', () => {
       const expected = composeNetwork();
@@ -529,14 +529,13 @@ describe('the image contract (static half)', () => {
      * `image:` lines.
      */
     const imageRefs = (): { file: string; image: string }[] =>
-      repoFiles('*.yml')
-        .concat(repoFiles('*.yaml'))
-        .flatMap((file) =>
-          [...read(file).matchAll(/^\s+image:\s+(\S+)$/gm)].map((match) => ({
+      readListed(repoFiles('*.yml').concat(repoFiles('*.yaml'))).flatMap(
+        ({ path: file, text }) =>
+          [...text.matchAll(/^\s+image:\s+(\S+)$/gm)].map((match) => ({
             file,
             image: match[1],
           })),
-        );
+      );
 
     it('finds at least twenty image references — the corpus floor', () => {
       // Twenty-two today: nine in compose, thirteen in `k8s/`. A pathspec or a
