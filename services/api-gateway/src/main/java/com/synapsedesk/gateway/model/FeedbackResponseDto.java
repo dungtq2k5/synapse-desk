@@ -20,42 +20,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 public class FeedbackResponseDto {
 
-  /**
-   * Gets or Sets rating
-   */
-  public enum RatingEnum {
-    NUMBER_MINUS_1(new BigDecimal("-1")),
-
-    NUMBER_1(new BigDecimal("1"));
-
-    private final BigDecimal value;
-
-    RatingEnum(BigDecimal value) {
-      this.value = value;
-    }
-
-    @JsonValue
-    public BigDecimal getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(value);
-    }
-
-    @JsonCreator
-    public static RatingEnum fromValue(BigDecimal value) {
-      for (RatingEnum b : RatingEnum.values()) {
-        if (b.value.compareTo(value) == 0) {
-          return b;
-        }
-      }
-      throw new IllegalArgumentException("Unexpected value '" + value + "'");
-    }
-  }
-
-  private RatingEnum rating;
+  private SubmitFeedbackDto.RatingEnum rating;
 
   private String id;
 
@@ -83,7 +48,7 @@ public class FeedbackResponseDto {
    * Constructor with only required parameters
    */
   public FeedbackResponseDto(
-    RatingEnum rating,
+    SubmitFeedbackDto.RatingEnum rating,
     String id,
     String ticketMessageId,
     String userId,
@@ -104,7 +69,7 @@ public class FeedbackResponseDto {
     this.updatedAt = updatedAt;
   }
 
-  public FeedbackResponseDto rating(RatingEnum rating) {
+  public FeedbackResponseDto rating(SubmitFeedbackDto.RatingEnum rating) {
     this.rating = rating;
     return this;
   }
@@ -116,12 +81,12 @@ public class FeedbackResponseDto {
   @NotNull
   @Valid
   @JsonProperty("rating")
-  public RatingEnum getRating() {
+  public SubmitFeedbackDto.RatingEnum getRating() {
     return rating;
   }
 
   @JsonProperty("rating")
-  public void setRating(RatingEnum rating) {
+  public void setRating(SubmitFeedbackDto.RatingEnum rating) {
     this.rating = rating;
   }
 

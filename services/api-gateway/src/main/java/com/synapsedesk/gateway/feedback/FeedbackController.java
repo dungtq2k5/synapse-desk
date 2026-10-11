@@ -245,7 +245,7 @@ public class FeedbackController {
 
   private static FeedbackResponseDto toDto(FeedbackResponse feedback) {
     return new FeedbackResponseDto(
-      FeedbackResponseDto.RatingEnum.fromValue(
+      SubmitFeedbackDto.RatingEnum.fromValue(
         BigDecimal.valueOf(feedback.getRating())
       ),
       feedback.getId(),
