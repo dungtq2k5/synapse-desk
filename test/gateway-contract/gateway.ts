@@ -81,6 +81,9 @@ const SHARD_PORT_BASE = 20_000 + (SHARD - 1) * 1_000;
 // realtime listener, on the first ports of a shard's block, one run after another).
 let shardPortCursor = Math.floor(Math.random() * 1_000);
 
+// Every port the OS path has handed out in this invocation.
+const handedOut = new Set<number>();
+
 /** Whether nothing is listening on `port` now. */
 function isFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -110,15 +113,25 @@ async function freePort(): Promise<number> {
     );
   }
 
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      server.close(() => resolve(port));
+  // Never the same port twice here either: the OS can hand back a port it just
+  // released, and it did on a CI runner — `PORT` and `METRICS_PORT` both got
+  // 38767, and Spring refused to start (a management address on the server's
+  // own port).
+  for (;;) {
+    const port = await new Promise<number>((resolve, reject) => {
+      const server = createServer();
+      server.on('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        const port = typeof address === 'object' && address ? address.port : 0;
+        server.close(() => resolve(port));
+      });
     });
-  });
+    if (!handedOut.has(port)) {
+      handedOut.add(port);
+      return port;
+    }
+  }
 }
 
 /**
