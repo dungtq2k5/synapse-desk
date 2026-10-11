@@ -1,5 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import {
+  readListed,
+  type RepoFile,
+  repoFiles,
+} from '@synapsedesk/testing/repo-files';
 
 /**
  * Scans FROM the code TOWARD the rule: every size comparison against a resolved
@@ -12,7 +15,6 @@ import { join } from 'node:path';
  * catch a site that was renamed, never one that was rewritten.
  */
 describe('Size comparisons go through the guard', () => {
-  const REPO = join(__dirname, '../../..');
   const SERVICES = [
     'services/api-gateway/src',
     'services/auth-service/src',
@@ -44,27 +46,15 @@ describe('Size comparisons go through the guard', () => {
     'services/api-gateway/src/modules/ingestion-jobs/ingestion-job.mapper.ts',
   ]);
 
-  const sources = (): string[] => {
-    const out: string[] = [];
-    const walk = (dir: string): void => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          if (entry.name !== 'generated' && entry.name !== 'node_modules') {
-            walk(path);
-          }
-        } else if (
-          entry.name.endsWith('.ts') &&
-          !entry.name.includes('.spec.')
-        ) {
-          out.push(path);
-        }
-      }
-    };
-    for (const service of SERVICES) walk(join(REPO, service));
-
-    return out;
-  };
+  const sources = (): RepoFile[] =>
+    readListed(
+      repoFiles(...SERVICES).filter(
+        (file) =>
+          file.endsWith('.ts') &&
+          !file.split('/').pop()!.includes('.spec.') &&
+          !/\/(generated|node_modules)\//.test(file),
+      ),
+    );
 
   it('1. **the scan reads a real corpus**', () => {
     // The vacuity guard, and the reason it is test 1. A scan over zero files
@@ -76,7 +66,7 @@ describe('Size comparisons go through the guard', () => {
     const files = sources();
 
     expect(files.length).toBeGreaterThan(200);
-    expect(files.some((file) => file.includes('messages.service.ts'))).toBe(
+    expect(files.some(({ path }) => path.includes('messages.service.ts'))).toBe(
       true,
     );
   });
@@ -84,11 +74,10 @@ describe('Size comparisons go through the guard', () => {
   it('2. **no service compares a size against a limit with a bare `>`**', () => {
     const offenders: string[] = [];
 
-    for (const file of sources()) {
-      const relative = file.slice(REPO.length + 1);
+    for (const { path: relative, text } of sources()) {
       if (SANCTIONED.has(relative)) continue;
 
-      const lines = readFileSync(file, 'utf8').split('\n');
+      const lines = text.split('\n');
       lines.forEach((line, index) => {
         if (DANGEROUS.test(line)) {
           offenders.push(`${relative}:${index + 1} — ${line.trim()}`);
@@ -102,7 +91,7 @@ describe('Size comparisons go through the guard', () => {
   it('3. and the sanctioned list has not gone stale', () => {
     // A sanctioned path that no longer exists is a reader being told a rule has
     // an exception it does not have.
-    const all = sources().map((file) => file.slice(REPO.length + 1));
+    const all = sources().map(({ path }) => path);
 
     for (const sanctioned of SANCTIONED) {
       expect(all).toContain(sanctioned);
