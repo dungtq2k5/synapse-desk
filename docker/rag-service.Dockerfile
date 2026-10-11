@@ -33,9 +33,15 @@ WORKDIR /app
 
 # Requirements before source, for the same layer-caching reason as the Node
 # image: a change to a servicer must not re-resolve torch.
-COPY services/rag-service/requirements.txt ./
+#
+# From the hashed lock, not requirements.txt: every package, transitive ones
+# included, is pinned and checked against its hash (`--require-hashes`), and
+# only wheels are accepted (`--only-binary :all:`), so no source distribution
+# runs setup code at install. `npm run lock:py` regenerates the lock.
+COPY services/rag-service/requirements.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefix=/install -r requirements.txt
+    pip install --prefix=/install --require-hashes --only-binary :all: \
+      -r requirements.lock
 
 # --------------------------------------------------------------- runtime
 FROM python:${PYTHON_VERSION} AS runtime

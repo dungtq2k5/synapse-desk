@@ -364,7 +364,7 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: |
-            services/rag-service/requirements.txt
+            services/rag-service/requirements.lock
             services/rag-service/requirements-dev.txt
 
       # `test_multimodal_e2e.py` carries TWO skip marks: one on GEMINI_API_KEY

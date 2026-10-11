@@ -312,6 +312,31 @@ describe('the image contract (static half)', () => {
     });
   });
 
+  // ------------------------------------------------------ the rag-service lock
+
+  it('every rag-service requirement is pinned at the same version in the lock', () => {
+    // The image installs `requirements.lock` with `--require-hashes`, never
+    // `requirements.txt`, so a pin bumped in the one and not regenerated
+    // (`npm run lock:py`) would ship the old version without a word.
+    const pins = (file: string): Map<string, string> =>
+      new Map(
+        [...read(file).matchAll(/^([A-Za-z0-9][A-Za-z0-9._-]*)==(\S+)/gm)].map(
+          ([, name, version]) => [
+            name.toLowerCase().replace(/[._-]+/g, '-'),
+            version,
+          ],
+        ),
+      );
+    const wanted = pins('services/rag-service/requirements.txt');
+    const locked = pins('services/rag-service/requirements.lock');
+
+    // Floor: a pattern that stops matching must fail, not compare nothing.
+    expect(wanted.size).toBeGreaterThanOrEqual(8);
+    for (const [name, version] of wanted) {
+      expect(`${name}==${locked.get(name)}`).toBe(`${name}==${version}`);
+    }
+  });
+
   // ------------------------------------------------------- the types major
 
   describe('every `@types/node` describes the runtime that runs', () => {
