@@ -9,8 +9,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.time.DateTimeException;
-import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -91,12 +90,7 @@ public @interface StrictIso8601 {
 
       if (month == 0 || day == 0) return true;
 
-      try {
-        LocalDate.of(year, month, day);
-        return true;
-      } catch (DateTimeException invalid) {
-        return false;
-      }
+      return month <= 12 && YearMonth.of(year, month).isValidDay(day);
     }
   }
 }

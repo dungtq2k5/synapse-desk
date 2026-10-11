@@ -794,15 +794,14 @@ public class InboundEmailService {
 
     int workers = Math.min(INGEST_CONCURRENCY, queued.size());
     if (workers > 0) {
-      ExecutorService pool = Executors.newFixedThreadPool(workers);
-      try {
+      // `close()` waits for the workers: every call has a deadline, and after an
+      // interrupt `invokeAll` has cancelled them and gRPC fails the rest at once.
+      try (ExecutorService pool = Executors.newFixedThreadPool(workers)) {
         List<Callable<Void>> jobs = new ArrayList<>();
         for (int i = 0; i < workers; i++) jobs.add(worker);
         pool.invokeAll(jobs);
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
-      } finally {
-        pool.shutdownNow();
       }
     }
 
