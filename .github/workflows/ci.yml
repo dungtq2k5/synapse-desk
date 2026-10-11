@@ -51,7 +51,7 @@ jobs:
           # than it looks.
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # **Neither check below can run without the Prisma clients.** They are
       # generated into `**/src/generated/prisma/`, which `.gitignore` excludes,
@@ -114,7 +114,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run build
       # The committed OpenAPI document equals what this build exports. After
       # the build, so its turbo build is a cache hit; no stack, the gateway is
@@ -140,7 +140,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # `test:contract` builds the gateway itself; this keeps the build failure
       # separate from a suite failure when one happens.
       - run: npm run build
@@ -182,7 +182,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # The same gitignored Prisma clients `static` needs, for the same reason.
       - run: npm run db:generate
@@ -245,7 +245,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # docker-compose.yml resolves every `${VAR}` from the root `.env`, which
       # is gitignored — without this the postgres containers come up with no
@@ -401,7 +401,7 @@ jobs:
       # to exist AND carry the schema — and the schema belongs to
       # ingestion-service, whose `db:test:push` both creates the database on
       # connect and applies it.
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run db:test:push:ingestion
 
       # The key is a repository secret, so it is absent on fork pull requests
