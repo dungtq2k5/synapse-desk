@@ -16,7 +16,7 @@ import { parseEnvFile } from '@synapsedesk/testing/env-file';
  * - **Browser-safe.** The client imports nothing server-side; in the app, Node's
  *   built-ins only under `src/server/`, where the renderer's fetcher lives. That
  *   is what makes "the Next server calls only the gateway" checkable.
- * - **No colour literal**, and no raw primitive: a component's colour is a
+ * - **No color literal**, and no raw primitive: a component's color is a
  *   semantic token, which switches with the theme.
  * - **`apps/web/.env.example` declares only `GATEWAY_URL`.** The dev server
  *   proxies the socket too, so the browser needs no address of its own; and a
@@ -137,27 +137,27 @@ describe('the web client', () => {
     ).toEqual([]);
   });
 
-  // ------------------------------------------------------------ colours
+  // ------------------------------------------------------------ colors
 
-  const COLOUR_LITERAL = [
+  const COLOR_LITERAL = [
     /(?<![\w&])#[0-9a-fA-F]{3,8}\b/, // only in CSS, below
     /\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/,
-    /\[#[0-9a-fA-F]{3,8}\]/, // a Tailwind arbitrary colour
-    /['"`]#[0-9a-fA-F]{3,8}['"`]/, // a string that is only a hex colour
+    /\[#[0-9a-fA-F]{3,8}\]/, // a Tailwind arbitrary color
+    /['"`]#[0-9a-fA-F]{3,8}['"`]/, // a string that is only a hex color
     /var\(--color-[a-z]+-\d{2,3}\)/, // a raw primitive
     // A Tailwind palette utility. The palette is reset, so it renders nothing.
     /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|shadow|decoration|divide|placeholder|caret)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})\b/,
   ];
 
-  const colourViolations = (path: string, source: string): string[] => {
+  const colorViolations = (path: string, source: string): string[] => {
     const code = stripComments(source);
     const patterns = path.endsWith('.css')
-      ? COLOUR_LITERAL
-      : COLOUR_LITERAL.slice(1);
+      ? COLOR_LITERAL
+      : COLOR_LITERAL.slice(1);
     return patterns.filter((pattern) => pattern.test(code)).map(() => path);
   };
 
-  it('**no colour literal and no raw primitive** in the web app', () => {
+  it('**no color literal and no raw primitive** in the web app', () => {
     const files = readRepoFiles('apps/web/src').filter(({ path }) =>
       /\.(ts|tsx|css)$/.test(path),
     );
@@ -167,31 +167,31 @@ describe('the web client', () => {
 
     expect([
       ...new Set(
-        files.flatMap(({ path, text }) => colourViolations(path, text)),
+        files.flatMap(({ path, text }) => colorViolations(path, text)),
       ),
     ]).toEqual([]);
   });
 
-  it('the colour scan sees a literal and spares a ticket number', () => {
-    expect(colourViolations('a.css', '.x { color: #006e75; }')).toHaveLength(1);
+  it('the color scan sees a literal and spares a ticket number', () => {
+    expect(colorViolations('a.css', '.x { color: #006e75; }')).toHaveLength(1);
     expect(
-      colourViolations('a.tsx', '<div className="bg-[#006e75]" />'),
+      colorViolations('a.tsx', '<div className="bg-[#006e75]" />'),
     ).toHaveLength(1);
     expect(
-      colourViolations('a.tsx', "style={{ color: 'rgb(0 0 0)' }}"),
+      colorViolations('a.tsx', "style={{ color: 'rgb(0 0 0)' }}"),
     ).toHaveLength(1);
     expect(
-      colourViolations('a.tsx', 'className="bg-[var(--color-teal-700)]"'),
+      colorViolations('a.tsx', 'className="bg-[var(--color-teal-700)]"'),
     ).toHaveLength(1);
     expect(
-      colourViolations('a.tsx', 'className="bg-black/50 text-white"'),
+      colorViolations('a.tsx', 'className="bg-black/50 text-white"'),
     ).toHaveLength(1);
-    expect(colourViolations('a.tsx', 'className="text-teal-700"')).toHaveLength(
+    expect(colorViolations('a.tsx', 'className="text-teal-700"')).toHaveLength(
       1,
     );
-    expect(colourViolations('a.tsx', '<span>Ticket #1042</span>')).toEqual([]);
+    expect(colorViolations('a.tsx', '<span>Ticket #1042</span>')).toEqual([]);
     expect(
-      colourViolations(
+      colorViolations(
         'a.tsx',
         'className="bg-primary text-primary-foreground whitespace-nowrap -translate-x-1/2 bg-overlay"',
       ),

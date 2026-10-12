@@ -12,7 +12,7 @@ import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 /**
  * Toasts: a popover surface with a border, and a solid square in the kind's
- * colour holding its icon. Bottom right; full width at the bottom on phones.
+ * color holding its icon. Bottom right; full width at the bottom on phones.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme();

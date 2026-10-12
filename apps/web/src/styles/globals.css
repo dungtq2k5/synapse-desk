@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * The design tokens as Tailwind's theme. A component's colour, radius, shadow
+ * The design tokens as Tailwind's theme. A component's color, radius, shadow
  * or type is a SEMANTIC token: the primitives (`--color-teal-700`) stay out of
  * the theme, and Tailwind's own palette is reset, so `bg-teal-700` is not a
  * utility at all. A primitive would skip the light/dark switch.

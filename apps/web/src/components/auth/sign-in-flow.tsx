@@ -4,7 +4,7 @@ import type { TenantOptionResponseDto } from '@synapsedesk/api-client';
 import { useState } from 'react';
 import { keepTwoStepWarning } from '@/lib/two-step-warning';
 import type { SignInStep } from '@/lib/sign-in';
-import { ChooseOrganisation } from './choose-organisation';
+import { ChooseOrganization } from './choose-organization';
 import { CredentialsForm } from './credentials-form';
 import { TwoStepCode } from './two-step-code';
 import { TwoStepSetup } from './two-step-setup';
@@ -25,7 +25,7 @@ type Step =
 
 /**
  * Sign-in and every leg the server may ask for next, on one page: email and
- * password, then (as answered) a choice of organisation, a two-step code, or
+ * password, then (as answered) a choice of organization, a two-step code, or
  * two-step setup. Signed in, it goes to `next` with a full page load, so the
  * app renders with the new cookies.
  */
@@ -63,7 +63,7 @@ export function SignInFlow({
       );
     case 'tenant':
       return (
-        <ChooseOrganisation
+        <ChooseOrganization
           email={email}
           tenants={step.tenants}
           onAnswer={advance}

@@ -36,7 +36,7 @@ export function manualKey(otpauthUri: string): string {
 }
 
 /**
- * Two-step setup, for an organisation that requires it: scan the QR code
+ * Two-step setup, for an organization that requires it: scan the QR code
  * (or type the key), confirm with a code, then the backup codes, shown once.
  * Both calls are allowed on the sign-in challenge alone, which is what lets a
  * member with no second factor yet enrol.
@@ -140,7 +140,7 @@ function ScanAndConfirm({
     <AuthCard
       above="Step 1 of 2"
       title="Set up two-step verification"
-      lead="Your organisation requires a second step when you sign in. Scan this QR code with an authenticator app."
+      lead="Your organization requires a second step when you sign in. Scan this QR code with an authenticator app."
       busy={!secret}
     >
       <div className="flex justify-center">

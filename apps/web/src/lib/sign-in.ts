@@ -30,8 +30,8 @@ export type SignInStep =
 
 /**
  * Reads `POST /auth/login` (or `/auth/login/tenant`): signed in, a two-step
- * code, two-step setup (the organisation requires it and this account has
- * none), or a choice of organisation.
+ * code, two-step setup (the organization requires it and this account has
+ * none), or a choice of organization.
  *
  * @example signInStep({ requiresTwoFactor: true, requiresTwoFactorSetup: false }) // { kind: 'code' }
  */

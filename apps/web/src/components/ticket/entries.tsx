@@ -431,7 +431,7 @@ export function PendingEntry({
   );
 }
 
-/** Something that happened to the ticket: centred, muted, no author. */
+/** Something that happened to the ticket: centered, muted, no author. */
 export function NoticeEntry({
   notice,
   perspective,

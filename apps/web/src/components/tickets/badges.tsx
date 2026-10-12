@@ -27,7 +27,7 @@ const PRIORITY_CLASS: Record<NonNullable<TicketResponseDtoPriority>, string> = {
   URGENT: 'bg-status-priority-urgent-bg text-status-priority-urgent-fg',
 };
 
-/** A status, by its label: never colour alone. */
+/** A status, by its label: never color alone. */
 export function StatusBadge({ status }: { status: TicketResponseDtoStatus }) {
   if (!status) return null;
   return (

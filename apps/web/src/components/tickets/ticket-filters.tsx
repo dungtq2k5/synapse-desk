@@ -182,7 +182,7 @@ function AssigneeFilter({
   value: string | undefined;
   onValue: (value: string) => void;
 }) {
-  // ponytail: the first 100 users; a searchable picker when organisations outgrow it.
+  // ponytail: the first 100 users; a searchable picker when organizations outgrow it.
   const users = useUserAdminControllerListV1({
     limit: 100,
     sortBy: 'fullName',

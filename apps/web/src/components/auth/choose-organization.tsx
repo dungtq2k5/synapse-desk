@@ -15,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { deviceName, signInStep, type SignInStep } from '@/lib/sign-in';
 import { AuthCard } from './auth-card';
 
-/** The email belongs to several organisations: pick the one to sign in to. */
-export function ChooseOrganisation({
+/** The email belongs to several organizations: pick the one to sign in to. */
+export function ChooseOrganization({
   email,
   tenants,
   onAnswer,
@@ -49,15 +49,15 @@ export function ChooseOrganisation({
 
   return (
     <AuthCard
-      title="Choose an organisation"
-      lead={`${email.trim()} belongs to more than one organisation. Choose the one to sign in to.`}
+      title="Choose an organization"
+      lead={`${email.trim()} belongs to more than one organization. Choose the one to sign in to.`}
     >
       {failed && (
         <Alert variant="destructive">
           <CircleAlertIcon />
           <AlertTitle>Couldn’t sign in to {failed.name}</AlertTitle>
           <AlertDescription>
-            Try again, or choose another organisation.
+            Try again, or choose another organization.
           </AlertDescription>
         </Alert>
       )}

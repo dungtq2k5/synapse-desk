@@ -34,9 +34,9 @@ test('a wrong password says so, without saying which field', async ({
 });
 
 /**
- * A new person founding a new organisation, on a domain no other organisation
+ * A new person founding a new organization, on a domain no other organization
  * allows: registration makes them its admin. Each run's domains are its own,
- * because the databases outlive a run and a domain an organisation already
+ * because the databases outlive a run and a domain an organization already
  * allows would make the registration join it instead.
  */
 async function founder(email: string) {
@@ -53,8 +53,8 @@ async function founder(email: string) {
 const run = Date.now();
 const domain = (name: string) => `${name}-${run}.example.test`;
 
-test('one email in two organisations: choose one', async ({ page }) => {
-  // Robin founds the first organisation; it stops admitting Robin's domain,
+test('one email in two organizations: choose one', async ({ page }) => {
+  // Robin founds the first organization; it stops admitting Robin's domain,
   // the second admits it, and Robin's second registration joins the second.
   const email = `robin@${domain('first')}`;
   const first = await founder(email);
@@ -79,7 +79,7 @@ test('one email in two organisations: choose one', async ({ page }) => {
   await signIn(page, email, DEMO_PASSWORD);
 
   await expect(
-    page.getByRole('heading', { name: 'Choose an organisation' }),
+    page.getByRole('heading', { name: 'Choose an organization' }),
   ).toBeVisible();
   await expect(
     page.getByText(`${email} belongs to more than one`),
@@ -91,7 +91,7 @@ test('one email in two organisations: choose one', async ({ page }) => {
   await expect(page).toHaveURL(/\/tickets$/);
 });
 
-test('an organisation that requires two-step: set it up, then the code', async ({
+test('an organization that requires two-step: set it up, then the code', async ({
   page,
 }) => {
   const email = `robin@${domain('two-step')}`;

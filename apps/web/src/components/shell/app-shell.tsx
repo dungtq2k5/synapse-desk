@@ -29,7 +29,7 @@ import { UserMenu } from './user-menu';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const organisation = useOrganizationsControllerGetV1({
+  const organization = useOrganizationsControllerGetV1({
     query: { retry: false },
   });
 
@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               />
               <span className="grid text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {organisation.data?.data?.name}
+                  {organization.data?.data?.name}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   SynapseDesk

@@ -25,7 +25,7 @@ export type LiveAnswer = {
   messageId?: string;
 };
 
-/** Something that happened TO the ticket, shown centred, with no author. */
+/** Something that happened TO the ticket, shown centered, with no author. */
 export type Notice = {
   kind: 'escalated' | 'ai-unavailable';
   at: string;
