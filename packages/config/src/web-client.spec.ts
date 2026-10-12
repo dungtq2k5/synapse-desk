@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process';
+import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 import { readRepoFiles, repoFiles } from '@synapsedesk/testing/repo-files';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
+import { parseEnvFile } from '@synapsedesk/testing/env-file';
 
 /**
  * The web client's boundaries, read from the files.
@@ -11,6 +13,14 @@ import { stripComments } from '@synapsedesk/testing/strip-comments';
  *   `fetch` would have neither.
  * - **The generated clients are never committed.** They're generated from the
  *   committed document before every build, so a committed copy could only drift.
+ * - **Browser-safe.** The client imports nothing server-side; in the app, Node's
+ *   built-ins only under `src/server/`, where the renderer's fetcher lives. That
+ *   is what makes "the Next server calls only the gateway" checkable.
+ * - **No colour literal**, and no raw primitive: a component's colour is a
+ *   semantic token, which switches with the theme.
+ * - **`apps/web/.env.example` declares only `GATEWAY_URL`.** The dev server
+ *   proxies the socket too, so the browser needs no address of its own; and a
+ *   `NEXT_PUBLIC_` variable is baked into the build, so none is wanted.
  */
 describe('the web client', () => {
   const REPO_ROOT = join(__dirname, '../../..');
@@ -67,5 +77,127 @@ describe('the web client', () => {
         { cwd: REPO_ROOT },
       ),
     ).not.toThrow();
+  });
+
+  // ------------------------------------------------------------ browser-safe
+
+  const SERVER_ONLY_PACKAGE =
+    /^(@synapsedesk\/(nest-common|grpc-proto|testing)(\/|$)|@nestjs\/|@grpc\/|ioredis$|nats$)/;
+  const NODE_BUILTIN = (spec: string) =>
+    spec.startsWith('node:') || builtinModules.includes(spec.split('/')[0]);
+
+  const specifiers = (source: string): string[] =>
+    [
+      ...source.matchAll(
+        /(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]/g,
+      ),
+      ...source.matchAll(/(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g),
+      ...source.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g),
+      ...source.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g),
+    ].map((match) => match[1]);
+
+  const browserSafeViolations = (path: string, source: string): string[] =>
+    specifiers(stripComments(source))
+      .filter(
+        (spec) =>
+          SERVER_ONLY_PACKAGE.test(spec) ||
+          (NODE_BUILTIN(spec) && !path.startsWith('apps/web/src/server/')),
+      )
+      .map((spec) => `${path}: ${spec}`);
+
+  it('**the client imports nothing server-side**; Node built-ins only in src/server/', () => {
+    const sources = clientSources();
+    expect(sources.some(({ path }) => path.startsWith('apps/web/src/'))).toBe(
+      true,
+    );
+
+    expect(
+      sources.flatMap(({ path, text }) => browserSafeViolations(path, text)),
+    ).toEqual([]);
+  });
+
+  it('the import scan sees a server package and a misplaced built-in', () => {
+    expect(
+      browserSafeViolations(
+        'apps/web/src/app/page.tsx',
+        "import { x } from '@nestjs/common';",
+      ),
+    ).toHaveLength(1);
+    expect(
+      browserSafeViolations(
+        'apps/web/src/app/page.tsx',
+        "import { readFileSync } from 'node:fs';",
+      ),
+    ).toHaveLength(1);
+    expect(
+      browserSafeViolations(
+        'apps/web/src/server/a.ts',
+        "import { readFileSync } from 'node:fs';",
+      ),
+    ).toEqual([]);
+  });
+
+  // ------------------------------------------------------------ colours
+
+  const COLOUR_LITERAL = [
+    /(?<![\w&])#[0-9a-fA-F]{3,8}\b/, // only in CSS, below
+    /\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/,
+    /\[#[0-9a-fA-F]{3,8}\]/, // a Tailwind arbitrary colour
+    /['"`]#[0-9a-fA-F]{3,8}['"`]/, // a string that is only a hex colour
+    /var\(--color-[a-z]+-\d{2,3}\)/, // a raw primitive
+  ];
+
+  const colourViolations = (path: string, source: string): string[] => {
+    const code = stripComments(source);
+    const patterns = path.endsWith('.css')
+      ? COLOUR_LITERAL
+      : COLOUR_LITERAL.slice(1);
+    return patterns.filter((pattern) => pattern.test(code)).map(() => path);
+  };
+
+  it('**no colour literal and no raw primitive** in the web app', () => {
+    const files = readRepoFiles('apps/web/src').filter(({ path }) =>
+      /\.(ts|tsx|css)$/.test(path),
+    );
+    expect(files.map(({ path }) => path)).toContain(
+      'apps/web/src/styles/globals.css',
+    );
+
+    expect([
+      ...new Set(
+        files.flatMap(({ path, text }) => colourViolations(path, text)),
+      ),
+    ]).toEqual([]);
+  });
+
+  it('the colour scan sees a literal and spares a ticket number', () => {
+    expect(colourViolations('a.css', '.x { color: #006e75; }')).toHaveLength(1);
+    expect(
+      colourViolations('a.tsx', '<div className="bg-[#006e75]" />'),
+    ).toHaveLength(1);
+    expect(
+      colourViolations('a.tsx', "style={{ color: 'rgb(0 0 0)' }}"),
+    ).toHaveLength(1);
+    expect(
+      colourViolations('a.tsx', 'className="bg-[var(--color-teal-700)]"'),
+    ).toHaveLength(1);
+    expect(colourViolations('a.tsx', '<span>Ticket #1042</span>')).toEqual([]);
+    expect(
+      colourViolations(
+        'a.tsx',
+        'className="bg-primary text-primary-foreground"',
+      ),
+    ).toEqual([]);
+  });
+
+  // ------------------------------------------------------------ environment
+
+  it('**apps/web/.env.example declares only GATEWAY_URL**', () => {
+    const [example] = readRepoFiles('apps/web/.env.example');
+    expect(example).toBeDefined();
+
+    const keys = Object.keys(parseEnvFile(example.text));
+    expect(keys).toContain('GATEWAY_URL');
+    expect(keys.filter((key) => key !== 'GATEWAY_URL')).toEqual([]);
   });
 });

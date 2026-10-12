@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect
+    width="24"
+    height="24"
+    rx="6"
+    fill="#006e75"
+  /><path
+    d="M12.314 4.814A3.6 3.6 0 1 0 12 12A3.6 3.6 0 1 1 11.686 19.186"
+    fill="none"
+    stroke="#fff"
+    stroke-width="2.4"
+    stroke-linecap="round"
+  /><circle cx="15.275" cy="6.906" r="1.7" fill="#fff" /><circle
+    cx="8.725"
+    cy="17.094"
+    r="1.7"
+    fill="#fff"
+  /></svg>

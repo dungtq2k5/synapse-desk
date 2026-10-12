@@ -4,6 +4,8 @@ import { defineConfig } from 'eslint/config';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import nextPlugin from '@next/eslint-plugin-next';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 // `defineConfig` from ESLint core, not `tseslint.config()` — the latter is
 // deprecated now that core provides the same thing, and typescript-eslint's
@@ -29,6 +31,9 @@ export default defineConfig(
       // tsconfig, so the type-aware rules have no program to read it with.
       'packages/api-client/orval.config.ts',
       '**/jest.e2e.config.ts',
+      // Next.js's own generated types and build output.
+      'apps/*/.next/**',
+      'apps/*/next-env.d.ts',
       'test/system/sequencer.cjs',
     ],
   },
@@ -47,6 +52,8 @@ export default defineConfig(
           './tsconfig.json',
           './services/*/tsconfig.json',
           './packages/*/tsconfig.json',
+          // The clients: each has its own tsconfig (Next.js sets its options).
+          './apps/*/tsconfig.json',
           // The demo seeder. `scripts/` is neither an app nor a lib, and the
           // root tsconfig does not include it — without this entry every file
           // under `scripts/seed-demo/` fails to parse with "none of those
@@ -86,6 +93,33 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-return': 'off',
       // `expect(obj.method)` is the normal way to assert on a spy, and it is
       // not a `this`-scoping mistake.
+      '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    // The web client: browser code (with the server renderer under src/server/),
+    // React's hook rules, and Next.js's own.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: { ...globals.browser },
+      sourceType: 'module',
+    },
+    plugins: { '@next/next': nextPlugin, 'react-hooks': reactHooks },
+    // The Next.js rules look for the app from the repository root otherwise.
+    settings: { next: { rootDir: 'apps/web/' } },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs['core-web-vitals'].rules,
+      ...reactHooks.configs.recommended.rules,
+    },
+  },
+  {
+    files: ['apps/web/**/*.spec.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
     },
   },

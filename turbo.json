@@ -51,6 +51,17 @@
       // build, revert (hit), edit again (miss) left the edit out of `dist/`.
       "outputs": ["dist/**", "*.tsbuildinfo"]
     },
+    // The clients' own typecheck (the root program doesn't include apps/):
+    // against their dependencies' built packages and their generated tokens.
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "tsconfig*.json",
+        "next.config.ts",
+        "design-tokens/**"
+      ]
+    },
     "lint": {
       // No "dependsOn": ["^build"] — eslint's type-aware rules read each
       // package's tsconfig and TypeScript SOURCE, never a built dist/, so

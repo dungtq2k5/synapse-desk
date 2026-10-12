@@ -34,7 +34,17 @@ describe('doc comments do not open accidental JSDoc tags', () => {
    * would wave through the exact typo this exists to catch. Adding a real tag
    * here is a deliberate edit, which is the point.
    */
-  const KNOWN_TAGS = new Set(['file', 'example', 'param', 'returns', 'throws']);
+  // `jest-environment` is a pragma Jest reads from a test file's first
+  // docblock (the web's server tests run under `node`, its components under
+  // jsdom); it has no other spelling.
+  const KNOWN_TAGS = new Set([
+    'file',
+    'example',
+    'param',
+    'returns',
+    'throws',
+    'jest-environment',
+  ]);
 
   /**
    * A doc line whose first token is `@something`.
