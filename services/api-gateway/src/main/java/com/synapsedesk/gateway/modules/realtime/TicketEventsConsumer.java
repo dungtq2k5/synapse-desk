@@ -145,8 +145,14 @@ public class TicketEventsConsumer implements RuntimeParticipant {
     String ticketId = NatsEnvelope.stringField(event, "ticketId");
 
     if (Subjects.TICKET_CREATED.equals(subject)) {
-      relay.relayToRoom(
-        RealtimeRooms.orgRoom(NatsEnvelope.organizationIdOf(event)),
+      // The tenant's agents, and the author: an end user must not learn of a
+      // colleague's ticket, which REST would never show them. One relay, so
+      // an agent who wrote the ticket gets it once.
+      relay.relayToRooms(
+        List.of(
+          RealtimeRooms.orgAgentsRoom(NatsEnvelope.organizationIdOf(event)),
+          RealtimeRooms.userRoom(NatsEnvelope.stringField(event, "authorId"))
+        ),
         RealtimeEvents.REALTIME_EVENTS_TICKET_CREATED,
         body
       );
@@ -208,7 +214,7 @@ public class TicketEventsConsumer implements RuntimeParticipant {
         body
       );
       relay.relayToRoom(
-        RealtimeRooms.orgRoom(NatsEnvelope.organizationIdOf(event)),
+        RealtimeRooms.orgAgentsRoom(NatsEnvelope.organizationIdOf(event)),
         RealtimeEvents.REALTIME_EVENTS_TICKET_UPDATED,
         body
       );

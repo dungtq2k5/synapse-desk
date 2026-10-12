@@ -25,4 +25,18 @@ public record JwtPrincipal(
   public boolean isFullSession() {
     return !is2faPending;
   }
+
+  /**
+   * An agent by ticket-service's own definition: a super admin, or a holder of
+   * {@code ticket.read.all} or {@code ticket.message.moderate}. It decides who
+   * sees internal notes there, and who joins the agents-only rooms here.
+   */
+  public boolean isAgent() {
+    return (
+      isSuperAdmin ||
+      (permissionCodes != null &&
+        (permissionCodes.contains("ticket.read.all") ||
+          permissionCodes.contains("ticket.message.moderate")))
+    );
+  }
 }

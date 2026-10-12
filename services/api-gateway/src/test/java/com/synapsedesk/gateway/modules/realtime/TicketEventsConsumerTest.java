@@ -12,6 +12,7 @@ import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import com.synapsedesk.gateway.modules.realtime.RealtimeRelay;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -45,20 +46,44 @@ class TicketEventsConsumerTest {
   }
 
   @Test
-  void createdRelaysOnlyToTheOrgRoom() {
+  void createdRelaysToTheAgentsRoomAndTheAuthorNeverTheWholeTenant() {
     consumer.onMessage(
       message(
         "ticket.created",
+        "{\"ticketId\":\"t1\",\"organizationId\":\"o1\",\"authorId\":\"u1\"}"
+      )
+    );
+
+    // One relay to both rooms: an agent who wrote it gets it once.
+    verify(relay).relayToRooms(
+      eq(List.of("org:o1:agents", "user:u1")),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_CREATED),
+      any()
+    );
+    verify(relay, never()).relayToRoom(eq("org:o1"), any(), any());
+    verify(relay, never()).relayToRoom(eq("ticket:t1"), any(), any());
+  }
+
+  @Test
+  void escalatedReachesTheTicketRoomAndTheAgentsNeverTheWholeTenant() {
+    consumer.onMessage(
+      message(
+        "ticket.escalated",
         "{\"ticketId\":\"t1\",\"organizationId\":\"o1\"}"
       )
     );
 
     verify(relay).relayToRoom(
-      eq("org:o1"),
-      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_CREATED),
+      eq("ticket:t1"),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_UPDATED),
       any()
     );
-    verify(relay, never()).relayToRoom(eq("ticket:t1"), any(), any());
+    verify(relay).relayToRoom(
+      eq("org:o1:agents"),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_UPDATED),
+      any()
+    );
+    verify(relay, never()).relayToRoom(eq("org:o1"), any(), any());
   }
 
   @Test

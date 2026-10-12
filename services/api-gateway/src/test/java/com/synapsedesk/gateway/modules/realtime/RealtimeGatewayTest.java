@@ -190,6 +190,47 @@ class RealtimeGatewayTest {
   }
 
   @Test
+  void anAgentAlsoJoinsTheTenantsAgentsRoomAnEndUserDoesNot() {
+    for (List<String> codes : List.of(
+      List.of("ticket.read.all"),
+      List.of("ticket.message.moderate")
+    )) {
+      JwtPrincipal agent = new JwtPrincipal(
+        "a1",
+        "o1",
+        false,
+        List.of(),
+        codes,
+        true,
+        false
+      );
+      when(jwtVerifier.verifyAccess("agent")).thenReturn(Optional.of(agent));
+      SocketIOClient client = clientWithCookie("access_token=agent");
+
+      connectCaptor.getValue().onConnect(client);
+
+      verify(client).joinRoom("org:o1:agents");
+    }
+
+    JwtPrincipal endUser = new JwtPrincipal(
+      "u1",
+      "o1",
+      false,
+      List.of(),
+      List.of("ticket.create"),
+      true,
+      false
+    );
+    when(jwtVerifier.verifyAccess("member")).thenReturn(Optional.of(endUser));
+    SocketIOClient member = clientWithCookie("access_token=member");
+
+    connectCaptor.getValue().onConnect(member);
+
+    verify(member).joinRoom("org:o1");
+    verify(member, never()).joinRoom("org:o1:agents");
+  }
+
+  @Test
   void noOrganizationSkipsTheOrgRoomButStillJoinsUser() {
     JwtPrincipal principal = new JwtPrincipal(
       "u1",
@@ -559,6 +600,7 @@ class RealtimeGatewayTest {
     ).onData(client, new TicketIdBody("t1"), mock(AckRequest.class));
 
     verify(client).joinRoom("ticket:t1");
+    verify(client, never()).joinRoom("ticket:t1:internal");
     verify(client).sendEvent(
       eq(RealtimeEvents.REALTIME_EVENTS_TICKET_JOINED),
       any()
@@ -592,14 +634,14 @@ class RealtimeGatewayTest {
   }
 
   @Test
-  void ticketJoinAlsoJoinsTheInternalRoomOnlyWithReadAllPermission()
-    throws Exception {
+  void ticketJoinAlsoJoinsTheInternalRoomOnlyForAnAgent() throws Exception {
+    // A super admin with no ticket permission: an agent all the same.
     JwtPrincipal principal = new JwtPrincipal(
       "u1",
       "o1",
-      false,
+      true,
       List.of(),
-      List.of("ticket.read.all"),
+      List.of(),
       true,
       false
     );

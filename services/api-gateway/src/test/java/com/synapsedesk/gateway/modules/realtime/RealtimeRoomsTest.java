@@ -17,4 +17,9 @@ class RealtimeRoomsTest {
     );
     assertThat(RealtimeRooms.deptRoom("d-1")).isEqualTo("dept:d-1");
   }
+
+  @Test
+  void theAgentsRoomIsTheTenantsRoomSuffixed() {
+    assertThat(RealtimeRooms.orgAgentsRoom("o-1")).isEqualTo("org:o-1:agents");
+  }
 }

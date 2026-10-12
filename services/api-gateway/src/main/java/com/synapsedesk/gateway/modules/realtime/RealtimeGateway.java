@@ -185,6 +185,11 @@ public class RealtimeGateway implements RuntimeParticipant {
       client.joinRoom(RealtimeRooms.userRoom(principal.sub()));
       if (principal.organizationId() != null) {
         client.joinRoom(RealtimeRooms.orgRoom(principal.organizationId()));
+        if (principal.isAgent()) {
+          client.joinRoom(
+            RealtimeRooms.orgAgentsRoom(principal.organizationId())
+          );
+        }
       }
       if (principal.departmentIds() != null) {
         for (String departmentId : principal.departmentIds()) {
@@ -365,14 +370,11 @@ public class RealtimeGateway implements RuntimeParticipant {
 
     client.joinRoom(RealtimeRooms.ticketRoom(ticketId));
 
-    // The agent-only half — joined only by a socket that holds
-    // `ticket.read.all` at THIS moment, read from the verified token, not
-    // re-fetched: the permission set is a JWT claim, and a revocation
-    // lands on the NEXT join.
-    if (
-      principal.permissionCodes() != null &&
-      principal.permissionCodes().contains("ticket.read.all")
-    ) {
+    // The agent-only half — joined only by a socket whose principal is an
+    // agent at THIS moment, read from the verified token, not re-fetched:
+    // the permission set is a JWT claim, and a revocation lands on the NEXT
+    // join.
+    if (principal.isAgent()) {
       client.joinRoom(RealtimeRooms.ticketInternalRoom(ticketId));
     }
 
