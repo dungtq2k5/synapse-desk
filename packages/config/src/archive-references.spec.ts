@@ -92,27 +92,21 @@ describe('nothing tracked cites the archive', () => {
       'packages/config/src/env-contract.spec.ts',
       'the narrower env-file version of this rule, which also spells the pattern',
     ],
+    // Configs that name the archive as a path to leave alone: an exclusion,
+    // not a citation.
+    ['.gitignore', 'ignores the archive'],
+    ['.markdownlint-cli2.jsonc', 'leaves the archive out of the Markdown lint'],
+    ['sonar-project.properties', 'leaves the archive out of the analysis'],
   ]);
 
+  /**
+   * Every tracked file. A list of directories missed the root's own files:
+   * `package.json`'s `//test:contract` note cited a plan, and nothing scanned
+   * it. The archive itself is git-ignored, so it is never in this list.
+   */
   const corpus = (): string[] =>
-    repoFiles(
-      'apps',
-      'services',
-      'packages',
-      'scripts',
-      'test',
-      'docs',
-      'k8s',
-      'docker',
-      '.github',
-      // Root-level markdown, which is otherwise in none of the directories
-      // above and is the most externally-visible text in the repository:
-      // `README.md` is what a reader outside this project sees FIRST, so an
-      // archive citation there is the one instance that reaches an audience
-      // who could never resolve it. Git de-duplicates overlapping pathspecs,
-      // so `docs/*.md` is listed once, not twice — verified, not assumed.
-      '*.md',
-    )
+    repoFiles('.')
+      .filter((file) => file !== 'package-lock.json')
       // Generated output carries whatever its source said, so a hit here is a
       // duplicate report of a citation in the `.proto` or `.prisma` that
       // produced it — and `npm run proto:generate` is what clears it.
