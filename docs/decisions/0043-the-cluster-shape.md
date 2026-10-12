@@ -63,6 +63,6 @@ That half belongs in `main.ts`, not in the proxy: `helmet` is one middleware, it
 
 ## Consequences
 
-- **`trust proxy` stays at 1.** `main.ts` sets a HOP COUNT and its comment already says _"Behind both an ALB and Nginx it must be 2"_. One `ingress-nginx` in front is exactly one hop, so the existing literal is correct for this decision and would be wrong for a shape that fronts the controller with a second proxy. `req.ip` feeds `device_sessions.ip_address`, the throttler's tracker and the audit log.
+- **Exactly one proxy hop is trusted.** `ClientIp` takes the rightmost non-blank `X-Forwarded-For` entry, the one the Ingress appended, and Spring's own forwarded-header handling is off (`server.forward-headers-strategy: none`). One `ingress-nginx` in front is exactly one hop, so the rule is correct for this decision and would be wrong for a shape that fronts the controller with a second proxy. The address feeds `device_sessions.ip_address`, the throttler's tracker, the audit log and the WebSocket handshake budget.
 - **The database name becomes the discriminator**, which is a third address shape. `generate-docker-env.mjs`'s substitution table has two — distinct host ports (5432–5435) and identical in-network ports — and neither is "one host, one port, four database names". The generator that writes cluster config carries all three.
 - **`DATABASE_URL` and `REDIS_URL` are Secrets, not ConfigMap entries**, because they carry passwords. The four-databases shape therefore lands on the Secret path.
