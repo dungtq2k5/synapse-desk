@@ -10,7 +10,7 @@
 # decide: that the images build, that the runtime trees resolve, that the
 # stage guards actually fire.
 #
-#     ./docker/check-images.sh            # everything: ~all seven builds
+#     ./docker/check-images.sh            # everything: the seven services and the web
 #     ./docker/check-images.sh --ocr-only # just the OCR section
 #
 # Minutes, not seconds — run it when the Dockerfiles change, and from CI the
@@ -237,6 +237,46 @@ echo "   ok — built for auth-service, refused storage-service"
 # --------------------------------------------------------------- 8. OCR section
 
 ocr_checks
+
+# --------------------------------------------------------------- 9. the web client
+#
+# Its own Dockerfile. Booted with no gateway behind it: the sign-in page
+# renders without one, so what this proves is the image (the standalone
+# server, its static files, the per-request policy), not the system.
+echo "9. the web image builds, runs as node, and serves a nonced page"
+docker build -f docker/web.Dockerfile \
+  --build-arg GIT_SHA="$GIT_SHA" \
+  --build-arg BUILD_TIME="$BUILD_TIME" \
+  -t synapsedesk/web . >/dev/null || fail "web did not build"
+
+[ "$(docker image inspect synapsedesk/web --format '{{.Config.User}}')" = node ] \
+  || fail "web does not run as the node user"
+for var in SERVICE_NAME BUILD_SHA BUILD_TIME; do
+  env_of synapsedesk/web | grep -q "^$var=.." \
+    || fail "web: $var is empty or missing"
+done
+
+# An ephemeral host port, so a dev server on 5173 can't collide with it.
+web=$(docker run -d --rm -p 127.0.0.1::5173 -e GATEWAY_URL=http://localhost:9 synapsedesk/web)
+stop_web() { docker stop "$web" >/dev/null 2>&1 || true; }
+web_port=$(docker port "$web" 5173/tcp | head -1 | sed 's/.*://')
+for _ in $(seq 1 30); do
+  curl -sf -o /dev/null "http://127.0.0.1:$web_port/login" && break
+  sleep 1
+done
+page=$(curl -s -D - "http://127.0.0.1:$web_port/login") \
+  || { stop_web; fail "web did not answer /login"; }
+nonce=$(printf '%s' "$page" | sed -n "s/.*'nonce-\([^']*\)'.*/\1/p" | head -1)
+[ -n "$nonce" ] || { stop_web; fail "web's /login carries no CSP nonce"; }
+printf '%s' "$page" | grep -qi '^x-content-type-options: nosniff' \
+  || { stop_web; fail "web's /login lacks X-Content-Type-Options"; }
+printf '%s' "$page" | grep -q "nonce=\"$nonce\"" \
+  || { stop_web; fail "web's scripts don't carry the request's nonce"; }
+chunk=$(printf '%s' "$page" | grep -o '/_next/static/[^"]*\.js' | head -1)
+curl -sf -o /dev/null "http://127.0.0.1:$web_port$chunk" \
+  || { stop_web; fail "web does not serve its static chunks ($chunk)"; }
+stop_web
+echo "   ok — non-root, identified, /login nonced, static served"
 
 printf '\nsizes:\n'
 docker images 'synapsedesk/*' --format '  {{.Repository}}:{{.Tag}}: {{.Size}}' | grep -v ocr-check

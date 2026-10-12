@@ -1,0 +1,89 @@
+# web — the web client's renderer (`apps/web`, Next.js standalone). The
+# Ingress sends `/` here and `/api`, `/graphql` and `/socket.io` to the
+# gateway, so the browser sees one origin (`k8s/ingress.yaml`).
+#
+# **It calls the gateway's Service directly** (`GATEWAY_URL`, generated), never
+# the Ingress, forwarding the browser's own `X-Forwarded-For` unchanged; the
+# gateway trusts that header only from here and the Ingress
+# (`k8s/policy/api-gateway-ingress.yaml`).
+#
+# Probes are HTTP on `/login`: a page that renders without calling the
+# gateway, so a slow gateway can't take the renderer out of rotation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      terminationGracePeriodSeconds: 30
+      # Nothing here talks to the Kubernetes API; see api-gateway.yaml.
+      automountServiceAccountToken: false
+      containers:
+        - name: web
+          # A real tag, never a placeholder; CD rewrites it per deploy.
+          image: us-central1-docker.pkg.dev/synapsedesk/services/web:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5173
+          envFrom:
+            - configMapRef:
+                name: web-config
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            # The standalone tree is read-only at runtime; Next's image cache
+            # is the one writable path it needs.
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/apps/web/.next/cache
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 128Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 512Mi
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 5173
+      targetPort: http

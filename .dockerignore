@@ -61,8 +61,10 @@ __pycache__
 .git
 .github
 docs
-# Except the published GraphQL schema, which the Java gateway is built from.
+# Except the published GraphQL schema, which the Java gateway is built from,
+# and the REST document, which the web's client is generated from.
 !docs/reference/schema.gql
+!docs/reference/openapi.json
 .vscode
 .claude
 # Deployment manifests. Nothing in any stage COPYs them, and the context is
@@ -88,3 +90,5 @@ graphify-out/
 sonar-project.properties
 .mcp.json
 .sonar-config.json
+# Next.js build output: the image builds its own.
+**/.next

@@ -280,47 +280,63 @@ describe('the image contract (static half)', () => {
      * prune stage ran turbo 2.10.12 from the network while the build stage
      * ran the lockfile's 2.10.9 — the same Dockerfile, two turbos.
      */
-    const dockerfile = (): string => read('docker/node-service.Dockerfile');
+    /**
+     * Every Node image: each Dockerfile that declares `NODE_VERSION`, found
+     * from the files rather than listed, so a new one is held from its first
+     * commit (the web client's is the second).
+     */
+    const nodeDockerfiles = (): string[] =>
+      repoFiles('docker')
+        .filter((file) => file.endsWith('.Dockerfile'))
+        .filter((file) => /^ARG NODE_VERSION=/m.test(read(file)));
 
-    const arg = (name: string): string => {
-      const match = new RegExp(`^ARG ${name}=(\\S+)$`, 'm').exec(dockerfile());
-
-      if (!match) throw new Error(`ARG ${name} not found in the Dockerfile`);
-      return match[1];
-    };
-
-    it('TURBO_VERSION equals the lockfile turbo', () => {
-      const lock = JSON.parse(read('package-lock.json')) as {
-        packages: Record<string, { version?: string }>;
-      };
-
-      expect(arg('TURBO_VERSION')).toBe(
-        lock.packages['node_modules/turbo'].version,
-      );
+    it('finds the Node images: the pattern-fires floor', () => {
+      expect(nodeDockerfiles()).toContain('docker/node-service.Dockerfile');
     });
 
-    it('NPM_VERSION equals packageManager', () => {
-      const manifest = JSON.parse(read('package.json')) as {
-        packageManager?: string;
+    describe.each(nodeDockerfiles())('%s', (dockerfile) => {
+      const arg = (name: string): string => {
+        const match = new RegExp(`^ARG ${name}=(\\S+)$`, 'm').exec(
+          read(dockerfile),
+        );
+
+        if (!match) throw new Error(`ARG ${name} not found in ${dockerfile}`);
+        return match[1];
       };
 
-      expect(`npm@${arg('NPM_VERSION')}`).toBe(manifest.packageManager);
-    });
+      it('TURBO_VERSION equals the lockfile turbo', () => {
+        const lock = JSON.parse(read('package-lock.json')) as {
+          packages: Record<string, { version?: string }>;
+        };
 
-    it('.nvmrc equals the image base version', () => {
-      // The third place a Node version is named. CI reads `.nvmrc` through
-      // `setup-node`'s `node-version-file`, the image reads `NODE_VERSION`,
-      // and nothing tied them — a CI that tests a runtime the image does not
-      // ship is a CI whose green means less than it appears to.
-      //
-      // `engines.node: ">=22.12"` in ingestion-service is deliberately NOT in
-      // this comparison: it is a FLOOR with a stated reason (pdfjs-dist is
-      // ESM-only and loaded through `createRequire`), and a floor and a pin
-      // are allowed to differ.
-      const image = /^(\d+\.\d+\.\d+)/.exec(arg('NODE_VERSION'));
+        expect(arg('TURBO_VERSION')).toBe(
+          lock.packages['node_modules/turbo'].version,
+        );
+      });
 
-      expect(image).not.toBeNull();
-      expect(read('.nvmrc').trim()).toBe(image?.[1]);
+      it('NPM_VERSION equals packageManager', () => {
+        const manifest = JSON.parse(read('package.json')) as {
+          packageManager?: string;
+        };
+
+        expect(`npm@${arg('NPM_VERSION')}`).toBe(manifest.packageManager);
+      });
+
+      it('.nvmrc equals the image base version', () => {
+        // The third place a Node version is named. CI reads `.nvmrc` through
+        // `setup-node`'s `node-version-file`, the image reads `NODE_VERSION`,
+        // and nothing tied them — a CI that tests a runtime the image does not
+        // ship is a CI whose green means less than it appears to.
+        //
+        // `engines.node: ">=22.12"` in ingestion-service is deliberately NOT in
+        // this comparison: it is a FLOOR with a stated reason (pdfjs-dist is
+        // ESM-only and loaded through `createRequire`), and a floor and a pin
+        // are allowed to differ.
+        const image = /^(\d+\.\d+\.\d+)/.exec(arg('NODE_VERSION'));
+
+        expect(image).not.toBeNull();
+        expect(read('.nvmrc').trim()).toBe(image?.[1]);
+      });
     });
   });
 
@@ -510,7 +526,10 @@ describe('the image contract (static half)', () => {
      */
     it('the Dockerfile base ARGs pin a full version', () => {
       const cases = [
-        ['docker/node-service.Dockerfile', 'NODE_VERSION'],
+        ...repoFiles('docker')
+          .filter((file) => file.endsWith('.Dockerfile'))
+          .filter((file) => /^ARG NODE_VERSION=/m.test(read(file)))
+          .map((file) => [file, 'NODE_VERSION'] as const),
         ['docker/rag-service.Dockerfile', 'PYTHON_VERSION'],
         // Two ARGs, because the Java image's builder and runtime are
         // different images — a JRE is not a Maven, and pinning one would

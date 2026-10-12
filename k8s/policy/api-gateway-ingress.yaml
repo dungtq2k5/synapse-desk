@@ -1,0 +1,50 @@
+# Who may reach the gateway's pods, and on which port.
+#
+# **Its HTTP port takes only the web renderer and the Ingress controller.**
+# The gateway reads a caller's address from the rightmost `X-Forwarded-For`
+# entry (`ClientIp`), which both of them set: the controller appends the
+# browser's address, and `web` forwards the header it received unchanged. A
+# third in-cluster caller could put any address there and be throttled and
+# audited as someone else, so there is none.
+#
+# **The socket port takes only the Ingress controller**: browsers reach it
+# through `/socket.io`, and `web` never opens a socket.
+#
+# **The metrics port takes any pod**, for whichever scraper the cluster runs;
+# it serves `/metrics` and nothing else, and no Ingress path reaches it.
+#
+# The controller's namespace is matched by the label Kubernetes sets on every
+# namespace, `kubernetes.io/metadata.name`; `ingress-nginx` is the namespace
+# its own manifests install into.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-ingress
+  labels:
+    app.kubernetes.io/name: api-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: web
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: http
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: ws
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - port: metrics

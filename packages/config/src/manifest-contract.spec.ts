@@ -91,6 +91,13 @@ describe('the manifest contract', () => {
       .map((file) => file.split('/')[1])
       .sort();
 
+  /** What gets a Deployment: every service, and every client app under `apps/`. */
+  const deployables = (): string[] =>
+    [
+      ...services(),
+      ...repoFiles('apps/*/package.json').map((file) => file.split('/')[1]),
+    ].sort();
+
   const documented = (service: string): Set<string> =>
     envDocumentedKeys(read(`services/${service}/.env.example`));
 
@@ -104,32 +111,42 @@ describe('the manifest contract', () => {
 
   // -------------------------------------------------------------- the floors
 
-  it('**the corpus is not empty** — seven Deployments, nine Services, one Ingress', () => {
+  it('**the corpus is not empty** — a Deployment per deployable, one Ingress', () => {
     // The pattern-fires floor every scan in this repo carries. Checks 1–6 all
     // iterate over this corpus, so a glob that matched nothing would make all
     // six vacuously green — the failure mode a check exists to prevent,
     // arriving through the check.
-    expect(byKind('Deployment')).toHaveLength(7);
-    // Nine: the seven application Services, plus `nats` and `qdrant`, which are
+    // Seven services at least, plus the client apps where a branch has them.
+    expect(services().length).toBeGreaterThanOrEqual(7);
+    expect(byKind('Deployment')).toHaveLength(deployables().length);
+    // One Service per deployable, plus `nats` and `qdrant`, which are
     // StatefulSets and need a Service each to be addressable.
-    expect(byKind('Service')).toHaveLength(9);
+    expect(byKind('Service')).toHaveLength(deployables().length + 2);
     expect(
       byKind('Service')
         .map(({ doc }) => doc.metadata?.name ?? '')
-        .filter((name) => services().includes(name))
+        .filter((name) => deployables().includes(name))
         .sort(),
-    ).toEqual(services());
+    ).toEqual(deployables());
     expect(byKind('Ingress')).toHaveLength(1);
     expect(byKind('StatefulSet')).toHaveLength(2);
-    // Two: the egress controls behind the two services that connect to a URL
-    // somebody else chose — tenant webhooks and inbound attachment sources.
+    // The egress controls behind the two services that connect to a URL
+    // somebody else chose (tenant webhooks and inbound attachment sources),
+    // and, where the web client is deployed, the rule that only it and the
+    // Ingress reach the gateway's HTTP port.
     expect(
       byKind('NetworkPolicy')
         .map(({ doc }) => doc.metadata?.name ?? '')
         .sort(),
-    ).toEqual(['notification-service-egress', 'storage-service-egress']);
-    expect(byKind('ConfigMap')).toHaveLength(7);
-    expect([...deployments().keys()].sort()).toEqual(services());
+    ).toEqual(
+      [
+        'notification-service-egress',
+        'storage-service-egress',
+        ...(deployables().includes('web') ? ['api-gateway-ingress'] : []),
+      ].sort(),
+    );
+    expect(byKind('ConfigMap')).toHaveLength(deployables().length);
+    expect([...deployments().keys()].sort()).toEqual(deployables());
   });
 
   it('**both egress policies refuse the SAME private ranges**', () => {
@@ -147,9 +164,14 @@ describe('the manifest contract', () => {
         .filter((except): except is string[] => Array.isArray(except))
         .map((except) => [...except].sort());
 
-    const [first, second] = byKind('NetworkPolicy').map(({ doc }) =>
-      exceptsOf(doc),
-    );
+    // The egress controls only: an ingress rule has no `except` list.
+    const [first, second] = byKind('NetworkPolicy')
+      .filter(({ doc }) =>
+        (doc.spec as { policyTypes?: string[] }).policyTypes?.includes(
+          'Egress',
+        ),
+      )
+      .map(({ doc }) => exceptsOf(doc));
 
     // Floor: each policy has exactly one `except` list, and it is not empty —
     // a policy that lost its public rule would otherwise compare equal to
@@ -235,6 +257,27 @@ describe('the manifest contract', () => {
       },
     );
   });
+
+  it.each(deployables().filter((name) => name === 'web'))(
+    '%s probes HTTP on the PORT its image sets',
+    (name) => {
+      // The renderer's port is the image's (`ENV PORT=` in its Dockerfile);
+      // the Deployment, the Service and both probes must agree with it.
+      const port = Number(
+        /\bPORT=(\d+)/.exec(read(`docker/${name}.Dockerfile`))?.[1],
+      );
+      const container = containersOf(deployments().get(name) as Doc)[0] as {
+        ports?: { name?: string; containerPort?: number }[];
+        livenessProbe?: { httpGet?: { port?: string } };
+        readinessProbe?: { httpGet?: { port?: string } };
+      };
+
+      expect(port).toBeGreaterThan(0);
+      expect(container.ports).toEqual([{ name: 'http', containerPort: port }]);
+      expect(container.livenessProbe?.httpGet?.port).toBe('http');
+      expect(container.readinessProbe?.httpGet?.port).toBe('http');
+    },
+  );
 
   // --------------------------------------------------- 2. the probe SERVICE names
 
@@ -665,7 +708,7 @@ describe('the manifest contract', () => {
 
   // ------------------------------------------------- 7. generated stays generated
 
-  it('7. **`k8s/generated/` is a function of `services/*/.env.example`**', () => {
+  it('7. **`k8s/generated/` is a function of each `.env.example`**', () => {
     // Same shape as `job-alerts.spec.ts`: the generator's own `--check` mode is
     // the authority, so this cannot drift from it by reimplementing the rule.
     // A ConfigMap edited by hand is a value the next regeneration silently

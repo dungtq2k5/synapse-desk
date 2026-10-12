@@ -37,11 +37,17 @@
       // workspace compiles against the client it generates, not its
       // dependencies'.
       "dependsOn": ["^build", "db:generate", "generate"],
+      // A client app's build also reads its Next.js config, its design tokens
+      // and its public files: a changed `next.config.ts` was a cache hit that
+      // replayed the previous build.
       "inputs": [
         "src/**",
         "prisma/schema.prisma",
         "tsconfig*.json",
-        "nest-cli.json"
+        "nest-cli.json",
+        "next.config.ts",
+        "design-tokens/**",
+        "public/**"
       ],
       // The build info with the output it describes. A library's
       // `tsconfig.build.tsbuildinfo` sits BESIDE `dist/`, so a cache hit used
@@ -49,7 +55,8 @@
       // next real `tsc --incremental` then matched source against it and
       // emitted nothing for the files it believed current. Measured: edit,
       // build, revert (hit), edit again (miss) left the edit out of `dist/`.
-      "outputs": ["dist/**", "*.tsbuildinfo"]
+      // `.next/` is a client app's output, less its own cache.
+      "outputs": ["dist/**", "*.tsbuildinfo", ".next/**", "!.next/cache/**"]
     },
     // The clients' own typecheck (the root program doesn't include apps/):
     // against their dependencies' built packages and their generated tokens.

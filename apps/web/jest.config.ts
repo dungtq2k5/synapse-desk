@@ -14,6 +14,8 @@ const config: Config = {
   testRegex: String.raw`\.spec\.tsx?$`,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+  // The standalone build carries its own copy of this package's manifest.
+  modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };
 
 export default createJestConfig(config);

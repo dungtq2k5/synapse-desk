@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { NextConfig } from 'next';
 
 /** Development only: one origin for the browser, proxied to the local gateway. */
@@ -17,6 +18,10 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The image's server: only the files it reaches, traced from the repository
+  // root so the workspace packages it imports come along.
+  output: 'standalone',
+  outputFileTracingRoot: join(import.meta.dirname, '../..'),
   poweredByHeader: false,
   // `next dev` would otherwise write AGENTS.md into the app.
   agentRules: false,

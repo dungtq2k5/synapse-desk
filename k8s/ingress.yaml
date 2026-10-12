@@ -1,16 +1,25 @@
 # The one Ingress — the routing-and-TLS half of the ingress requirement, ADR 0043.
 #
-# **`ingress-nginx`, and only the gateway.** The five gRPC services and
-# rag-service have `ClusterIP` Services and nothing else: they are reachable
-# from inside the cluster and from nowhere else, which is the property
+# **`ingress-nginx`, one origin, two backends.** The browser sees a single
+# origin: `/api`, `/graphql` and `/socket.io` go to the gateway, everything
+# else to `web`, the web client's renderer. Cookies are therefore first-party
+# and nothing needs CORS. The five gRPC services and rag-service have
+# `ClusterIP` Services and nothing else: they are reachable from inside the
+# cluster and from nowhere else, which is the property
 # `AUTH_SERVICE_URL = auth-service:5001` already assumes.
+#
+# **Not routed:** the gateway's `/health`, `/health/ready`, `/version` and
+# `/v3/api-docs`. Probes are in-cluster, and Swagger is off in the cluster.
 #
 # **Exactly one trusted hop, and this controller is it.** The gateway reads the
 # caller's IP with `ClientIp` (`common/web`): the rightmost `X-Forwarded-For`
 # entry, the one this controller appends, else the connection's peer. Front this
 # controller with a second proxy and that entry becomes the proxy's address —
 # which feeds `device_sessions.ip_address`, the throttle buckets, the WebSocket
-# handshake budget and the audit log.
+# handshake budget and the audit log. A page `web` renders calls the gateway's
+# Service directly and forwards the header it received, unchanged, so the
+# rightmost entry is still the browser's; `policy/api-gateway-ingress.yaml`
+# keeps every other pod off the gateway's HTTP port.
 #
 # **The metrics port is deliberately not routed.** `METRICS_PORT = 9464` is its
 # own listener so that "not reachable from the internet" is structural rather
@@ -38,7 +47,8 @@ spec:
     - http:
         paths:
           # Socket.IO listens on its own port in both implementations; the
-          # longer prefix wins, so the handshake and its upgrade go there.
+          # longer prefix wins over `/`, so the handshake and its upgrade go
+          # there.
           - path: /socket.io
             pathType: Prefix
             backend:
@@ -46,10 +56,24 @@ spec:
                 name: api-gateway
                 port:
                   name: ws
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: api-gateway
+                port:
+                  name: http
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
                 port:
                   name: http
