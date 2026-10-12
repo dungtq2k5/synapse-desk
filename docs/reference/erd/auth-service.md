@@ -61,6 +61,7 @@ erDiagram
     String gender "❓"
     Boolean is_two_factor_enabled 
     String two_factor_secret "❓"
+    Int two_factor_last_time_step "❓"
     Boolean is_locked 
     DateTime locked_until "❓"
     DateTime last_login_at "❓"

@@ -7,6 +7,7 @@ import {
   SupersededReason,
   TICKET_PATTERNS,
   ticketMessageGroupKey,
+  TicketStatus,
 } from '@synapsedesk/contracts';
 import {
   E2eFixture,
@@ -20,6 +21,7 @@ import {
   createAiMessage,
   createAttachment,
   createMessage,
+  createAssignedTicket,
   createTicket,
   TenantFixture,
 } from '../factories';
@@ -373,6 +375,67 @@ describe('Ticket messages & attachments (e2e)', () => {
           bystander,
         ),
         status.NOT_FOUND,
+      );
+    });
+
+    it('6. **REFUSES an overseer who neither raised nor holds the ticket**', async () => {
+      // `ticket.read.all` shows them the thread; it doesn't let them answer in
+      // it as the organization. Replies and notes alike.
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      for (const isInternalNote of [false, true]) {
+        await expectRpc(
+          createTestMessage(
+            messages,
+            {
+              ticketId: ticket.id,
+              content: 'hi',
+              isInternalNote,
+              invokeAi: false,
+            },
+            agent(),
+          ),
+          status.PERMISSION_DENIED,
+        );
+      }
+      expect(await fx.prisma.ticketMessage.count()).toBe(0);
+    });
+
+    it('7. lets the ASSIGNEE post a reply and a note', async () => {
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
+
+      for (const isInternalNote of [false, true]) {
+        const message = await createTestMessage(
+          messages,
+          {
+            ticketId: ticket.id,
+            content: 'on it',
+            isInternalNote,
+            invokeAi: false,
+          },
+          agent(),
+        );
+        expect(message.senderId).toBe(tenant.agentId);
+      }
+    });
+
+    it('8. REFUSES a CLOSED ticket, even to its author', async () => {
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.CLOSED,
+      });
+
+      await expectRpc(
+        createTestMessage(
+          messages,
+          {
+            ticketId: ticket.id,
+            content: 'hello?',
+            isInternalNote: false,
+            invokeAi: false,
+          },
+          author(),
+        ),
+        status.FAILED_PRECONDITION,
       );
     });
   });
@@ -1203,7 +1266,7 @@ describe('Ticket messages & attachments (e2e)', () => {
       // a draft was produced and nothing about whether a human used it — and
       // "was the co-pilot worth paying for" is the one question the ledger
       // exists to answer.
-      const ticket = await createTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
       const generationId = faker.string.uuid();
 
       const message = await createTestMessage(
@@ -1232,7 +1295,7 @@ describe('Ticket messages & attachments (e2e)', () => {
     it('2. posts normally WITHOUT it — the field is optional', async () => {
       // Most messages are typed by a human with no draft involved, and a
       // required field here would break the ordinary path.
-      const ticket = await createTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
 
       const message = await createTestMessage(
         messages,
@@ -1255,7 +1318,7 @@ describe('Ticket messages & attachments (e2e)', () => {
       // metric is exactly the wrong trade — the sweep marking it DISCARDED is
       // the honest cost, and it is logged.
       recordOutcome.mockResolvedValue(null);
-      const ticket = await createTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
 
       const message = await createTestMessage(
         messages,

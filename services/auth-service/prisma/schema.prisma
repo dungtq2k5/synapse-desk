@@ -295,17 +295,21 @@ model User {
   ///     ON users (email) WHERE organization_id IS NULL AND deleted_at IS NULL;
   ///
   /// Same split as Role.name below.
-  email              String    @db.VarChar(255)
-  isEmailVerified    Boolean   @default(false) @map("is_email_verified")
-  passwordHash       String?   @map("password_hash") @db.VarChar(255)
-  fullName           String    @map("full_name") @db.VarChar(150)
-  avatarUrl          String?   @map("avatar_url") @db.Text
-  phoneNumber        String?   @map("phone_number") @db.VarChar(30)
-  isPhoneVerified    Boolean   @default(false) @map("is_phone_verified")
-  dob                DateTime? @db.Date
-  gender             String?   @db.VarChar(20)
-  isTwoFactorEnabled Boolean   @default(false) @map("is_two_factor_enabled")
-  twoFactorSecret    String?   @map("two_factor_secret") @db.VarChar(255)
+  email                 String    @db.VarChar(255)
+  isEmailVerified       Boolean   @default(false) @map("is_email_verified")
+  passwordHash          String?   @map("password_hash") @db.VarChar(255)
+  fullName              String    @map("full_name") @db.VarChar(150)
+  avatarUrl             String?   @map("avatar_url") @db.Text
+  phoneNumber           String?   @map("phone_number") @db.VarChar(30)
+  isPhoneVerified       Boolean   @default(false) @map("is_phone_verified")
+  dob                   DateTime? @db.Date
+  gender                String?   @db.VarChar(20)
+  isTwoFactorEnabled    Boolean   @default(false) @map("is_two_factor_enabled")
+  twoFactorSecret       String?   @map("two_factor_secret") @db.VarChar(255)
+  /// The TOTP time step of the last code accepted (RFC 6238 §5.2), so the
+  /// same code can't be used twice inside its window. NULL until a code is
+  /// accepted, and again after a new secret or turning two-factor off.
+  twoFactorLastTimeStep Int?      @map("two_factor_last_time_step")
 
   /// **The one authoritative boolean.** Every read in the system asks this and
   /// only this — login, 2FA, forgot-password, both notification audiences, the
@@ -769,7 +773,6 @@ model BillingEvent {
   /// webhook, so this index is on the hot path of the integration.
   @@index([organizationId, stripeCreatedAt(sort: Desc)])
   @@index([eventType])
-
   /// The FINANCE read, which neither index above covers. The composite is
   /// tenant-first and unusable for a cross-tenant range; `[eventType]` has no
   /// time component. A platform-wide `stripe_created_at BETWEEN ... GROUP BY

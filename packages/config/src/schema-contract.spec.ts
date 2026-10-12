@@ -272,8 +272,14 @@ describe('the schema contract', () => {
         `services/${service}/prisma/migrations/*/migration.sql`,
       );
 
+      // The baseline is the first by name: Prisma applies them in that order,
+      // and a listing puts an uncommitted one wherever git does.
+      const [baseline] = [...migrations].sort((a, b) =>
+        a.path.localeCompare(b.path),
+      );
+
       expect(migrations.length).toBeGreaterThanOrEqual(1);
-      expect(migrations[0].text.length).toBeGreaterThan(500);
+      expect(baseline.text.length).toBeGreaterThan(500);
     });
 
     it.each(withSchema())(

@@ -123,6 +123,13 @@ export const REALTIME_EVENTS = {
   /** A user's availability changed. Room: `org:{id}`. */
   presence: 'presence',
 
+  /**
+   * Who is in a ticket now: the agents joined to `ticket:{id}`, sent on every
+   * join, leave and disconnect. Room: `ticket:{id}:internal`, so an end user
+   * never learns who is reading their ticket. Payload: `TicketViewersPayload`.
+   */
+  ticketViewers: 'ticket:viewers',
+
   /** One token of a streaming AI answer. Emitted to the REQUESTING SOCKET. */
   aiStreamChunk: 'ai:stream:chunk',
   /**
@@ -202,6 +209,15 @@ export const REALTIME_EVENTS = {
    */
   notificationUnreadCount: 'notification:unread-count',
 } as const;
+
+/** One agent in a ticket; `fullName` is null when it couldn't be resolved. */
+export type TicketViewer = { id: string; fullName: string | null };
+
+/** `ticket:viewers`' payload: every agent in the ticket now, the receiver included. */
+export type TicketViewersPayload = {
+  ticketId: string;
+  viewers: TicketViewer[];
+};
 
 /** Events the CLIENT emits to the server. */
 export const CLIENT_EVENTS = {

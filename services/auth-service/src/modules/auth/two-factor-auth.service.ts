@@ -141,6 +141,7 @@ export class TwoFactorAuthService {
         // Encrypted, not hashed: a TOTP secret has to be readable to verify a
         // code against it. See encryptSecret().
         twoFactorSecret: encryptSecret(secret, this.MASTER_KEY),
+        twoFactorLastTimeStep: null,
         isTwoFactorEnabled: false,
       },
     });
@@ -169,6 +170,7 @@ export class TwoFactorAuthService {
         fullName: true,
         isTwoFactorEnabled: true,
         twoFactorSecret: true,
+        twoFactorLastTimeStep: true,
       },
     });
     if (!user) {
@@ -190,7 +192,7 @@ export class TwoFactorAuthService {
       });
     }
 
-    if (!(await this.verifyTotp(user.twoFactorSecret, request.code))) {
+    if (!(await this.acceptTotp(user, user.twoFactorSecret, request.code))) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
         message: 'Invalid authentication code',
@@ -243,7 +245,7 @@ export class TwoFactorAuthService {
     let warning: string | undefined;
 
     if (request.code) {
-      if (!(await this.verifyTotp(user.twoFactorSecret, request.code))) {
+      if (!(await this.acceptTotp(user, user.twoFactorSecret, request.code))) {
         throw new RpcException({
           code: status.UNAUTHENTICATED,
           message: 'Invalid verification code',
@@ -310,6 +312,7 @@ export class TwoFactorAuthService {
         fullName: true,
         isTwoFactorEnabled: true,
         twoFactorSecret: true,
+        twoFactorLastTimeStep: true,
         passwordHash: true,
         organization: { select: { enforceTwoFactor: true } },
       },
@@ -336,7 +339,7 @@ export class TwoFactorAuthService {
 
     await this.assertPassword(user.passwordHash, request.password);
 
-    if (!(await this.verifyTotp(user.twoFactorSecret, request.code))) {
+    if (!(await this.acceptTotp(user, user.twoFactorSecret, request.code))) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,
         message: 'Invalid verification code',
@@ -346,7 +349,11 @@ export class TwoFactorAuthService {
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
-        data: { isTwoFactorEnabled: false, twoFactorSecret: null },
+        data: {
+          isTwoFactorEnabled: false,
+          twoFactorSecret: null,
+          twoFactorLastTimeStep: null,
+        },
       });
       await tx.twoFactorBackupCode.deleteMany({ where: { userId: user.id } });
       // Trusted devices exist only to skip a prompt that no longer happens.
@@ -542,23 +549,61 @@ export class TwoFactorAuthService {
   private async verifyTotp(
     encryptedSecret: string,
     code: string,
-  ): Promise<boolean> {
+    afterTimeStep: number | null,
+  ): Promise<number | null> {
     try {
       const result = await verify({
         token: code,
         secret: decryptSecret(encryptedSecret, this.MASTER_KEY),
         epochTolerance: this.TIME_TOLERANCE,
+        // A code at or before the last accepted step is a replay.
+        ...(afterTimeStep === null ? {} : { afterTimeStep }),
       });
 
-      return result.valid;
+      return result.valid && 'timeStep' in result ? result.timeStep : null;
     } catch (error) {
       // A malformed ciphertext means the master key rotated without a
       // re-encryption migration — operationally important, not a user error.
       this.logger.error(
         `Failed to verify TOTP code: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return false;
+      return null;
     }
+  }
+
+  /**
+   * Verifies a code and spends it: `true` once per time step, never twice
+   * (RFC 6238 §5.2).
+   *
+   * The step is recorded by a conditional update, `last IS NULL OR last <
+   * step`, rather than read and written: two concurrent submissions of one
+   * code both pass `verify`, and only one of them can win the update.
+   *
+   * @example await this.acceptTotp(user, user.twoFactorSecret, '123456') // true, then false for the same code
+   */
+  private async acceptTotp(
+    user: { id: string; twoFactorLastTimeStep: number | null },
+    encryptedSecret: string,
+    code: string,
+  ): Promise<boolean> {
+    const step = await this.verifyTotp(
+      encryptedSecret,
+      code,
+      user.twoFactorLastTimeStep,
+    );
+    if (step === null) return false;
+
+    const { count } = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        OR: [
+          { twoFactorLastTimeStep: null },
+          { twoFactorLastTimeStep: { lt: step } },
+        ],
+      },
+      data: { twoFactorLastTimeStep: step },
+    });
+    return count === 1;
   }
 
   /**
