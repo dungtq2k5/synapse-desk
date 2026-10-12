@@ -23,7 +23,9 @@
     "test/system/**/*",
     // The gateway contract harness, same rule: it starts a process and asserts
     // wire shapes, so a type error in a row is a row that proves nothing.
-    "test/gateway-contract/**/*"
+    "test/gateway-contract/**/*",
+    // The web client's end-to-end rows, same rule.
+    "test/e2e-web/**/*"
   ],
   // The two harness jest configs are the header's jest-config case again: they
   // import each other with the explicit `.ts` extension jest's ESM loading

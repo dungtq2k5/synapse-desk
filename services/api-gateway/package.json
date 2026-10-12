@@ -5,7 +5,8 @@
   "license": "AGPL-3.0-only",
   "//": "A MAVEN project with an npm manifest, for the reason rag-service's manifest gives: turbo dispatches by workspace, and a directory with no package.json is not one. It declares NO `build`, `lint` or `test`, because turbo skips a task a workspace does not define and `npm test` must stay runnable without a JDK — Maven owns those three, through `./mvnw`.",
   "scripts": {
-    "dev": "./mvnw -q spring-boot:run",
-    "start:prod": "java -jar target/api-gateway-1.0.0.jar"
+    "//dev": "Spring reads no `.env`, unlike the Nest services: these load `.env`, then `.env.example` for any key it lacks (the first file wins, the shell over both). The image and the contract harness pass their own environment and start the jar directly.",
+    "dev": "dotenv -e .env -e .env.example -- ./mvnw -q spring-boot:run",
+    "start:prod": "dotenv -e .env -e .env.example -- java -jar target/api-gateway-1.0.0.jar"
   }
 }

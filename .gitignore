@@ -82,3 +82,8 @@ graphify-out/
 .env.sonar
 .mcp.json
 .sonar-config.json
+
+# Playwright: traces, screenshots and the CI report of a run.
+test/e2e-web/test-results/
+test/e2e-web/playwright-report/
+test/e2e-web/results.xml
