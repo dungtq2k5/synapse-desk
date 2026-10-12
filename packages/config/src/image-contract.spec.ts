@@ -88,7 +88,12 @@ describe('the image contract (static half)', () => {
       for (const pattern of IMPORT_PATTERNS) {
         for (const match of stripped.matchAll(pattern)) {
           const spec = match[1];
-          if (spec.startsWith('.') || spec.startsWith('@synapsedesk/'))
+          // `@/` is a client app's own `src/`, by its tsconfig `paths`.
+          if (
+            spec.startsWith('.') ||
+            spec.startsWith('@/') ||
+            spec.startsWith('@synapsedesk/')
+          )
             continue;
 
           const pkg = packageOf(spec);
@@ -164,7 +169,7 @@ describe('the image contract (static half)', () => {
       const sources = [
         ...repoFiles(`${workspace}/src`),
         ...repoFiles(`${workspace}/test`),
-      ].filter((file) => file.endsWith('.ts'));
+      ].filter((file) => /\.tsx?$/.test(file));
 
       const used = new Map<string, string>();
       for (const { path: file, text } of readListed(sources)) {
@@ -241,7 +246,7 @@ describe('the image contract (static half)', () => {
       const files = [
         ...repoFiles(`${top}/*/src/**`),
         ...repoFiles(`${top}/*/test/**`),
-      ].filter((file) => file.endsWith('.ts'));
+      ].filter((file) => /\.tsx?$/.test(file));
 
       // The corpus floor — a glob that stops matching must fail, not pass.
       if (!MAY_BE_EMPTY.has(top)) expect(files.length).toBeGreaterThan(0);
