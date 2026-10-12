@@ -19,7 +19,7 @@ Documents are uploaded, parsed, chunked and embedded; questions are answered by 
 
 ## What is in here
 
-A Turborepo monorepo in three parts: `services/` holds the backends, `packages/` holds the code they share, and `apps/` is kept for clients. The npm workspaces are `services/*` and `packages/*`; `apps/*` joins them with its first client, since a workspace glob that matches nothing fails `publish-safety.spec.ts`. Everything else is deliberately outside them.
+A Turborepo monorepo in three parts: `services/` holds the backends, `packages/` holds the code they share, and `apps/` is kept for clients. The npm workspaces are `apps/*`, `services/*` and `packages/*`. On this branch `apps/` is empty: the web client lives on `main-java`, with the Java gateway it talks to, and `publish-safety.spec.ts` lets `apps/*` alone match nothing. Everything else is deliberately outside them.
 
 | Service | Port | Speaks | Owns |
 | :--- | :--- | :--- | :--- |
