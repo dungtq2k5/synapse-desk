@@ -11,6 +11,10 @@
 #                         collection, resets the JetStream streams — spawns
 #                         seven processes, and two of its steps need a live
 #                         paid API.
+#   npm run test:e2e:web  the web client in a browser, over test:system's own
+#                         setup: the same three stores reset, and its seeding
+#                         runs `plans:seed --apply`, which reads the plans
+#                         from a Stripe account. A runner has no Stripe key.
 #   npm run db:push       (no `:test:`) targets the DEV databases.
 #   seed:demo / stripe:provision / plans:seed with `--apply`
 #                         write to a real Stripe sandbox and real databases.
@@ -68,7 +72,18 @@ jobs:
       # SOURCE and compiling dependencies first would be wasted work. The
       # generated client is source too, which is the part that declaration
       # cannot express. So the workflow is where the dependency gets said.
-      - run: npm run db:generate
+      #
+      # `generate` is both: the Prisma clients and the web's REST client
+      # (`packages/api-client/src/generated`, from the committed API
+      # document), which the root typecheck reads as source.
+      - run: npm run generate
+
+      # **And the libraries built**, for the web app. It resolves
+      # `@synapsedesk/api-client` and `@synapsedesk/contracts` by their `main`
+      # and `types` (`dist/`), as its bundler does, so on a fresh clone its
+      # lint has no types to read and `typecheck`'s turbo half rebuilds them
+      # anyway.
+      - run: npm run build:libs
 
       # `lint` is a composite: lint:models && turbo run lint && eslint over the
       # two directories turbo does not own (scripts/seed-demo, test/system),
@@ -254,6 +269,19 @@ jobs:
       - name: start the stores the gateway reads
         run: docker compose up -d --wait redis nats
       - run: npm run images:boot-gateway
+
+  # -------------------------------------------------------------- web image
+  #
+  # The web client's image, built and booted with nothing behind it: the
+  # sign-in page renders without the gateway, so this proves the image (the
+  # standalone server, its static files, the per-request CSP), not the system.
+  web-image:
+    name: web image (build and boot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./docker/check-images.sh --web-only
 
   # ------------------------------------------------------------------ unit
   #

@@ -123,6 +123,10 @@ describe('the CI contract', () => {
         why: 'DESTRUCTIVE to Redis, Qdrant and JetStream in setup and teardown',
       },
       {
+        pattern: /npm run test:e2e:web\b/,
+        why: "test:system's setup: the same stores reset, and seeding that reads a Stripe account",
+      },
+      {
         // No lookahead. A `(?!:)` here looks like it prevents a false positive
         // on `db:test:push` and cannot: that string does not CONTAIN
         // `db:push`, so the plain pattern never matched it. Its only effect
