@@ -11,14 +11,12 @@
 #                         collection, resets the JetStream streams — spawns
 #                         seven processes, and two of its steps need a live
 #                         paid API.
-#   npm run test:e2e:web  the web client in a browser, over test:system's own
-#                         setup: the same three stores reset, and its seeding
-#                         runs `plans:seed --apply`, which reads the plans
-#                         from a Stripe account. A runner has no Stripe key.
 #   npm run db:push       (no `:test:`) targets the DEV databases.
 #   seed:demo / stripe:provision / plans:seed with `--apply`
 #                         write to a real Stripe sandbox and real databases.
-#                         Their dry-run forms are harmless.
+#                         Their dry-run forms are harmless. (e2e-web's setup
+#                         runs seed:demo and plans:seed with `--apply` against
+#                         the runner's own databases; they only read Stripe.)
 name: CI
 
 on:
@@ -282,6 +280,96 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: ./docker/check-images.sh --web-only
+
+  # ---------------------------------------------------------------- e2e-web
+  #
+  # The web client in Chromium over the whole system: `test/system`'s setup
+  # (the stores reset, every service built and started, the demo seeded), the
+  # built web app, and the rows in `test/e2e-web`. On a runner every store is
+  # this job's own compose stack, so the reset costs nothing.
+  #
+  # **One secret, STRIPE_RESTRICT_KEY:** the seed reads the plans from the
+  # Stripe sandbox (products and prices, read only), and nothing else here
+  # calls Stripe. It must be a restricted TEST key (`rk_test_`), and the first
+  # step refuses anything else, an `sk_` or a live key, before any step can
+  # use it. Without it the job FAILS: a suite that quietly doesn't run passes
+  # on nothing. Pull requests from forks get no secrets, and this repository
+  # takes none, so that case is not designed for. The key reaches only the two
+  # steps that read it.
+  e2e-web:
+    name: e2e (web, Playwright)
+    runs-on: ubuntu-latest
+    # Measured locally: setup about 2½ minutes, the rows about a minute. The
+    # runner adds the installs and a cold build; re-set this once a run has
+    # been timed.
+    timeout-minutes: 40
+    steps:
+      - name: the Stripe key is a restricted test key
+        env:
+          STRIPE_RESTRICT_KEY: ${{ secrets.STRIPE_RESTRICT_KEY }}
+        run: |
+          case "$STRIPE_RESTRICT_KEY" in
+            '')
+              echo "::error::STRIPE_RESTRICT_KEY is not set: add a restricted test key (rk_test_, read on Products and Prices) as a repository secret."
+              exit 1 ;;
+            rk_test_*) ;;
+            *)
+              echo "::error::STRIPE_RESTRICT_KEY is not a restricted test key: it must start with rk_test_ (never sk_, never live)."
+              exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: services/api-gateway/pom.xml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: npm run setup:py
+
+      # Every service reads its own `.env`, and docker-compose.yml the root's;
+      # all gitignored, so the examples stand in.
+      - name: stack env
+        run: |
+          cp .env.example .env
+          for example in services/*/.env.example; do cp "$example" "${example%.example}"; done
+      - name: credentials
+        run: |
+          npm run keys:generate -- --force
+          npm run keys:service-account
+      - name: start the stack
+        run: docker compose up -d --wait
+      # The services don't create their schemas, and these are this runner's
+      # own databases.
+      - name: databases
+        run: |
+          npm run db:generate
+          npm run db:reset -- --dev-only
+      - run: npx playwright install --with-deps chromium
+
+      - name: e2e-web
+        env:
+          STRIPE_RESTRICT_KEY: ${{ secrets.STRIPE_RESTRICT_KEY }}
+          SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
+        run: npm run test:e2e:web
+
+      - name: upload the report, traces and service logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-web
+          path: |
+            test/e2e-web/test-results/
+            test/e2e-web/results.xml
+            e2e-web-logs/
+          if-no-files-found: warn
 
   # ------------------------------------------------------------------ unit
   #

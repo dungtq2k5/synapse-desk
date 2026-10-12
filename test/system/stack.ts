@@ -21,7 +21,14 @@
  */
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -262,7 +269,15 @@ function start(spec: ServiceSpec): Running {
   });
 
   const output: string[] = [];
+  // `SYSTEM_LOG_DIR` keeps each service's whole output as a file, for CI to
+  // upload when a run fails; the in-memory tail goes with the process.
+  const logDir = process.env.SYSTEM_LOG_DIR;
+  const logFile = logDir
+    ? join(logDir, `${spec.pkg.replace('@synapsedesk/', '')}.log`)
+    : undefined;
+  if (logDir) mkdirSync(logDir, { recursive: true });
   const capture = (chunk: Buffer) => {
+    if (logFile) appendFileSync(logFile, chunk);
     output.push(chunk.toString());
     if (output.length > OUTPUT_TAIL * 4) output.splice(0, output.length / 2);
   };
