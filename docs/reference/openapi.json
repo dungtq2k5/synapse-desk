@@ -28722,6 +28722,9 @@
         "security": [
           {
             "access-cookie": []
+          },
+          {
+            "mfa-cookie": []
           }
         ]
       }
@@ -28946,6 +28949,9 @@
         "security": [
           {
             "access-cookie": []
+          },
+          {
+            "mfa-cookie": []
           }
         ]
       }

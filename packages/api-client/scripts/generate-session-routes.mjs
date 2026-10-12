@@ -1,6 +1,8 @@
 /**
  * @file Writes `src/generated/session-routes.ts`: the operations the published
- * document secures with the access cookie, as method and path pattern.
+ * document secures with the access cookie alone, as method and path pattern.
+ * An operation that also accepts another credential (the 2FA enrolment
+ * routes, which take the sign-in challenge too) is left out.
  *
  * The browser fetcher refreshes on a 401 only for these, because a refresh can
  * only help a call the access cookie authorises. A sign-in leg (no security,
@@ -23,10 +25,11 @@ const routes = [];
 
 for (const [path, operations] of Object.entries(document.paths)) {
   for (const [method, operation] of Object.entries(operations)) {
-    const schemes = (operation.security ?? []).flatMap((entry) =>
-      Object.keys(entry),
-    );
-    if (!schemes.includes('access-cookie')) continue;
+    const security = operation.security ?? [];
+    const sessionOnly =
+      security.length > 0 &&
+      security.every((entry) => 'access-cookie' in entry);
+    if (!sessionOnly) continue;
 
     const pattern = path
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

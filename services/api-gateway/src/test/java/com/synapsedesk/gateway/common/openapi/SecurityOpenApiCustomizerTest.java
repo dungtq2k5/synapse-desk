@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.method.HandlerMethod;
 
@@ -66,9 +67,15 @@ class SecurityOpenApiCustomizerTest {
   }
 
   @Test
-  void aRouteThatAdmitsEitherCredentialIsPublishedAsTheSessionCookie()
+  void aRouteThatAdmitsEitherCredentialPublishesBothAsAlternatives()
     throws Exception {
-    assertThat(schemeOf(publish("either"))).isEqualTo("access-cookie");
+    assertThat(
+      publish("either")
+        .getSecurity()
+        .stream()
+        .map(requirement -> requirement.keySet())
+        .toList()
+    ).containsExactly(Set.of("access-cookie"), Set.of("mfa-cookie"));
   }
 
   @Test

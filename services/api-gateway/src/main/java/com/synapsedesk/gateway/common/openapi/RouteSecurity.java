@@ -32,8 +32,9 @@ public @interface RouteSecurity {
     /**
      * A full session OR a live login challenge, checked by the handler itself (the
      * two 2FA enrolment routes, which a member holding only a challenge must reach).
-     * Published as the session cookie, as the committed document does, and not
-     * gated ahead of the body: the handler decides which credential it was given.
+     * Published as two alternatives, {@code access-cookie} or {@code mfa-cookie},
+     * and not gated ahead of the body: the handler decides which credential it was
+     * given.
      */
     SESSION_OR_CHALLENGE,
   }
