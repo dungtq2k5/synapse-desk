@@ -402,7 +402,7 @@ describe('Ticket messages & attachments (e2e)', () => {
     });
 
     it('7. lets the ASSIGNEE post a reply and a note', async () => {
-      const ticket = await createAssignedTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
 
       for (const isInternalNote of [false, true]) {
         const message = await createTestMessage(
@@ -1266,7 +1266,7 @@ describe('Ticket messages & attachments (e2e)', () => {
       // a draft was produced and nothing about whether a human used it — and
       // "was the co-pilot worth paying for" is the one question the ledger
       // exists to answer.
-      const ticket = await createAssignedTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
       const generationId = faker.string.uuid();
 
       const message = await createTestMessage(
@@ -1295,7 +1295,7 @@ describe('Ticket messages & attachments (e2e)', () => {
     it('2. posts normally WITHOUT it — the field is optional', async () => {
       // Most messages are typed by a human with no draft involved, and a
       // required field here would break the ordinary path.
-      const ticket = await createAssignedTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
 
       const message = await createTestMessage(
         messages,
@@ -1318,7 +1318,7 @@ describe('Ticket messages & attachments (e2e)', () => {
       // metric is exactly the wrong trade — the sweep marking it DISCARDED is
       // the honest cost, and it is logged.
       recordOutcome.mockResolvedValue(null);
-      const ticket = await createAssignedTicket(fx.prisma, tenant);
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
 
       const message = await createTestMessage(
         messages,

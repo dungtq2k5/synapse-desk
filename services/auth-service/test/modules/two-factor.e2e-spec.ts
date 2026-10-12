@@ -433,13 +433,21 @@ describe('Two-factor auth (e2e)', () => {
       const code = generateSync({ secret });
 
       await twoFactor.authenticateTwoFactor(
-        { twoFactorToken: await challenge(user.email), code },
+        {
+          twoFactorToken: await challenge(user.email),
+          code,
+          rememberDevice: false,
+        },
         requestOrigin(),
       );
 
       await expectRpc(
         twoFactor.authenticateTwoFactor(
-          { twoFactorToken: await challenge(user.email), code },
+          {
+            twoFactorToken: await challenge(user.email),
+            code,
+            rememberDevice: false,
+          },
           requestOrigin(),
         ),
         status.UNAUTHENTICATED,
@@ -453,6 +461,7 @@ describe('Two-factor auth (e2e)', () => {
         {
           twoFactorToken: await challenge(user.email),
           code: generateSync({ secret }),
+          rememberDevice: false,
         },
         requestOrigin(),
       );
@@ -477,7 +486,11 @@ describe('Two-factor auth (e2e)', () => {
       try {
         await expect(
           twoFactor.authenticateTwoFactor(
-            { twoFactorToken: token, code: generateSync({ secret }) },
+            {
+              twoFactorToken: token,
+              code: generateSync({ secret }),
+              rememberDevice: false,
+            },
             requestOrigin(),
           ),
         ).resolves.toHaveProperty('accessToken');
@@ -495,7 +508,11 @@ describe('Two-factor auth (e2e)', () => {
 
       await expectRpc(
         twoFactor.authenticateTwoFactor(
-          { twoFactorToken: await challenge(user.email), code },
+          {
+            twoFactorToken: await challenge(user.email),
+            code,
+            rememberDevice: false,
+          },
           requestOrigin(),
         ),
         status.UNAUTHENTICATED,
@@ -513,11 +530,11 @@ describe('Two-factor auth (e2e)', () => {
 
       const outcomes = await Promise.allSettled([
         twoFactor.authenticateTwoFactor(
-          { twoFactorToken: first, code },
+          { twoFactorToken: first, code, rememberDevice: false },
           requestOrigin(),
         ),
         twoFactor.authenticateTwoFactor(
-          { twoFactorToken: second, code },
+          { twoFactorToken: second, code, rememberDevice: false },
           requestOrigin(),
         ),
       ]);
