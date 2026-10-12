@@ -7,6 +7,8 @@ import com.corundumstudio.socketio.Transport;
 import com.corundumstudio.socketio.store.RedissonStoreFactory;
 import com.synapsedesk.gateway.common.config.RealtimeProperties;
 import com.synapsedesk.gateway.common.config.StoreProperties;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -86,14 +88,15 @@ public class RealtimeServerConfig {
   }
 
   /**
-   * The whole realtime surface lives under `/ws`, never the default
-   * namespace. Registering it is a NAME, not a bind — safe
+   * The whole realtime surface lives under `/ws`
+   * ({@code REALTIME_SOCKET.namespace} in `packages/contracts`), never the
+   * default namespace. Registering it is a NAME, not a bind — safe
    * before {@link SocketIOServer#start()}, and required before one: a client
    * connecting to `/ws` before this exists gets netty-socketio's own
    * `"Invalid namespace"` and disconnects immediately (measured).
    */
   @Bean
   public SocketIONamespace realtimeNamespace(SocketIOServer server) {
-    return server.addNamespace("/ws");
+    return server.addNamespace(RealtimeEvents.REALTIME_SOCKET_NAMESPACE);
   }
 }

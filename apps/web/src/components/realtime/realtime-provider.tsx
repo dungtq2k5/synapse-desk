@@ -1,7 +1,7 @@
 'use client';
 
 import { browserFetch } from '@synapsedesk/api-client';
-import { REALTIME_EVENTS } from '@synapsedesk/contracts';
+import { REALTIME_EVENTS, REALTIME_SOCKET } from '@synapsedesk/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
@@ -45,10 +45,10 @@ export function useRealtimeEvent<T>(
 const LOST_TOAST = 'realtime-lost';
 
 /**
- * One Socket.IO connection per tab: namespace `/ws`, on this origin's
- * `/socket.io` path (the Ingress, or the dev server's proxy, sends it to the
- * gateway), websocket only, authenticated by the same `access_token` cookie
- * as REST.
+ * One Socket.IO connection per tab: the gateway's namespace
+ * (`REALTIME_SOCKET.namespace`) on this origin's `/socket.io` path (the
+ * Ingress, or the dev server's proxy, sends it to the gateway), websocket
+ * only, authenticated by the same `access_token` cookie as REST.
  *
  * - **Nothing is emitted before `connection:ready`.** The transport is up
  *   before the server has checked the cookie and joined the identity rooms.
@@ -64,9 +64,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const [socket] = useState(() =>
     typeof window === 'undefined'
       ? null
-      : // The gateway's one namespace (`RealtimeServerConfig`): the root
-        // namespace answers "Invalid namespace" and never says it's ready.
-        io('/ws', {
+      : io(REALTIME_SOCKET.namespace, {
           path: '/socket.io',
           transports: ['websocket'],
           withCredentials: true,
