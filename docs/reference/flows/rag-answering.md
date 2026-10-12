@@ -239,7 +239,7 @@ The answer's shape is [`ai-output-contract.md`](../ai-output-contract.md).
 | Answers went vague after a deploy | three candidates, in order: did FlashRank load (loud, per request); was the pool ≤ `final_context_k` (silent); was `skip_rerank` set |
 | Chat answers but the thread shows nothing | the completion's status — the gateway persists every non-`AT_CAP` completion |
 | A greeting got a real answer | the attachment condition, or Layer 2 skipped at the cap |
-| Retrieval empty for a document you can see | `is_deleted`, then the department clause — organisation-wide is a separate flag |
+| Retrieval empty for a document you can see | `is_deleted`, then the department clause — organization-wide is a separate flag |
 | The guard's cost is missing from the ledger | on `Chat` it books `GREETING_CLASSIFY`; `INJECTION_CLASSIFY` is `Ask` and `Draft` only |
 | Spend does not match traffic | the fire-and-forget record, not the awaited charge |
 
