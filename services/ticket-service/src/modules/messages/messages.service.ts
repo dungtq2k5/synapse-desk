@@ -42,6 +42,7 @@ import {
   SupersededReason,
   ticketMessageGroupKey,
   PARSE_ELIGIBLE_MIME_TYPES,
+  TicketStatus,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
 import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
@@ -52,6 +53,7 @@ import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { assertKnownStatus } from '../../common/utils/ticket-state';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { LedgerClientService } from '../ai-client/ledger-client.service';
 import { AttachmentExtractorClient } from '../ai-client/attachment-extractor.client';
@@ -217,6 +219,8 @@ export class MessagesService {
     const ticket = await this.tickets.load(request.ticketId, context);
     const senderId = requireActor(context);
     const content = this.requireContent(request.content);
+
+    this.assertMayPost(ticket, senderId);
 
     if (request.isInternalNote && !this.canSeeInternalNotes(context)) {
       // Writing a note you could not then read would produce a message
@@ -1186,6 +1190,41 @@ export class MessagesService {
    */
   private canSeeInternalNotes(context: CallerContext): boolean {
     return this.access.isAgent(context);
+  }
+
+  /**
+   * Who may post in a thread, by REST, socket or email alike: its author and
+   * its current assignee, never on a closed ticket.
+   *
+   * `ticket.read.all` is NOT here. Seeing every thread lets an agent oversee
+   * them, not reply in one as the organization: a ticket's answers come from
+   * the person who holds it. The gateways' socket checks state the same rule
+   * so the refusal can reach the ack; this is the one that decides.
+   *
+   * An inbound email reply reaches here as its sender, already narrowed to
+   * tickets they raised or hold, and a closed ticket is reopened before it.
+   */
+  private assertMayPost(
+    ticket: {
+      authorId: string;
+      currentAssigneeId: string | null;
+      status: string;
+    },
+    senderId: string,
+  ): void {
+    if (assertKnownStatus(ticket.status) === TicketStatus.CLOSED) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: 'This ticket is closed. Reopen it to post a reply',
+      });
+    }
+    if (ticket.authorId !== senderId && ticket.currentAssigneeId !== senderId) {
+      throw new RpcException({
+        code: status.PERMISSION_DENIED,
+        message:
+          'Only the ticket’s requester and its assignee can post in this thread',
+      });
+    }
   }
 
   private canModerate(context: CallerContext): boolean {
