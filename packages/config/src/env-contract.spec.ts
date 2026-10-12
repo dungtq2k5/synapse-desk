@@ -171,7 +171,7 @@ describe('the environment contract', () => {
     // (Untracked `.env` files carry more of these; they are a developer's own
     // and do not exist in CI, so no test can hold them — their cleanup was a
     // one-time manual pass.)
-    const envFiles = repoFiles('services/*/.env*');
+    const envFiles = repoFiles('services/*/.env*', 'apps/*/.env*');
 
     // The corpus floor: seven services × (.env.example + .env.test).
     expect(envFiles.length).toBeGreaterThanOrEqual(14);

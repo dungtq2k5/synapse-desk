@@ -46,6 +46,8 @@ describe('doc comments do not open accidental JSDoc tags', () => {
 
   const documentedFiles = (): string[] =>
     repoFiles(
+      'apps/**/*.ts',
+      'apps/**/*.tsx',
       'services/**/*.ts',
       'packages/**/*.ts',
       'services/**/*.prisma',

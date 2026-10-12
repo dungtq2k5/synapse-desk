@@ -96,6 +96,7 @@ describe('nothing tracked cites the archive', () => {
 
   const corpus = (): string[] =>
     repoFiles(
+      'apps',
       'services',
       'packages',
       'scripts',
