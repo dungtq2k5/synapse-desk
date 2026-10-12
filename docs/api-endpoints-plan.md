@@ -305,6 +305,8 @@ _Audit actions:_ `BILLING_SUBSCRIPTION_CHANGED`, `BILLING_ENTITLEMENTS_APPLIED`,
 
 ### 2.1 Tickets — `/tickets`
 
+**Every ticket and message response names its people.** Beside `authorId`, `currentAssigneeId` and `currentDepartmentId`, a ticket carries `author`, `assignee` (`{ id, fullName, avatarUrl }`) and `department` (`{ id, name }`). A message carries `sender` beside `senderId`. This holds on every route that returns either shape, including the status actions and `/chat`. The names are looked up once per response, with one batch call to auth-service for users and one for departments (`TicketReferences`), so a page costs two calls, not one per row. **A reference is `null`** when the ticket is unassigned or has no department, when the message is the AI's, when the id names nobody, or when auth-service doesn't answer; the response still succeeds. A client shows "Unknown" for an id without a name.
+
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
 | GET | `/tickets` | Queue view. Filters: `?status=&priority=&departmentId=&assigneeId=&authorId=&createdFrom=&createdTo=&q=`. Non-agents see only their own. | USER |
