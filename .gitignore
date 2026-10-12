@@ -30,6 +30,10 @@ services/rag-service/.coverage
 pytest.xml
 ci-artifacts/
 
+# SWC's plugin cache (Next.js and @swc/core write `.swc/plugins/<platform>/`
+# wherever they run). Machine-specific build cache, like `.turbo/`.
+.swc/
+
 # Turborepo per-package task logs and local cache. One appears in every
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/

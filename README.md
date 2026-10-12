@@ -235,7 +235,7 @@ npm run check            # lint, lint:py, format:check, typecheck, typecheck:py
 
 Tests print their results, not the services' logs. When a failure needs the logs, `TEST_LOGS=1 npm test` brings them back.
 
-CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit and Python jobs write. It runs on pushes to `main-java` only, SonarCloud's main branch: the organisation's plan analyses no other branch, so on this branch the job is skipped; `sonar-project.properties` says what is analysed and what counts toward coverage.
+CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit and Python jobs write. It runs on pushes to `main-java` only, SonarCloud's main branch: the organization's plan analyses no other branch, so on this branch the job is skipped; `sonar-project.properties` says what is analysed and what counts toward coverage.
 
 End-to-end suites need the stack up and their own databases. `prisma db push` creates a missing database on connect, so this is the whole preparation:
 
