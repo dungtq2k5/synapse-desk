@@ -23,6 +23,7 @@ import {
   NodeEnv,
   orgRoom,
   REALTIME_EVENTS,
+  REALTIME_SOCKET,
   RealtimeRoom,
   RequestContext,
   ticketInternalRoom,
@@ -73,7 +74,7 @@ import {
  * first client connects, and makes every publisher silently depend on someone
  * having opened a socket first.
  */
-@SecureGateway('ws')
+@SecureGateway(REALTIME_SOCKET.namespace)
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {

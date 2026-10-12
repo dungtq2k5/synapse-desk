@@ -63,6 +63,13 @@ export const deptRoom = (departmentId: string): DeptRoom =>
   `dept:${departmentId}`;
 
 /**
+ * Where a client connects: the one Socket.IO namespace, on the `/socket.io`
+ * path, e.g. `io('/ws', { path: '/socket.io' })`. A client on the root
+ * namespace connects and then receives nothing, `connection:ready` included.
+ */
+export const REALTIME_SOCKET = { namespace: '/ws' } as const;
+
+/**
  * Events the SERVER emits to clients.
  *
  * Named from the client's point of view (`ticket:updated`, not

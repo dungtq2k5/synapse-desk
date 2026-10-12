@@ -11,7 +11,11 @@ import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
 import { io, Socket as ClientSocket } from 'socket.io-client';
 import type { Server } from 'node:http';
-import { JwtPayload, TicketDomainEvent } from '@synapsedesk/contracts';
+import {
+  JwtPayload,
+  REALTIME_SOCKET,
+  TicketDomainEvent,
+} from '@synapsedesk/contracts';
 import { createNatsTransport } from '@synapsedesk/nest-common';
 import {
   AUTH_GRPC_CLIENT,
@@ -155,7 +159,7 @@ export async function bootstrapRealtimeTest(
 
   const address = app.getHttpServer().address();
   const port = typeof address === 'string' ? 0 : (address?.port ?? 0);
-  const wsUrl = `http://127.0.0.1:${port}/ws`;
+  const wsUrl = `http://127.0.0.1:${port}${REALTIME_SOCKET.namespace}`;
 
   /**
    * A real Nest `ClientProxy`, not a bare `nats.publish`.
