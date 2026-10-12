@@ -27,6 +27,7 @@ const SKIP_DIRECTORIES = new Set([
   'node_modules',
   'dist',
   'build',
+  '.next',
   'coverage',
   '.venv',
   '__pycache__',
