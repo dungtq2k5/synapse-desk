@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.common.error;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.grpc.Status;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -74,6 +75,24 @@ class GrpcStatusMappingTest {
     assertThat(
       GrpcStatusMapping.resolve(Status.Code.UNKNOWN, "x").status()
     ).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  @Test
+  void anUnmappedCodesTextIsWithheld() {
+    // What rag-service's unhandled Python exception arrives as.
+    for (Status.Code code : List.of(
+      Status.Code.UNKNOWN,
+      Status.Code.INTERNAL,
+      Status.Code.DATA_LOSS
+    )) {
+      GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+        code,
+        "Unexpected <class 'NameError'>: name '_attachments_of' is not defined"
+      );
+
+      assertThat(safe.status()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(safe.message()).isEqualTo("Internal server error!");
+    }
   }
 
   @Test

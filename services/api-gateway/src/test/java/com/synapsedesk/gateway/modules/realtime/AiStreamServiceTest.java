@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.corundumstudio.socketio.HandshakeData;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.synapsedesk.gateway.common.auth.JwtPrincipal;
+import io.grpc.Status;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -138,6 +139,46 @@ class AiStreamServiceTest {
     verify(messages).appendAiMessage(captor.capture());
     assertThat(captor.getValue().getContent()).isEqualTo("Hello");
     assertThat(captor.getValue().getTicketId()).isEqualTo("t1");
+  }
+
+  /** The `ai:stream:error` frame a stream that threw sends, for its message. */
+  private WsResponse<?> errorFrameFor(RuntimeException failure) {
+    SocketIOClient client = client();
+    when(rag.chat(any())).thenThrow(failure);
+
+    service.start(client, "t1", "hi", principal, "m1");
+
+    ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+    verify(client, timeout(2000)).sendEvent(
+      org.mockito.ArgumentMatchers.eq(
+        com.synapsedesk.gateway.common.contracts.RealtimeEvents.REALTIME_EVENTS_AI_STREAM_ERROR
+      ),
+      payload.capture()
+    );
+    return (WsResponse<?>) payload.getValue();
+  }
+
+  @Test
+  void anInternalFailureReachesTheClientAsAGenericMessage() {
+    WsResponse<?> frame = errorFrameFor(
+      Status.UNKNOWN.withDescription(
+        "Unexpected <class 'NameError'>: name '_attachments_of' is not defined"
+      ).asRuntimeException()
+    );
+
+    assertThat(frame.success()).isFalse();
+    assertThat(frame.message()).isEqualTo("Internal server error!");
+  }
+
+  @Test
+  void aMarkedRefusalKeepsItsMessage() {
+    WsResponse<?> frame = errorFrameFor(
+      Status.INVALID_ARGUMENT.withDescription(
+        "[http:422] The question is too long"
+      ).asRuntimeException()
+    );
+
+    assertThat(frame.message()).isEqualTo("The question is too long!");
   }
 
   @Test

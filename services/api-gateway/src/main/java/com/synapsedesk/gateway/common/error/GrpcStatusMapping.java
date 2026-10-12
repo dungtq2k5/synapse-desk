@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -22,10 +24,22 @@ import org.springframework.http.HttpStatus;
  * `withHttpStatus` (`packages/core/src/utils/http-status-hint.ts`) prefixes it
  * with `[http:NNN]`, and a marked message is forwarded with the marked status. That marker is the whole channel — a
  * service cannot otherwise make its own text reach a client.
+ *
+ * <p><b>A code outside the table is a fault, and its text stays here.</b>
+ * `UNKNOWN`, `INTERNAL` and `DATA_LOSS` carry whatever the peer raised (a
+ * Python traceback's first line, measured); unmarked, the client is told
+ * `Internal server error` and the details are logged.
  */
 public final class GrpcStatusMapping {
 
   private GrpcStatusMapping() {}
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+    GrpcStatusMapping.class
+  );
+
+  /** What a client is told for a fault: a code outside the table, unmarked. */
+  private static final String INTERNAL_ERROR = "Internal server error";
 
   /** The marker `withHttpStatus` writes, and `readHttpStatusHint`'s 100–599 guard. */
   private static final Pattern MARKER = Pattern.compile(
@@ -104,6 +118,15 @@ public final class GrpcStatusMapping {
     String fixed = TRANSPORT.get(code);
     if (fixed != null) {
       return new ClientSafe(mapped, ErrorMessages.format(fixed));
+    }
+
+    if (!TO_HTTP.containsKey(code)) {
+      LOG.error(
+        "Unmapped gRPC status {}; details withheld from the client: {}",
+        code,
+        text
+      );
+      return new ClientSafe(mapped, ErrorMessages.format(INTERNAL_ERROR));
     }
 
     return new ClientSafe(mapped, ErrorMessages.format(text));
