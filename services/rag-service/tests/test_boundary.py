@@ -4,7 +4,7 @@
 specific to one of them: `corag.build_prompt`, `build_review_prompt` and
 `build_refine_prompt` all interpolate the same untrusted question into the same
 plain-text delimiters, and CoRAG runs the latter two on the Draft path — the
-surface whose question can be an email from outside the organisation.
+surface whose question can be an email from outside the organization.
 """
 
 from __future__ import annotations

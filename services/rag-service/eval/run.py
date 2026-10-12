@@ -727,7 +727,7 @@ class _NullQuota:
     The eval runs with an unlimited allowance already (see `entitlement`
     below), so a real counter would write Redis keys for a tenant that is
     deleted a minute later — and a partial write there would look like budget
-    state for an organisation that never existed.
+    state for an organization that never existed.
     """
 
     # `async` with nothing awaited, and REQUIRED rather than stylistic:
