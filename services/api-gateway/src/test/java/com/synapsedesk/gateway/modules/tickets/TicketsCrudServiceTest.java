@@ -64,7 +64,7 @@ class TicketsCrudServiceTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    service = new TicketsCrudService(stub);
+    service = new TicketsCrudService(stub, mock(TicketReferences.class));
   }
 
   @Test

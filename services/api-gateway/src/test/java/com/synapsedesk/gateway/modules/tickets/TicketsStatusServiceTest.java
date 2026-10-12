@@ -63,7 +63,7 @@ class TicketsStatusServiceTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    service = new TicketsStatusService(stub);
+    service = new TicketsStatusService(stub, mock(TicketReferences.class));
   }
 
   @Test

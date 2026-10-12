@@ -3,6 +3,8 @@ package com.synapsedesk.gateway.modules.tickets.dto.rest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.common.dto.DepartmentReferenceResponseDto;
+import com.synapsedesk.gateway.common.dto.UserReferenceResponseDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -181,6 +183,12 @@ public class TicketResponseDto {
   private OffsetDateTime deletedAt = null;
 
   private String deletedById = null;
+
+  private UserReferenceResponseDto author = null;
+
+  private UserReferenceResponseDto assignee = null;
+
+  private DepartmentReferenceResponseDto department = null;
 
   public TicketResponseDto() {
     super();
@@ -591,6 +599,53 @@ public class TicketResponseDto {
   @JsonProperty("deletedById")
   public void setDeletedById(String deletedById) {
     this.deletedById = deletedById;
+  }
+
+  public TicketResponseDto author(UserReferenceResponseDto author) {
+    this.author = author;
+    return this;
+  }
+
+  @JsonProperty("author")
+  public UserReferenceResponseDto getAuthor() {
+    return author;
+  }
+
+  @JsonProperty("author")
+  public void setAuthor(UserReferenceResponseDto author) {
+    this.author = author;
+  }
+
+  public TicketResponseDto assignee(UserReferenceResponseDto assignee) {
+    this.assignee = assignee;
+    return this;
+  }
+
+  @JsonProperty("assignee")
+  public UserReferenceResponseDto getAssignee() {
+    return assignee;
+  }
+
+  @JsonProperty("assignee")
+  public void setAssignee(UserReferenceResponseDto assignee) {
+    this.assignee = assignee;
+  }
+
+  public TicketResponseDto department(
+    DepartmentReferenceResponseDto department
+  ) {
+    this.department = department;
+    return this;
+  }
+
+  @JsonProperty("department")
+  public DepartmentReferenceResponseDto getDepartment() {
+    return department;
+  }
+
+  @JsonProperty("department")
+  public void setDepartment(DepartmentReferenceResponseDto department) {
+    this.department = department;
   }
 
   @Override

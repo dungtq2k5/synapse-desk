@@ -60,11 +60,14 @@ public class TicketsStatusService {
   private static final int MAX_BULK_TICKET_IDS = 50;
 
   private final TicketServiceGrpc.TicketServiceBlockingStub stub;
+  private final TicketReferences references;
 
   public TicketsStatusService(
-    TicketServiceGrpc.TicketServiceBlockingStub stub
+    TicketServiceGrpc.TicketServiceBlockingStub stub,
+    TicketReferences references
   ) {
     this.stub = stub;
+    this.references = references;
   }
 
   public ResponseEntity<
@@ -171,7 +174,7 @@ public class TicketsStatusService {
       wire.build()
     );
 
-    return ok(response, "Ticket status changed");
+    return ok(context, response, "Ticket status changed");
   }
 
   /** Not permission-gated — a correction, not an omission; see the class docblock family in {@link TicketsCrudService}. */
@@ -184,7 +187,7 @@ public class TicketsStatusService {
       toActionRequest(id, dto)
     );
 
-    return ok(response, "Ticket escalated");
+    return ok(context, response, "Ticket escalated");
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> resolve(
@@ -201,7 +204,7 @@ public class TicketsStatusService {
       toActionRequest(id, dto)
     );
 
-    return ok(response, "Ticket resolved");
+    return ok(context, response, "Ticket resolved");
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> reopen(
@@ -218,7 +221,7 @@ public class TicketsStatusService {
       toActionRequest(id, dto)
     );
 
-    return ok(response, "Ticket reopened");
+    return ok(context, response, "Ticket reopened");
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> close(
@@ -235,7 +238,7 @@ public class TicketsStatusService {
       toActionRequest(id, dto)
     );
 
-    return ok(response, "Ticket closed");
+    return ok(context, response, "Ticket closed");
   }
 
   private static TicketStatusActionRequest toActionRequest(
@@ -269,17 +272,15 @@ public class TicketsStatusService {
       .reason(failure.getReason());
   }
 
-  private static ResponseEntity<ApiResponse<TicketResponseDto>> ok(
+  private ResponseEntity<ApiResponse<TicketResponseDto>> ok(
+    RequestContext context,
     TicketResponse response,
     String message
   ) {
-    return ResponseEntity.ok(
-      ApiResponse.of(
-        200,
-        message,
-        TicketsCrudService.toTicketResponseDto(response)
-      )
-    );
+    TicketResponseDto ticket = TicketsCrudService.toTicketResponseDto(response);
+    references.fillTickets(context, List.of(ticket));
+
+    return ResponseEntity.ok(ApiResponse.of(200, message, ticket));
   }
 
   private TicketServiceGrpc.TicketServiceBlockingStub withMetadata(

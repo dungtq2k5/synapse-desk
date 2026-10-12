@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -76,8 +77,14 @@ public class TicketsCrudService {
 
   private final TicketServiceGrpc.TicketServiceBlockingStub stub;
 
-  public TicketsCrudService(TicketServiceGrpc.TicketServiceBlockingStub stub) {
+  private final TicketReferences references;
+
+  public TicketsCrudService(
+    TicketServiceGrpc.TicketServiceBlockingStub stub,
+    TicketReferences references
+  ) {
     this.stub = stub;
+    this.references = references;
   }
 
   public ResponseEntity<ApiResponse<PagedData<TicketResponseDto>>> list(
@@ -123,12 +130,14 @@ public class TicketsCrudService {
 
     ListTicketsResponse response = withMetadata(context).listTickets(wire);
 
+    List<TicketResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(TicketsCrudService::toTicketResponseDto)
+      .toList();
+    references.fillTickets(context, items);
     PagedData<TicketResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(TicketsCrudService::toTicketResponseDto)
-        .toList(),
+      items,
       PageMeta.from(response.getMeta())
     );
 
@@ -145,7 +154,7 @@ public class TicketsCrudService {
         .build()
     );
 
-    return ok(response, "OK", HttpStatus.OK);
+    return ok(context, response, "OK", HttpStatus.OK);
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> get(
@@ -156,7 +165,7 @@ public class TicketsCrudService {
       GetTicketRequest.newBuilder().setId(id).build()
     );
 
-    return ok(response, "OK", HttpStatus.OK);
+    return ok(context, response, "OK", HttpStatus.OK);
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> create(
@@ -187,7 +196,7 @@ public class TicketsCrudService {
 
     TicketResponse response = withMetadata(context).createTicket(wire.build());
 
-    return ok(response, "Ticket created", HttpStatus.CREATED);
+    return ok(context, response, "Ticket created", HttpStatus.CREATED);
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> update(
@@ -213,7 +222,7 @@ public class TicketsCrudService {
 
     TicketResponse response = withMetadata(context).updateTicket(wire.build());
 
-    return ok(response, "Ticket updated", HttpStatus.OK);
+    return ok(context, response, "Ticket updated", HttpStatus.OK);
   }
 
   public ResponseEntity<ApiResponse<Void>> remove(
@@ -241,7 +250,7 @@ public class TicketsCrudService {
       TicketIdRequest.newBuilder().setId(id).build()
     );
 
-    return ok(response, "Ticket restored", HttpStatus.OK);
+    return ok(context, response, "Ticket restored", HttpStatus.OK);
   }
 
   /**
@@ -292,13 +301,17 @@ public class TicketsCrudService {
     );
   }
 
-  private static ResponseEntity<ApiResponse<TicketResponseDto>> ok(
+  private ResponseEntity<ApiResponse<TicketResponseDto>> ok(
+    RequestContext context,
     TicketResponse response,
     String message,
     HttpStatus status
   ) {
+    TicketResponseDto ticket = toTicketResponseDto(response);
+    references.fillTickets(context, List.of(ticket));
+
     return ResponseEntity.status(status).body(
-      ApiResponse.of(status.value(), message, toTicketResponseDto(response))
+      ApiResponse.of(status.value(), message, ticket)
     );
   }
 

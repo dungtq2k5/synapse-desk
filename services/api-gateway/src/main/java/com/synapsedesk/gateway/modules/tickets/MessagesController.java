@@ -97,13 +97,16 @@ public class MessagesController {
 
   private final MessageServiceGrpc.MessageServiceBlockingStub stub;
   private final CurrentUser currentUser;
+  private final TicketReferences references;
 
   public MessagesController(
     MessageServiceGrpc.MessageServiceBlockingStub stub,
-    CurrentUser currentUser
+    CurrentUser currentUser,
+    TicketReferences references
   ) {
     this.stub = stub;
     this.currentUser = currentUser;
+    this.references = references;
   }
 
   @GetMapping(
@@ -162,12 +165,14 @@ public class MessagesController {
         .build()
     );
 
+    List<MessageResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(MessagesController::toMessageResponseDto)
+      .toList();
+    references.fillMessages(context, items);
     PagedData<MessageResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(MessagesController::toMessageResponseDto)
-        .toList(),
+      items,
       PageMeta.from(response.getMeta())
     );
 
@@ -217,8 +222,12 @@ public class MessagesController {
       wire.build()
     );
 
+    MessageResponseDto message = withSender(
+      context,
+      toMessageResponseDto(response.getMessage())
+    );
     CreateMessageResponseDto data = new CreateMessageResponseDto(
-      toMessageResponseDto(response.getMessage()),
+      message,
       response.getSkippedAttachmentsList()
     );
 
@@ -251,7 +260,11 @@ public class MessagesController {
     );
 
     return ResponseEntity.ok(
-      ApiResponse.of(200, "Message updated", toMessageResponseDto(response))
+      ApiResponse.of(
+        200,
+        "Message updated",
+        withSender(context, toMessageResponseDto(response))
+      )
     );
   }
 
@@ -280,7 +293,7 @@ public class MessagesController {
       ApiResponse.of(
         200,
         "Message redacted",
-        toMessageResponseDto(response.getMessage())
+        withSender(context, toMessageResponseDto(response.getMessage()))
       )
     );
   }
@@ -414,6 +427,14 @@ public class MessagesController {
       response.getObjectPath(),
       toOffsetDateTime(response.getExpiresAt())
     );
+  }
+
+  private MessageResponseDto withSender(
+    RequestContext context,
+    MessageResponseDto message
+  ) {
+    references.fillMessages(context, List.of(message));
+    return message;
   }
 
   private static MessageResponseDto toMessageResponseDto(

@@ -56236,6 +56236,18 @@
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
+      "DepartmentReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"]
+      },
       "TicketResponseDto": {
         "type": "object",
         "properties": {
@@ -56310,15 +56322,51 @@
           },
           "deletedById": {
             "type": ["string", "null"]
+          },
+          "author": {
+            "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignee": {
+            "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the ticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "department": {
+            "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null when it is in none, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DepartmentReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
+          "assignee",
+          "author",
           "authorId",
           "createdAt",
           "currentAssigneeId",
           "currentDepartmentId",
           "deletedAt",
           "deletedById",
+          "department",
           "description",
           "escalatedAt",
           "id",
@@ -56332,6 +56380,21 @@
           "unreadCount",
           "updatedAt"
         ]
+      },
+      "UserReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["avatarUrl", "fullName", "id"]
       },
       "CreateMessageDto": {
         "type": "object",
@@ -56504,6 +56567,17 @@
             "type": ["string", "null"],
             "description": "null for an AI-generated message — no user wrote it."
           },
+          "sender": {
+            "description": "Who wrote the message, resolved from `senderId`. Always null for an AI-generated message: no user wrote it. For a human message, null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "content": {
             "type": "string"
           },
@@ -56579,6 +56653,7 @@
           "modelName",
           "promptTokens",
           "redactedAt",
+          "sender",
           "senderId",
           "ticketId"
         ]

@@ -1420,6 +1420,18 @@
     },
     "WebhookEndpointWithSecretResponseDto.secret": {
       "description": "`whsec_…` — store it now; no read returns it again."
+    },
+    "TicketResponseDto.author": {
+      "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it."
+    },
+    "TicketResponseDto.assignee": {
+      "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the ticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it."
+    },
+    "TicketResponseDto.department": {
+      "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null when it is in none, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it."
+    },
+    "MessageResponseDto.sender": {
+      "description": "Who wrote the message, resolved from `senderId`. Always null for an AI-generated message: no user wrote it. For a human message, null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it."
     }
   }
 }

@@ -12,6 +12,7 @@ import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.modules.chat.dto.rest.StartConversationDto;
+import com.synapsedesk.gateway.modules.tickets.TicketReferences;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.AttachmentResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageResponseDto;
@@ -90,15 +91,18 @@ public class ChatController {
   private final TicketServiceGrpc.TicketServiceBlockingStub tickets;
   private final MessageServiceGrpc.MessageServiceBlockingStub messages;
   private final CurrentUser currentUser;
+  private final TicketReferences references;
 
   public ChatController(
     TicketServiceGrpc.TicketServiceBlockingStub tickets,
     MessageServiceGrpc.MessageServiceBlockingStub messages,
-    CurrentUser currentUser
+    CurrentUser currentUser,
+    TicketReferences references
   ) {
     this.tickets = tickets;
     this.messages = messages;
     this.currentUser = currentUser;
+    this.references = references;
   }
 
   private TicketServiceGrpc.TicketServiceBlockingStub ticketsWith(
@@ -149,7 +153,11 @@ public class ChatController {
     TicketResponse response = ticketsWith(context).createTicket(wire.build());
 
     return new ResponseEntity<>(
-      ApiResponse.of(201, "Conversation started", toTicketDto(response)),
+      ApiResponse.of(
+        201,
+        "Conversation started",
+        withNames(context, toTicketDto(response))
+      ),
       HttpStatus.CREATED
     );
   }
@@ -254,12 +262,14 @@ public class ChatController {
       wire.build()
     );
 
+    List<TicketResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(ChatController::toTicketDto)
+      .toList();
+    references.fillTickets(context, items);
     PagedData<TicketResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(ChatController::toTicketDto)
-        .toList(),
+      items,
       PageMeta.from(response.getMeta())
     );
 
@@ -280,7 +290,9 @@ public class ChatController {
       synapsedesk.ticket.Ticket.GetTicketRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(ApiResponse.of(200, "OK", toTicketDto(response)));
+    return ResponseEntity.ok(
+      ApiResponse.of(200, "OK", withNames(context, toTicketDto(response)))
+    );
   }
 
   @GetMapping(
@@ -339,12 +351,14 @@ public class ChatController {
         .build()
     );
 
+    List<MessageResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(ChatController::toMessageDto)
+      .toList();
+    references.fillMessages(context, items);
     PagedData<MessageResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(ChatController::toMessageDto)
-        .toList(),
+      items,
       PageMeta.from(response.getMeta())
     );
 
@@ -378,7 +392,7 @@ public class ChatController {
     CreateMessageResponse response = messagesWith(context).createMessage(wire);
 
     CreateMessageResponseDto data = new CreateMessageResponseDto(
-      toMessageDto(response.getMessage()),
+      withSender(context, toMessageDto(response.getMessage())),
       response.getSkippedAttachmentsList()
     );
 
@@ -405,8 +419,28 @@ public class ChatController {
     );
 
     return ResponseEntity.ok(
-      ApiResponse.of(200, "Handed off to an agent", toTicketDto(response))
+      ApiResponse.of(
+        200,
+        "Handed off to an agent",
+        withNames(context, toTicketDto(response))
+      )
     );
+  }
+
+  private TicketResponseDto withNames(
+    RequestContext context,
+    TicketResponseDto ticket
+  ) {
+    references.fillTickets(context, List.of(ticket));
+    return ticket;
+  }
+
+  private MessageResponseDto withSender(
+    RequestContext context,
+    MessageResponseDto message
+  ) {
+    references.fillMessages(context, List.of(message));
+    return message;
   }
 
   private static TicketResponseDto toTicketDto(TicketResponse ticket) {

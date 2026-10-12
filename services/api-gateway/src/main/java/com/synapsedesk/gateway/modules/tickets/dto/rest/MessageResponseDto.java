@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.synapsedesk.gateway.common.dto.CitationResponseDto;
+import com.synapsedesk.gateway.common.dto.UserReferenceResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.AttachmentResponseDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -30,6 +31,8 @@ public class MessageResponseDto {
   private String ticketId;
 
   private String senderId = null;
+
+  private UserReferenceResponseDto sender = null;
 
   private String content;
 
@@ -202,6 +205,21 @@ public class MessageResponseDto {
   @JsonProperty("senderId")
   public void setSenderId(String senderId) {
     this.senderId = senderId;
+  }
+
+  public MessageResponseDto sender(UserReferenceResponseDto sender) {
+    this.sender = sender;
+    return this;
+  }
+
+  @JsonProperty("sender")
+  public UserReferenceResponseDto getSender() {
+    return sender;
+  }
+
+  @JsonProperty("sender")
+  public void setSender(UserReferenceResponseDto sender) {
+    this.sender = sender;
   }
 
   public MessageResponseDto content(String content) {
