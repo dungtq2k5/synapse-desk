@@ -1,6 +1,6 @@
 /**
  * Finds the constraints the Java gateway's sources declare on a value, beyond its JSON
- * type: the six constraint annotations of `com.synapsedesk.gateway.validation`, and a
+ * type: the six constraint annotations of `com.synapsedesk.gateway.common.validation`, and a
  * value whose Java type is a date (`OffsetDateTime`), which only a valid date-time
  * string satisfies.
  *
