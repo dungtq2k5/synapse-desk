@@ -145,6 +145,8 @@ describe('the web client', () => {
     /\[#[0-9a-fA-F]{3,8}\]/, // a Tailwind arbitrary colour
     /['"`]#[0-9a-fA-F]{3,8}['"`]/, // a string that is only a hex colour
     /var\(--color-[a-z]+-\d{2,3}\)/, // a raw primitive
+    // A Tailwind palette utility. The palette is reset, so it renders nothing.
+    /(?<![\w-])(?:bg|text|border|ring|outline|fill|stroke|from|via|to|shadow|decoration|divide|placeholder|caret)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})\b/,
   ];
 
   const colourViolations = (path: string, source: string): string[] => {
@@ -181,11 +183,17 @@ describe('the web client', () => {
     expect(
       colourViolations('a.tsx', 'className="bg-[var(--color-teal-700)]"'),
     ).toHaveLength(1);
+    expect(
+      colourViolations('a.tsx', 'className="bg-black/50 text-white"'),
+    ).toHaveLength(1);
+    expect(colourViolations('a.tsx', 'className="text-teal-700"')).toHaveLength(
+      1,
+    );
     expect(colourViolations('a.tsx', '<span>Ticket #1042</span>')).toEqual([]);
     expect(
       colourViolations(
         'a.tsx',
-        'className="bg-primary text-primary-foreground"',
+        'className="bg-primary text-primary-foreground whitespace-nowrap -translate-x-1/2 bg-overlay"',
       ),
     ).toEqual([]);
   });

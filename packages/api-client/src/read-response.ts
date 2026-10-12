@@ -19,6 +19,18 @@ export async function readResponse<T>(response: Response): Promise<T> {
     }
   }
 
-  if (!response.ok) throw new ApiError(response.status, body ?? null);
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      body ?? null,
+      retryAfterSeconds(response.headers.get('retry-after')),
+    );
+  }
   return body as T;
+}
+
+/** `Retry-After` in its delta-seconds form; an HTTP date or junk is `null`. */
+function retryAfterSeconds(header: string | null): number | null {
+  if (header === null || !/^\d+$/.test(header.trim())) return null;
+  return Number(header.trim());
 }

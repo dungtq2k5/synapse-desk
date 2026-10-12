@@ -126,3 +126,26 @@ describe('needsSession', () => {
     expect(needsSession('POST', '/api/v1/auth/2fa/authenticate')).toBe(false);
   });
 });
+
+describe('a 429', () => {
+  it("keeps Retry-After's seconds, and null when it wasn't sent", async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{"statusCode":429}', {
+          status: 429,
+          headers: { 'retry-after': '120' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response('{"statusCode":429}', { status: 429 }),
+      );
+
+    await expect(
+      browserFetch('/api/v1/auth/login', { method: 'POST' }),
+    ).rejects.toMatchObject({ status: 429, retryAfterSeconds: 120 });
+    await expect(
+      browserFetch('/api/v1/auth/login', { method: 'POST' }),
+    ).rejects.toMatchObject({ status: 429, retryAfterSeconds: null });
+  });
+});

@@ -9,9 +9,10 @@
     "services/*",
     "packages/*"
   ],
-  "//overrides": "`@nestjs/apollo@13` requires `@apollo/server@^5` while depending on `@apollo/server-plugin-landing-page-graphql-playground@4`, which peers on `^4` \u2014 an internal conflict in the package, not in this repo. Pinning one Apollo server for the whole tree resolves it. The plugin is only reached when `playground: true`, which the GraphQL config turns off, so the version it never loads against is the version it never runs on.",
+  "//overrides": "`@nestjs/apollo@13` requires `@apollo/server@^5` while depending on `@apollo/server-plugin-landing-page-graphql-playground@4`, which peers on `^4` \u2014 an internal conflict in the package, not in this repo. Pinning one Apollo server for the whole tree resolves it. The plugin is only reached when `playground: true`, which the GraphQL config turns off, so the version it never loads against is the version it never runs on. `@types/react` is pinned for the same reason a copy is: a second version (Prisma Studio brings one) gives a hoisted package like `input-otp` different React types from the web app's, and the two don't assign to each other.",
   "overrides": {
-    "@apollo/server": "^5.5.1"
+    "@apollo/server": "^5.5.1",
+    "@types/react": "19.3.0"
   },
   "scripts": {
     "//prepare": "`simple-git-hooks` writes `.git/hooks/pre-commit` from the `simple-git-hooks` block below on every `npm install` \u2014 local to this checkout, never itself committed. `npx`, not a bare binary name, inside that block: a git hook's shell has no `node_modules/.bin` on its `PATH`, only what `npx` resolves from the local install.",

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
-import { connection } from 'next/server';
+import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
 import '@/styles/globals.css';
@@ -25,12 +25,24 @@ export default async function RootLayout({
 }) {
   // Read per request, so every page renders per request: a page prerendered at
   // build time has no nonce on its scripts, and the policy would block them.
-  await connection();
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body>
-        <Providers>{children}</Providers>
+    // The theme script sets `class` before React hydrates.
+    <html
+      lang="en"
+      className={`${sans.variable} ${mono.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="bg-background text-foreground antialiased">
+        <Providers nonce={nonce}>{children}</Providers>
+        {/* What `announce()` says, for screen readers only. */}
+        <div id="announcer-polite" className="sr-only" aria-live="polite" />
+        <div
+          id="announcer-assertive"
+          className="sr-only"
+          aria-live="assertive"
+        />
       </body>
     </html>
   );

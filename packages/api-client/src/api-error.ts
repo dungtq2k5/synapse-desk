@@ -11,6 +11,8 @@ export class ApiError extends Error {
     readonly status: number,
     /** The parsed response body: the gateway's error envelope, or `null`. */
     readonly body: unknown,
+    /** A 429's `Retry-After`, in seconds; `null` when it wasn't sent. */
+    readonly retryAfterSeconds: number | null = null,
   ) {
     super(ApiError.messageOf(status, body));
     this.name = 'ApiError';

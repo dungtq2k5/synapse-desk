@@ -1,4 +1,9 @@
 {
   "extends": "./tsconfig.json",
+  // ES modules, unlike every other package: its one consumer is the web app's
+  // bundler, and a CommonJS build would `require` React Query's CJS entry
+  // while the app imports its ESM one. Two copies, two contexts: the
+  // generated hooks then find no QueryClient.
+  "compilerOptions": { "module": "esnext", "moduleResolution": "bundler" },
   "exclude": ["node_modules", "dist", "**/*spec.ts"]
 }
