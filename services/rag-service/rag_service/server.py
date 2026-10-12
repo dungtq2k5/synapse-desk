@@ -1044,10 +1044,6 @@ async def serve() -> None:  # pragma: no cover
         await server.stop(grace=5)
 
 
-if __name__ == "__main__":  # pragma: no cover
-    asyncio.run(serve())
-
-
 # ---------------------------------------------------------------------------
 # Proto mapping
 # ---------------------------------------------------------------------------
@@ -1148,3 +1144,10 @@ def _transcript(history) -> str:
     and the summaries come out attributing the agent's questions to the user.
     """
     return "\n".join(f"{turn.role}: {turn.content}" for turn in history)
+
+
+# Last, after every definition: run as `python -m rag_service.server`, this
+# module is `__main__`, and `serve()` never returns, so a function defined
+# below it would never exist in the running service.
+if __name__ == "__main__":  # pragma: no cover
+    asyncio.run(serve())
