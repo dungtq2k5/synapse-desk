@@ -40,6 +40,7 @@ public final class RealtimeEvents {
   public static final String REALTIME_EVENTS_TICKET_CREATED = "ticket:created";
   public static final String REALTIME_EVENTS_TICKET_JOINED = "ticket:joined";
   public static final String REALTIME_EVENTS_TICKET_UPDATED = "ticket:updated";
+  public static final String REALTIME_EVENTS_TICKET_VIEWERS = "ticket:viewers";
   public static final String REALTIME_EVENTS_TYPING = "typing";
 
   /** {@code REALTIME_SOCKET} in `packages/contracts`. */

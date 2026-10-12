@@ -3,6 +3,7 @@ package com.synapsedesk.gateway;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * The Java gateway's entry point.
@@ -22,6 +23,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 // `config/` at context refresh — the point at which a missing key must
 // refuse, before anything listens.
 @ConfigurationPropertiesScan
+// For `@Scheduled` (TicketViewers' refresh).
+@EnableScheduling
 public class GatewayApplication {
 
   public static void main(String[] args) {

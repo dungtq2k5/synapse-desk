@@ -8,16 +8,21 @@ import com.synapsedesk.gateway.common.auth.JwtPrincipal;
 import com.synapsedesk.gateway.common.auth.JwtVerifier;
 import com.synapsedesk.gateway.common.config.JwtProperties;
 import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
+import com.synapsedesk.gateway.common.dto.UserReferenceResponseDto;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.common.runtime.RuntimeParticipant;
+import com.synapsedesk.gateway.modules.tickets.TicketReferences;
 import io.grpc.stub.MetadataUtils;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -62,6 +67,8 @@ public class RealtimeGateway implements RuntimeParticipant {
   private final TicketAccessService ticketAccess;
   private final AiStreamService aiStreams;
   private final MessageServiceGrpc.MessageServiceBlockingStub messages;
+  private final TicketViewers viewers;
+  private final TicketReferences references;
 
   /**
    * Per-socket typing-relay gate: at most one `typing:start` relayed per
@@ -90,7 +97,9 @@ public class RealtimeGateway implements RuntimeParticipant {
     WsThrottlerService wsThrottler,
     TicketAccessService ticketAccess,
     AiStreamService aiStreams,
-    MessageServiceGrpc.MessageServiceBlockingStub messages
+    MessageServiceGrpc.MessageServiceBlockingStub messages,
+    TicketViewers viewers,
+    TicketReferences references
   ) {
     this.server = server;
     this.jwtVerifier = jwtVerifier;
@@ -102,6 +111,8 @@ public class RealtimeGateway implements RuntimeParticipant {
     this.ticketAccess = ticketAccess;
     this.aiStreams = aiStreams;
     this.messages = messages;
+    this.viewers = viewers;
+    this.references = references;
 
     // On the `/ws` namespace specifically — `SocketIOServer.addConnectListener`
     // attaches to the DEFAULT namespace ("/"), which this gateway never
@@ -233,6 +244,20 @@ public class RealtimeGateway implements RuntimeParticipant {
   private void onDisconnect(SocketIOClient client) {
     aiStreams.cancelAll(client);
     typingAt.remove(client.getSessionId());
+    if (
+      client.getHandshakeData().getAuthToken() instanceof JwtPrincipal principal
+    ) {
+      List<String> left;
+      try {
+        left = viewers.disconnect(client.getSessionId());
+      } catch (RuntimeException failure) {
+        LOG.warn("Ticket viewers not cleared: {}", failure.getMessage());
+        left = List.of();
+      }
+      for (String ticketId : left) {
+        updateViewers(ticketId, principal, client, () -> true);
+      }
+    }
 
     if (client.getHandshakeData().getAuthToken() != null) {
       metrics.socketClosed();
@@ -382,6 +407,13 @@ public class RealtimeGateway implements RuntimeParticipant {
       RealtimeEvents.REALTIME_EVENTS_TICKET_JOINED,
       WsResponse.ok("Joined ticket room", new TicketJoinedPayload(ticketId))
     );
+
+    if (principal.isAgent()) {
+      updateViewers(ticketId, principal, client, () -> {
+        viewers.join(ticketId, client.getSessionId(), principal.sub());
+        return true;
+      });
+    }
   }
 
   /** No authorization check — leaving a room you are not in is a no-op. */
@@ -405,6 +437,57 @@ public class RealtimeGateway implements RuntimeParticipant {
     // Both halves, unconditionally — an agent whose permission was revoked
     // mid-session must not stay in the internal room.
     client.leaveRoom(RealtimeRooms.ticketInternalRoom(ticketId));
+    updateViewers(ticketId, principal, client, () ->
+      viewers.leave(ticketId, client.getSessionId())
+    );
+  }
+
+  /**
+   * Applies a change to a ticket's viewers and, when it changed something, sends
+   * every replica's agents in `ticket:{id}:internal` the new list as
+   * `ticket:viewers`, names from one `ListUsersByIds`. End users never join that
+   * room. Never fails the caller: who else is looking is the least of what this
+   * socket does, as presence is.
+   */
+  private void updateViewers(
+    String ticketId,
+    JwtPrincipal principal,
+    SocketIOClient client,
+    BooleanSupplier change
+  ) {
+    try {
+      if (!change.getAsBoolean()) return;
+
+      List<String> ids = viewers.viewerIds(ticketId);
+      Map<String, UserReferenceResponseDto> people = references.users(
+        SocketRequestContext.from(principal, client),
+        new LinkedHashSet<>(ids)
+      );
+      List<TicketViewersPayload.Viewer> list = ids
+        .stream()
+        .map(id -> {
+          UserReferenceResponseDto person = people.get(id);
+          return new TicketViewersPayload.Viewer(
+            id,
+            person == null ? null : person.fullName()
+          );
+        })
+        .toList();
+      broadcast.broadcastToRoom(
+        RealtimeRooms.ticketInternalRoom(ticketId),
+        RealtimeEvents.REALTIME_EVENTS_TICKET_VIEWERS,
+        WsResponse.ok(
+          "Viewers changed",
+          new TicketViewersPayload(ticketId, list)
+        )
+      );
+    } catch (RuntimeException failure) {
+      LOG.warn(
+        "Ticket viewers not updated for {}: {}",
+        ticketId,
+        failure.getMessage()
+      );
+    }
   }
 
   /**

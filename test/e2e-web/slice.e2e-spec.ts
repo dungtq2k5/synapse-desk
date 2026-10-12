@@ -108,6 +108,58 @@ test('a reply arrives live in the requester’s browser, and a note never does',
   await agent.context.close();
 });
 
+test('an agent sees who else is viewing the ticket, until they leave', async ({
+  browser,
+}) => {
+  const { admin, colleague } = await seededActors();
+  const first = await personAt(browser, admin.email);
+
+  // A second agent: a third member of the tenant, made a Support Agent before
+  // signing in, so the session carries the role.
+  const { items } = await api<{
+    items: { user: { id: string; email: string; fullName: string } }[];
+  }>(first.page.request, 'GET', '/users?limit=10');
+  const users = items.map((item) => item.user);
+  const adminName = users.find((user) => user.id === admin.id)?.fullName;
+  const other = users.find(
+    (user) => user.email !== admin.email && user.email !== colleague.email,
+  );
+  expect(other, 'the seeded tenant has fewer than three members').toBeDefined();
+  const { items: roles } = await api<{ items: { id: string; name: string }[] }>(
+    first.page.request,
+    'GET',
+    '/roles?limit=50&includeSystem=true',
+  );
+  const supportAgent = roles.find(
+    (role) => role.name === 'Support Agent (Tier 2)',
+  );
+  expect(supportAgent, 'no Support Agent role').toBeDefined();
+  await api(first.page.request, 'PUT', `/users/${other!.id}/roles`, {
+    roleIds: [supportAgent!.id],
+  });
+  const second = await personAt(browser, other!.email);
+  const { items: tickets } = await api<{ items: { id: string }[] }>(
+    first.page.request,
+    'GET',
+    '/tickets?limit=1',
+  );
+
+  await first.page.goto(`/tickets/${tickets[0].id}`);
+  await second.page.goto(`/tickets/${tickets[0].id}`);
+
+  await expect(
+    first.page.getByText(`${other!.fullName} is also viewing`),
+  ).toBeVisible();
+  await expect(
+    second.page.getByText(`${adminName} is also viewing`),
+  ).toBeVisible();
+
+  await second.context.close();
+  await expect(first.page.getByText(/is also viewing/)).toHaveCount(0);
+
+  await first.context.close();
+});
+
 test('an expired access cookie: the page renders, refreshes once, shows the data', async ({
   browser,
 }) => {

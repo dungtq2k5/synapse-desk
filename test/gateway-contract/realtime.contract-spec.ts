@@ -14,6 +14,7 @@
  * called again".
  */
 
+import { randomUUID } from 'node:crypto';
 import { connect, JSONCodec, type NatsConnection } from 'nats';
 import { io, type Socket } from 'socket.io-client';
 import { sign } from 'jsonwebtoken';
@@ -24,6 +25,7 @@ import {
   REALTIME_EVENTS,
   REALTIME_SOCKET,
   TICKET_PATTERNS,
+  type TicketViewersPayload,
 } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
@@ -178,6 +180,66 @@ describe('realtime across replicas, and the cache', () => {
       await publishCreated(CAROL);
 
       expect(seen.map((frames) => frames())).toEqual([1, 0, 1]);
+    },
+  );
+
+  rowFor('Tickets')(
+    '**`ticket:viewers` names the agents in a ticket across replicas, never to an end user**',
+    async () => {
+      // A fresh ticket per run: the set lives in the run's Redis.
+      const ticketId = randomUUID();
+      peers.ticket.on('TicketService/GetTicket').always({
+        id: ticketId,
+        ticketNumber: 7,
+        organizationId: ORGANIZATION,
+        authorId: CAROL,
+        source: 2,
+        status: 1,
+        priority: 2,
+        title: 'Printer is on fire',
+        description: 'It is genuinely on fire',
+        unreadCount: 0,
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
+      peers.auth.on('UserService/ListUsersByIds').always({
+        summaries: [
+          { userId: ALICE, fullName: 'Alice Agent' },
+          { userId: BOB, fullName: 'Bob Agent' },
+        ],
+      });
+
+      const alice = await connectClient(first, ALICE, AGENT);
+      const bob = await connectClient(second, BOB, AGENT);
+      const carol = await connectClient(first, CAROL);
+      const lists = (socket: Socket) => {
+        const seen: string[][] = [];
+        socket.on(
+          REALTIME_EVENTS.ticketViewers,
+          (frame: { data: TicketViewersPayload }) =>
+            seen.push(frame.data.viewers.map((viewer) => viewer.id).sort()),
+        );
+        return seen;
+      };
+      const [toAlice, toBob, toCarol] = [alice, bob, carol].map(lists);
+      const join = async (socket: Socket) => {
+        const joined = new Promise((resolve) =>
+          socket.once(REALTIME_EVENTS.ticketJoined, resolve),
+        );
+        socket.emit(CLIENT_EVENTS.ticketJoin, { ticketId });
+        await joined;
+      };
+
+      for (const socket of [alice, bob, carol]) await join(socket);
+      await settle();
+
+      const both = [ALICE, BOB].sort();
+      expect([toAlice.at(-1), toBob.at(-1), toCarol]).toEqual([both, both, []]);
+
+      bob.close();
+      await settle();
+
+      expect(toAlice.at(-1)).toEqual([ALICE]);
     },
   );
 

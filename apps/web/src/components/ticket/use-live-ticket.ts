@@ -8,6 +8,8 @@ import {
   CLIENT_EVENTS,
   REALTIME_EVENTS,
   type TicketDomainEvent,
+  type TicketViewer,
+  type TicketViewersPayload,
 } from '@synapsedesk/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
@@ -59,6 +61,7 @@ export function useLiveTicket(
   const [answers, setAnswers] = useState<LiveAnswer[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [typing, setTyping] = useState<Record<string, number>>({});
+  const [viewers, setViewers] = useState<TicketViewer[]>([]);
 
   const refetch = useCallback(
     (what: { messages?: boolean; ticket?: boolean }) => {
@@ -136,6 +139,17 @@ export function useLiveTicket(
       [ticketId],
     ),
   );
+  // Agents only: the gateway sends the list to the ticket's internal room.
+  useRealtimeEvent(
+    REALTIME_EVENTS.ticketViewers,
+    useCallback(
+      (frame: Frame<TicketViewersPayload>) => {
+        if (frame.data?.ticketId === ticketId) setViewers(frame.data.viewers);
+      },
+      [ticketId],
+    ),
+  );
+
   // The client expires typing: a closed tab never sends `typing:stop`.
   useEffect(() => {
     const expiries = Object.values(typing);
@@ -348,6 +362,7 @@ export function useLiveTicket(
     answers,
     notices,
     typingUserIds: Object.keys(typing),
+    viewers,
     send,
     retry,
     stop,

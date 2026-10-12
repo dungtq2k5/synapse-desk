@@ -43,7 +43,7 @@ export async function signIn(
  */
 export async function api<T>(
   request: APIRequestContext,
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT',
   path: string,
   data?: unknown,
 ): Promise<T> {

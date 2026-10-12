@@ -185,6 +185,9 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
     </Button>
   );
 
+  const alsoViewing = live.viewers
+    .filter((viewer) => viewer.id !== viewerId)
+    .map((viewer) => viewer.fullName ?? 'Someone');
   const typers = live.typingUserIds
     .filter((id) => id !== viewerId)
     .map((id) => names.get(id) ?? 'Someone');
@@ -203,6 +206,12 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
           <h1 className="text-2xl font-semibold tracking-tight">
             {ticket.title}
           </h1>
+          {alsoViewing.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {alsoViewing.join(', ')} {alsoViewing.length === 1 ? 'is' : 'are'}{' '}
+              also viewing
+            </p>
+          )}
         </div>
 
         <Collapsible className="rounded-lg border lg:hidden">

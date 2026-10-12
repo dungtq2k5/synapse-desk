@@ -63,6 +63,9 @@ class RealtimeGatewayTest {
     TicketAccessService.class
   );
   private final AiStreamService aiStreams = mock(AiStreamService.class);
+  private final TicketViewers viewers = mock(TicketViewers.class);
+  private final com.synapsedesk.gateway.modules.tickets.TicketReferences references =
+    mock(com.synapsedesk.gateway.modules.tickets.TicketReferences.class);
   private final synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub messagesStub =
     mock(
       synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub.class
@@ -98,7 +101,9 @@ class RealtimeGatewayTest {
       wsThrottler,
       ticketAccess,
       aiStreams,
-      messagesStub
+      messagesStub,
+      viewers,
+      references
     );
     verify(realtimeNamespace).addConnectListener(connectCaptor.capture());
     verify(realtimeNamespace).addDisconnectListener(disconnectCaptor.capture());
@@ -655,6 +660,93 @@ class RealtimeGatewayTest {
 
     verify(client).joinRoom("ticket:t1");
     verify(client).joinRoom("ticket:t1:internal");
+  }
+
+  @Test
+  void anAgentsJoinSendsTheViewersToTheInternalRoomAnEndUsersDoesNot()
+    throws Exception {
+    JwtPrincipal agent = new JwtPrincipal(
+      "a1",
+      "o1",
+      false,
+      List.of(),
+      List.of("ticket.read.all"),
+      true,
+      false
+    );
+    JwtPrincipal endUser = new JwtPrincipal(
+      "u1",
+      "o1",
+      false,
+      List.of(),
+      List.of(),
+      true,
+      false
+    );
+    SocketIOClient agentClient = authenticatedClient(agent);
+    SocketIOClient memberClient = authenticatedClient(endUser);
+    when(ticketAccess.canRead(eq("t1"), any(), any())).thenReturn(true);
+    when(viewers.viewerIds("t1")).thenReturn(List.of("a1"));
+    when(references.users(any(), any())).thenReturn(Map.of());
+    var join = capturedListener(
+      RealtimeEvents.CLIENT_EVENTS_TICKET_JOIN,
+      TicketIdBody.class
+    );
+
+    join.onData(memberClient, new TicketIdBody("t1"), mock(AckRequest.class));
+    verify(viewers, never()).join(any(), any(), any());
+    verify(broadcast, never()).broadcastToRoom(
+      any(),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_VIEWERS),
+      any()
+    );
+
+    join.onData(agentClient, new TicketIdBody("t1"), mock(AckRequest.class));
+    verify(viewers).join("t1", agentClient.getSessionId(), "a1");
+    // An unresolved name is null, not an error.
+    verify(broadcast).broadcastToRoom(
+      "ticket:t1:internal",
+      RealtimeEvents.REALTIME_EVENTS_TICKET_VIEWERS,
+      WsResponse.ok(
+        "Viewers changed",
+        new TicketViewersPayload(
+          "t1",
+          List.of(new TicketViewersPayload.Viewer("a1", null))
+        )
+      )
+    );
+  }
+
+  @Test
+  void aDisconnectSendsTheListForEveryTicketTheSocketViewed() {
+    JwtPrincipal agent = new JwtPrincipal(
+      "a1",
+      "o1",
+      false,
+      List.of(),
+      List.of("ticket.read.all"),
+      true,
+      false
+    );
+    SocketIOClient client = authenticatedClient(agent);
+    when(viewers.disconnect(client.getSessionId())).thenReturn(
+      List.of("t1", "t2")
+    );
+    when(viewers.viewerIds(any())).thenReturn(List.of());
+    when(references.users(any(), any())).thenReturn(Map.of());
+
+    disconnectCaptor.getValue().onDisconnect(client);
+
+    verify(broadcast).broadcastToRoom(
+      eq("ticket:t1:internal"),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_VIEWERS),
+      any()
+    );
+    verify(broadcast).broadcastToRoom(
+      eq("ticket:t2:internal"),
+      eq(RealtimeEvents.REALTIME_EVENTS_TICKET_VIEWERS),
+      any()
+    );
   }
 
   @Test

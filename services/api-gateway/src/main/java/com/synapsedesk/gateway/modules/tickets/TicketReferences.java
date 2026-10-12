@@ -102,7 +102,11 @@ public class TicketReferences {
     }
   }
 
-  private Map<String, UserReferenceResponseDto> users(
+  /**
+   * The references for these user ids, in one {@code ListUsersByIds} call; an id
+   * that doesn't resolve, or a failed lookup, is simply absent.
+   */
+  public Map<String, UserReferenceResponseDto> users(
     RequestContext context,
     Set<String> ids
   ) {
