@@ -38,7 +38,8 @@ WORKDIR /app
 COPY . .
 # The lockfile's turbo; `image-contract.spec.ts` asserts it.
 ARG TURBO_VERSION=2.10.9
-RUN npx --yes "turbo@${TURBO_VERSION}" prune @synapsedesk/web --docker
+RUN npm i -g --ignore-scripts "turbo@${TURBO_VERSION}" \
+  && turbo prune @synapsedesk/web --docker
 
 # --------------------------------------------------------------- deps
 FROM node:${NODE_VERSION} AS deps
@@ -61,8 +62,9 @@ COPY --from=prune /app/docs/reference/openapi.json ./docs/reference/
 # `standalone` traces from the repository root (`outputFileTracingRoot`), and
 # `next build` typechecks against the root tsconfig the app's extends.
 COPY --from=prune /app/tsconfig.json ./
-# `...` builds the app and the packages it depends on, generation first.
-RUN npx turbo run build --filter="@synapsedesk/web..."
+# `...` builds the app and the packages it depends on, generation first, with
+# the turbo `npm ci` installed from the lockfile.
+RUN ./node_modules/.bin/turbo run build --filter="@synapsedesk/web..."
 
 # --------------------------------------------------------------- runtime
 FROM node:${NODE_VERSION} AS runtime

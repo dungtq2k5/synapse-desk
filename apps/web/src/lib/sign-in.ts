@@ -90,4 +90,4 @@ export function minutesFrom(seconds: number): number {
 }
 
 /** A plausible email address: what the field checks before sending. */
-export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;

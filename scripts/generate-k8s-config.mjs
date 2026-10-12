@@ -181,8 +181,9 @@ const CLUSTER = {
   },
   // The web's renderer calls the gateway's Service, never the Ingress: the
   // browser's own address is what it forwards, and the Ingress would append
-  // the pod's.
-  web: { GATEWAY_URL: 'http://api-gateway:3000' },
+  // the pod's. Plain HTTP inside the cluster: the Service has no TLS, and
+  // `api-gateway-ingress` admits only `web` and the controller to its port.
+  web: { GATEWAY_URL: 'http://api-gateway:3000' }, // NOSONAR: in-cluster Service, no TLS listener
   'notification-service': {
     // notification-service's Joi schema refuses `true` outside development
     // (`webhook-private-targets.spec.ts` pins it). Setting it explicitly is

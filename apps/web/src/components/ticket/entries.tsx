@@ -47,10 +47,9 @@ function Time({ at, edited }: { at: string; edited?: string | null }) {
   return (
     <>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <time dateTime={at} tabIndex={0} className="rounded-sm">
-            {clockTime(at)}
-          </time>
+        {/* A button, so the full time is reachable from the keyboard. */}
+        <TooltipTrigger className="rounded-sm">
+          <time dateTime={at}>{clockTime(at)}</time>
         </TooltipTrigger>
         <TooltipContent>{absoluteTime(at)}</TooltipContent>
       </Tooltip>
@@ -58,11 +57,7 @@ function Time({ at, edited }: { at: string; edited?: string | null }) {
         <>
           {' · '}
           <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0} className="rounded-sm">
-                Edited
-              </span>
-            </TooltipTrigger>
+            <TooltipTrigger className="rounded-sm">Edited</TooltipTrigger>
             <TooltipContent>{absoluteTime(edited)}</TooltipContent>
           </Tooltip>
         </>
