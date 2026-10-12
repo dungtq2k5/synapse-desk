@@ -1,6 +1,6 @@
 # 0012 — Cache keys start with the tenant id
 
-**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/cache/CacheService.java`
+**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/common/cache/CacheService.java`
 
 ## Decision
 

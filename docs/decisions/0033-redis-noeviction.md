@@ -1,6 +1,6 @@
 # 0033 — One Redis instance, and `noeviction`
 
-**Status:** accepted · **Code:** `docker-compose.yml`, `services/api-gateway/src/main/java/com/synapsedesk/gateway/realtime/RealtimeServerConfig.java` (the second client)
+**Status:** accepted · **Code:** `docker-compose.yml`, `services/api-gateway/src/main/java/com/synapsedesk/gateway/modules/realtime/RealtimeServerConfig.java` (the second client)
 
 ## Decision
 

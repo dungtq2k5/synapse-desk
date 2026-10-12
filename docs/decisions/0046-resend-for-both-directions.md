@@ -1,6 +1,6 @@
 # 0046 — Email is Resend in both directions, and the transport is the only thing that changed
 
-**Status:** accepted · **Supersedes the transport bullets of:** [0018](./0018-inbound-email-routing-and-threading.md) · **Code:** `services/notification-service/src/modules/email/email.service.ts`, `services/api-gateway/src/main/java/com/synapsedesk/gateway/inbound/`
+**Status:** accepted · **Supersedes the transport bullets of:** [0018](./0018-inbound-email-routing-and-threading.md) · **Code:** `services/notification-service/src/modules/email/email.service.ts`, `services/api-gateway/src/main/java/com/synapsedesk/gateway/modules/inboundemail/`
 
 ## Decision
 

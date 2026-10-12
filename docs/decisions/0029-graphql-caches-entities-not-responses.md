@@ -1,6 +1,6 @@
 # 0029 — GraphQL caches entities, not responses, and the session key is never the token
 
-**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/graphql/` (the `*LoaderConfig.java` classes)
+**Status:** accepted · **Code:** the `*LoaderConfig.java` classes: `services/api-gateway/src/main/java/com/synapsedesk/gateway/common/graphql/UsersLoaderConfig.java`, and one each in `modules/departments/`, `modules/documents/` and `modules/roles/`
 
 **Not yet implemented in this gateway:** the loaders read the peer directly, with no entity cache ([known gap 50](../reference/known-gaps.md)), and nothing caches a GraphQL response.
 

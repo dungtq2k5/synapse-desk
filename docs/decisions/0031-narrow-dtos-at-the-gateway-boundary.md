@@ -1,6 +1,6 @@
 # 0031 — The gateway defines narrow DTOs; it never republishes a proto type
 
-**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/tickets/`
+**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/modules/tickets/`
 
 ## Decision
 

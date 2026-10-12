@@ -1,6 +1,6 @@
 # 0034 — The cache read-repopulate race is accepted, not fixed
 
-**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/cache/CacheService.java` (`wrap`)
+**Status:** accepted · **Code:** `services/api-gateway/src/main/java/com/synapsedesk/gateway/common/cache/CacheService.java` (`wrap`)
 
 ## Decision
 
