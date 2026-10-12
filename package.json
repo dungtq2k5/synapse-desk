@@ -33,7 +33,7 @@
     "test:e2e:notification": "dotenv -e services/notification-service/.env.test.local -e services/notification-service/.env.test -- jest --config services/notification-service/jest.e2e.config.ts --runInBand",
     "test:e2e:ingestion": "dotenv -e services/ingestion-service/.env.test.local -e services/ingestion-service/.env.test -- jest --config services/ingestion-service/jest.e2e.config.ts --runInBand",
     "test:e2e:storage": "dotenv -e services/storage-service/.env.test.local -e services/storage-service/.env.test -- jest --config services/storage-service/jest.e2e.config.ts --runInBand",
-    "//test:contract": "The gateway CONTRACT harness: it starts the gateway as a PROCESS and asserts what a client sees. Not a `npm test` project — it pulls two containers and starts a process, and `npm test` must stay runnable on a machine with nothing started. `run-contract-suite.mjs` BUILDS the gateway first: the harness starts a built gateway, and a built-output check can see an absent build but never a stale one (plan 80 departure 1).",
+    "//test:contract": "The gateway CONTRACT harness: it starts the gateway as a PROCESS and asserts what a client sees. Not a `npm test` project — it pulls two containers and starts a process, and `npm test` must stay runnable on a machine with nothing started. `run-contract-suite.mjs` BUILDS the gateway first: the harness starts a built gateway, and a built-output check can see an absent build but never a stale one.",
     "test:contract": "node scripts/run-contract-suite.mjs",
     "images:boot-gateway": "./docker/boot-gateway.sh",
     "test:e2e": "npm run test:e2e:gateway && npm run test:e2e:auth && npm run test:e2e:ticket && npm run test:e2e:notification && npm run test:e2e:ingestion && npm run test:e2e:storage",
