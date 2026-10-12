@@ -211,6 +211,33 @@ describe('authentication', () => {
     },
   );
 
+  rowFor('Auth')(
+    "**the caller's IP is the rightmost `X-Forwarded-For` entry**: the one the trusted hop appended",
+    async () => {
+      // Exactly one proxy hop (the Ingress) is trusted, and it appends the
+      // address it saw; everything to the left of that entry is whatever the
+      // client wrote. The device session, the audit trail and IP lockout all
+      // read this value from the metadata.
+      peers.auth.on('AuthService/Login').reply({
+        requiresTwoFactor: false,
+        requiresTenantSelection: false,
+        accessToken: accessToken(),
+        refreshToken: 'refresh-token',
+        tenants: [],
+        user: wireUser(),
+      });
+
+      await new Session(gateway.baseUrl).post(
+        `${API}/auth/login`,
+        { email: 'ada@example.com', password: 'correct horse battery staple' },
+        { 'x-forwarded-for': '198.51.100.7, 203.0.113.9' },
+      );
+
+      const [call] = peers.auth.calls('AuthService/Login');
+      expect(call.metadata.ip_address).toBe('203.0.113.9');
+    },
+  );
+
   rowFor('Users')(
     '**an authenticated request carries the caller context** on the peer call',
     async () => {

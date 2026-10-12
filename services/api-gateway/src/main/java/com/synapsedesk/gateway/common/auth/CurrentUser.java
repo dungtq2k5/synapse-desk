@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.common.auth;
 
 import com.synapsedesk.gateway.common.config.JwtProperties;
+import com.synapsedesk.gateway.common.web.ClientIp;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
@@ -25,12 +26,18 @@ public class CurrentUser {
     this.jwt = jwt;
   }
 
-  /** `{ ip, userAgent }` — no guard needed, provenance exists for anonymous callers too. */
+  /**
+   * `{ ip, userAgent }` — no guard needed, provenance exists for anonymous callers too.
+   * The IP is {@link ClientIp}'s, the same one the throttle keys on.
+   */
   public RequestOrigin origin(HttpServletRequest request) {
     String userAgent = request.getHeader("user-agent");
 
     return new RequestOrigin(
-      request.getRemoteAddr() == null ? "" : request.getRemoteAddr(),
+      ClientIp.of(
+        request.getHeader("X-Forwarded-For"),
+        request.getRemoteAddr()
+      ),
       userAgent == null ? "" : userAgent
     );
   }

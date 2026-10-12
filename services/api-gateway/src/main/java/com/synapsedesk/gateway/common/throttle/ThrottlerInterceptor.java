@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.common.throttle;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.config.ThrottleProperties;
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
+import com.synapsedesk.gateway.common.web.ClientIp;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
@@ -214,30 +215,13 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
       return "user:" + sub.get();
     }
 
-    String ip = clientIp(request);
+    String ip = ClientIp.of(
+      request.getHeader("X-Forwarded-For"),
+      request.getRemoteAddr()
+    );
     String account = accountIdentifier(request);
 
     return account != null ? "ip:" + ip + "|acct:" + account : "ip:" + ip;
-  }
-
-  /**
-   * The rightmost {@code X-Forwarded-For} entry: exactly one proxy hop is
-   * trusted (P6), and it is the one
-   * that appended the LAST entry. Spring's {@code ForwardedHeaderFilter}
-   * default (leftmost) is client-supplied and spoofable, which matters here
-   * because this value keys a rate-limit bucket. Scoped to the throttler's
-   * tracker only; {@code CurrentUser.origin()}'s {@code getRemoteAddr()} is
-   * unchanged, since audit metadata never keyed a bucket.
-   */
-  private static String clientIp(HttpServletRequest request) {
-    String forwardedFor = request.getHeader("X-Forwarded-For");
-    if (forwardedFor == null || forwardedFor.isBlank()) {
-      return request.getRemoteAddr();
-    }
-
-    String[] hops = forwardedFor.split(",");
-
-    return hops[hops.length - 1].trim();
   }
 
   /** The `email` field of a JSON body, lower-cased — `extractAccountIdentifier`, reproduced. */

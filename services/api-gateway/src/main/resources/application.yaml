@@ -43,6 +43,12 @@ spring:
 
 server:
   port: ${PORT}
+  # The caller's IP has one rule, `ClientIp` (the rightmost X-Forwarded-For
+  # entry), read from the raw header. Spring Boot would otherwise switch
+  # Tomcat's RemoteIpValve on when it detects Kubernetes, rewriting
+  # getRemoteAddr() and removing the header, so a pod and every test would
+  # read the address by different rules.
+  forward-headers-strategy: none
 
 # **The scrape listener is a SEPARATE server, not a path on the public one.**
 # A distinct port is what makes "not reachable from the internet" structural

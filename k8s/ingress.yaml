@@ -5,11 +5,12 @@
 # from inside the cluster and from nowhere else, which is the property
 # `AUTH_SERVICE_URL = auth-service:5001` already assumes.
 #
-# **`trust proxy` is 1 in `main.ts` and this is why it is right.** That literal
-# is a HOP COUNT and its comment says "Behind both an ALB and Nginx it must be
-# 2". One `ingress-nginx` in front is exactly one hop. Front this controller
-# with a second proxy and `req.ip` becomes the proxy's address — which feeds
-# `device_sessions.ip_address`, the throttler's tracker and the audit log.
+# **Exactly one trusted hop, and this controller is it.** The gateway reads the
+# caller's IP with `ClientIp` (`common/web`): the rightmost `X-Forwarded-For`
+# entry, the one this controller appends, else the connection's peer. Front this
+# controller with a second proxy and that entry becomes the proxy's address —
+# which feeds `device_sessions.ip_address`, the throttle buckets, the WebSocket
+# handshake budget and the audit log.
 #
 # **The metrics port is deliberately not routed.** `METRICS_PORT = 9464` is its
 # own listener so that "not reachable from the internet" is structural rather

@@ -104,6 +104,44 @@ class RealtimeGatewayTest {
     verify(realtimeNamespace).addDisconnectListener(disconnectCaptor.capture());
   }
 
+  /** A handshake that arrived through the Ingress: one peer, its own X-Forwarded-For. */
+  private static SocketIOClient clientForwardedFor(String forwardedFor) {
+    SocketIOClient client = mock(SocketIOClient.class);
+    HttpHeaders headers = new DefaultHttpHeaders();
+    headers.add("X-Forwarded-For", forwardedFor);
+    HandshakeData handshake = new HandshakeData(
+      headers,
+      Map.of(),
+      new InetSocketAddress("10.0.0.5", 443),
+      "/socket.io",
+      false
+    );
+    when(client.getHandshakeData()).thenReturn(handshake);
+    when(client.getSessionId()).thenReturn(UUID.randomUUID());
+    return client;
+  }
+
+  @Test
+  void theHandshakeBudgetIsKeyedByTheCallerNotByTheIngress() {
+    // Every handshake behind the Ingress has the same peer; the budget is keyed
+    // on the rightmost X-Forwarded-For entry, the one the Ingress appended.
+    for (String forwarded : List.of(
+      "198.51.100.7, 203.0.113.9",
+      "198.51.100.7, 203.0.113.10",
+      "192.0.2.1, 203.0.113.9"
+    )) {
+      connectCaptor.getValue().onConnect(clientForwardedFor(forwarded));
+    }
+
+    ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
+    verify(wsThrottler, times(3)).allowHandshake(keys.capture());
+    assertThat(keys.getAllValues()).containsExactly(
+      "203.0.113.9",
+      "203.0.113.10",
+      "203.0.113.9"
+    );
+  }
+
   private static SocketIOClient clientWithCookie(String cookieHeader) {
     SocketIOClient client = mock(SocketIOClient.class);
     HttpHeaders headers = new DefaultHttpHeaders();

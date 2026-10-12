@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.realtime;
 
 import com.corundumstudio.socketio.SocketIOClient;
+import com.synapsedesk.gateway.common.web.ClientIp;
 import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
@@ -13,15 +14,19 @@ final class SocketHandshakes {
 
   private SocketHandshakes() {}
 
-  /** {@code CurrentUser.origin}'s own fallback: {@code ""}, never null. */
+  /**
+   * {@link ClientIp}'s rule over the handshake: the rightmost {@code X-Forwarded-For}
+   * entry, else the socket's peer. Behind the Ingress the peer is the Ingress for
+   * every user, so the peer alone would give the whole user base one handshake
+   * budget.
+   */
   static String ip(SocketIOClient client) {
-    String address = client
-      .getHandshakeData()
-      .getAddress()
-      .getAddress()
-      .getHostAddress();
+    var handshake = client.getHandshakeData();
 
-    return address == null ? "" : address;
+    return ClientIp.of(
+      handshake.getHttpHeaders().get("X-Forwarded-For"),
+      handshake.getAddress().getAddress().getHostAddress()
+    );
   }
 
   /** @see #ip(SocketIOClient) */
