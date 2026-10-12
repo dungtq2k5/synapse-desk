@@ -1,0 +1,28 @@
+{
+  "name": "@synapsedesk/api-client",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "orval --config orval.config.ts && node scripts/generate-session-routes.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist src/generated *.tsbuildinfo",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.3.0",
+    "orval": "8.41.0",
+    "react": "^19.3.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.2"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

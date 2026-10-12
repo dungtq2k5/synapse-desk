@@ -25,6 +25,9 @@ export default defineConfig(
       // And each workspace's own: a service's config spreads this one, and
       // resolves these patterns from its own folder.
       '**/jest.config.ts',
+      // Orval's config is read by Orval (through jiti), not compiled by any
+      // tsconfig, so the type-aware rules have no program to read it with.
+      'packages/api-client/orval.config.ts',
       '**/jest.e2e.config.ts',
       'test/system/sequencer.cjs',
     ],

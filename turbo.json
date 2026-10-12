@@ -20,10 +20,23 @@
       "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
       "outputs": ["src/generated/**", "**/docs/reference/erd/**.md"]
     },
+    // The web's REST client, generated from the committed document into
+    // `src/generated` (gitignored). Keyed on the document, so a change to the
+    // published contract regenerates it, and the build after it fails if the
+    // change broke a caller.
+    "generate": {
+      "inputs": [
+        "orval.config.ts",
+        "scripts/**",
+        "$TURBO_ROOT$/docs/reference/openapi.json"
+      ],
+      "outputs": ["src/generated/**"]
+    },
     "build": {
-      // `db:generate` is this package's OWN (no `^`): a service compiles against
-      // the client it generates, not its dependencies'.
-      "dependsOn": ["^build", "db:generate"],
+      // `db:generate` and `generate` are this package's OWN (no `^`): a
+      // workspace compiles against the client it generates, not its
+      // dependencies'.
+      "dependsOn": ["^build", "db:generate", "generate"],
       "inputs": [
         "src/**",
         "prisma/schema.prisma",
@@ -41,7 +54,9 @@
     "lint": {
       // No "dependsOn": ["^build"] — eslint's type-aware rules read each
       // package's tsconfig and TypeScript SOURCE, never a built dist/, so
-      // compiling dependencies first is pure wasted work.
+      // compiling dependencies first is pure wasted work. The package's own
+      // generated client is source, so it comes first.
+      "dependsOn": ["generate"],
       "inputs": ["src/**", "tsconfig*.json", "eslint.config.mjs"]
     },
     "dev": {
