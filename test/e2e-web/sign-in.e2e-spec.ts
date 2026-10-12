@@ -106,8 +106,9 @@ test('an organization that requires two-step: set it up, then the code', async (
   await expect(
     page.getByRole('heading', { name: 'Set up two-step verification' }),
   ).toBeVisible();
+  // The key renders after the heading: wait for it, then read it.
+  await expect(page.locator('code')).toHaveText(/^[A-Z2-7 ]+$/);
   const key = (await page.locator('code').innerText()).trim();
-  expect(key).toMatch(/^[A-Z2-7 ]+$/);
   const enabling = totp(key);
   await page.getByLabel('Verification code').fill(enabling);
   await page.getByRole('button', { name: 'Verify and continue' }).click();
