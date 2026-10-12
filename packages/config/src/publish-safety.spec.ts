@@ -149,8 +149,13 @@ describe('nothing here can be published, and the licence is one string', () => {
 
     expect(globs.length).toBeGreaterThan(0);
 
+    // `apps/*` holds the clients and may be empty (on `main` it is); every
+    // other glob must reach a manifest.
+    const MAY_BE_EMPTY = new Set(['apps']);
+
     for (const glob of globs) {
       const directory = glob.replace(/\/\*$/, '');
+      if (MAY_BE_EMPTY.has(directory)) continue;
 
       expect([
         directory,

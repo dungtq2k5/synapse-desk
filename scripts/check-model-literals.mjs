@@ -14,13 +14,13 @@
  * language with no compiler to lean on.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
-const SCAN_ROOTS = ['services', 'packages', 'scripts'];
+const SCAN_ROOTS = ['apps', 'services', 'packages', 'scripts'];
 const SCAN_EXTENSIONS = ['.ts', '.tsx', '.mjs', '.js', '.py'];
 
 const SKIP_DIRECTORIES = new Set([
@@ -125,6 +125,8 @@ function stripBlockComments(text) {
 const violations = [];
 
 for (const scanRoot of SCAN_ROOTS) {
+  // `apps/` may be empty, or absent (on `main` it is).
+  if (!existsSync(join(ROOT, scanRoot))) continue;
   for (const path of walk(join(ROOT, scanRoot))) {
     const relativePath = relative(ROOT, path);
     if (ALLOWED.includes(relativePath)) continue;

@@ -225,7 +225,10 @@ describe('the image contract (static half)', () => {
      * typecheck covers them and that is exactly where the measured case
      * lived. The legitimate cross-workspace channel is `@synapsedesk/*`.
      */
-    it.each(['services', 'packages'])('%s', (top) => {
+    // `apps/` holds the clients, and it may be empty (on `main` it is).
+    const MAY_BE_EMPTY = new Set(['apps']);
+
+    it.each(['apps', 'services', 'packages'])('%s', (top) => {
       // `src/**` + JS filter, and the spelling is measured: `${top}/*/src`
       // matches NOTHING (a pathspec with a wildcard is not a prefix), and
       // `src/**/*.ts` misses files directly in `src/` — the same git `**`
@@ -237,7 +240,7 @@ describe('the image contract (static half)', () => {
       ].filter((file) => file.endsWith('.ts'));
 
       // The corpus floor — a glob that stops matching must fail, not pass.
-      expect(files.length).toBeGreaterThan(0);
+      if (!MAY_BE_EMPTY.has(top)) expect(files.length).toBeGreaterThan(0);
 
       const offenders: string[] = [];
       for (const { path: file, text } of readListed(files)) {

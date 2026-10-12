@@ -5,6 +5,7 @@
   "packageManager": "npm@11.9.0",
   "type": "module",
   "workspaces": [
+    "apps/*",
     "services/*",
     "packages/*"
   ],
