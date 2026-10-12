@@ -27,9 +27,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: api-gateway
+  # The system's, not the gateway's: it routes `/` to `web` as well.
+  name: synapsedesk
   labels:
-    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/name: synapsedesk
   annotations:
     # WebSocket upgrades need a read timeout longer than the default 60s or an
     # idle socket is closed under the client. `pingInterval` is Socket.IO's
