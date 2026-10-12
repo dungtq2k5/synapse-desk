@@ -108,7 +108,8 @@ test('an organization that requires two-step: set it up, then the code', async (
   ).toBeVisible();
   const key = (await page.locator('code').innerText()).trim();
   expect(key).toMatch(/^[A-Z2-7 ]+$/);
-  await page.getByLabel('Verification code').fill(totp(key));
+  const enabling = totp(key);
+  await page.getByLabel('Verification code').fill(enabling);
   await page.getByRole('button', { name: 'Verify and continue' }).click();
 
   await expect(
@@ -123,6 +124,11 @@ test('an organization that requires two-step: set it up, then the code', async (
     page.getByRole('heading', { name: 'Two-step verification' }),
   ).toBeVisible();
   await expect(page.getByText('Two-step verification is on')).toBeVisible();
+  // A code works once (RFC 6238 §5.2): signing in takes the next step's code,
+  // as a person would wait for their app to show a new one.
+  await expect
+    .poll(() => totp(key), { timeout: 31_000, intervals: [1_000] })
+    .not.toBe(enabling);
   await page.getByLabel('Verification code').fill(totp(key));
 
   await expect(page).toHaveURL(/\/tickets$/);

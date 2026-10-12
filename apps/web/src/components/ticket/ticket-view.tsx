@@ -84,6 +84,10 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
   const { user, isAgent } = useViewer();
   const viewerId = user?.id ?? null;
   const requester = viewerId !== null && ticket.authorId === viewerId;
+  // ticket-service's posting rule: the author or the current assignee, never
+  // on a closed ticket. Saying so beats a composer whose send fails.
+  const holder = viewerId !== null && ticket.currentAssigneeId === viewerId;
+  const closed = ticket.status === 'CLOSED';
   const open = BEFORE_ESCALATION.has(ticket.status);
   const perspective: Perspective = isAgent
     ? 'agent'
@@ -298,12 +302,20 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
           </p>
         )}
 
-        <Composer
-          agent={isAgent}
-          requesterName={ticket.author?.fullName ?? null}
-          onSend={live.send}
-          onTyping={live.signalTyping}
-        />
+        {closed || !(requester || holder) ? (
+          <p className="rounded-lg border bg-muted p-3 text-sm text-muted-foreground">
+            {closed
+              ? 'This ticket is closed.'
+              : 'Only the assignee can reply or add notes.'}
+          </p>
+        ) : (
+          <Composer
+            agent={isAgent}
+            requesterName={ticket.author?.fullName ?? null}
+            onSend={live.send}
+            onTyping={live.signalTyping}
+          />
+        )}
       </div>
 
       <aside className="hidden lg:block">

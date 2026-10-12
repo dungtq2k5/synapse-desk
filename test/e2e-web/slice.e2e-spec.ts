@@ -50,6 +50,22 @@ test('a reply arrives live in the requester’s browser, and a note never does',
   const agent = await personAt(browser, admin.email);
   const stamp = Date.now();
   const ticketId = await ownTicket(requester.page);
+  // Only the author or the assignee posts, so the agent takes it first; a
+  // re-run finds it already theirs (409).
+  // A department is required, and ticket-service only checks it exists: the
+  // seeded admin belongs to none, and a seeded ticket may have none.
+  const departments = await api<{ items: { id: string }[] }>(
+    agent.page.request,
+    'GET',
+    '/departments?limit=1',
+  );
+  const [department] = departments.items;
+  expect(department, 'the seeded tenant has no department').toBeDefined();
+  const taken = await agent.page.request.post(
+    `/api/v1/tickets/${ticketId}/assign/self`,
+    { data: { departmentId: department.id } },
+  );
+  expect([200, 201, 409], await taken.text()).toContain(taken.status());
 
   await requester.page.goto(`/tickets/${ticketId}`);
   await agent.page.goto(`/tickets/${ticketId}`);
