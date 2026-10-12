@@ -497,7 +497,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
 
         # **The guard, on the surface that most needs it**. This
         # "question" is the last message on a ticket, and with inbound email
-        # that can be an email from outside the organisation: an agent clicks
+        # that can be an email from outside the organization: an agent clicks
         # *suggest a reply* and a stranger's text becomes the question in a
         # prompt whose output the agent is about to send back to them.
         #

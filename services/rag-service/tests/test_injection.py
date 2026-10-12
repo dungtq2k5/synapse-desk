@@ -1120,7 +1120,7 @@ async def test_DRAFT_runs_the_guard_over_the_attachments(servicer, tenant_a):
     """The highest-exposure surface in the system.
 
     After 31/32 the last message on a ticket can be an email from
-    outside the organisation, so its attachment was chosen by somebody who
+    outside the organization, so its attachment was chosen by somebody who
     never authenticated. An agent then clicks *suggest a reply*, and a
     stranger's file becomes part of a prompt whose output the agent is about to
     send back to them.

@@ -499,7 +499,7 @@ export const INGESTION_JOB_NAME = 'ingest-document';
  * A SEPARATE queue from ingestion, not a second job name on the same one. The
  * two have opposite shapes: ingestion jobs are long, few and CPU-heavy, so
  * their worker runs at concurrency 2; a re-scope is short, can arrive in bursts
- * (an admin reorganising departments), and must not queue behind a 200-page
+ * (an admin reorganizing departments), and must not queue behind a 200-page
  * PDF. Sharing a queue would put a security-relevant write behind a parse.
  */
 export const SCOPE_FANOUT_QUEUE = 'document-scope-fanout';

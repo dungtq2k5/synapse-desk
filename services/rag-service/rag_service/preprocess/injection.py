@@ -485,7 +485,7 @@ INJECTION_PROMPT = (
 #:
 #: Appended rather than folded in, so the prompt above stays byte-identical on
 #: the calls that carry no file. `Draft` is why this matters most: after 31/32,
-#: the last message on a ticket can be an email from outside the organisation,
+#: the last message on a ticket can be an email from outside the organization,
 #: so its attachment was chosen by somebody who never authenticated. That is the
 #: highest-trust position an untrusted file reaches in this system.
 #:
