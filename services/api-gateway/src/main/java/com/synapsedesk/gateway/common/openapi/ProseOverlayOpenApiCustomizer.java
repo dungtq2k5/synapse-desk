@@ -38,15 +38,20 @@ import tools.jackson.databind.json.JsonMapper;
 @Order(OpenApiCustomizerOrder.PROSE_OVERLAY)
 public class ProseOverlayOpenApiCustomizer implements OpenApiCustomizer {
 
-  private static final String OVERLAY = "openapi/prose-overlay.json";
+  private static final String OVERLAY_PATH = "openapi/prose-overlay.json";
 
   private final JsonNode overlay;
 
   public ProseOverlayOpenApiCustomizer() {
-    try (InputStream in = new ClassPathResource(OVERLAY).getInputStream()) {
+    try (
+      InputStream in = new ClassPathResource(OVERLAY_PATH).getInputStream()
+    ) {
       this.overlay = JsonMapper.builder().build().readTree(in);
     } catch (IOException missing) {
-      throw new IllegalStateException("could not read " + OVERLAY, missing);
+      throw new IllegalStateException(
+        "could not read " + OVERLAY_PATH,
+        missing
+      );
     }
   }
 
