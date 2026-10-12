@@ -1,16 +1,17 @@
 # SynapseDesk
 
-An enterprise AI helpdesk backend: a knowledge base your users can ask questions of, and a ticketing system that takes over when the answer is not in it.
+An enterprise AI helpdesk: a knowledge base your users can ask questions of, and a ticketing system that takes over when the answer is not in it.
 
 Documents are uploaded, parsed, chunked and embedded; questions are answered by a retrieval pipeline that cites the chunks it used, refuses when the corpus does not support an answer, and hands off to a human agent when it should. Everything is multi-tenant, every AI call is metered against a plan, and inbound email becomes a ticket in the same thread the web UI writes to.
 
-**This repository is the backend only** — seven services and the manifests to run them. There is no front end here.
+This repository holds the seven backend services, the web client (`apps/web`), and the manifests to run them.
 
 ## Contents
 
 - [What is in here](#what-is-in-here)
 - [Documentation](#documentation)
 - [Setup, from A to Z](#setup-from-a-to-z)
+- [The web client](#the-web-client)
 - [Running the tests](#running-the-tests)
 - [Docker images](#docker-images)
 - [Kubernetes](#kubernetes)
@@ -19,7 +20,11 @@ Documents are uploaded, parsed, chunked and embedded; questions are answered by 
 
 ## What is in here
 
-A Turborepo monorepo in three parts: `services/` holds the backends, `packages/` holds the code they share, and `apps/` is kept for clients. The npm workspaces are `services/*` and `packages/*`; `apps/*` joins them with its first client, since a workspace glob that matches nothing fails `publish-safety.spec.ts`. Everything else is deliberately outside them.
+A Turborepo monorepo in three parts: `apps/` holds the clients, `services/` holds the backends, and `packages/` holds the code they share. The npm workspaces are `apps/*`, `services/*` and `packages/*`; everything else is deliberately outside them.
+
+| Client | Port | What it is |
+| :--- | :--- | :--- |
+| [`apps/web`](apps/web/) | `5173` | Next.js (App Router), shadcn/ui on Tailwind CSS. It renders pages and calls the gateway's public API, nothing else — see [The web client](#the-web-client) |
 
 | Service | Port | Speaks | Owns |
 | :--- | :--- | :--- | :--- |
@@ -33,6 +38,7 @@ A Turborepo monorepo in three parts: `services/` holds the backends, `packages/`
 
 | Also | What it is |
 | :--- | :--- |
+| [`packages/api-client`](packages/api-client/) | Browser-safe: the web's REST client, **generated** from `docs/reference/openapi.json` by Orval, and its fetcher |
 | [`packages/contracts`](packages/contracts/) | Browser-safe: event names and shapes, enum values, limits, permission codes |
 | [`packages/core`](packages/core/) | Browser-safe pure functions: email normalisation, masking, limit comparison, job staleness |
 | [`packages/nest-common`](packages/nest-common/) | Server code the TypeScript services share: NATS and JetStream, publishers, tenant scope, the SSRF guard |
@@ -52,7 +58,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 | If you want to | Read |
 | :--- | :--- |
 | Write code in this repo | [`docs/development-conventions.md`](docs/development-conventions.md) |
-| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 44 ADRs, append-only |
+| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 47 ADRs, append-only |
 | Follow an end-to-end path | [`docs/reference/flows/`](docs/reference/flows/) |
 | Build a client | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
 | Know what is currently broken | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md) |
@@ -138,13 +144,14 @@ Real Google credentials are needed only for real Google sign-in and a real Stora
 
 ### 5. Per-service `.env` files
 
-Each service loads `.env` from its **own** directory, validated by a Joi schema at boot. Every key in each `.env.example` is required.
+Each service loads `.env` from its **own** directory, validated by a Joi schema at boot. Every key in each `.env.example` is required. The gateway is the exception in mechanism, not in practice: Spring reads no `.env`, so its npm scripts load `.env`, then `.env.example` for any key it lacks. The web client's `.env` holds one key, `GATEWAY_URL`.
 
 ```sh
 for s in api-gateway auth-service ticket-service ingestion-service \
          notification-service storage-service rag-service; do
   cp "services/$s/.env.example" "services/$s/.env"
 done
+cp apps/web/.env.example apps/web/.env
 ```
 
 **A plain copy does not boot.** These values are placeholders, and two of them fail in ways worth knowing in advance:
@@ -197,12 +204,13 @@ The nightly chunk-usage projection adds to counters from a cursor and refuses to
 npm run dev
 ```
 
-`turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `packages/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
+`turbo run dev` starts all seven services and the web client. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `packages/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
 
 On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in.
 
 | Reach | At |
 | :--- | :--- |
+| The web client | `http://localhost:5173`. It proxies `/api`, `/graphql` and `/socket.io` to the gateway, so the browser sees one origin |
 | REST | `http://localhost:3000/api/v1` — prefix `api` + URI version `v1`; `GLOBAL_PREFIX` is the word, not the path |
 | GraphQL | `http://localhost:3000/graphql` — **not** under the prefix |
 | OpenAPI document | `http://localhost:3000/v3/api-docs`, with `SWAGGER_ENABLED = true` — no documentation UI is served; the same document as a tracked file at [`docs/reference/openapi.json`](docs/reference/openapi.json), regenerated by `npm run openapi:export` |
@@ -226,6 +234,18 @@ npm run seed:demo:apply
 
 Two things only `--apply` does, and the portal depends on the first: it creates the **marked** portal configuration (`metadata.synapsedesk_portal`) that `createPortalSession` insists on — until it exists, opening the billing portal is refused with a message naming this script — and it creates the Stripe webhook endpoint, printing its signing secret **exactly once**; put that in `services/auth-service/.env` as `STRIPE_WEBHOOK_SECRET`.
 
+## The web client
+
+`apps/web` is a **renderer, not a backend** ([ADR 0047](docs/decisions/0047-the-web-server-is-a-renderer.md)). Its server renders pages by forwarding the browser's own cookies to the gateway's public API, with `cache: 'no-store'` on every call. It never refreshes a token, never calls a service directly, and never decides who may see what. When the gateway answers 401 during server rendering, the page renders without its data, and the browser fetches, refreshes once and retries.
+
+- **REST by default.** The client is generated: `npm run generate` writes `packages/api-client/src/generated/` from the committed `docs/reference/openapi.json`, so a breaking change to the document fails the web's typecheck. GraphQL is used only where REST can't serve a screen, and no screen needs it yet.
+- **Design tokens** come from Figma as W3C design-token JSON, committed under `apps/web/design-tokens/`. Style Dictionary turns them into CSS variables (`npm run tokens -w @synapsedesk/web`, run by `dev`, `build` and `typecheck`). Components use semantic tokens only. A guard fails on a colour literal or a Tailwind palette class.
+- **Components** are shadcn/ui, copied into `apps/web/src/components/ui/` and ours to change.
+- **Realtime:** one Socket.IO client per tab, on the gateway's `/ws` namespace, through `/socket.io`.
+- **Security headers:** `src/proxy.ts` sets a per-request nonce and the Content-Security-Policy. It does nothing else, and in particular nothing about who is signed in.
+
+In the cluster the Ingress sends `/api`, `/graphql` and `/socket.io` to the gateway and everything else to `web` (`k8s/ingress.yaml`); `docker/web.Dockerfile` builds the image from Next's standalone output.
+
 ## Running the tests
 
 ```sh
@@ -244,6 +264,8 @@ End-to-end suites need the stack up and their own databases. `prisma db push` cr
 npm run db:test:push
 npm run test:e2e         # six suites, sequential
 ```
+
+`npm run test:e2e:web` drives the web client in Chromium across the whole system (`test/e2e-web/`, Playwright): sign-in through every leg, the expired-session fallback, a live reply between two browsers, and sign-out. It reuses `test:system`'s setup, so it is destructive in the same way, and it isn't run in CI yet: that setup seeds plans from Stripe, and CI has no Stripe key. Install the browser once with `npx playwright install chromium`.
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares.
 

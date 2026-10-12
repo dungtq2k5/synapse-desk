@@ -45,6 +45,7 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 - A service **`*-grpc.controller.ts` MUST be a thin adapter**: unpack metadata, delegate, return the proto message. No queries, no branching.
 - A service **`*.service.ts` MUST NOT know about HTTP.** It throws `RpcException` with a gRPC `status`, never `BadRequestException`. (§6.4)
 - **`packages/` MUST NOT import from `services/` or `apps/`.** Ever.
+- **The web client's server MUST NOT hold a session, refresh a token, call anything but the gateway's public API, or decide access** ([ADR 0047](./decisions/0047-the-web-server-is-a-renderer.md)). Every server call is `cache: 'no-store'`. `web-client.spec.ts` holds what a scan can see.
 - **In the Java gateway, `common/` MUST NOT reference `modules/`**, the same direction rule one level down. **No string literal names a sub-package of `com.synapsedesk.gateway`**: an AOP pointcut that names a missing type is dropped without an error, and `StrictRequestBodyConverter` matches the root package as text. **No two published classes share a simple name**, because springdoc names schemas by simple name. `PackageLayoutTest` holds all three.
 - **`@synapsedesk/contracts` and `@synapsedesk/core` MUST NOT import a Node built-in, NestJS, gRPC or any other server package**, `import type` included — a browser imports them. `core` may import `contracts`, and nothing else of ours. `browser-safe.spec.ts` holds both. `packages/grpc-proto` is where the wire lives.
 - **A provider that holds a connection MUST be an `@Injectable` class implementing `OnModuleDestroy`, registered with `useClass`.** Nest calls lifecycle hooks only on providers it instantiated from a class; a value returned by `useFactory` is just a value, so implementing the interface on it does nothing and no warning is issued. The connection is then never closed on `app.close()` — one leak per restart in production, and a test run that passes and then hangs with no output. `PendingUploadStore` in `services/storage-service/src/modules/storage/pending-upload.store.ts` is the reference.
@@ -65,6 +66,11 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 | Gateway code every feature uses — auth, security, cache, errors, OpenAPI, GraphQL wiring | `services/api-gateway/src/main/java/com/synapsedesk/gateway/common/<area>/` |
 | A gateway feature's controller, resolver, service or mapper | `services/api-gateway/src/main/java/com/synapsedesk/gateway/modules/<feature>/`, named after the Node module it ports, without hyphens |
 | A gateway request or response class | that module's `dto/rest/`, or `dto/graphql/` for a `*GqlDto`; `common/dto/` only when `common/` reads it or no single module owns it |
+| A web page or layout | `apps/web/src/app/`, under `(auth)` for the signed-out pages and `(app)` for the signed-in ones |
+| A web component | `apps/web/src/components/<area>/`; a shadcn component in `components/ui/` |
+| Web code that reads the incoming request (the server fetcher, prefetching) | `apps/web/src/server/`, the only place Node built-ins are allowed |
+| A call to the gateway from the web | nowhere by hand: the generated client in `packages/api-client`, through its fetcher |
+| A colour, spacing, radius or type value | a token, exported from Figma into `apps/web/design-tokens/`; never a literal in a component |
 
 ---
 
