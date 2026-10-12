@@ -34,7 +34,16 @@ describe('Two-factor auth (e2e)', () => {
     return secret;
   };
 
-  /** Enrols a user end to end and returns their TOTP secret + backup codes. */
+  /** The current RFC 6238 time step, as otplib counts it (30-second periods). */
+  const currentStep = () => Math.floor(Date.now() / 1000 / 30);
+
+  /**
+   * Enrols a user end to end and returns their TOTP secret + backup codes.
+   *
+   * Enabling spends the code it was given, so a row that then signs in inside
+   * the same 30 seconds would be replaying it. The enrolment is recorded one
+   * step earlier, as if it happened before the test began.
+   */
   async function enrol(userId: string) {
     const setup = await twoFactor.generateTwoFactor({ userId });
     const secret = secretFromUri(setup.otpauthUri);
@@ -42,7 +51,20 @@ describe('Two-factor auth (e2e)', () => {
       userId,
       code: generateSync({ secret }),
     });
+    await fx.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorLastTimeStep: currentStep() - 1 },
+    });
     return { secret, backupCodes: activated.backupCodes };
+  }
+
+  /** A fresh 2FA challenge for the user: the token `authenticate` takes. */
+  async function challenge(email: string): Promise<string> {
+    const login = await auth.login(
+      { email, password: TEST_PASSWORD },
+      requestOrigin(),
+    );
+    return login.twoFactorToken!;
   }
 
   beforeAll(async () => {
@@ -401,6 +423,109 @@ describe('Two-factor auth (e2e)', () => {
         ),
         status.UNAUTHENTICATED,
       );
+    });
+  });
+
+  describe('a TOTP code works once (RFC 6238 §5.2)', () => {
+    it('**a code accepted for sign-in is refused the second time**', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const { secret } = await enrol(user.id);
+      const code = generateSync({ secret });
+
+      await twoFactor.authenticateTwoFactor(
+        { twoFactorToken: await challenge(user.email), code },
+        requestOrigin(),
+      );
+
+      await expectRpc(
+        twoFactor.authenticateTwoFactor(
+          { twoFactorToken: await challenge(user.email), code },
+          requestOrigin(),
+        ),
+        status.UNAUTHENTICATED,
+      );
+    });
+
+    it("the next step's code is accepted", async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const { secret } = await enrol(user.id);
+      await twoFactor.authenticateTwoFactor(
+        {
+          twoFactorToken: await challenge(user.email),
+          code: generateSync({ secret }),
+        },
+        requestOrigin(),
+      );
+      const token = await challenge(user.email);
+
+      // Only the clock moves, 30 seconds: timers keep running for real.
+      jest.useFakeTimers({
+        now: Date.now() + 30_000,
+        doNotFake: [
+          'nextTick',
+          'queueMicrotask',
+          'setImmediate',
+          'clearImmediate',
+          'setTimeout',
+          'clearTimeout',
+          'setInterval',
+          'clearInterval',
+          'hrtime',
+          'performance',
+        ],
+      });
+      try {
+        await expect(
+          twoFactor.authenticateTwoFactor(
+            { twoFactorToken: token, code: generateSync({ secret }) },
+            requestOrigin(),
+          ),
+        ).resolves.toHaveProperty('accessToken');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('the code that enabled two-factor cannot then sign in', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const setup = await twoFactor.generateTwoFactor({ userId: user.id });
+      const secret = secretFromUri(setup.otpauthUri);
+      const code = generateSync({ secret });
+      await twoFactor.activateTwoFactor({ userId: user.id, code });
+
+      await expectRpc(
+        twoFactor.authenticateTwoFactor(
+          { twoFactorToken: await challenge(user.email), code },
+          requestOrigin(),
+        ),
+        status.UNAUTHENTICATED,
+      );
+    });
+
+    it('two concurrent submissions of one code: exactly one signs in', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const { secret } = await enrol(user.id);
+      const code = generateSync({ secret });
+      const [first, second] = [
+        await challenge(user.email),
+        await challenge(user.email),
+      ];
+
+      const outcomes = await Promise.allSettled([
+        twoFactor.authenticateTwoFactor(
+          { twoFactorToken: first, code },
+          requestOrigin(),
+        ),
+        twoFactor.authenticateTwoFactor(
+          { twoFactorToken: second, code },
+          requestOrigin(),
+        ),
+      ]);
+
+      expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
+        'fulfilled',
+        'rejected',
+      ]);
     });
   });
 
