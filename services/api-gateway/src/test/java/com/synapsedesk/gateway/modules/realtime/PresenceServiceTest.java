@@ -60,11 +60,9 @@ class PresenceServiceTest {
         any(Duration.class)
       )
     ).thenReturn(false);
-    when(values.get("presence:org-1:user-1")).thenReturn(
-      "{\"state\":\"busy\",\"updatedAt\":\"2026-01-01T00:00:00Z\"}"
-    );
 
-    assertThat(presence.onConnect(ORG, USER)).isEqualTo("busy");
+    // Nothing set by this connection, so nothing to announce; `busy` stays.
+    assertThat(presence.onConnect(ORG, USER)).isNull();
     verify(redis).expire(eq("presence:org-1:user-1"), any(Duration.class));
   }
 

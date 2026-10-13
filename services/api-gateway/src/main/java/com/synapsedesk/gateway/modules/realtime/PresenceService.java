@@ -53,9 +53,11 @@ public class PresenceService {
 
   /**
    * A socket connected. `online` ONLY if nothing is recorded — an existing
-   * `busy` survives a new tab. {@code null} means the store was unreachable,
-   * distinct from "offline": a transition not actually made must not be
-   * announced.
+   * `busy` survives a new tab. Returns `online` when this connection set it,
+   * the one transition a connect makes, and {@code null} otherwise: something
+   * was already recorded, or the store was unreachable. A transition not
+   * actually made must not be announced, and a state read beforehand can be
+   * stale by the time this runs (another socket's update in between).
    */
   public String onConnect(String organizationId, String userId) {
     String key = key(organizationId, userId);
@@ -71,9 +73,8 @@ public class PresenceService {
       // Something was already there — refresh its TTL without touching its
       // value, so an existing `busy` survives the new tab AND stays alive.
       redis.expire(key, TTL);
-      String existing = read(organizationId, userId);
 
-      return existing != null ? existing : ONLINE;
+      return null;
     } catch (RuntimeException failure) {
       LOG.error("Presence connect failed: {}", failure.getMessage());
 

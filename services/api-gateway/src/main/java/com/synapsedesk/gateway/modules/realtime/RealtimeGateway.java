@@ -276,18 +276,15 @@ public class RealtimeGateway implements RuntimeParticipant {
     }
 
     try {
-      String before = presence.read(
-        principal.organizationId(),
-        principal.sub()
-      );
+      // Only the transition this connection made: `online` when nothing was
+      // recorded. A state read first can be stale by the time the connection
+      // is recorded, and announcing it repeated another socket's update.
       String state = presence.onConnect(
         principal.organizationId(),
         principal.sub()
       );
 
-      // `null` means the store was unreachable — announcing nothing is
-      // right: a transition not actually made must not be reported.
-      if (state != null && !state.equals(before)) {
+      if (state != null) {
         emitPresence(principal.organizationId(), principal.sub(), state);
       }
     } catch (RuntimeException failure) {

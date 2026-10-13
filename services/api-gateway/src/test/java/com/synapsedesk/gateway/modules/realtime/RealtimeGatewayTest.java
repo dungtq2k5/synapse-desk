@@ -355,7 +355,6 @@ class RealtimeGatewayTest {
       false
     );
     when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
-    when(presence.read("o1", "u1")).thenReturn(null);
     when(presence.onConnect("o1", "u1")).thenReturn("online");
 
     connectCaptor.getValue().onConnect(clientWithCookie("access_token=tok"));
@@ -368,7 +367,7 @@ class RealtimeGatewayTest {
   }
 
   @Test
-  void doesNotAnnouncePresenceWhenTheStateDidNotChange() {
+  void doesNotAnnouncePresenceTheConnectionDidNotSet() {
     JwtPrincipal principal = new JwtPrincipal(
       "u1",
       "o1",
@@ -379,12 +378,14 @@ class RealtimeGatewayTest {
       false
     );
     when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
-    when(presence.read("o1", "u1")).thenReturn("busy");
-    when(presence.onConnect("o1", "u1")).thenReturn("busy");
+    // Already `busy`: the connection set nothing. And the state is not read
+    // first, since a read taken before another socket's update is stale.
+    when(presence.onConnect("o1", "u1")).thenReturn(null);
 
     connectCaptor.getValue().onConnect(clientWithCookie("access_token=tok"));
 
     verify(broadcast, never()).broadcastToRoom(any(), any(), any());
+    verify(presence, never()).read(any(), any());
   }
 
   @Test
