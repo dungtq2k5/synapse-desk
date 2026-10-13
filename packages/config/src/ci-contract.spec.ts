@@ -135,6 +135,10 @@ describe('the CI contract', () => {
         why: 'targets the DEV databases; CI wants db:test:push',
       },
       {
+        pattern: /\bnpx\b/,
+        why: 'npx can install a package on demand and run its lifecycle scripts (Sonar S6505); run the lockfile’s binary from node_modules/.bin',
+      },
+      {
         pattern: /npm run (seed:demo|stripe:provision|plans:seed)[^\n]*--apply/,
         why: 'writes to a real Stripe sandbox and real databases',
       },

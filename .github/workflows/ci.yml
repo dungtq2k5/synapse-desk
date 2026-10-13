@@ -355,7 +355,9 @@ jobs:
         run: |
           npm run db:generate
           npm run db:reset -- --dev-only
-      - run: npx playwright install --with-deps chromium
+      # The lockfile's Playwright, never `npx`: npx can fetch a package on
+      # demand and run its install scripts.
+      - run: ./node_modules/.bin/playwright install --with-deps chromium
       # The harness imports the workspace libraries' `dist` as it loads, before
       # its setup builds anything.
       - run: npm run build:libs
