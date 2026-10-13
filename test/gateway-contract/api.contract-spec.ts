@@ -5,7 +5,7 @@
  * with its `PaginationResponseDto`, the GraphQL endpoint (which is NOT under
  * the API prefix and formats its own errors), and the two webhooks, whose
  * contract at the gateway is that the RAW body reaches the peer unchanged —
- * a signature is computed over bytes, so a gateway that re-serialised the JSON
+ * a signature is computed over bytes, so a gateway that re-serialized the JSON
  * would break verification without changing a single visible field.
  */
 
@@ -186,7 +186,7 @@ describe('pagination, GraphQL and the webhooks', () => {
     async () => {
       // The signature is computed over the exact body Stripe sent; the gateway
       // buffers it (`rawBody: true`) and hands both to the peer, which verifies.
-      // A gateway that re-serialised the JSON would break verification while
+      // A gateway that re-serialized the JSON would break verification while
       // every visible field stayed the same.
       peers.auth
         .on('BillingService/HandleStripeWebhook')

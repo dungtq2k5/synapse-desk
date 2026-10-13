@@ -133,7 +133,7 @@ describe('feedback', () => {
 
       expect(response.status).toBe(204);
       // Not `{}`, not `null` parsed from `"null"` — NO body at all. A framework
-      // that serialises an envelope onto a 204 would leave `response.text`
+      // that serializes an envelope onto a 204 would leave `response.text`
       // non-empty even though the status line says there is nothing to read.
       expect(response.text).toBe('');
       expect(response.body).toBeUndefined();

@@ -5,7 +5,7 @@
  * accepted on all but two (those two are Node's own 500s, listed below). It means
  * ABSENT on most and a specific instruction on eleven. A document that says
  * "optional, not nullable" understates this, and a gateway that answers 500 to a
- * `null` the other one accepts breaks a client that serialises its model with
+ * `null` the other one accepts breaks a client that serializes its model with
  * explicit nulls, which is common.
  *
  * **Two kinds of row, because the two kinds of answer are different contracts.**
