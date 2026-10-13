@@ -239,7 +239,16 @@ test.describe('the thread, live', () => {
       .getByRole('textbox')
       .pressSequentially('Thanks', { delay: 50 });
     await expect(page.getByText('Priya Shah is typing…')).toBeVisible();
-    await look(page, 'ticket-presence');
+    // Priya keeps typing while the captures run: typing ends 3 s after the
+    // last keystroke, and four captures take longer than that on a runner.
+    const keepTyping = setInterval(() => {
+      void others[1].page.keyboard.type('.').catch(() => undefined);
+    }, 1_000);
+    try {
+      await look(page, 'ticket-presence');
+    } finally {
+      clearInterval(keepTyping);
+    }
     for (const other of others) await other.context.close();
   });
 

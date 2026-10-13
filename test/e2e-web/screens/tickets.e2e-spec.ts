@@ -218,9 +218,19 @@ test.describe('the app shell', () => {
 
   test('live updates paused when the socket drops', async ({ page }) => {
     let drop: (() => void) | undefined;
+    let dropped = false;
+    // After the drop every reconnect is refused too, so the page stays paused
+    // while it is drawn rather than coming back mid-capture.
     await page.routeWebSocket(/\/socket\.io\//, (ws) => {
+      if (dropped) {
+        void ws.close();
+        return;
+      }
       ws.connectToServer();
-      drop = () => void ws.close();
+      drop = () => {
+        dropped = true;
+        void ws.close();
+      };
     });
     await page.goto('/tickets');
     await expect.poll(() => drop !== undefined).toBe(true);

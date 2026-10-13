@@ -63,6 +63,9 @@ export async function look(
         `${name} at ${width} is wider than the viewport`,
       ).toBeLessThanOrEqual(size.width);
       await normalize(page);
+      // From the top: a full-page capture draws the fixed sidebar wherever the
+      // scroll left it, and focus (an escalation notice) scrolls by timing.
+      await page.evaluate(() => window.scrollTo(0, 0));
       const mask = [...variable(page), ...(options.mask ?? [])];
       const file = `${name}-${width}-${scheme}.png`;
       if (options.target) {
