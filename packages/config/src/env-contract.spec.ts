@@ -292,6 +292,53 @@ describe('the environment contract', () => {
     });
   });
 
+  // ------------------------------- database URLs that reach compose's databases
+
+  /**
+   * Every service's example database URL names the user, password, port and
+   * database that `docker-compose.yml` creates from the root `.env.example`.
+   * Copying the examples is how a machine (a developer's, or CI's e2e-web job)
+   * gets its `.env` files, so a URL that disagrees fails the first connection
+   * (`P1000: Authentication failed`), as `user:password` placeholders did.
+   */
+  it('**every example database URL reaches the database compose creates**', () => {
+    const root = parseEnvFile(
+      readFileSync(join(REPO_ROOT, '.env.example'), 'utf8'),
+    );
+    const byPort = new Map(
+      Object.entries(root)
+        .filter(([key]) => key.endsWith('_DB_PORT'))
+        .map(([key, port]) => [port, root[key.replace(/_PORT$/, '_NAME')]]),
+    );
+    const urls = services().flatMap((service) =>
+      Object.entries(
+        parseEnvFile(
+          readFileSync(
+            join(REPO_ROOT, 'services', service, '.env.example'),
+            'utf8',
+          ),
+        ),
+      )
+        .filter(([key]) => key.endsWith('DATABASE_URL'))
+        .map(([key, value]) => ({
+          where: `${service} ${key}`,
+          url: new URL(value),
+        })),
+    );
+
+    expect(urls.length).toBeGreaterThanOrEqual(5);
+    expect(
+      urls
+        .filter(
+          ({ url }) =>
+            decodeURIComponent(url.username) !== root.DB_USER ||
+            decodeURIComponent(url.password) !== root.DB_PASSWORD ||
+            url.pathname.slice(1) !== byPort.get(url.port),
+        )
+        .map(({ where }) => where),
+    ).toEqual([]);
+  });
+
   // ------------------------- values that must be DERIVED from another service
 
   describe('**cookie lifetimes follow the tokens they carry**', () => {
