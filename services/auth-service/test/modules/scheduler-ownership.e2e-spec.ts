@@ -53,9 +53,17 @@ describe('scheduled jobs reach only their owner (e2e)', () => {
     return worker;
   };
 
-  const queueOn = (queueName: string): Queue => {
+  /**
+   * The real queue, emptied first. These are production's queue names on the
+   * one Redis every suite shares, and a booted ingestion-service registers its
+   * repeat entries there and leaves them: ten minutes after an ingestion e2e
+   * run, an `ingestion-reconcile` is waiting with no worker, and the first
+   * worker on the queue (this file's) takes it.
+   */
+  const queueOn = async (queueName: string): Promise<Queue> => {
     const queue = new Queue(queueName, { connection });
     queues.push(queue);
+    await queue.obliterate({ force: true });
 
     return queue;
   };
@@ -105,9 +113,9 @@ describe('scheduled jobs reach only their owner (e2e)', () => {
     // The assertion the doc insists on: the job-name-to-WORKER pairing, not
     // merely that everything completed. Under the bug everything completed too
     // — that was the bug.
-    const authQueue = queueOn(SCHEDULER_QUEUE.auth);
-    const ingestionQueue = queueOn(SCHEDULER_QUEUE.ingestion);
-    const ticketQueue = queueOn(SCHEDULER_QUEUE.ticket);
+    const authQueue = await queueOn(SCHEDULER_QUEUE.auth);
+    const ingestionQueue = await queueOn(SCHEDULER_QUEUE.ingestion);
+    const ticketQueue = await queueOn(SCHEDULER_QUEUE.ticket);
 
     workerOn(SCHEDULER_QUEUE.auth);
     workerOn(SCHEDULER_QUEUE.ingestion);
@@ -146,7 +154,7 @@ describe('scheduled jobs reach only their owner (e2e)', () => {
     //
     // Deterministic on purpose: the real bug was a race between workers, and a
     // test that raced would be flaky in the direction of passing.
-    const ingestionQueue = queueOn(SCHEDULER_QUEUE.ingestion);
+    const ingestionQueue = await queueOn(SCHEDULER_QUEUE.ingestion);
     workerOn(SCHEDULER_QUEUE.ingestion);
 
     await ingestionQueue.add(SCHEDULED_JOBS.AUTH_HOURLY, {});
@@ -168,7 +176,7 @@ describe('scheduled jobs reach only their owner (e2e)', () => {
     // its own worker (so cron repeats cannot fire mid-suite), so the worker
     // here is ours and the handler is theirs.
     const processor = fx.moduleRef.get(SchedulerProcessor);
-    const queue = queueOn(SCHEDULER_QUEUE.auth);
+    const queue = await queueOn(SCHEDULER_QUEUE.auth);
 
     const worker = new Worker(
       SCHEDULER_QUEUE.auth,
