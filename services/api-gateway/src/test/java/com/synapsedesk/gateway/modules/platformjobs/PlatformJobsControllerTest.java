@@ -87,8 +87,6 @@ class PlatformJobsControllerTest {
     controller = new PlatformJobsController(
       analyticsStub,
       ledgerStub,
-      platformStub,
-      notificationStub,
       currentUser,
       new SuperAdminCheck(),
       new JobHeartbeats(

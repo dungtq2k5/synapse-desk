@@ -37,7 +37,6 @@ class StrictRequestBodyConverterTest {
     public URI url;
   }
 
-  @SuppressWarnings("unchecked")
   private static final HttpMessageConverter<Object> STRICT = strict();
 
   private static HttpMessageConverter<Object> strict() {
@@ -47,8 +46,14 @@ class StrictRequestBodyConverterTest {
       builder
     );
 
-    // Custom converters come first.
-    return (HttpMessageConverter<Object>) builder.build().iterator().next();
+    // Custom converters come first. The builder types them `?`; this one reads
+    // any object.
+    @SuppressWarnings("unchecked")
+    HttpMessageConverter<Object> first = (HttpMessageConverter<Object>) builder
+      .build()
+      .iterator()
+      .next();
+    return first;
   }
 
   private static Fields read(String json) throws Exception {

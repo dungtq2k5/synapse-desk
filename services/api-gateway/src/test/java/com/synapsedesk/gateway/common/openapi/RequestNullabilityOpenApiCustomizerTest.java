@@ -109,9 +109,8 @@ class RequestNullabilityOpenApiCustomizerTest {
 
     assertThat(property(in, "list").getTypes()).contains("null");
     assertThat(property(in, "nested").getOneOf()).hasSize(2);
-    assertThat(property(in, "nested").getOneOf().get(1).getTypes()).contains(
-      "null"
-    );
+    Schema<?> nullBranch = property(in, "nested").getOneOf().get(1);
+    assertThat(nullBranch.getTypes()).contains("null");
   }
 
   @Test
@@ -150,8 +149,10 @@ class RequestNullabilityOpenApiCustomizerTest {
       document("In", "Out", List.of(query, path), named("In"), named("Out"))
     );
 
-    assertThat(query.getSchema().getTypes()).containsExactly("string");
-    assertThat(path.getSchema().getTypes()).containsExactly("string");
+    Schema<?> querySchema = query.getSchema();
+    Schema<?> pathSchema = path.getSchema();
+    assertThat(querySchema.getTypes()).containsExactly("string");
+    assertThat(pathSchema.getTypes()).containsExactly("string");
   }
 
   @Test

@@ -109,7 +109,8 @@ class ResponseSchemasOpenApiCustomizerTest {
     assertThat(property.getOneOf().get(0).get$ref()).isEqualTo(
       "#/components/schemas/Child"
     );
-    assertThat(property.getOneOf().get(1).getTypes()).containsExactly("null");
+    Schema<?> nullBranch = property.getOneOf().get(1);
+    assertThat(nullBranch.getTypes()).containsExactly("null");
   }
 
   @Test

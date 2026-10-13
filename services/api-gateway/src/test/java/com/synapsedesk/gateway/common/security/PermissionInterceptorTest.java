@@ -60,6 +60,7 @@ class PermissionInterceptorTest {
   })
   private void eitherCode() {}
 
+  @SuppressWarnings("unused") // looked up by name: handlerFor("noAnnotation")
   private void noAnnotation() {}
 
   @Test

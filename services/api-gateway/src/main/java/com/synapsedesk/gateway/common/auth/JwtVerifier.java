@@ -33,6 +33,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtVerifier {
 
+  /**
+   * The algorithm every token here must carry, refused otherwise before its
+   * signature is checked: an RSA verifier also accepts RS384, RS512 and PS256
+   * signatures from the same key, and auth-service issues only RS256.
+   */
+  static final JWSAlgorithm ALGORITHM = JWSAlgorithm.RS256;
+
   private final JWSVerifier accessVerifier;
   private final JWSVerifier twoFactorVerifier;
 
@@ -58,7 +65,10 @@ public class JwtVerifier {
   private Optional<JWTClaimsSet> verify(String token, JWSVerifier verifier) {
     try {
       SignedJWT jwt = SignedJWT.parse(token);
-      if (!jwt.verify(verifier)) {
+      if (
+        !ALGORITHM.equals(jwt.getHeader().getAlgorithm()) ||
+        !jwt.verify(verifier)
+      ) {
         return Optional.empty();
       }
 
@@ -115,9 +125,6 @@ public class JwtVerifier {
       throw new JOSEException("not an RSA public key: " + path, notAnRsaKey);
     }
   }
-
-  /** For a filter's own use — the algorithm every SignedJWT here must carry. */
-  static final JWSAlgorithm ALGORITHM = JWSAlgorithm.RS256;
 
   /**
    * The configured path, as given — or, failing that, as it resolves from the

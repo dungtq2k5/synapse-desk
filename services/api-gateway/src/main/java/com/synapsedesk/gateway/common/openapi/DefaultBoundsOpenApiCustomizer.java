@@ -74,13 +74,15 @@ public class DefaultBoundsOpenApiCustomizer implements OpenApiCustomizer {
   }
 
   private static void forEachValue(
-    Map<String, Schema> schemas,
+    // swagger-core's maps are raw; each value is a schema.
+    Map<String, ?> schemas,
     Set<Schema<?>> seen
   ) {
-    if (schemas != null) schemas.values().forEach(s -> strip(s, seen));
+    if (schemas != null) {
+      schemas.values().forEach(s -> strip((Schema<?>) s, seen));
+    }
   }
 
-  @SuppressWarnings("rawtypes")
   private static void strip(Schema<?> schema, Set<Schema<?>> seen) {
     if (schema == null || !seen.add(schema)) return;
 
@@ -107,13 +109,13 @@ public class DefaultBoundsOpenApiCustomizer implements OpenApiCustomizer {
     if (schema.getAdditionalProperties() instanceof Schema<?> additional) {
       strip(additional, seen);
     }
-    for (java.util.List<Schema> group : java.util.Arrays.asList(
+    for (java.util.List<?> group : java.util.Arrays.asList(
       schema.getAllOf(),
       schema.getAnyOf(),
       schema.getOneOf(),
       schema.getPrefixItems()
     )) {
-      if (group != null) group.forEach(s -> strip(s, seen));
+      if (group != null) group.forEach(s -> strip((Schema<?>) s, seen));
     }
     strip(schema.getNot(), seen);
   }

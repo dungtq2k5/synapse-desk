@@ -66,12 +66,16 @@ class ErrorEnvelopeOperationCustomizerIT {
     return operations;
   }
 
+  /** An operation's {@code responses}, a JSON object, by status code. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> responses(Map<String, Object> operation) {
+    return (Map<String, Object>) operation.get("responses");
+  }
+
   @Test
   void everyRouteDocuments415IffItTakesABody() {
     for (Map<String, Object> operation : operations()) {
-      Map<String, Object> responses = (Map<String, Object>) operation.get(
-        "responses"
-      );
+      Map<String, Object> responses = responses(operation);
       boolean has415 = responses.containsKey("415");
       boolean hasBody = operation.containsKey("requestBody");
       assertThat(has415)
@@ -116,9 +120,7 @@ class ErrorEnvelopeOperationCustomizerIT {
 
     int documented = 0;
     for (Map<String, Object> operation : operations()) {
-      Map<String, Object> responses = (Map<String, Object>) operation.get(
-        "responses"
-      );
+      Map<String, Object> responses = responses(operation);
       boolean throttled = !exempt.contains(
         normalized((String) operation.get("operationId"))
       );
@@ -135,9 +137,7 @@ class ErrorEnvelopeOperationCustomizerIT {
   @Test
   void everyRouteDocuments500() {
     for (Map<String, Object> operation : operations()) {
-      Map<String, Object> responses = (Map<String, Object>) operation.get(
-        "responses"
-      );
+      Map<String, Object> responses = responses(operation);
       assertThat(responses)
         .as(
           "500 should be documented on every route for %s",

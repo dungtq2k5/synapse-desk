@@ -247,6 +247,22 @@
       </plugin>
 
       <!--
+        An unchecked conversion or a raw type fails the build, in main, test and
+        generated code. JDK 21's `-Werror` takes no category, so any warning javac
+        prints by default fails it too; there are none.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerArgs combine.children="append">
+            <arg>-Xlint:unchecked,rawtypes</arg>
+            <arg>-Werror</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+
+      <!--
         **Stated, not left to the default.** One fork, no parallel classes —
         already true with no config at all, since neither plugin below set
         `forkCount` before this. Left implicit, a later "speed the build up"

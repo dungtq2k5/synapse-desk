@@ -73,9 +73,7 @@ class InboundEmailControllerTest {
       org.mockito.ArgumentCaptor.forClass(byte[].class);
     org.mockito.ArgumentCaptor<
       java.util.function.Function<String, String>
-    > header = org.mockito.ArgumentCaptor.forClass(
-      java.util.function.Function.class
-    );
+    > header = org.mockito.ArgumentCaptor.captor();
     org.mockito.Mockito.verify(resendInbound).handle(
       bytes.capture(),
       header.capture()

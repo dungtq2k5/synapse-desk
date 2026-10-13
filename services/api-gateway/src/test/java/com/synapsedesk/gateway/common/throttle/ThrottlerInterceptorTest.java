@@ -37,9 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 class ThrottlerInterceptorTest {
 
   private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
-  private final ValueOperations<String, String> valueOps = mock(
-    ValueOperations.class
-  );
+  private final ValueOperations<String, String> valueOps = mock();
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final HttpServletRequest request = mock(HttpServletRequest.class);
   private final HttpServletResponse response = mock(HttpServletResponse.class);
@@ -68,6 +66,7 @@ class ThrottlerInterceptorTest {
   @AuthThrottle
   private void authRoute() {}
 
+  @SuppressWarnings("unused") // looked up by name: handlerFor("generalRoute")
   private void generalRoute() {}
 
   @SkipThrottle

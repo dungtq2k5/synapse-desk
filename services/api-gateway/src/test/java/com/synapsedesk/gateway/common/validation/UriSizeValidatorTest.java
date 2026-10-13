@@ -32,7 +32,11 @@ class UriSizeValidatorTest {
 
     @Override
     public Class<? extends jakarta.validation.Payload>[] payload() {
-      return new Class[0];
+      // Java has no generic array creation; an empty array holds nothing to mistype.
+      @SuppressWarnings("unchecked")
+      Class<? extends jakarta.validation.Payload>[] none =
+        (Class<? extends jakarta.validation.Payload>[]) new Class<?>[0];
+      return none;
     }
 
     @Override

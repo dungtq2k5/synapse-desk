@@ -21,7 +21,6 @@ import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -36,11 +35,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.PlatformServiceGrpc;
 import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ingestion.Ledger.RunAiRollupRequest;
 import synapsedesk.ingestion.Ledger.RunAiRollupResponse;
-import synapsedesk.notification.NotificationServiceGrpc;
 import synapsedesk.ticket.Analytics.RunRollupRequest;
 import synapsedesk.ticket.Analytics.RunRollupResponse;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
@@ -90,8 +87,6 @@ public class PlatformJobsController {
 
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub;
   private final AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub;
-  private final PlatformServiceGrpc.PlatformServiceBlockingStub platformStub;
-  private final NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub;
   private final CurrentUser currentUser;
   private final SuperAdminCheck superAdminCheck;
   private final JobHeartbeats heartbeats;
@@ -99,16 +94,12 @@ public class PlatformJobsController {
   public PlatformJobsController(
     AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
     AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub,
-    PlatformServiceGrpc.PlatformServiceBlockingStub platformStub,
-    NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub,
     CurrentUser currentUser,
     SuperAdminCheck superAdminCheck,
     JobHeartbeats heartbeats
   ) {
     this.analyticsStub = analyticsStub;
     this.ledgerStub = ledgerStub;
-    this.platformStub = platformStub;
-    this.notificationStub = notificationStub;
     this.currentUser = currentUser;
     this.superAdminCheck = superAdminCheck;
     this.heartbeats = heartbeats;
@@ -288,10 +279,6 @@ public class PlatformJobsController {
       .health(JobRunStatusResponseDto.HealthEnum.fromValue(health));
   }
 
-  private static Instant toInstant(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
-  }
-
   private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(
     RequestContext context
   ) {
@@ -306,26 +293,6 @@ public class PlatformJobsController {
     RequestContext context
   ) {
     return ledgerStub
-      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(
-        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
-      );
-  }
-
-  private PlatformServiceGrpc.PlatformServiceBlockingStub withPlatformMetadata(
-    RequestContext context
-  ) {
-    return platformStub
-      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(
-        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
-      );
-  }
-
-  private NotificationServiceGrpc.NotificationServiceBlockingStub withNotificationMetadata(
-    RequestContext context
-  ) {
-    return notificationStub
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
