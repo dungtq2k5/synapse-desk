@@ -22,7 +22,7 @@ describe('two-factor-auth', () => {
   const ORGANIZATION = 'aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa';
   const USER = 'aaaaaaaa-4444-4444-8444-aaaaaaaaaaaa';
 
-  const accessCookie = () => ({
+  const accessCookie = (algorithm: 'RS256' | 'RS384' = 'RS256') => ({
     cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
       {
         sub: USER,
@@ -33,16 +33,19 @@ describe('two-factor-auth', () => {
         isEmailVerified: true,
       },
       TEST_KEYS.access(),
-      { algorithm: 'RS256', expiresIn: '15m' },
+      { algorithm, expiresIn: '15m' },
     )}`,
   });
 
-  const challengeCookie = (sub = USER) => ({
+  const challengeCookie = (
+    sub = USER,
+    algorithm: 'RS256' | 'RS384' = 'RS256',
+  ) => ({
     cookie: `${GATEWAY_ENV.JWT_2FA_NAME}=${sign(
       { sub, is2faPending: true },
       TEST_KEYS.twoFactor(),
       {
-        algorithm: 'RS256',
+        algorithm,
         expiresIn: '5m',
       },
     )}`,
@@ -244,6 +247,31 @@ describe('two-factor-auth', () => {
       expect(response.status).toBe(401);
       expect(
         peers.auth.calls('TwoFactorAuthService/AuthenticateTwoFactor'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Two Factor Auth')(
+    '**a token signed with the right key but not RS256 is refused, the session and the challenge alike**',
+    async () => {
+      // RS384 verifies with the same RSA key; only RS256 is issued.
+      const challenge = await new Session(gateway.baseUrl).post(
+        `${API}/auth/2fa/authenticate`,
+        { code: '123456' },
+        challengeCookie(USER, 'RS384'),
+      );
+      const session = await new Session(gateway.baseUrl).post(
+        `${API}/auth/2fa/setup`,
+        undefined,
+        accessCookie('RS384'),
+      );
+
+      expect([challenge.status, session.status]).toEqual([401, 401]);
+      expect(
+        peers.auth.calls('TwoFactorAuthService/AuthenticateTwoFactor'),
+      ).toHaveLength(0);
+      expect(
+        peers.auth.calls('TwoFactorAuthService/GenerateTwoFactor'),
       ).toHaveLength(0);
     },
   );
