@@ -1666,6 +1666,39 @@ describe('the real-time relay (e2e)', () => {
       expect(await presenceOf(organizationId, busyUser)).toBe('busy');
     });
 
+    it('2b. **a new socket announces only a change it made itself**', async () => {
+      // A connect used to read the state, then record the connection, then
+      // announce if the two differed; another socket's `busy` landing between
+      // those awaits was announced a second time (the contract suite's
+      // cross-replica row saw two frames on a slow runner). The read here is
+      // the one taken before that update.
+      const busyUser = faker.string.uuid();
+      const watcher = await fx.connectClient({ organizationId });
+      const first = await fx.connectClient({ sub: busyUser, organizationId });
+      const busy = waitForMatchingEvent<WirePresence>(
+        watcher,
+        REALTIME_EVENTS.presence,
+        (frame) =>
+          frame.data.userId === busyUser && frame.data.state === 'busy',
+      );
+      await setPresence(first, 'busy');
+      await busy;
+
+      const frames: WirePresence[] = [];
+      watcher.on(REALTIME_EVENTS.presence, (frame: WirePresence) => {
+        if (frame.data.userId === busyUser) frames.push(frame);
+      });
+      const staleRead = jest
+        .spyOn(fx.app.get(PresenceService), 'read')
+        .mockResolvedValueOnce(null);
+      await fx.connectClient({ sub: busyUser, organizationId });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      staleRead.mockRestore();
+
+      expect(frames).toEqual([]);
+      expect(await presenceOf(organizationId, busyUser)).toBe('busy');
+    });
+
     it('3. **a user whose heartbeat stops expires with NO disconnect event**', async () => {
       // The crashed-pod case. A pod that dies never sends `disconnect`, so
       // anything derived from disconnect events leaks "online forever" — and

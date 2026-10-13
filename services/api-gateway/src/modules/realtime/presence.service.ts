@@ -66,14 +66,16 @@ export class PresenceService {
    * unconditional write on connect would silently reset them to `online` and
    * they would have no idea their colleagues were being told they were free.
    *
-   * Returns the state now in force, or null if the store was unreachable —
-   * distinct from "offline", because the caller must not announce a transition
-   * it did not actually make.
+   * Returns `online` when this connection set it, the one transition a
+   * connect can make, and null otherwise: something was already recorded (an
+   * existing `busy` survives), or the store was unreachable. The caller must
+   * not announce a transition it did not make, and a state read beforehand
+   * can be stale by the time this runs (another socket's update in between).
    */
   async onConnect(
     organizationId: string,
     userId: string,
-  ): Promise<PresenceState | null> {
+  ): Promise<'online' | null> {
     const key = this.key(organizationId, userId);
 
     try {
@@ -91,7 +93,7 @@ export class PresenceService {
       // value, so an existing `busy` survives the new tab AND stays alive.
       await this.redis.expire(key, PRESENCE_TTL_SECONDS);
 
-      return (await this.read(organizationId, userId)) ?? 'online';
+      return null;
     } catch (error) {
       this.logger.error(`Presence connect failed: ${formatErrorMsg(error)}`);
       return null;

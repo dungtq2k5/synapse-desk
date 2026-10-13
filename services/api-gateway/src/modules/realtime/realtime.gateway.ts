@@ -637,25 +637,23 @@ export class RealtimeGateway
    *
    * `online` ONLY if nothing is recorded — an existing `busy` survives a new
    * tab, because a user who declared themselves busy did not stop being busy by
-   * opening a window. And the frame goes out only when the state actually
-   * changed, for the same reason `presence:update` is transition-only.
+   * opening a window. And the frame goes out only when this connection
+   * changed the state, for the same reason `presence:update` is
+   * transition-only.
    */
   private async announceConnected(payload: JwtPayload): Promise<void> {
     if (!payload.organizationId) return;
 
     try {
-      const before = await this.presence.read(
-        payload.organizationId,
-        payload.sub,
-      );
+      // Only the transition this connection made: `online` when nothing was
+      // recorded. A state read first can be stale by the time the connection
+      // is recorded, and announcing it repeated another socket's update.
       const state = await this.presence.onConnect(
         payload.organizationId,
         payload.sub,
       );
 
-      // `null` means the store was unreachable. Announcing nothing is right:
-      // a transition we did not manage to record is one we must not report.
-      if (state && state !== before) {
+      if (state) {
         this.emitPresence(payload.organizationId, payload.sub, state);
       }
     } catch (error) {
