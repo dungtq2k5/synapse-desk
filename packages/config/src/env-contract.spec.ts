@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ObjectSchema } from 'joi';
 import { envDocumentedKeys, parseEnvFile } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
 import {
@@ -303,7 +302,10 @@ describe('the environment contract', () => {
     for (const file of files) {
       const service = file.split('/')[1];
       const { envValidationSchema } = (await import(join(REPO_ROOT, file))) as {
-        envValidationSchema: ObjectSchema;
+        // Joi's `validate`, typed here: this package doesn't depend on joi.
+        envValidationSchema: {
+          validate: (value: unknown, options: object) => { error?: Error };
+        };
       };
       const { error } = envValidationSchema.validate(
         {

@@ -30,7 +30,7 @@ data:
   JWT_ACCESS_EXPIRES_IN: '15m'
   JWT_ACCESS_PRIVATE_KEY_PATH: './secrets/jwt-access.key'
   JWT_TENANT_SELECTION_EXPIRES_IN: '5m'
-  LOG_LEVEL: 'log'
+  LOG_LEVEL: 'info'
   NATS_MONITOR_URL: 'http://nats:8222'
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
