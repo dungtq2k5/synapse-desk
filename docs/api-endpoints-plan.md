@@ -135,12 +135,14 @@ _Audit actions:_ `USER_LOGIN`, `USER_LOGIN_FAILED`, `USER_LOGOUT_ALL`, `REFRESH_
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| POST | `/auth/2fa/setup` | Generate + encrypt `two_factor_secret`, return `otpauth://` URI and QR data URL. Not yet enabled. | SELF |
-| POST | `/auth/2fa/enable` | Confirm a TOTP code → `is_two_factor_enabled = true`; returns the one-time plaintext backup codes. | SELF |
+| POST | `/auth/2fa/setup` | Generate + encrypt `two_factor_secret`, return `otpauth://` URI and QR data URL. Not yet enabled. | SELF, or the sign-in challenge (`mfa_token`) |
+| POST | `/auth/2fa/enable` | Confirm a TOTP code → `is_two_factor_enabled = true`; returns the one-time plaintext backup codes. | SELF, or the sign-in challenge (`mfa_token`) |
 | POST | `/auth/2fa/authenticate` | **Second leg of login.** Exchange the `two_factor` challenge cookie + TOTP (or backup code) for tokens. With `rememberDevice`, issues a device secret → `device_token_hash`, `is_trusted = true`, `trusted_until = NOW() + 30d`, as an HTTP-only `SameSite=Strict` cookie. Lives here rather than at `/auth/login/2fa` so all six 2FA operations share one controller. | PUBLIC (cookie) |
 | DELETE | `/auth/2fa` | Disable 2FA (requires TOTP + password). **409** when `organizations.enforce_two_factor = true`. | SELF |
 | POST | `/auth/2fa/backup-codes` | Regenerate `two_factor_backup_codes` (30d expiry). Invalidates unused codes; **dedupe-checks generated codes** — `generateBackupCodes()` is `Set`-based, so a batch can never contain the same code twice. | SELF |
 | GET | `/auth/2fa/backup-codes` | Metadata only — count remaining, `is_used`, `expires_at`. Never returns hashes or plaintext. | SELF |
+
+**A TOTP code is accepted once** (RFC 6238 §5.2). `users.two_factor_last_time_step` records the last accepted 30-second step, and a code from that step or an earlier one is refused, on `authenticate`, `enable` and the disable route alike. The step is written by a conditional update, so of two concurrent submissions of one code exactly one succeeds. The code that turned two-factor on can't then sign in: the next leg waits for the app's next code. Backup codes were already single-use.
 
 ### 1.3 Device Sessions — `/auth/sessions`
 
@@ -334,6 +336,8 @@ _Audit actions:_ `BILLING_SUBSCRIPTION_CHANGED`, `BILLING_ENTITLEMENTS_APPLIED`,
 ### 2.2 Ticket Messages — `/tickets/:id/messages`
 
 The unified Tier 1 + Tier 2 timeline (RDM §1.3).
+
+**Who may post: the ticket's author or its current assignee, and nobody on a `CLOSED` ticket.** That covers replies and internal notes alike. `ticket.read.all` lets an agent read any ticket, not reply to it as the support team. ticket-service enforces it (`PERMISSION_DENIED`, or `FAILED_PRECONDITION` when closed), and the socket's `message:send` checks the same rule first, so its refusal arrives in the ack. Edits and redactions aren't new posts and follow their own rows below.
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
