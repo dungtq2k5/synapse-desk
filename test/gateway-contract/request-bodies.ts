@@ -105,6 +105,8 @@ export function minimalValue(raw: Schema, name = ''): unknown {
       if (/email/iu.test(name)) return 'a@example.com';
       if (name === 'from') return '2026-01-01';
       if (name === 'to') return '2026-01-31';
+      // Meets PASSWORD_POLICY, which a password that is set must.
+      if (/password/iu.test(name)) return 'Aa1!aaaa';
 
       return 'x'.repeat(Math.max(1, schema.minLength ?? 1));
     case 'number':
