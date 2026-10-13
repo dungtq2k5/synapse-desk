@@ -11,12 +11,13 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { PASSWORD_POLICY } from '@synapsedesk/contracts';
 
 export class RegisterDto {
   @IsEmail()
   readonly email!: string;
 
-  @IsStrongPassword()
+  @IsStrongPassword(PASSWORD_POLICY)
   readonly password!: string;
 
   @IsNotEmpty()

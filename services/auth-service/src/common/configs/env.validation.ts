@@ -1,8 +1,10 @@
 import * as Joi from 'joi';
+import { isStrongPassword } from 'class-validator';
 import {
   LOG_LEVELS,
-  MIN_PASSWORD_LENGTH,
   NODE_ENV_OPTIONS,
+  PASSWORD_POLICY,
+  SUPER_ADMIN_PASSWORD_MIN_LENGTH,
 } from '@synapsedesk/contracts';
 
 /**
@@ -106,9 +108,9 @@ export const envValidationSchema = Joi.object({
   // every enrolled user.
   //
   // No constant for the `32`, deliberately. A constant earns its place when
-  // two things must AGREE — `MIN_PASSWORD_LENGTH` below is the counterpart,
-  // because the platform's password policy and this schema are two readers
-  // of one number. This 32 agrees with nothing: it is a floor on a key
+  // two things must AGREE — `PASSWORD_POLICY` below is the counterpart,
+  // because the gateway's password checks and this schema are two readers
+  // of one rule. This 32 agrees with nothing: it is a floor on a key
   // length, chosen here, read once. Naming it would add a lookup without
   // adding a tie.
   TWO_FACTOR_MASTER_KEY: Joi.string().required().min(32),
@@ -208,8 +210,8 @@ export const envValidationSchema = Joi.object({
   // account is created; rotating it later is done through the API, not here.
   SUPER_ADMIN_EMAIL: Joi.string().email().required(),
   SUPER_ADMIN_FULL_NAME: Joi.string().required(),
-  // **A list of PUBLISHED values, not of weak ones.** Length is already
-  // `min(12)`'s job and both of these pass it — the first is 37 characters.
+  // **A list of PUBLISHED values, not of weak ones.** Strength is the job of
+  // `min(12)` and `PASSWORD_POLICY`, and the `.env.test` value passes both.
   // What makes them dangerous is that a reader can look them up: one ships in
   // `.env.example` — the deployment contract `development-conventions.md` §10
   // requires of every service — and the other is in the tracked `.env.test`
@@ -225,7 +227,17 @@ export const envValidationSchema = Joi.object({
   // Every published value stays refused in the environments where "published"
   // means "an attacker can read it too".
   SUPER_ADMIN_PASSWORD: Joi.string()
-    .min(MIN_PASSWORD_LENGTH)
+    .min(SUPER_ADMIN_PASSWORD_MIN_LENGTH)
+    .custom((value: string, helpers) =>
+      isStrongPassword(value, PASSWORD_POLICY)
+        ? value
+        : helpers.error('password.strong'),
+    )
+    .messages({
+      'password.strong':
+        'SUPER_ADMIN_PASSWORD needs a lowercase letter, an uppercase letter, ' +
+        'a digit and a symbol.',
+    })
     .required()
     .when('NODE_ENV', {
       is: 'test',
@@ -246,7 +258,7 @@ export const envValidationSchema = Joi.object({
             'SUPER_ADMIN_PASSWORD is one of the placeholder values PUBLISHED in ' +
             'this repository (services/auth-service/.env.example and .env.test), so ' +
             'anyone can read it. It is refused outside NODE_ENV=test. Set your ' +
-            'own value of 12+ characters in services/auth-service/.env — the seeder ' +
+            'own value of 12+ characters, with a lowercase letter, an uppercase letter, a digit and a symbol, in services/auth-service/.env — the seeder ' +
             'applies it only when the Super Admin account is first created.',
         }),
     }),

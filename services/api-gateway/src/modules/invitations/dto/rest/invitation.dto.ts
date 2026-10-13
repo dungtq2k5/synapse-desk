@@ -9,6 +9,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsStrongPassword,
   IsUUID,
   MaxLength,
   MinLength,
@@ -18,7 +19,7 @@ import {
   DEFAULT_SEARCH,
   INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
-  MIN_PASSWORD_LENGTH,
+  PASSWORD_POLICY,
   type InvitationSortableField,
 } from '@synapsedesk/contracts';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
@@ -97,7 +98,7 @@ export class AcceptInvitationDto {
   readonly fullName!: string;
 
   @IsString()
-  @MinLength(MIN_PASSWORD_LENGTH)
+  @IsStrongPassword(PASSWORD_POLICY)
   readonly password!: string;
 
   /**

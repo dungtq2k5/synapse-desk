@@ -61753,8 +61753,7 @@
             "minLength": 1
           },
           "password": {
-            "type": "string",
-            "minLength": 12
+            "type": "string"
           },
           "deviceName": {
             "type": "string",
