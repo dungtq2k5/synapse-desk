@@ -9,7 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;

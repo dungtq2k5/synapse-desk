@@ -5,7 +5,6 @@ import com.synapsedesk.gateway.common.graphql.UsersLoaderConfig;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.modules.departments.DepartmentsLoaderConfig;
 import com.synapsedesk.gateway.modules.documents.DocumentsLoaderConfig;
-import com.synapsedesk.gateway.modules.roles.RoleMapper;
 import com.synapsedesk.gateway.modules.roles.dto.graphql.PermissionCatalogueGqlDto;
 import com.synapsedesk.gateway.modules.roles.dto.graphql.PermissionGqlDto;
 import io.grpc.stub.MetadataUtils;

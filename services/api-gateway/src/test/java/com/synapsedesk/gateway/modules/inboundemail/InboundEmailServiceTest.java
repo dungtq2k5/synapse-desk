@@ -55,7 +55,6 @@ import synapsedesk.ticket.Message.IngestAttachmentResponse;
 import synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
 import synapsedesk.ticket.Ticket.GetTicketByNumberRequest;
-import synapsedesk.ticket.Ticket.GetTicketRequest;
 import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc.TicketServiceBlockingStub;
 

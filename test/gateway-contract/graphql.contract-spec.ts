@@ -319,7 +319,7 @@ describe('the GraphQL limits and guards', () => {
         extensions?: Record<string, unknown>;
       }>;
       expect(error.message).toMatch(/too complex/);
-      // `classification` is graphql-java's own, on every error it serialises.
+      // `classification` is graphql-java's own, on every error it serializes.
       expect(error.extensions).toEqual({
         classification: 'ExecutionAborted',
         code: 'QUERY_TOO_COMPLEX',

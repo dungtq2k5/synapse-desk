@@ -1,7 +1,6 @@
 package com.synapsedesk.gateway.modules.roles.dto.graphql;
 
 import com.synapsedesk.gateway.modules.roles.PermissionCatalogueLoaderConfig;
-import com.synapsedesk.gateway.modules.roles.dto.graphql.PermissionGqlDto;
 import java.util.List;
 
 /**

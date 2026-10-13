@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Maps a {@link ResponseStatusException} — the SAME exception {@code
  * CurrentUser.require}, {@link com.synapsedesk.gateway.common.security.PermissionChecker}
  * and every resolver's own guard throw — to a proper GraphQL error instead
- * of the generic `INTERNAL_ERROR` Spring for GraphQL gives an unrecognised
+ * of the generic `INTERNAL_ERROR` Spring for GraphQL gives an unrecognized
  * exception.
  *
  * <p><b>Found, not assumed.</b> `PermissionChecker` throwing this exception

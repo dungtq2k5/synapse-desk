@@ -7,7 +7,6 @@ import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodes
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.modules.documents.dto.graphql.DocumentGqlDto;
-import com.synapsedesk.gateway.modules.ingestionjobs.IngestionJobMapper;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobGqlDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobPageGqlDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobStatusGql;

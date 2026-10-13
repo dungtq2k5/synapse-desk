@@ -6,8 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
-import com.synapsedesk.gateway.common.metrics.PublishedSeries;
 import io.grpc.Metadata;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;

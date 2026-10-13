@@ -2,7 +2,6 @@ package com.synapsedesk.gateway.common.metrics;
 
 import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
-import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.common.metrics.GatewayMetrics.JobSuccess;
 import java.util.ArrayList;
 import java.util.List;

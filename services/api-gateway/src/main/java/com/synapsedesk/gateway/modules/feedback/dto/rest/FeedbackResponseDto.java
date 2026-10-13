@@ -1,15 +1,9 @@
 package com.synapsedesk.gateway.modules.feedback.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import java.math.BigDecimal;
-import java.net.URI;
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;

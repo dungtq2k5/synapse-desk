@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.common.metrics;
 
-import com.synapsedesk.gateway.common.metrics.JobMetricsCollector;
 import io.prometheus.metrics.model.registry.PrometheusRegistry;
 import java.util.Properties;
 import java.util.Set;

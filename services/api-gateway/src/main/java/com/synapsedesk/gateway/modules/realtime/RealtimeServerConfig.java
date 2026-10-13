@@ -8,7 +8,6 @@ import com.corundumstudio.socketio.store.RedissonStoreFactory;
 import com.synapsedesk.gateway.common.config.RealtimeProperties;
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
-import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;

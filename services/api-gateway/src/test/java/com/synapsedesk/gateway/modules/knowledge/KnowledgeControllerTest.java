@@ -22,7 +22,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.ingestion.Document.GetKnowledgeArticleRequest;
 import synapsedesk.ingestion.Document.KnowledgeArticleDetailResponse;
 import synapsedesk.ingestion.Document.KnowledgeArticleResponse;

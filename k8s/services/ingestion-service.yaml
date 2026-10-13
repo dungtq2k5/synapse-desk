@@ -31,7 +31,7 @@ spec:
         # Prisma cannot express. Both are idempotent — `migrate deploy` takes
         # Prisma's own advisory lock and the DDL is `IF NOT EXISTS`
         # throughout — so the N concurrent runs a multi-replica rollout
-        # produces serialise and the losers no-op.
+        # produces serialize and the losers no-op.
         #
         # Moving the DDL here is what takes its `ShareLock` wait off the
         # readiness path: the same statements, before this pod is in the

@@ -1,7 +1,5 @@
 package com.synapsedesk.gateway.modules.sessions.dto.rest;
 
-import com.synapsedesk.gateway.modules.sessions.SessionsController;
-import com.synapsedesk.gateway.modules.sessions.UserSessionsController;
 import jakarta.validation.constraints.NotNull;
 
 /**

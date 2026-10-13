@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>A body field.</b> Measured by sending every optional field of every JSON route
  * absent and as an explicit {@code null}: it is accepted. On most it means "absent"; on eleven it is an instruction (clear
- * the date of birth, replace the allowed domains with none). A client that serialises
+ * the date of birth, replace the allowed domains with none). A client that serializes
  * its model with explicit nulls, which is common, sends one. The document used to say
  * "optional, not nullable" for most of them, because the annotation that makes springdoc
  * publish a null is the one the DTOs happen to carry, so this states the rule instead of

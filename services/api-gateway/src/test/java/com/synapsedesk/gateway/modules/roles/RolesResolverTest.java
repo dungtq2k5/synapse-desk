@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.modules.roles.PermissionCatalogueLoaderConfig;
 import com.synapsedesk.gateway.modules.roles.dto.graphql.PermissionCatalogueGqlDto;
 import com.synapsedesk.gateway.modules.roles.dto.graphql.PermissionGqlDto;
 import com.synapsedesk.gateway.modules.roles.dto.graphql.RoleGqlDto;

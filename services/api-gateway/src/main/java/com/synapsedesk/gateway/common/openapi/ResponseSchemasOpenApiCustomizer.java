@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * Publishes what a response schema's properties really are: ALL of them required,
  * and nullable wherever {@code @NotNull} does not say otherwise.
  *
- * <p><b>Why every property is required.</b> The gateway serialises nulls (no
+ * <p><b>Why every property is required.</b> The gateway serializes nulls (no
  * {@code @JsonInclude} on any DTO, no global inclusion setting), so a response
  * property's key is on the wire whether or not it has a value. springdoc publishes
  * as required only the properties carrying {@code @NotNull}, so a field that may be

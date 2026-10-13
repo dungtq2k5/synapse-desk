@@ -6,8 +6,6 @@ import com.synapsedesk.gateway.common.contracts.Subjects;
 import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
 import com.synapsedesk.gateway.common.nats.NatsEnvelope;
 import com.synapsedesk.gateway.common.runtime.RuntimeParticipant;
-import com.synapsedesk.gateway.modules.realtime.RealtimeRelay;
-import com.synapsedesk.gateway.modules.realtime.RealtimeRooms;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;

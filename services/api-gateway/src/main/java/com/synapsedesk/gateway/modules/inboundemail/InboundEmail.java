@@ -19,8 +19,8 @@ import java.util.Map;
  * for hours to no effect.
  *
  * <p><b>Absent and empty are the same here.</b> A record has no field
- * initialisers, so the constructor normalises a missing list to empty, which is
- * what a fixture that omits one deserialises to.
+ * initializers, so the constructor normalizes a missing list to empty, which is
+ * what a fixture that omits one deserializes to.
  *
  * <p>{@code text} and {@code html} may be null, because "no text part" and "the
  * field was forgotten" are different facts. A record always has the component,

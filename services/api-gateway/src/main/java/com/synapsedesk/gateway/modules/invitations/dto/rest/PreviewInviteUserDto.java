@@ -1,15 +1,9 @@
 package com.synapsedesk.gateway.modules.invitations.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

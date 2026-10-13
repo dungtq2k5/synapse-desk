@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.modules.roles.dto.graphql;
 
-import com.synapsedesk.gateway.modules.roles.RolesResolver;
 import java.time.OffsetDateTime;
 import java.util.List;
 

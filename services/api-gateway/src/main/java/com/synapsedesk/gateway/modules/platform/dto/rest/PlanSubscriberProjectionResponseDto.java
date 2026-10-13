@@ -1,15 +1,10 @@
 package com.synapsedesk.gateway.modules.platform.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

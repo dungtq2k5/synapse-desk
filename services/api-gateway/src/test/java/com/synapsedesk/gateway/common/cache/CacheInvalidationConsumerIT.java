@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.common.cache;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import io.nats.client.Connection;

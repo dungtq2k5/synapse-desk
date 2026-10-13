@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.common.cache;
 
-import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.common.contracts.Subjects;
 import com.synapsedesk.gateway.common.nats.NatsEnvelope;

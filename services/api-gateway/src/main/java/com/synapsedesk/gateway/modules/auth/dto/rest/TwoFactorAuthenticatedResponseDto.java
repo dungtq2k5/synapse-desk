@@ -1,13 +1,9 @@
 package com.synapsedesk.gateway.modules.auth.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.synapsedesk.gateway.common.dto.UserResponseDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 

@@ -6,7 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
-import com.synapsedesk.gateway.modules.inboundemail.ResendInboundService;
 import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementDto;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;

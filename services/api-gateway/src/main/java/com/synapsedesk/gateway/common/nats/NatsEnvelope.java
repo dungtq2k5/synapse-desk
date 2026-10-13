@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.common.nats;
 
-import com.synapsedesk.gateway.common.cache.CacheInvalidationConsumer;
 import java.nio.charset.StandardCharsets;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

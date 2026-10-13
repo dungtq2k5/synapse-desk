@@ -1,13 +1,9 @@
 package com.synapsedesk.gateway.modules.sessions.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import java.net.URI;
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;

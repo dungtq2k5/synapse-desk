@@ -44,7 +44,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.notification.Notification.CreateWebhookEndpointRequest;
 import synapsedesk.notification.Notification.DeleteWebhookEndpointResponse;
 import synapsedesk.notification.Notification.EventTypeList;
@@ -62,7 +61,6 @@ import synapsedesk.notification.Notification.WebhookEndpointIdRequest;
 import synapsedesk.notification.Notification.WebhookEndpointResponse;
 import synapsedesk.notification.Notification.WebhookEndpointWithSecretResponse;
 import synapsedesk.notification.NotificationServiceGrpc;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * `WebhookEndpointsApi` — outbound webhook management, against

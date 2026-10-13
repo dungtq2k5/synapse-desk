@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.common.metrics;
 
-import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import java.time.Instant;

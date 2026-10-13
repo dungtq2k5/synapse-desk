@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.modules.documents;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.graphql.UsersLoaderConfig;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
-import com.synapsedesk.gateway.modules.documents.DocumentMapper;
 import com.synapsedesk.gateway.modules.documents.dto.graphql.DocumentGqlDto;
 import io.grpc.stub.MetadataUtils;
 import java.util.HashMap;

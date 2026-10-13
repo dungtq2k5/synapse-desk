@@ -1,19 +1,10 @@
 package com.synapsedesk.gateway.modules.platform.dto.rest;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.synapsedesk.gateway.modules.platform.dto.rest.FinanceDunningResponseDto;
-import com.synapsedesk.gateway.modules.platform.dto.rest.FinancePlanMixResponseDto;
-import com.synapsedesk.gateway.modules.platform.dto.rest.FinanceRevenueResponseDto;
-import com.synapsedesk.gateway.modules.platform.dto.rest.FinanceTenantCountsResponseDto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import java.net.URI;
 import java.time.OffsetDateTime;
-import java.time.OffsetDateTime;
-import java.util.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

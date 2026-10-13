@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
-import com.synapsedesk.gateway.modules.realtime.RealtimeRelay;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

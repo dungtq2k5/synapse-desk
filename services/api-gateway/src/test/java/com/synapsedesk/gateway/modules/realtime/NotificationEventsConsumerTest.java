@@ -3,14 +3,12 @@ package com.synapsedesk.gateway.modules.realtime;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
-import com.synapsedesk.gateway.modules.realtime.RealtimeRelay;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
