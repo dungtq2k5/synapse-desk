@@ -311,7 +311,7 @@ describe('invitations', () => {
         {
           token: 'tok_abc123',
           fullName: 'Ada Lovelace',
-          password: 'super-secret-1',
+          password: 'Super-secret-1',
         },
       );
 
@@ -333,6 +333,43 @@ describe('invitations', () => {
   );
 
   rowFor('Invitations')(
+    '**`accept` takes the password rule sign-up does: 8+ with every character class, not length alone**',
+    async () => {
+      peers.auth.on('InvitationService/AcceptInvitation').reply({
+        accessToken: 'access-tok',
+        refreshToken: 'refresh-tok',
+        user: {
+          id: USER,
+          organizationId: ORGANIZATION,
+          fullName: 'Ada Lovelace',
+          email: 'invitee@example.com',
+          isEmailVerified: true,
+          isPhoneVerified: false,
+          isLocked: false,
+          isTwoFactorEnabled: false,
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        skipped: [],
+      });
+      const accept = (password: string) =>
+        new Session(gateway.baseUrl).post(`${API}/users/invitations/accept`, {
+          token: 'tok_abc123',
+          fullName: 'Ada Lovelace',
+          password,
+        });
+
+      // Thirteen characters, all lowercase letters.
+      expect((await accept('longpasswordx')).status).toBe(400);
+      expect(
+        peers.auth.calls('InvitationService/AcceptInvitation'),
+      ).toHaveLength(0);
+
+      expect((await accept('Aa1!aaaa')).status).toBe(200);
+    },
+  );
+
+  rowFor('Invitations')(
     '**`accept` refuses a caller who already holds a live session, before dialing the peer**',
     async () => {
       const response = await new Session(gateway.baseUrl).post(
@@ -340,7 +377,7 @@ describe('invitations', () => {
         {
           token: 'tok_abc123',
           fullName: 'Ada Lovelace',
-          password: 'super-secret-1',
+          password: 'Super-secret-1',
         },
         headers(['user.read']),
       );

@@ -305,7 +305,7 @@ describe('the environment contract', () => {
     // What an example tells you to set before it boots, by design: auth refuses
     // its published placeholder password outside NODE_ENV=test.
     const SET_BY_YOU: Readonly<Record<string, Record<string, string>>> = {
-      'auth-service': { SUPER_ADMIN_PASSWORD: 'a value of your own, 12+' },
+      'auth-service': { SUPER_ADMIN_PASSWORD: 'A value of your own, 12+' },
     };
     const files = repoFiles('services/*/src/**/env.validation.ts');
     const failures: string[] = [];

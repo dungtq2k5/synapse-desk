@@ -33,14 +33,35 @@ export const OTP_PURPOSES = [
 ] as const;
 
 /**
- * Shortest password any surface accepts.
+ * The rule every password a person sets must meet: at least 8 characters, with
+ * a lowercase letter, an uppercase letter, a digit and a symbol.
  *
- * Shared because two services enforce it independently: the gateway validates
- * it on the invitation-accept body, and auth-service's Joi schema requires it
- * of `SUPER_ADMIN_PASSWORD`. Two copies of a password policy is one copy that
- * gets raised and one that does not.
+ * The first five keys are validator.js's `isStrongPassword` options, so
+ * `@IsStrongPassword(PASSWORD_POLICY)` applies it as is. `symbols` is the set
+ * validator.js counts as a symbol, written out for the readers that do not run
+ * validator.js (Java's `@StrongPassword`, the web's checklist); validator.js
+ * takes no such option, and `password-policy.spec.ts` holds the two equal.
+ * A `€` is not a symbol.
+ *
+ * Routes that only check a password (sign-in) do not apply it, so a password
+ * set before the rule keeps working.
+ *
+ * @example isStrongPassword('Aa1!aaaa', PASSWORD_POLICY) // true
  */
-export const MIN_PASSWORD_LENGTH = 12;
+export const PASSWORD_POLICY = {
+  minLength: 8,
+  minLowercase: 1,
+  minUppercase: 1,
+  minNumbers: 1,
+  minSymbols: 1,
+  symbols: '-#!$@£%^&*()_+|~=`{}[]:";\'<>?,./\\ ',
+} as const;
+
+/**
+ * Shortest `SUPER_ADMIN_PASSWORD` auth-service boots with. The platform's
+ * highest-privilege account meets `PASSWORD_POLICY` and this longer minimum.
+ */
+export const SUPER_ADMIN_PASSWORD_MIN_LENGTH = 12;
 
 /**
  * What may be stored as a user AVATAR.

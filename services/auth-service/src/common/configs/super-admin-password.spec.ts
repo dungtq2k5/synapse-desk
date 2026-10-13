@@ -93,6 +93,12 @@ describe('SUPER_ADMIN_PASSWORD refuses the passwords this repo publishes', () =>
     ['development', PUBLISHED[1], 'FAIL:any.invalid'],
     ['production', 'short', 'FAIL:string.min'],
     ['test', 'short', 'FAIL:string.min'],
+    // Twelve characters, but no uppercase letter, digit or symbol.
+    ['production', 'longpassword', 'FAIL:password.strong'],
+    ['test', 'longpassword', 'FAIL:password.strong'],
+    // Every class, but shorter than the account's own minimum.
+    ['production', 'Aa1!aaaa', 'FAIL:string.min'],
+    ['production', 'Aa1!aaaaaaaa', 'PASS'],
     [undefined, PUBLISHED[1], 'FAIL:any.invalid'],
   ])('NODE_ENV=%s password=%s → %s', (nodeEnv, password, expected) => {
     expect(verdict(nodeEnv, password)).toBe(expected);
