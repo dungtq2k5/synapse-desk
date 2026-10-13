@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils';
 
 /** How long without a keystroke before "typing" ends. */
 const IDLE_MS = 3000;
+/**
+ * How often "typing" is said again while it goes on: the gateway relays it
+ * with a 5 s life (and at most every 2 s), so one signal per burst would
+ * vanish from the other side mid-sentence.
+ */
+const REFRESH_MS = 2000;
 
 /**
  * The reply box. An agent picks **Reply** or **Internal note** first, and in
@@ -36,6 +42,7 @@ export function Composer({
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typing = useRef(false);
+  const signalled = useRef(0);
   const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const helpId = useId();
   const note = agent && mode === 'note';
@@ -56,8 +63,9 @@ export function Composer({
     setContent(value);
     if (note) return;
     if (!value) return stopTyping();
-    if (!typing.current) {
+    if (!typing.current || Date.now() - signalled.current >= REFRESH_MS) {
       typing.current = true;
+      signalled.current = Date.now();
       onTyping(true);
     }
     globalThis.clearTimeout(idle.current);

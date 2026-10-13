@@ -42,6 +42,30 @@ describe('the composer', () => {
     expect(onTyping).not.toHaveBeenCalled();
   });
 
+  it('says "typing" again while it goes on, no more than every 2 s', async () => {
+    jest.useFakeTimers();
+    try {
+      const onTyping = jest.fn();
+      render(
+        <Composer
+          agent
+          requesterName="Priya Shah"
+          onSend={jest.fn()}
+          onTyping={onTyping}
+        />,
+      );
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+
+      await user.type(screen.getByRole('textbox'), 'Th');
+      expect(onTyping.mock.calls).toEqual([[true]]);
+      jest.advanceTimersByTime(2000);
+      await user.type(screen.getByRole('textbox'), 'a');
+      expect(onTyping.mock.calls).toEqual([[true], [true]]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('switching to a note mid-reply ends the typing signal', async () => {
     const { onTyping, user } = setup(true);
 
