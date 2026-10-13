@@ -21,11 +21,21 @@ message GenerateTwoFactorResponse {
 message ActivateTwoFactorRequest {
   string user_id = 1;
   string code = 2;
+  // Set when the user is enrolling mid sign-in: the challenge token the
+  // gateway verified. auth-service verifies it again, and with the code
+  // accepted the activation also signs the user in.
+  optional string two_factor_token = 3;
+  optional string device_name = 4;
 }
 
 message ActivateTwoFactorResponse {
   // Shown to the user EXACTLY once -- only hashes are stored.
   repeated string backup_codes = 1;
+  // Set only when two_factor_token was: the session, minted as
+  // AuthenticateTwoFactor mints it.
+  optional string access_token = 2;
+  optional string refresh_token = 3;
+  optional UserResponse user = 4;
 }
 
 // Second leg of login: exchanges the short-lived two_factor_token for real
