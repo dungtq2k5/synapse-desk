@@ -147,8 +147,7 @@ services:
     # message dies with the next `compose up`. A durable subject on that broker
     # is worse than a core one: core loses the message visibly, JetStream acks
     # the publisher first. `assertDurableStore` refuses to boot against it.
-    command:
-      ['-js', '-sd', '/data', '-m', '${NATS_DASHBOARD_PORT}'] # JetStream with a PERSISTENT store, + monitoring on 8222
+    command: ['-js', '-sd', '/data', '-m', '${NATS_DASHBOARD_PORT}'] # JetStream with a PERSISTENT store, + monitoring on 8222
     ports:
       - '${NATS_PORT}:4222' # NATS Client Port
       - '${NATS_DASHBOARD_PORT}:8222' # HTTP Management/Monitoring UI
@@ -262,6 +261,42 @@ services:
       timeout: 3s
       retries: 5
 
+  # ---------------------------------------------------------------- Docs
+  #
+  # Swagger UI over the committed docs/reference/openapi.json, the document
+  # the gateway serves (`openapi:check` holds them byte-equal). Development
+  # only, and opt-in like Prometheus: `docker compose up -d swagger-ui`, then
+  # http://localhost:${SWAGGER_UI_PORT}. The gateway serves JSON only, so the
+  # page lives here rather than in its image. Stop it with
+  # `docker compose --profile docs down`.
+  swagger-ui:
+    # Pinned — same rule as qdrant and firebase-storage above. Not 5.33: both
+    # 5.33.0 and 5.33.2 render only the first of this document's 31 tags
+    # (measured); 5.32.15 renders all 230 operations.
+    image: swaggerapi/swagger-ui:v5.32.15
+    container_name: synapsedesk-swagger-ui
+    profiles: [docs]
+    ports:
+      - '${SWAGGER_UI_PORT}:8080'
+    environment:
+      SWAGGER_JSON: /docs/openapi.json
+      # "Try it out" sends the gateway's cookies; the gateway's CORS list in
+      # services/api-gateway/.env.example admits this origin.
+      WITH_CREDENTIALS: 'true'
+    # The initializer is copied in, not mounted over the image's: the image
+    # rewrites it in place at start, from the environment above.
+    entrypoint:
+      - sh
+      - -c
+      - cp /synapsedesk/swagger-initializer.js /usr/share/nginx/html/ && exec /docker-entrypoint.sh nginx -g 'daemon off;'
+    volumes:
+      - ./docs/reference/openapi.json:/docs/openapi.json:ro
+      - ./docker/swagger-ui/swagger-initializer.js:/synapsedesk/swagger-initializer.js:ro
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 volumes:
   pgdata_auth:
   pgdata_ticket:
