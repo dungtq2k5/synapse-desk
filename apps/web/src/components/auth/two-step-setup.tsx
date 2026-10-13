@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { deviceName } from '@/lib/sign-in';
 import { announce } from '@/lib/toast';
 import { AuthCard } from './auth-card';
 import { CodeSlots } from './two-step-code';
@@ -39,19 +40,23 @@ export function manualKey(otpauthUri: string): string {
  * Two-step setup, for an organization that requires it: scan the QR code
  * (or type the key), confirm with a code, then the backup codes, shown once.
  * Both calls are allowed on the sign-in challenge alone, which is what lets a
- * member with no second factor yet enrol.
+ * member with no second factor yet enrol. Confirming through the challenge
+ * also signs the member in, so `onEnrolled` says whether a code is still due.
  */
 export function TwoStepSetup({
   onEnrolled,
   onBack,
 }: {
-  onEnrolled: () => void;
+  onEnrolled: (signedIn: boolean) => void;
   onBack: () => void;
 }) {
   const [secret, setSecret] = useState<GenerateTwoFactorResponseDto | null>(
     null,
   );
-  const [codes, setCodes] = useState<string[] | null>(null);
+  const [enabled, setEnabled] = useState<{
+    codes: string[];
+    signedIn: boolean;
+  } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const started = useRef(false);
 
@@ -85,20 +90,23 @@ export function TwoStepSetup({
     );
   }
 
-  return codes ? (
-    <BackupCodes codes={codes} onContinue={onEnrolled} />
+  return enabled ? (
+    <BackupCodes
+      codes={enabled.codes}
+      onContinue={() => onEnrolled(enabled.signedIn)}
+    />
   ) : (
-    <ScanAndConfirm secret={secret} onCodes={setCodes} onBack={onBack} />
+    <ScanAndConfirm secret={secret} onEnabled={setEnabled} onBack={onBack} />
   );
 }
 
 function ScanAndConfirm({
   secret,
-  onCodes,
+  onEnabled,
   onBack,
 }: {
   secret: GenerateTwoFactorResponseDto | null;
-  onCodes: (codes: string[]) => void;
+  onEnabled: (enabled: { codes: string[]; signedIn: boolean }) => void;
   onBack: () => void;
 }) {
   const [code, setCode] = useState('');
@@ -114,8 +122,14 @@ function ScanAndConfirm({
     setBusy(true);
     setError(null);
     try {
-      const answer = await twoFactorAuthControllerActivateV1({ code });
-      onCodes(answer.data?.backupCodes ?? []);
+      const answer = await twoFactorAuthControllerActivateV1({
+        code,
+        deviceName: deviceName(navigator.userAgent),
+      });
+      onEnabled({
+        codes: answer.data?.backupCodes ?? [],
+        signedIn: answer.data?.user != null,
+      });
     } catch (failure) {
       setBusy(false);
       setError(

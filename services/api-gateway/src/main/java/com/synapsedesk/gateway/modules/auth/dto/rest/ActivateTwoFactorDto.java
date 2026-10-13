@@ -18,6 +18,8 @@ public class ActivateTwoFactorDto {
 
   private String code;
 
+  private @Nullable String deviceName;
+
   public ActivateTwoFactorDto() {
     super();
   }
@@ -50,6 +52,27 @@ public class ActivateTwoFactorDto {
     this.code = code;
   }
 
+  public ActivateTwoFactorDto deviceName(@Nullable String deviceName) {
+    this.deviceName = deviceName;
+    return this;
+  }
+
+  /**
+   * The session's device label, used only when enabling through the sign-in
+   * challenge signs the caller in.
+   * @return deviceName
+   */
+  @Size(max = 100)
+  @JsonProperty("deviceName")
+  public @Nullable String getDeviceName() {
+    return deviceName;
+  }
+
+  @JsonProperty("deviceName")
+  public void setDeviceName(@Nullable String deviceName) {
+    this.deviceName = deviceName;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -59,12 +82,15 @@ public class ActivateTwoFactorDto {
       return false;
     }
     ActivateTwoFactorDto activateTwoFactorDto = (ActivateTwoFactorDto) o;
-    return Objects.equals(this.code, activateTwoFactorDto.code);
+    return (
+      Objects.equals(this.code, activateTwoFactorDto.code) &&
+      Objects.equals(this.deviceName, activateTwoFactorDto.deviceName)
+    );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(code);
+    return Objects.hash(code, deviceName);
   }
 
   @Override
@@ -72,6 +98,9 @@ public class ActivateTwoFactorDto {
     StringBuilder sb = new StringBuilder();
     sb.append("class ActivateTwoFactorDto {\n");
     sb.append("    code: ").append(toIndentedString(code)).append("\n");
+    sb.append("    deviceName: ")
+      .append(toIndentedString(deviceName))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }

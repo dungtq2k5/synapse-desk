@@ -28733,6 +28733,7 @@
       "post": {
         "tags": ["Two Factor Auth"],
         "summary": "Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes",
+        "description": "Through the sign-in challenge (an organization that requires two-step, met at sign-in), the accepted code also signs you in: the session cookies are set, the challenge cookie is cleared, and `user` is returned, so no second code is asked for. From a session, only the backup codes are returned.",
         "operationId": "TwoFactorAuthController_activate_v1",
         "requestBody": {
           "content": {
@@ -28750,7 +28751,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseBackupCodesResponseDto"
+                  "$ref": "#/components/schemas/ApiResponseTwoFactorEnabledResponseDto"
                 }
               }
             }
@@ -59851,9 +59852,73 @@
             "type": "string",
             "maxLength": 6,
             "minLength": 6
+          },
+          "deviceName": {
+            "type": ["string", "null"],
+            "description": "The new session's device label, used only when enabling through the sign-in challenge signs you in.",
+            "maxLength": 100
           }
         },
         "required": ["code"]
+      },
+      "ApiResponseTwoFactorEnabledResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/TwoFactorEnabledResponseDto"
+          }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
+      },
+      "TwoFactorEnabledResponseDto": {
+        "type": "object",
+        "properties": {
+          "backupCodes": {
+            "type": "array",
+            "description": "Shown once. Only hashes are stored.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "user": {
+            "description": "The user signed in when two-step was enabled through the sign-in challenge; null when it was enabled from a session.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["backupCodes", "user"]
+      },
+      "RegenerateBackupCodesDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["password"]
       },
       "ApiResponseBackupCodesResponseDto": {
         "type": "object",
@@ -59892,16 +59957,6 @@
           }
         },
         "required": ["backupCodes"]
-      },
-      "RegenerateBackupCodesDto": {
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": ["password"]
       },
       "AuthenticateTwoFactorDto": {
         "type": "object",

@@ -91,7 +91,7 @@ test('one email in two organizations: choose one', async ({ page }) => {
   await expect(page).toHaveURL(/\/tickets$/);
 });
 
-test('an organization that requires two-step: set it up, then the code', async ({
+test('an organization that requires two-step: setting it up signs you in', async ({
   page,
 }) => {
   const email = `robin@${domain('two-step')}`;
@@ -109,8 +109,7 @@ test('an organization that requires two-step: set it up, then the code', async (
   // The key renders after the heading: wait for it, then read it.
   await expect(page.locator('code')).toHaveText(/^[A-Z2-7 ]+$/);
   const key = (await page.locator('code').innerText()).trim();
-  const enabling = totp(key);
-  await page.getByLabel('Verification code').fill(enabling);
+  await page.getByLabel('Verification code').fill(totp(key));
   await page.getByRole('button', { name: 'Verify and continue' }).click();
 
   await expect(
@@ -121,16 +120,7 @@ test('an organization that requires two-step: set it up, then the code', async (
   await page.getByLabel('I’ve saved my backup codes somewhere safe').check();
   await continueButton.click();
 
-  await expect(
-    page.getByRole('heading', { name: 'Two-step verification' }),
-  ).toBeVisible();
-  await expect(page.getByText('Two-step verification is on')).toBeVisible();
-  // A code works once (RFC 6238 §5.2): signing in takes the next step's code,
-  // as a person would wait for their app to show a new one.
-  await expect
-    .poll(() => totp(key), { timeout: 31_000, intervals: [1_000] })
-    .not.toBe(enabling);
-  await page.getByLabel('Verification code').fill(totp(key));
-
+  // The code that enabled two-step also signed in: no second code is asked.
   await expect(page).toHaveURL(/\/tickets$/);
+  await expect(page.getByLabel('Verification code')).toHaveCount(0);
 });

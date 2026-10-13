@@ -433,7 +433,8 @@
       "summary": "Regenerate two_factor_backup_codes (30d expiry)"
     },
     "POST /api/v1/auth/2fa/enable": {
-      "summary": "Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes"
+      "summary": "Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes",
+      "description": "Through the sign-in challenge (an organization that requires two-step, met at sign-in), the accepted code also signs you in: the session cookies are set, the challenge cookie is cleared, and `user` is returned, so no second code is asked for. From a session, only the backup codes are returned."
     },
     "POST /api/v1/auth/2fa/setup": {
       "summary": "Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL"
@@ -743,6 +744,9 @@
   "properties": {
     "AcceptInvitationDto.deviceName": {
       "description": "Labels the session this call creates, in the user's active-device list.\n\nOptional: the client sends what it can identify itself as, and a session\nwith no label is still a session."
+    },
+    "ActivateTwoFactorDto.deviceName": {
+      "description": "The new session's device label, used only when enabling through the sign-in challenge signs you in."
     },
     "AddDepartmentMembersDto.isPrimary": {
       "description": "Makes THIS department primary for every user in the batch. A user has at\nmost one primary, so setting it here demotes whichever they had."
@@ -1330,6 +1334,12 @@
     },
     "TicketStatusChangeResponseDto.reason": {
       "description": "Null when the caller may not read it — see the route's docblock."
+    },
+    "TwoFactorEnabledResponseDto.backupCodes": {
+      "description": "Shown once. Only hashes are stored."
+    },
+    "TwoFactorEnabledResponseDto.user": {
+      "description": "The user signed in when two-step was enabled through the sign-in challenge; null when it was enabled from a session."
     },
     "TwoFactorRequiredResponseDto.requiresTwoFactorSetup": {
       "description": "True when the tenant REQUIRES 2FA and this account has not enrolled.\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."

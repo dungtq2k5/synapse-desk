@@ -8,6 +8,7 @@ import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,20 +42,31 @@ public class TwoFactorEnrolmentGuard {
     this.verifier = verifier;
   }
 
-  /** `EnrolleeContext` — only what a full session and a mid-challenge caller share. */
-  public record Enrollee(String sub, RequestOrigin origin) {}
+  /**
+   * `EnrolleeContext` — only what a full session and a mid-challenge caller share,
+   * plus the challenge token when that is how the caller came: enabling two-step
+   * with it also signs them in.
+   */
+  public record Enrollee(
+    String sub,
+    RequestOrigin origin,
+    @Nullable String twoFactorToken
+  ) {}
 
   public Enrollee require(HttpServletRequest request) {
     Optional<RequestContext> full = currentUser.read(request);
     if (full.isPresent()) {
-      return new Enrollee(full.get().sub(), full.get().origin());
+      return new Enrollee(full.get().sub(), full.get().origin(), null);
     }
 
-    Optional<JwtPrincipal> challenge = cookies
-      .readTwoFactorToken(request)
-      .flatMap(verifier::verifyTwoFactor);
+    Optional<String> token = cookies.readTwoFactorToken(request);
+    Optional<JwtPrincipal> challenge = token.flatMap(verifier::verifyTwoFactor);
     if (challenge.isPresent()) {
-      return new Enrollee(challenge.get().sub(), currentUser.origin(request));
+      return new Enrollee(
+        challenge.get().sub(),
+        currentUser.origin(request),
+        token.get()
+      );
     }
 
     throw new ResponseStatusException(

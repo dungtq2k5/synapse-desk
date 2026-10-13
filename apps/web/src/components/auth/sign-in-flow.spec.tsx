@@ -81,16 +81,8 @@ describe('the sign-in flow', () => {
     expect(globalThis.location.hash).toBe(NEXT);
   });
 
-  it('sets up two-step when the organization requires it, then asks for a code', async () => {
-    const { user } = setup({
-      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
-      [GENERATE]: ok({
-        otpauthUri: 'otpauth://totp/SynapseDesk:priya?secret=JBSWY3DPEHPK3PXP',
-        qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-      }),
-      [ENABLE]: ok({ backupCodes: ['AAAAA-11111'] }),
-    });
-
+  /** Setup through to the backup codes being acknowledged. */
+  const enrol = async (user: ReturnType<typeof userEvent.setup>) => {
     await signIn(user);
     await screen.findByText('JBSW Y3DP EHPK 3PXP');
     await user.type(screen.getByLabelText('Verification code'), '123456');
@@ -104,6 +96,41 @@ describe('the sign-in flow', () => {
       }),
     );
     await user.click(screen.getByRole('button', { name: 'Continue' }));
+  };
+
+  it('**setup through the sign-in challenge signs in: no second code**', async () => {
+    const { calls, user } = setup({
+      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
+      [GENERATE]: ok({
+        otpauthUri: 'otpauth://totp/SynapseDesk:priya?secret=JBSWY3DPEHPK3PXP',
+        qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+      [ENABLE]: ok({
+        backupCodes: ['AAAAA-11111'],
+        user: { id: 'u1', email: 'priya@acme.example' },
+      }),
+    });
+
+    await enrol(user);
+
+    expect(globalThis.location.hash).toBe(NEXT);
+    expect(screen.queryByLabelText('Verification code')).toBeNull();
+    expect(
+      calls.find((call) => call.url.endsWith('/2fa/enable'))?.body,
+    ).toEqual({ code: '123456', deviceName: expect.any(String) });
+  });
+
+  it('without a session from setup, it still asks for a code', async () => {
+    const { user } = setup({
+      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
+      [GENERATE]: ok({
+        otpauthUri: 'otpauth://totp/SynapseDesk:priya?secret=JBSWY3DPEHPK3PXP',
+        qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      }),
+      [ENABLE]: ok({ backupCodes: ['AAAAA-11111'], user: null }),
+    });
+
+    await enrol(user);
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Two-step verification is on',

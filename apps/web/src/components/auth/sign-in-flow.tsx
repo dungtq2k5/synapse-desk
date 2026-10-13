@@ -81,7 +81,9 @@ export function SignInFlow({
     case 'setup':
       return (
         <TwoStepSetup
-          onEnrolled={() => setStep({ kind: 'code', justEnrolled: true })}
+          onEnrolled={(signedIn) =>
+            signedIn ? finish() : setStep({ kind: 'code', justEnrolled: true })
+          }
           onBack={back}
         />
       );

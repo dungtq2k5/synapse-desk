@@ -28,6 +28,7 @@ import com.synapsedesk.gateway.modules.auth.dto.rest.DisableTwoFactorDto;
 import com.synapsedesk.gateway.modules.auth.dto.rest.GenerateTwoFactorResponseDto;
 import com.synapsedesk.gateway.modules.auth.dto.rest.RegenerateBackupCodesDto;
 import com.synapsedesk.gateway.modules.auth.dto.rest.TwoFactorAuthenticatedResponseDto;
+import com.synapsedesk.gateway.modules.auth.dto.rest.TwoFactorEnabledResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -88,10 +89,10 @@ import synapsedesk.auth.TwoFactorAuthServiceGrpc;
  * first one. The gateway's own verification here is a fast 401 at the edge,
  * nothing more.
  *
- * <p><b>Migrated off `TwoFactorAuthApi`.</b> `activate` and
- * `regenerateBackupCodes` shared ONE generated response class for two
- * different routes — the dedup this flip retires — and now each returns
- * {@code ApiResponse<BackupCodesResponseDto>} on its own.
+ * <p><b>{@code activate} and {@code regenerateBackupCodes} answer different
+ * shapes.</b> Both return the backup codes; {@code activate} adds the user it
+ * signed in, when it was called through the sign-in challenge
+ * ({@link TwoFactorEnabledResponseDto}).
  */
 @Tag(name = "Two Factor Auth")
 @RestController
@@ -159,27 +160,58 @@ public class TwoFactorAuthController {
   )
   @ApiErrors({ "400", "401" })
   public ResponseEntity<
-    ApiResponse<BackupCodesResponseDto>
+    ApiResponse<TwoFactorEnabledResponseDto>
   > twoFactorAuthControllerActivateV1(
     @Valid @RequestBody ActivateTwoFactorDto activateTwoFactorDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     Enrollee enrollee = enrolment.require(request);
 
-    ActivateTwoFactorResponse response = withMetadata(
-      enrollee.origin()
-    ).activateTwoFactor(
+    // Through the sign-in challenge, auth-service also signs the caller in:
+    // the accepted code is the proof /2fa/authenticate would ask for again.
+    ActivateTwoFactorRequest.Builder wire =
       ActivateTwoFactorRequest.newBuilder()
         .setUserId(enrollee.sub())
-        .setCode(activateTwoFactorDto.getCode())
-        .build()
-    );
+        .setCode(activateTwoFactorDto.getCode());
+    if (enrollee.twoFactorToken() != null) {
+      wire.setTwoFactorToken(enrollee.twoFactorToken());
+      if (activateTwoFactorDto.getDeviceName() != null) {
+        wire.setDeviceName(activateTwoFactorDto.getDeviceName());
+      }
+    }
 
+    ActivateTwoFactorResponse response = withMetadata(
+      enrollee.origin()
+    ).activateTwoFactor(wire.build());
+
+    if (!response.hasAccessToken()) {
+      return ResponseEntity.ok(
+        ApiResponse.of(
+          200,
+          "OK",
+          new TwoFactorEnabledResponseDto(response.getBackupCodesList(), null)
+        )
+      );
+    }
+
+    // As /2fa/authenticate: the challenge is spent before the session is set.
+    cookies.clearTwoFactorToken(CurrentRequest.response());
+    cookies.setAccessToken(
+      CurrentRequest.response(),
+      response.getAccessToken()
+    );
+    cookies.setRefreshToken(
+      CurrentRequest.response(),
+      response.getRefreshToken()
+    );
     return ResponseEntity.ok(
       ApiResponse.of(
         200,
         "OK",
-        new BackupCodesResponseDto(response.getBackupCodesList())
+        new TwoFactorEnabledResponseDto(
+          response.getBackupCodesList(),
+          UserMapper.toUserResponseDto(response.getUser())
+        )
       )
     );
   }

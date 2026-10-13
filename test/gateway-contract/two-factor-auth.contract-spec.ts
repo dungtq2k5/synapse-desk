@@ -163,10 +163,59 @@ describe('two-factor-auth', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
-        data: { backupCodes: ['code-1', 'code-2'] },
+        data: { backupCodes: ['code-1', 'code-2'], user: null },
       });
+      // From a session it signs nobody in: no cookie is set or cleared.
+      expect(response.setCookie).toEqual([]);
       const [call] = peers.auth.calls('TwoFactorAuthService/ActivateTwoFactor');
       expect(call.request).toMatchObject({ userId: USER, code: '123456' });
+      expect(call.request).not.toHaveProperty('twoFactorToken');
+    },
+  );
+
+  rowFor('Two Factor Auth')(
+    '**`activate` through the challenge signs in: session cookies set, `mfa_token` cleared**',
+    async () => {
+      peers.auth.on('TwoFactorAuthService/ActivateTwoFactor').reply({
+        backupCodes: ['code-1'],
+        accessToken: 'access-tok',
+        refreshToken: 'refresh-tok',
+        user: wireUser(USER),
+      });
+      const challenge = challengeCookie();
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/2fa/enable`,
+        { code: '123456', deviceName: 'Chrome on macOS' },
+        challenge,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { backupCodes: ['code-1'], user: { email: 'ada@example.com' } },
+      });
+      const names = response.setCookie.map((line) => line.split('=')[0]);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          GATEWAY_ENV.JWT_ACCESS_NAME,
+          GATEWAY_ENV.JWT_REFRESH_NAME,
+        ]),
+      );
+      expect(
+        response.setCookie.find((line) =>
+          line.startsWith(`${GATEWAY_ENV.JWT_2FA_NAME}=`),
+        ),
+      ).toMatch(/Max-Age=0|Expires=/);
+      // The raw challenge goes to auth-service, which verifies it itself.
+      const [call] = peers.auth.calls('TwoFactorAuthService/ActivateTwoFactor');
+      expect(call.request).toMatchObject({
+        userId: USER,
+        code: '123456',
+        twoFactorToken: challenge.cookie.slice(
+          challenge.cookie.indexOf('=') + 1,
+        ),
+        deviceName: 'Chrome on macOS',
+      });
     },
   );
 
