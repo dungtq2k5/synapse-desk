@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.invitations.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.common.validation.StrongPassword;
 import jakarta.validation.constraints.*;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -83,7 +84,7 @@ public class AcceptInvitationDto {
    * @return password
    */
   @NotNull
-  @Size(min = 12)
+  @StrongPassword
   @JsonProperty("password")
   public String getPassword() {
     return password;

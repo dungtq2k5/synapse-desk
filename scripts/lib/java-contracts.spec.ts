@@ -65,6 +65,20 @@ describe('the Java contracts generator', () => {
       ).toThrow('GONE_PATTERNS');
     });
 
+    it('emits an integer as an `int`, so Java compares it as a number', () => {
+      const source = renderClass(
+        { className: 'PasswordPolicy', purpose: 'probe', exports: ['POLICY'] },
+        { POLICY: { minLength: 8, symbols: '!' } },
+      );
+
+      expect(source).toContain(
+        'public static final int POLICY_MIN_LENGTH = 8;',
+      );
+      expect(source).toContain(
+        'public static final String POLICY_SYMBOLS = "!";',
+      );
+    });
+
     it('says it is generated, so an edit is not mistaken for a source of truth', () => {
       expect(renderClass(group, common)).toContain('do not edit');
     });
@@ -104,6 +118,7 @@ describe('the Java contracts generator', () => {
     it('one file per group, named for its class', () => {
       expect(Object.keys(renderAll(complete)).sort()).toEqual([
         'GrpcMetadata.java',
+        'PasswordPolicy.java',
         'RealtimeEvents.java',
         'Subjects.java',
       ]);

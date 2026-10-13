@@ -243,7 +243,7 @@ describe('a write evicts the cached read it changes', () => {
         {
           token: 'tok_abc123',
           fullName: 'Ada Lovelace',
-          password: 'super-secret-1',
+          password: 'Super-secret-1',
         },
       );
 

@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.common.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.synapsedesk.gateway.common.contracts.PasswordPolicy;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,28 @@ class FieldValidatorParityTest {
   @MethodSource("passwords")
   void passwordAgreesWithClassValidator(String input, boolean expected) {
     assertThat(StrongPassword.Validator.accepts(input)).isEqualTo(expected);
+  }
+
+  /**
+   * The rule reads {@code PASSWORD_POLICY}: each symbol the policy names counts, in the
+   * validator and in the published pattern, and one character short is refused.
+   */
+  @Test
+  void passwordRuleReadsThePolicy() {
+    for (char symbol : PasswordPolicy.PASSWORD_POLICY_SYMBOLS.toCharArray()) {
+      String password =
+        "Aa1" +
+        "a".repeat(PasswordPolicy.PASSWORD_POLICY_MIN_LENGTH - 4) +
+        symbol;
+      assertThat(StrongPassword.Validator.accepts(password))
+        .as(password)
+        .isTrue();
+      assertThat(password).as(password).matches(StrongPassword.REGEX);
+      String oneShort = password.replaceFirst("aa", "a");
+      assertThat(StrongPassword.Validator.accepts(oneShort))
+        .as(oneShort)
+        .isFalse();
+    }
   }
 
   @ParameterizedTest(name = "isPhoneNumber({0}) is {1}")

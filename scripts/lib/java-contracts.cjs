@@ -52,6 +52,12 @@ const GROUPS = [
       'The caller-context keys every peer reads off the metadata. A missing one is a peer applying the wrong tenant filter.',
     exports: ['GRPC_CONTEXT_METADATA'],
   },
+  {
+    className: 'PasswordPolicy',
+    purpose:
+      'The rule every password a person sets meets, read by `@StrongPassword`. A stale copy is a gateway and a web checklist that disagree on what a password needs.',
+    exports: ['PASSWORD_POLICY'],
+  },
 ];
 
 /** Every `*_PATTERNS` export must be in a group, or named here with a reason. */
@@ -89,7 +95,9 @@ function renderClass(group, common) {
     for (const key of Object.keys(value).sort()) {
       const name = `${constantName(exportName.replace(/_PATTERNS$/u, ''))}_${constantName(key)}`;
       lines.push(
-        `  public static final String ${name} = ${javaString(value[key])};`,
+        Number.isInteger(value[key])
+          ? `  public static final int ${name} = ${value[key]};`
+          : `  public static final String ${name} = ${javaString(value[key])};`,
       );
     }
 
