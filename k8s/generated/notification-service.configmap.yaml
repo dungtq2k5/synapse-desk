@@ -22,7 +22,7 @@ data:
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '5005'
   INBOUND_EMAIL_DOMAIN: 'REPLACE_ME'
-  LOG_LEVEL: 'log'
+  LOG_LEVEL: 'info'
   NATS_MONITOR_URL: 'http://nats:8222'
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
