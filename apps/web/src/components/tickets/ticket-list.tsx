@@ -312,7 +312,9 @@ export function TicketList() {
                       {' · '}
                     </>
                   )}
-                  {relativeTime(ticket.updatedAt)}
+                  <time dateTime={ticket.updatedAt}>
+                    {relativeTime(ticket.updatedAt)}
+                  </time>
                 </p>
               </li>
             ))}

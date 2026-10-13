@@ -74,7 +74,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SidebarContent>
             <nav aria-label="Main">
               <SidebarGroup>
-                <SidebarGroupLabel>Support</SidebarGroupLabel>
+                {/* Muted, but not shadcn's 70% foreground, which fails AA contrast. */}
+                <SidebarGroupLabel className="text-muted-foreground">
+                  Support
+                </SidebarGroupLabel>
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton

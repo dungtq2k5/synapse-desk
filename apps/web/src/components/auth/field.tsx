@@ -16,6 +16,7 @@ export function Field({
   labelAside,
   description,
   error,
+  announce = false,
   children,
 }: {
   id: string;
@@ -24,6 +25,11 @@ export function Field({
   labelAside?: ReactNode;
   description?: ReactNode;
   error?: string | null;
+  /**
+   * The error is an answer from the server rather than a check as you type,
+   * so it is announced (`role="alert"`) as well as tied to the control.
+   */
+  announce?: boolean;
   children: (aria: {
     'aria-describedby'?: string;
     'aria-invalid'?: true;
@@ -50,7 +56,11 @@ export function Field({
         </div>
       )}
       {error && (
-        <p id={`${id}-error`} className="text-sm text-destructive">
+        <p
+          id={`${id}-error`}
+          role={announce ? 'alert' : undefined}
+          className="text-sm text-destructive"
+        >
           {error}
         </p>
       )}

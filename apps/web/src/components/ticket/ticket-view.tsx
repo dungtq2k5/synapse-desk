@@ -444,7 +444,8 @@ function Details({
   ticket: TicketResponseDto;
   agent: boolean;
 }) {
-  const when = (at: string | null) => (at ? absoluteTime(at) : '—');
+  const when = (at: string | null) =>
+    at ? <time dateTime={at}>{absoluteTime(at)}</time> : '—';
   const rows: [string, React.ReactNode][] = [
     ['Status', <StatusBadge key="s" status={ticket.status} />],
     ['Priority', <PriorityBadge key="p" priority={ticket.priority} />],

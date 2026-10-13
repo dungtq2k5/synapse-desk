@@ -45,6 +45,10 @@ export function CodeSlots({
       inputMode="numeric"
       pattern="^[0-9]*$"
       autoComplete="one-time-code"
+      // The default ('increase-width') widens the hidden input past the slots
+      // for a password manager's badge, and after a resize it pushes the page
+      // 24px wider than a 390px phone.
+      pushPasswordManagerStrategy="none"
       autoFocus
       value={value}
       onChange={onChange}
@@ -190,6 +194,7 @@ export function TwoStepCode({
           </div>
         ) : (
           <Field
+            announce
             id="backup-code"
             label="Backup code"
             description="Each code works once. Capitals and the dash are optional."
