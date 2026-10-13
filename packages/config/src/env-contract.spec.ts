@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ObjectSchema } from 'joi';
 import { envDocumentedKeys, parseEnvFile } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
 import {
@@ -292,6 +293,48 @@ describe('the environment contract', () => {
     });
   });
 
+  // -------------------------------------------- examples a service boots on
+
+  /**
+   * Every service boots on its own `.env.example`: its Joi schema, with the
+   * options its `ConfigModule` uses, accepts the file. Copying the examples is
+   * how a fresh machine (CI's e2e-web job included) gets its `.env` files, and
+   * a value the schema refuses stops the service before it listens, as
+   * `LOG_LEVEL = log` did once the schema took only the logger's levels.
+   */
+  it("**every example passes its own service's env schema**", async () => {
+    // What an example tells you to set before it boots, by design: auth refuses
+    // its published placeholder password outside NODE_ENV=test.
+    const SET_BY_YOU: Readonly<Record<string, Record<string, string>>> = {
+      'auth-service': { SUPER_ADMIN_PASSWORD: 'a value of your own, 12+' },
+    };
+    const files = repoFiles('services/*/src/**/env.validation.ts');
+    const failures: string[] = [];
+
+    for (const file of files) {
+      const service = file.split('/')[1];
+      const { envValidationSchema } = (await import(join(REPO_ROOT, file))) as {
+        envValidationSchema: ObjectSchema;
+      };
+      const { error } = envValidationSchema.validate(
+        {
+          ...parseEnvFile(
+            readFileSync(
+              join(REPO_ROOT, 'services', service, '.env.example'),
+              'utf8',
+            ),
+          ),
+          ...SET_BY_YOU[service],
+        },
+        { allowUnknown: true, abortEarly: false },
+      );
+      if (error) failures.push(`${service}: ${error.message}`);
+    }
+
+    expect(files.length).toBeGreaterThanOrEqual(5);
+    expect(failures).toEqual([]);
+  });
+
   // ------------------------------- database URLs that reach compose's databases
 
   /**
@@ -330,10 +373,13 @@ describe('the environment contract', () => {
     expect(
       urls
         .filter(
-          ({ url }) =>
+          ({ where, url }) =>
             decodeURIComponent(url.username) !== root.DB_USER ||
             decodeURIComponent(url.password) !== root.DB_PASSWORD ||
-            url.pathname.slice(1) !== byPort.get(url.port),
+            url.pathname.slice(1) !== byPort.get(url.port) ||
+            // asyncpg refuses Prisma's `?schema=public` ("unrecognized
+            // configuration parameter"), so rag-service's carries no query.
+            (where.startsWith('rag-service') && url.search !== ''),
         )
         .map(({ where }) => where),
     ).toEqual([]);
