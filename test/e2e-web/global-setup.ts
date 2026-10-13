@@ -4,6 +4,7 @@ import systemSetup from '../system/global-setup';
 import systemTeardown from '../system/global-teardown';
 import { REPO_ROOT, type ServiceSpec } from '../system/services';
 import { startStack } from '../system/stack';
+import { startBrowserServer, stopBrowserServer } from './browser-server';
 import { startIngress, WEB_PORT } from './ingress';
 
 /** Where `next build` puts the server the image runs (`output: 'standalone'`). */
@@ -36,8 +37,9 @@ function completeStandalone(): void {
 
 /**
  * `test/system`'s setup (reset the stores, build everything, the web app
- * included, start the services, seed the demo data), then the web app and
- * the ingress in front of it. The returned function is the teardown.
+ * included, start the services, seed the demo data), then the web app, the
+ * ingress in front of it, and the browser the screen rows render in
+ * (browser-server.ts). The returned function is the teardown.
  */
 export default async function globalSetup(): Promise<() => Promise<void>> {
   await systemSetup();
@@ -55,8 +57,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     throw error;
   }
   const ingress = await startIngress();
+  await startBrowserServer();
 
   return async () => {
+    stopBrowserServer();
     ingress.closeAllConnections();
     await new Promise((resolve) => ingress.close(resolve));
     await systemTeardown();

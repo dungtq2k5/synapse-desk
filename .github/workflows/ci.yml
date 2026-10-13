@@ -361,6 +361,11 @@ jobs:
       # The harness imports the workspace libraries' `dist` as it loads, before
       # its setup builds anything.
       - run: npm run build:libs
+      # The screen rows render in the official Playwright image at the
+      # lockfile's version (test/e2e-web/browser-server.ts): pulled here so the
+      # suite's own time doesn't include it.
+      - name: the Playwright image the screens render in
+        run: docker pull "mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
 
       - name: e2e-web
         env:
@@ -368,7 +373,9 @@ jobs:
           SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
         run: npm run test:e2e:web
 
-      - name: upload the report, traces and service logs
+      # test-results holds each failed screenshot's -actual, -expected and
+      # -diff images beside the trace.
+      - name: upload the report, traces, screenshot diffs and service logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
