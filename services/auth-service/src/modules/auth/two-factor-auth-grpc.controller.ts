@@ -32,13 +32,18 @@ export class TwoFactorAuthGrpcController implements TwoFactorAuthServiceControll
 
   activateTwoFactor(
     request: ActivateTwoFactorRequest,
+    metadata?: Metadata,
   ): Promise<ActivateTwoFactorResponse> {
-    return this.twoFactorAuthService.activateTwoFactor(request);
+    return this.twoFactorAuthService.activateTwoFactor(
+      request,
+      unpackRequestOrigin(metadata),
+    );
   }
 
   /**
-   * The only method here that needs the origin: it creates a `device_sessions`
-   * row, which records the IP and user-agent the session was born on.
+   * Takes the origin, as `activateTwoFactor` does: both can create a
+   * `device_sessions` row, which records the IP and user-agent the session was
+   * born on.
    */
   authenticateTwoFactor(
     request: AuthenticateTwoFactorRequest,

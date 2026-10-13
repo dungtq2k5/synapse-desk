@@ -47,10 +47,10 @@ describe('Two-factor auth (e2e)', () => {
   async function enrol(userId: string) {
     const setup = await twoFactor.generateTwoFactor({ userId });
     const secret = secretFromUri(setup.otpauthUri);
-    const activated = await twoFactor.activateTwoFactor({
-      userId,
-      code: generateSync({ secret }),
-    });
+    const activated = await twoFactor.activateTwoFactor(
+      { userId, code: generateSync({ secret }) },
+      requestOrigin(),
+    );
     await fx.prisma.user.update({
       where: { id: userId },
       data: { twoFactorLastTimeStep: currentStep() - 1 },
@@ -87,7 +87,10 @@ describe('Two-factor auth (e2e)', () => {
         status.FAILED_PRECONDITION,
       );
       await expectRpc(
-        twoFactor.activateTwoFactor({ userId: user.id, code: '000000' }),
+        twoFactor.activateTwoFactor(
+          { userId: user.id, code: '000000' },
+          requestOrigin(),
+        ),
         status.FAILED_PRECONDITION,
       );
     });
@@ -114,7 +117,10 @@ describe('Two-factor auth (e2e)', () => {
       await twoFactor.generateTwoFactor({ userId: user.id });
 
       await expect(
-        twoFactor.activateTwoFactor({ userId: user.id, code: '000000' }),
+        twoFactor.activateTwoFactor(
+          { userId: user.id, code: '000000' },
+          requestOrigin(),
+        ),
       ).rejects.toBeInstanceOf(RpcException);
 
       const row = await fx.prisma.user.findUniqueOrThrow({
@@ -149,6 +155,75 @@ describe('Two-factor auth (e2e)', () => {
       });
       expect(statusResponse.remaining).toBe(backupCodes.length);
       expect(JSON.stringify(statusResponse)).not.toContain(backupCodes[0]);
+    });
+
+    it('6c. **through the sign-in challenge it also signs in**', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma, {
+        organization: { enforceTwoFactor: true },
+      });
+      const twoFactorToken = await challenge(user.email);
+      const setup = await twoFactor.generateTwoFactor({ userId: user.id });
+
+      const activated = await twoFactor.activateTwoFactor(
+        {
+          userId: user.id,
+          code: generateSync({ secret: secretFromUri(setup.otpauthUri) }),
+          twoFactorToken,
+          deviceName: 'Chrome on macOS',
+        },
+        requestOrigin(),
+      );
+
+      expect(activated.backupCodes.length).toBeGreaterThan(0);
+      expect(activated.accessToken).toEqual(expect.any(String));
+      expect(activated.refreshToken).toEqual(expect.any(String));
+      expect(activated.user?.id).toBe(user.id);
+      expect(
+        await fx.prisma.deviceSession.count({
+          where: { userId: user.id, deviceName: 'Chrome on macOS' },
+        }),
+      ).toBe(1);
+    });
+
+    it('6d. through a session it returns the codes and no tokens', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const setup = await twoFactor.generateTwoFactor({ userId: user.id });
+
+      const activated = await twoFactor.activateTwoFactor(
+        {
+          userId: user.id,
+          code: generateSync({ secret: secretFromUri(setup.otpauthUri) }),
+        },
+        requestOrigin(),
+      );
+
+      expect(activated.backupCodes.length).toBeGreaterThan(0);
+      expect(activated.accessToken).toBeUndefined();
+      expect(activated.user).toBeUndefined();
+    });
+
+    it("6e. another user's challenge is refused, and nothing is switched on", async () => {
+      const { user: holder } = await seedTenantWithUser(fx.prisma, {
+        organization: { enforceTwoFactor: true },
+      });
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const setup = await twoFactor.generateTwoFactor({ userId: user.id });
+
+      await expectRpc(
+        twoFactor.activateTwoFactor(
+          {
+            userId: user.id,
+            code: generateSync({ secret: secretFromUri(setup.otpauthUri) }),
+            twoFactorToken: await challenge(holder.email),
+          },
+          requestOrigin(),
+        ),
+        status.UNAUTHENTICATED,
+      );
+      expect(
+        (await fx.prisma.user.findUniqueOrThrow({ where: { id: user.id } }))
+          .isTwoFactorEnabled,
+      ).toBe(false);
     });
 
     it('6b. stored codes are SALTED SCRYPT — service and factory alike', async () => {
@@ -504,7 +579,10 @@ describe('Two-factor auth (e2e)', () => {
       const setup = await twoFactor.generateTwoFactor({ userId: user.id });
       const secret = secretFromUri(setup.otpauthUri);
       const code = generateSync({ secret });
-      await twoFactor.activateTwoFactor({ userId: user.id, code });
+      await twoFactor.activateTwoFactor(
+        { userId: user.id, code },
+        requestOrigin(),
+      );
 
       await expectRpc(
         twoFactor.authenticateTwoFactor(

@@ -158,10 +158,27 @@ export class TwoFactorAuthService {
    *
    * Requiring a valid code before enabling is what stops a mis-scanned QR from
    * becoming a locked-out account.
+   *
+   * **Mid sign-in, it also signs in.** A user whose organization requires
+   * two-step enrols holding only the login challenge; when the gateway passes
+   * that challenge (`twoFactorToken`), the accepted code is the same proof
+   * `authenticateTwoFactor` asks for, so the session is minted here and the
+   * user isn't asked for a second code (one code is spent per time step).
    */
   async activateTwoFactor(
     request: ActivateTwoFactorRequest,
+    origin: RequestOrigin,
   ): Promise<ActivateTwoFactorResponse> {
+    if (
+      request.twoFactorToken !== undefined &&
+      this.verifyTwoFactorToken(request.twoFactorToken) !== request.userId
+    ) {
+      throw new RpcException({
+        code: status.UNAUTHENTICATED,
+        message: 'Two-factor session is invalid or has expired',
+      });
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: request.userId, deletedAt: null },
       select: {
@@ -210,7 +227,19 @@ export class TwoFactorAuthService {
       'Two-factor authentication is now switched on for your account. You will be asked for a code from your authenticator app the next time you sign in.',
     );
 
-    return { backupCodes };
+    if (request.twoFactorToken === undefined) return { backupCodes };
+
+    const session = await this.authService.issueSession(
+      await this.authService.loadUserForAuth(user.id),
+      { name: request.deviceName, ...origin },
+    );
+
+    return {
+      backupCodes,
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      user: session.user,
+    };
   }
 
   /**

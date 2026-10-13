@@ -25,11 +25,25 @@ export interface GenerateTwoFactorResponse {
 export interface ActivateTwoFactorRequest {
   userId: string;
   code: string;
+  /**
+   * Set when the user is enrolling mid sign-in: the challenge token the
+   * gateway verified. auth-service verifies it again, and with the code
+   * accepted the activation also signs the user in.
+   */
+  twoFactorToken?: string | undefined;
+  deviceName?: string | undefined;
 }
 
 export interface ActivateTwoFactorResponse {
   /** Shown to the user EXACTLY once -- only hashes are stored. */
   backupCodes: string[];
+  /**
+   * Set only when two_factor_token was: the session, minted as
+   * AuthenticateTwoFactor mints it.
+   */
+  accessToken?: string | undefined;
+  refreshToken?: string | undefined;
+  user?: UserResponse | undefined;
 }
 
 /**
