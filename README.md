@@ -265,7 +265,7 @@ npm run db:test:push
 npm run test:e2e         # six suites, sequential
 ```
 
-`npm run test:e2e:web` drives the web client in Chromium across the whole system (`test/e2e-web/`, Playwright): sign-in through every leg, the expired-session fallback, a live reply between two browsers, and sign-out. It reuses `test:system`'s setup, so it is destructive in the same way, and it isn't run in CI yet: that setup seeds plans from Stripe, and CI has no Stripe key. Install the browser once with `npx playwright install chromium`.
+`npm run test:e2e:web` drives the web client in Chromium across the whole system (`test/e2e-web/`, Playwright): sign-in through every leg, the expired-session fallback, a live reply between two browsers, and sign-out. It reuses `test:system`'s setup, so it is destructive in the same way. CI runs it in the `e2e-web` job, whose plans seed reads Stripe with the repository secret `STRIPE_RESTRICT_KEY`: a test-mode restricted key (`rk_test_…`) with Read on Products and Prices, and nothing else. The job refuses any other kind of key. Install the browser once with `npx playwright install chromium`.
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares.
 
@@ -273,7 +273,7 @@ The specs under `packages/config/src/` are contract guards rather than unit test
 
 ## Docker images
 
-Three Dockerfiles, eleven images. The Node services build from one file with a `SERVICE` build arg; ingestion adds OCR, and the four schema-owning services also build a `migrate` target for their init container. The gateway builds from `docker/java-service.Dockerfile`, a Maven build and a JRE runtime, with the repository root as its context — it reads the protos and the published GraphQL schema.
+Four Dockerfiles, twelve images. The Node services build from one file with a `SERVICE` build arg; ingestion adds OCR, and the four schema-owning services also build a `migrate` target for their init container. The gateway builds from `docker/java-service.Dockerfile`, a Maven build and a JRE runtime, with the repository root as its context — it reads the protos and the published GraphQL schema. The web client builds from `docker/web.Dockerfile`, from Next.js's standalone output; `docker/check-images.sh --web-only` builds and boots it alone.
 
 ```sh
 docker build -f docker/node-service.Dockerfile \
@@ -306,7 +306,7 @@ docker run --network synapsedesk-network --env-file services/api-gateway/.env.do
 
 ## Kubernetes
 
-[**`k8s/README.md`**](k8s/README.md) owns this. Seven Deployments, seven Services, one Ingress, two StatefulSets and one NetworkPolicy; the decisions are [ADR 0043](docs/decisions/0043-the-cluster-shape.md).
+[**`k8s/README.md`**](k8s/README.md) owns this. Eight Deployments (the seven services and the web client), eight Services, one Ingress, two StatefulSets and three NetworkPolicies; the decisions are [ADR 0043](docs/decisions/0043-the-cluster-shape.md).
 
 Four things it does **not** create and will not tell you about twice: a namespace, a CNI that actually enforces NetworkPolicy, a default `StorageClass`, and an `ingress-nginx` controller. Read _Before the first apply_ before the first apply — an existing database built by `db push` has no `_prisma_migrations` row and needs `prisma migrate resolve --applied 0_init`, or `migrate deploy` will try to create tables that are already there.
 

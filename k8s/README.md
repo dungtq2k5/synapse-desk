@@ -1,6 +1,6 @@
 # `k8s/` — the manifests
 
-Seven Deployments, seven Services, one Ingress, two StatefulSets and one NetworkPolicy. The decisions behind them are [ADR 0043](../docs/decisions/0043-the-cluster-shape.md); this file is what you need to apply them.
+Eight Deployments, eight Services, one Ingress, two StatefulSets and three NetworkPolicies. The decisions behind them are [ADR 0043](../docs/decisions/0043-the-cluster-shape.md); this file is what you need to apply them.
 
 ## Layout
 
@@ -8,8 +8,8 @@ Seven Deployments, seven Services, one Ingress, two StatefulSets and one Network
 k8s/
   services/          Deployment + Service, one file per service
   infrastructure/    NATS and Qdrant StatefulSets (ADR 0043 keeps these in-cluster)
-  policy/            NetworkPolicy — known gap #26's egress control
-  ingress.yaml       the one Ingress; api-gateway only
+  policy/            NetworkPolicy: the two egress controls, and who may reach the gateway's HTTP port
+  ingress.yaml       the one Ingress, `synapsedesk`: /api, /graphql, /socket.io to the gateway, the rest to web
   generated/         ConfigMaps and Secret SKELETONS — do not edit
 ```
 

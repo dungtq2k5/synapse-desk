@@ -17,7 +17,7 @@ const socket = io(`${API_ORIGIN}/ws`, {
 });
 ```
 
-- **Namespace: `/ws`.** Not the default namespace.
+- **Namespace: `/ws`.** Not the default namespace. Import it as `REALTIME_SOCKET.namespace` from `@synapsedesk/contracts` rather than writing it out: a client on the root namespace connects and then never receives `connection:ready`.
 - **`withCredentials: true` is mandatory.** Without it the browser sends no cookie and the handshake is refused.
 - **`transports: ['websocket']` is mandatory too**, and it is a *deployment* constraint rather than a preference. Socket.IO's default list begins with HTTP long-polling, whose handshake is a sequence of requests that must all reach the **same** gateway replica; the Redis adapter shares broadcasts across replicas, not handshake state. With more than one replica a polling client gets `Session ID unknown` and reconnect-loops. Pin it, in every client.
 - **One frame per event, however many replicas run.** Every replica receives every server event from NATS and relays it to **its own** sockets only; presence and typing, which start on one replica, are the only frames that cross replicas through the Redis adapter. A client that sees a server event twice has found a bug, not a replica — do not de-duplicate it away.
@@ -91,10 +91,11 @@ The server puts every authenticated socket into its identity rooms at connection
 | Room | Joined | Carries |
 | :--- | :--- | :--- |
 | `user:{yourId}` | automatically | notifications, ticket assignments, your document events |
-| `org:{tenantId}` | automatically | tenant-wide ticket and presence events |
+| `org:{tenantId}` | automatically | presence, and `document:indexed` for organization-wide documents |
+| `org:{tenantId}:agents` | automatically, **only if you're an agent** (a super admin, or `ticket.read.all` or `ticket.message.moderate`) | `ticket:created`, and `ticket:updated` on escalation |
 | `dept:{id}` (one per department you belong to) | automatically | `document:indexed` for department-scoped documents |
 | `ticket:{id}` | **you join** via `ticket:join` | the thread's messages and typing |
-| `ticket:{id}:internal` | joined *with* `ticket:join`, only if you hold `ticket.read.all` | internal notes |
+| `ticket:{id}:internal` | joined *with* `ticket:join`, only if you're an agent, as above | internal notes, and `ticket:viewers` |
 
 **Internal notes are a separate room, not a filtered field.** If you are not an agent you never receive them at all — there is nothing to hide client-side. Permission is evaluated **at join time**, so a permission revoked mid-session takes effect on the next join rather than immediately.
 
@@ -144,8 +145,9 @@ Named from your point of view, and deliberately **coarser than the server's own 
 
 | Event | Room | Notes |
 | :--- | :--- | :--- |
-| `ticket:created` | `org:` | |
-| `ticket:updated` | `ticket:` **always**; `org:` **only on escalation**; `user:` on assign/reassign | see the warning below |
+| `ticket:created` | `org:…:agents`, and the author's `user:` | an end user hears only of their own tickets; an agent who is also the author gets one frame |
+| `ticket:updated` | `ticket:` **always**; `org:…:agents` **only on escalation**; `user:` on assign/reassign | see the warning below |
+| `ticket:viewers` | `ticket:…:internal` | `{ ticketId, viewers: [{ id, fullName }] }`, the agents viewing the ticket, sent on every join, leave and disconnect. `fullName` is `null` when a name doesn't resolve. A dead replica's viewers drop out within 90 s, seen at the ticket's next change |
 | `ticket:assigned` | `user:` | *personal* — a call to action, not a state change |
 | `ticket:joined` | your socket only | confirms a `ticket:join` |
 | `message:new` | `ticket:` | |
@@ -153,7 +155,7 @@ Named from your point of view, and deliberately **coarser than the server's own 
 | `message:deleted` | `ticket:` or `:internal` | **carries no content** — a redaction announces only that it happened, plus the id |
 | `typing` | `ticket:`, minus the sender | see §7 |
 
-**`ticket:updated` does not reach the org room on most changes.** Measured across the five producing patterns: the ticket room gets all five, the org room gets **one** — escalation. So a queue dashboard built on `org:` alone will not refresh on a status change, an assignment or an unassignment, but *will* refresh on an escalation. Partial freshness reads as a flaky server, and it is not. **Build a queue view on a REST poll or on `ticket:created` plus your own refetch**, not on `ticket:updated` in the org room.
+**`ticket:updated` does not reach the agents room on most changes.** Measured across the five producing patterns: the ticket room gets all five, the agents room gets **one** — escalation. So a queue dashboard built on `org:…:agents` alone will not refresh on a status change, an assignment or an unassignment, but *will* refresh on an escalation. Partial freshness reads as a flaky server, and it is not. **Build a queue view on a REST poll or on `ticket:created` plus your own refetch**, not on `ticket:updated` in the agents room.
 
 ### AI streaming
 
