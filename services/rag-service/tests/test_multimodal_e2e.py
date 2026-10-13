@@ -12,11 +12,15 @@ works: **a string that exists NOWHERE except inside the image comes out in the
 reformulated query.** If this fails, the parts are arriving and doing nothing.
 
 Skipped rather than failed without an API key or without poppler, because a
-missing credential is not a broken feature.
+missing credential is not a broken feature; and, after three tries, when the
+provider refuses with a transient status (503, 429): the pipeline then keeps the
+raw message by design, and an outage at Google is not a broken feature either.
 """
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -48,6 +52,32 @@ pytestmark = [
 ]
 
 
+#: What the provider says when it is busy rather than when the call is wrong.
+TRANSIENT = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
+
+
+async def run_live(pipeline, caplog, **kwargs):
+    """`pipeline.run`, tried again when the provider was transiently busy.
+
+    A refused call is logged by `MeteredGenerator` and the pipeline falls back
+    to the raw message, which would read as the model ignoring the image (and
+    pass the control for the wrong reason). Three tries, then a skip.
+    """
+    for attempt in range(3):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="rag_service.ledger.metered"):
+            result = await pipeline.run(**kwargs)
+        refused = [
+            record.getMessage()
+            for record in caplog.records
+            if any(status in record.getMessage() for status in TRANSIENT)
+        ]
+        if not refused:
+            return result
+        await asyncio.sleep(5 * (attempt + 1))
+    pytest.skip(f"the provider stayed busy for three tries: {refused[0]}")
+
+
 class NullQuota:
     async def charge(self, *_args, **_kwargs):
         return None
@@ -77,14 +107,16 @@ def screenshot() -> Attachment:
 
 
 async def test_the_reformulated_query_carries_a_string_only_the_IMAGE_has(
-    live_pipeline, screenshot, budget
+    live_pipeline, screenshot, budget, caplog
 ):
-    # 's example, run for real: six words that name no product, no
+    # The example, run for real: six words that name no product, no
     # error and no policy, plus the screenshot that names all three.
-    result = await live_pipeline.run(
-        "how can I solve this problem?",
-        [],
-        resolve_ai_settings("FAST"),
+    result = await run_live(
+        live_pipeline,
+        caplog,
+        message="how can I solve this problem?",
+        history=[],
+        settings=resolve_ai_settings("FAST"),
         budget=budget,
         attachments=[screenshot],
     )
@@ -99,15 +131,17 @@ async def test_the_reformulated_query_carries_a_string_only_the_IMAGE_has(
 
 
 async def test_without_the_attachment_the_same_message_yields_nothing_to_search(
-    live_pipeline, budget
+    live_pipeline, budget, caplog
 ):
     # The control, and the reason the test above means something. The same six
     # words with no file cannot produce the code — so a passing run above is the
     # image doing the work, not the model guessing from the prompt.
-    result = await live_pipeline.run(
-        "how can I solve this problem?",
-        [Turn(role="user", content="hello")],
-        resolve_ai_settings("FAST"),
+    result = await run_live(
+        live_pipeline,
+        caplog,
+        message="how can I solve this problem?",
+        history=[Turn(role="user", content="hello")],
+        settings=resolve_ai_settings("FAST"),
         budget=budget,
     )
 
