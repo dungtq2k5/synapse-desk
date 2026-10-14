@@ -151,7 +151,7 @@ done
 | Where | Key | Change it to | What happens otherwise |
 | :--- | :--- | :--- | :--- |
 | all four DB services | `DATABASE_URL` | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password` |
-| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own, 12+ chars | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
+| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own: 12+ characters, with a lowercase letter, an uppercase letter, a digit and a symbol | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
 
 `INBOUND_EMAIL_SECRET` needs one more thing that no single file can state: the **same value** must reach `api-gateway` and `notification-service`. Both examples ship a byte-identical placeholder, and `env-contract.spec.ts` keeps them that way — because a mismatch between the gateway and notification is **silent**: `parseTicketReplyToken` returns `null` and every email reply opens a new ticket instead of threading, with nothing in a log.
 
