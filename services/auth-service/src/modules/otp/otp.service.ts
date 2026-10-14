@@ -99,6 +99,7 @@ export class OtpService {
     return {
       target: maskEmail(user.email),
       expiresInMinutes: this.OTP_EXPIRY_MINUTES,
+      codeLength: this.OTP_LENGTH,
     };
   }
 
@@ -151,6 +152,7 @@ export class OtpService {
     return {
       target: maskPhoneNumber(request.phoneNumber),
       expiresInMinutes: this.OTP_EXPIRY_MINUTES,
+      codeLength: this.OTP_LENGTH,
     };
   }
 
@@ -190,7 +192,13 @@ export class OtpService {
     }
 
     const otp = await this.findPending(request.userId, purpose);
-    if (!otp) return { pending: false, attemptsRemaining: 0 };
+    if (!otp) {
+      return {
+        pending: false,
+        attemptsRemaining: 0,
+        codeLength: this.OTP_LENGTH,
+      };
+    }
 
     return {
       pending: true,
@@ -200,6 +208,7 @@ export class OtpService {
           : maskEmail(otp.target),
       expiresAt: toProtoTimestamp(otp.expiresAt),
       attemptsRemaining: Math.max(0, otp.maxAttempts - otp.attemptsCount),
+      codeLength: this.OTP_LENGTH,
     };
   }
 

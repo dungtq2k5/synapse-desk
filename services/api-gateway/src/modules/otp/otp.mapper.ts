@@ -10,5 +10,6 @@ export function toOtpStatusResponseDto(
     target: response.target ?? null,
     expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
     attemptsRemaining: response.attemptsRemaining,
+    codeLength: response.codeLength,
   };
 }

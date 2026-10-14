@@ -62245,9 +62245,13 @@
           },
           "expiresInMinutes": {
             "type": "number"
+          },
+          "codeLength": {
+            "type": "number",
+            "description": "How many digits the code has."
           }
         },
-        "required": ["target", "expiresInMinutes"]
+        "required": ["target", "expiresInMinutes", "codeLength"]
       },
       "VerifyOtpResponseDto": {
         "type": "object",
@@ -62302,9 +62306,19 @@
           },
           "attemptsRemaining": {
             "type": "number"
+          },
+          "codeLength": {
+            "type": "number",
+            "description": "How many digits a code has, pending or not."
           }
         },
-        "required": ["pending", "target", "expiresAt", "attemptsRemaining"]
+        "required": [
+          "pending",
+          "target",
+          "expiresAt",
+          "attemptsRemaining",
+          "codeLength"
+        ]
       },
       "DepartmentResponseDto": {
         "type": "object",

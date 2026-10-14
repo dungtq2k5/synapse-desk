@@ -141,6 +141,49 @@ describe('otp', () => {
   );
 
   rowFor('Otp')(
+    '**the code’s length is in every answer that sends or reports a code**, so a client’s field can match it',
+    async () => {
+      peers.auth.on('OtpService/RequestEmailVerification').reply({
+        target: 'a***e@acme.com',
+        expiresInMinutes: 10,
+        codeLength: 6,
+      });
+      peers.auth.on('OtpService/RequestPhoneVerification').reply({
+        target: '+44******1234',
+        expiresInMinutes: 10,
+        codeLength: 6,
+      });
+      peers.auth.on('OtpService/GetOtpStatus').reply({
+        pending: false,
+        attemptsRemaining: 0,
+        codeLength: 6,
+      });
+      const session = new Session(gateway.baseUrl);
+
+      const answers = [
+        await session.post(
+          `${API}/auth/email/verify/request`,
+          undefined,
+          cookie(),
+        ),
+        await session.post(
+          `${API}/auth/phone/verify/request`,
+          { phoneNumber: '+441234561234' },
+          cookie(),
+        ),
+        await session.get(
+          `${API}/auth/otp/status?purpose=EMAIL_VERIFICATION`,
+          cookie(),
+        ),
+      ];
+
+      for (const answer of answers) {
+        expect(answer.body).toMatchObject({ data: { codeLength: 6 } });
+      }
+    },
+  );
+
+  rowFor('Otp')(
     'a verified email code round-trips the peer’s answer',
     async () => {
       peers.auth.on('OtpService/VerifyEmail').reply({

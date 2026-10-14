@@ -393,6 +393,7 @@ describe('auth at the HTTP boundary (e2e)', () => {
           target: 's*****c@example.test',
           attemptsRemaining: 4,
           expiresAt: undefined,
+          codeLength: 6,
         }),
       );
 

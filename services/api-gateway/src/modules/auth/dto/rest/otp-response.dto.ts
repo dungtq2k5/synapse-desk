@@ -4,6 +4,8 @@ export class RequestOtpResponseDto {
   /** Masked: `a***e@acme.com` or `+44******1234`. */
   readonly target!: string;
   readonly expiresInMinutes!: number;
+  /** How many digits the code has. */
+  readonly codeLength!: number;
 }
 
 export class VerifyOtpResponseDto {
@@ -17,4 +19,6 @@ export class OtpStatusResponseDto {
   readonly target!: string | null;
   readonly expiresAt!: Date | null;
   readonly attemptsRemaining!: number;
+  /** How many digits a code has, pending or not. */
+  readonly codeLength!: number;
 }
