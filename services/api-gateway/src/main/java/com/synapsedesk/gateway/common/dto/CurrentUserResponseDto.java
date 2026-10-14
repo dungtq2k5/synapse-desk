@@ -142,6 +142,8 @@ public class CurrentUserResponseDto {
 
   private List<UUID> departmentIds = new ArrayList<>();
 
+  private Boolean hasPassword;
+
   public CurrentUserResponseDto() {
     super();
   }
@@ -152,11 +154,13 @@ public class CurrentUserResponseDto {
   public CurrentUserResponseDto(
     UserResponseDto user,
     List<PermissionCodesEnum> permissionCodes,
-    List<UUID> departmentIds
+    List<UUID> departmentIds,
+    Boolean hasPassword
   ) {
     this.user = user;
     this.permissionCodes = permissionCodes;
     this.departmentIds = departmentIds;
+    this.hasPassword = hasPassword;
   }
 
   public CurrentUserResponseDto user(UserResponseDto user) {
@@ -241,6 +245,27 @@ public class CurrentUserResponseDto {
     this.departmentIds = departmentIds;
   }
 
+  public CurrentUserResponseDto hasPassword(Boolean hasPassword) {
+    this.hasPassword = hasPassword;
+    return this;
+  }
+
+  /**
+   * Whether the account has a password. A Google-only one doesn't, and sets
+   * one through `POST /auth/password/forgot`.
+   * @return hasPassword
+   */
+  @NotNull
+  @JsonProperty("hasPassword")
+  public Boolean getHasPassword() {
+    return hasPassword;
+  }
+
+  @JsonProperty("hasPassword")
+  public void setHasPassword(Boolean hasPassword) {
+    this.hasPassword = hasPassword;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -256,13 +281,17 @@ public class CurrentUserResponseDto {
         this.permissionCodes,
         currentUserResponseDto.permissionCodes
       ) &&
-      Objects.equals(this.departmentIds, currentUserResponseDto.departmentIds)
+      Objects.equals(
+        this.departmentIds,
+        currentUserResponseDto.departmentIds
+      ) &&
+      Objects.equals(this.hasPassword, currentUserResponseDto.hasPassword)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(user, permissionCodes, departmentIds);
+    return Objects.hash(user, permissionCodes, departmentIds, hasPassword);
   }
 
   @Override
@@ -275,6 +304,9 @@ public class CurrentUserResponseDto {
       .append("\n");
     sb.append("    departmentIds: ")
       .append(toIndentedString(departmentIds))
+      .append("\n");
+    sb.append("    hasPassword: ")
+      .append(toIndentedString(hasPassword))
       .append("\n");
     sb.append("}");
     return sb.toString();

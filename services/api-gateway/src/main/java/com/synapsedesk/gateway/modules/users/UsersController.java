@@ -114,7 +114,8 @@ public class UsersController {
     CurrentUserResponseDto data = new CurrentUserResponseDto()
       .user(UserMapper.toUserResponseDto(response.getUser()))
       .permissionCodes(permissions)
-      .departmentIds(departments);
+      .departmentIds(departments)
+      .hasPassword(response.getHasPassword());
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }

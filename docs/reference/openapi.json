@@ -61200,9 +61200,13 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "Whether the account has a password. A Google-only one doesn't, and sets\none through `POST /auth/password/forgot`."
           }
         },
-        "required": ["departmentIds", "permissionCodes", "user"]
+        "required": ["departmentIds", "hasPassword", "permissionCodes", "user"]
       },
       "ApiResponsePagedDataInvitationResponseDto": {
         "type": "object",

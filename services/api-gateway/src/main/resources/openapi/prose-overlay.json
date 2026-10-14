@@ -911,6 +911,9 @@
     "CurrentUserResponseDto.permissionCodes": {
       "description": "Every permission code the caller holds, granted through their roles."
     },
+    "CurrentUserResponseDto.hasPassword": {
+      "description": "Whether the account has a password. A Google-only one doesn't, and sets\none through `POST /auth/password/forgot`."
+    },
     "DeflectionResponseDto.dataThrough": {
       "description": "See `OverviewResponseDto.dataThrough`."
     },
