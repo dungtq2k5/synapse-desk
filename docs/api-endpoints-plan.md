@@ -79,7 +79,7 @@ A global interceptor checks `organizations.status` (RDM §1.8) before dispatch:
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| POST | `/auth/register` | Sign up. Auto-joins a tenant when the email domain matches `organizations.allowed_email_domains`/`domain`; otherwise creates a `PENDING_ONBOARDING` org. The "already registered" check is scoped to the **tenant being joined**, not global (RDM §1.10) — the same address may legitimately hold an account in another tenant. | PUBLIC |
+| POST | `/auth/register` | Sign up. Auto-joins a tenant when the email domain matches `organizations.allowed_email_domains`/`domain`; otherwise creates a `PENDING_ONBOARDING` org. The "already registered" check is scoped to the **tenant being joined**, not global (RDM §1.10) — the same address may legitimately hold an account in another tenant. **It never says whether the address is taken:** a taken address gets exactly what a new sign-up gets, `{ email, requiresEmailVerification: true }`, and no 409. The address's owner gets a `SIGN_UP_ATTEMPT` email instead, linking to sign-in and password reset, at most once an hour per address. Both paths finish no sooner than 100 ms after hashing the password, so their timing matches too. It doesn't sign the person in. | PUBLIC |
 | POST | `/auth/login` | Email + password. Returns tokens; **or** `{ requiresTwoFactor: true, twoFactorToken }` when `is_two_factor_enabled` (or `enforce_two_factor`) and the request carries no device-trust cookie matching a live `device_token_hash` with `trusted_until > NOW()`; **or** `{ requiresTenantSelection: true, tenantSelectionToken, tenants[] }` when the address resolves to accounts in more than one tenant (RDM §1.10). Every candidate row is password-checked even after a match, so response time does not leak how many tenants an address belongs to. | PUBLIC |
 | POST | `/auth/login/tenant` | Exchange `tenantSelectionToken` + `{ organizationId }` for tokens. **401** if `organizationId` is outside the token's verified candidate set. The 2FA challenge is evaluated _after_ this step, since `enforce_two_factor` is per-tenant. The tenant list is only ever emitted after a password has verified, so this pair never becomes an unauthenticated "which tenants own this address?" oracle. | PUBLIC |
 | POST | `/auth/refresh` | Rotate the refresh token. Looks the presented token up by `refresh_token_hash`, stamps `rotated_at` on the old row, and inserts a successor carrying the **same `family_id`**. Three distinct outcomes: unknown hash → **401**; hash found with `rotated_at` already set → **replay detected**, revoke every row in that `family_id` and **401**; otherwise → new token pair. | PUBLIC (cookie) |
@@ -95,11 +95,11 @@ A global interceptor checks `organizations.status` (RDM §1.8) before dispatch:
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| POST | `/auth/email/verify/request` | Issue an `otps` row (`purpose = EMAIL_VERIFICATION`, `target = users.email`) and mail the 6-digit code. Invalidates the user's prior outstanding email codes; Redis-rate-limited per user. | USER |
+| POST | `/auth/email/verify/request` | Issue an `otps` row (`purpose = EMAIL_VERIFICATION`, `target = users.email`) and mail the code (`OTP_LENGTH` digits, 6 by default; the answer's `codeLength` says how many). Invalidates the user's prior outstanding email codes; Redis-rate-limited per user. | USER |
 | POST | `/auth/email/verify` | Submit `{ code }`. On match → `is_email_verified = true`. On mismatch → `attempts_count++`; at `max_attempts` the code is burned (`is_used = true`) and the response is **429** with `mustRequestNewCode: true`. | USER |
 | POST | `/auth/phone/verify/request` | Issue an `otps` row (`purpose = PHONE_VERIFICATION`) and SMS the code. `{ phoneNumber }` in the body becomes `otps.target`, which lets this same endpoint serve **first-time verification and change-of-number** — `users.phone_number` is not touched until the code for that exact target verifies. | SELF |
 | POST | `/auth/phone/verify` | Submit `{ code }`. On match, copy `otps.target` into `users.phone_number` and set `is_phone_verified = true`. Same attempt-counter semantics as above. | SELF |
-| GET | `/auth/otp/status` | `?purpose=` — outstanding-challenge state for the resend UI: `{ pending, target (masked), expiresAt, attemptsRemaining }`. Never returns `code_hash`. | SELF |
+| GET | `/auth/otp/status` | `?purpose=` — outstanding-challenge state for the resend UI: `{ pending, target (masked), expiresAt, attemptsRemaining, codeLength }`. Never returns `code_hash`. | SELF |
 
 **Google sign-in** — implemented, and it doubles as sign-up:
 
@@ -210,7 +210,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| GET | `/users/me` | Own profile + org + departments + effective permission codes. **Implemented.** | SELF |
+| GET | `/users/me` | Own profile + org + departments + effective permission codes, and `hasPassword` (false for an account that signs in only with Google; it can set one through `POST /auth/password/forgot`). **Implemented.** | SELF |
 | PATCH | `/users/me` | Update own profile fields (`fullName`, `dob`, `gender`). Explicitly **not** `avatarUrl` — that goes through the two rows below, never a direct field write, because writing it here would bypass the old-file cleanup and the confirm-time existence check — nor `email`/`phoneNumber` (the OTP flow), nor `isEmailVerified`/`isLocked`/roles/departments. **Implemented**, minus the `avatarUrl` field which was never actually wired to write it. | SELF |
 | POST | `/users/me/avatar/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Image mime allowlist + 2MB cap enforced before signing. See [ADR 0024](./decisions/0024-one-upload-mechanism.md). | SELF |
 | POST | `/users/me/avatar/confirm` | `{ objectPath }` — confirms the upload landed, writes `users.avatar_url` (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the **previous** avatar if one existed. | SELF |
