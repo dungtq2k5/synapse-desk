@@ -28,6 +28,7 @@ import {
 import { AuthService } from '../../src/modules/auth/auth.service';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
+import { UsersService } from '../../src/modules/users/users.service';
 import { hashToken } from '../../src/common/utils';
 
 describe('Auth core (e2e)', () => {
@@ -962,6 +963,49 @@ describe('Auth core (e2e)', () => {
           requestOrigin(),
         ),
       ).resolves.toMatchObject({ requiresTenantSelection: false });
+    });
+
+    it('a Google-only account sets its first password through forgot-password', async () => {
+      // No separate "set a password" route: the reset link is it, and
+      // `hasPassword` on the current user is what tells the client to offer it.
+      const users = fx.moduleRef.get(UsersService);
+      const { user: withPassword, org } = await seedTenantWithUser(fx.prisma);
+      const googleOnly = await fx.prisma.user.create({
+        data: {
+          email: 'first-password@oauth.test',
+          fullName: 'Google Only',
+          organizationId: org.id,
+          passwordHash: null,
+        },
+      });
+      const hasPassword = async (id: string) =>
+        (await users.getCurrentUser(id)).hasPassword;
+
+      expect([
+        await hasPassword(withPassword.id),
+        await hasPassword(googleOnly.id),
+      ]).toEqual([true, false]);
+
+      await auth.forgotPassword({ email: googleOnly.email }, requestOrigin());
+
+      expect(fx.notifications.sendEmail).toHaveBeenCalledTimes(1);
+      const [command] = fx.notifications.sendEmail.mock.calls[0] as [
+        { template: string; data: { links: { url: string }[] } },
+      ];
+      expect(command.template).toBe(EmailTemplateName.PASSWORD_RESET);
+      const token = new URL(command.data.links[0].url).searchParams.get(
+        'token',
+      )!;
+
+      await auth.resetPassword({ token, newPassword: RESET_PASSWORD });
+
+      await expect(
+        auth.login(
+          { email: googleOnly.email, password: RESET_PASSWORD },
+          requestOrigin(),
+        ),
+      ).resolves.toMatchObject({ requiresTenantSelection: false });
+      expect(await hasPassword(googleOnly.id)).toBe(true);
     });
 
     it('a reset token is single-use', async () => {

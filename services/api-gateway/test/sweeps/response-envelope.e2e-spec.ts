@@ -95,7 +95,12 @@ describe('response envelope sweep (e2e)', () => {
       as: [],
       succeed: (f) =>
         f.stubs.user.getCurrentUser.mockReturnValue(
-          of({ user: wireUser(), permissionCodes: [], departmentIds: [] }),
+          of({
+            user: wireUser(),
+            permissionCodes: [],
+            departmentIds: [],
+            hasPassword: true,
+          }),
         ),
       fail: (f) =>
         f.stubs.user.getCurrentUser.mockReturnValue(

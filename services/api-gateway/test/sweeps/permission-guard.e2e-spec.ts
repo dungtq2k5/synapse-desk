@@ -293,7 +293,12 @@ describe('PermissionGuard on real routes (e2e)', () => {
     // `GET /users/me` carries no @RequirePermission — being signed in is the
     // whole authorization, and that must not decay into "no check at all".
     fx.stubs.user.getCurrentUser.mockReturnValue(
-      of({ user: wireUser(), permissionCodes: [], departmentIds: [] }),
+      of({
+        user: wireUser(),
+        permissionCodes: [],
+        departmentIds: [],
+        hasPassword: true,
+      }),
     );
 
     const withSession = await authenticatedAgent(fx.app, {

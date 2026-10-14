@@ -193,6 +193,7 @@ export function toCurrentUserResponseDto(
     user: toUserResponseDto(requireField(response.user, 'user')),
     permissionCodes: response.permissionCodes as PermissionCode[],
     departmentIds: response.departmentIds,
+    hasPassword: response.hasPassword,
   };
 }
 

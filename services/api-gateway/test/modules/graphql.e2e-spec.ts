@@ -179,6 +179,7 @@ describe('The GraphQL surface (e2e)', () => {
           user: { ...wireUser(), id: sub },
           permissionCodes: [],
           departmentIds: [],
+          hasPassword: true,
         }),
       );
 
@@ -1040,6 +1041,7 @@ describe('The GraphQL surface (e2e)', () => {
           user: wireUser(),
           permissionCodes: [],
           departmentIds: [departmentId],
+          hasPassword: true,
         }),
       );
       fx.stubs.department.listDepartmentsByIds.mockReturnValue(

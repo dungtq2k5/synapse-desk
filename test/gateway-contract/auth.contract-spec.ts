@@ -270,6 +270,31 @@ describe('authentication', () => {
   );
 
   rowFor('Users')(
+    '**the current user says whether a password exists**, both ways, and never the hash',
+    async () => {
+      const session = new Session(gateway.baseUrl);
+      const me = async (hasPassword: boolean) => {
+        peers.auth.on('UserService/GetCurrentUser').reply({
+          user: wireUser(),
+          permissionCodes: [],
+          departmentIds: [],
+          hasPassword,
+        });
+        return session.get(`${API}/users/me`, {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+        });
+      };
+
+      for (const hasPassword of [true, false]) {
+        const response = await me(hasPassword);
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ data: { hasPassword } });
+        expect(JSON.stringify(response.body)).not.toMatch(/passwordHash/i);
+      }
+    },
+  );
+
+  rowFor('Users')(
     '**an authenticated request carries the caller context** on the peer call',
     async () => {
       // What `expect(stubs.user.getCurrentUser).toHaveBeenCalledWith(…)` checked

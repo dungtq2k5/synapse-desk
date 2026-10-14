@@ -141,4 +141,11 @@ export class CurrentUserResponseDto {
   @IsArray()
   @IsUUID('all', { each: true })
   readonly departmentIds!: string[];
+
+  /**
+   * Whether the account has a password. A Google-only one doesn't, and sets
+   * one through `POST /auth/password/forgot`.
+   */
+  @IsBoolean()
+  readonly hasPassword!: boolean;
 }

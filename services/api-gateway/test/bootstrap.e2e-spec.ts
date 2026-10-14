@@ -29,7 +29,12 @@ describe('e2e bootstrap', () => {
     // The stub stands in for auth-service; what is under test is the guard
     // chain in front of it, not the RPC.
     fx.stubs.user.getCurrentUser.mockReturnValue(
-      of({ user: wireUser(), permissionCodes: [], departmentIds: [] }),
+      of({
+        user: wireUser(),
+        permissionCodes: [],
+        departmentIds: [],
+        hasPassword: true,
+      }),
     );
 
     const res = await authenticatedAgent(fx.app).get(`${API}/users/me`);

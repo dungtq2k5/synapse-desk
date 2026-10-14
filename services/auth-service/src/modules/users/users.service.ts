@@ -133,6 +133,7 @@ export class UsersService {
       user: toUserResponse(user, avatarUrls),
       permissionCodes: flattenPermissionCodes(user.roles),
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),
+      hasPassword: user.passwordHash !== null,
     };
   }
 
