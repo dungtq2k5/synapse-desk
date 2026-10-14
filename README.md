@@ -49,7 +49,7 @@ A Turborepo monorepo in three parts: `apps/` holds the clients, `services/` hold
 | [`docker/`](docker/) | The Dockerfiles and the image checks |
 | [`scripts/`](scripts/) | Key generation, seeding, schema verification, generators |
 
-Backing services, all from `docker-compose.yml`: four Postgres instances (one per schema-owning service — there are no cross-service foreign keys), Redis, NATS with JetStream, Qdrant, and the Firebase Storage emulator.
+Backing services, all from `docker-compose.yml`: four Postgres instances (one per schema-owning service — there are no cross-service foreign keys), Redis, NATS with JetStream, Qdrant, and the Firebase emulators (the `firebase` service: Storage on 9199, Authentication on 9099, so Google sign-in works locally with no Google account).
 
 ## Documentation
 
@@ -136,7 +136,7 @@ npm run keys:test-tls          # the self-signed pair the e2e receivers listen w
 | `services/api-gateway/secrets/jwt-access.pub` | api-gateway — can only **verify** |
 | `services/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
 
-`keys:service-account` writes `services/storage-service/serviceAccountKey.json` and `services/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. It is idempotent — it exits 0 when the file exists.
+`keys:service-account` writes `services/storage-service/serviceAccountKey.json` and `services/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. Its `project_id` is `synapsedesk-test`, the emulators' project, which is what lets auth-service accept the Auth emulator's Google ID tokens: **put a real Firebase project's key in `services/auth-service/` and Google sign-in fails locally** ("incorrect aud claim"). It is idempotent — it exits 0 when the file exists.
 
 `keys:test-tls` writes `receiver-key.pem` and `receiver-cert.pem` into `services/notification-service/test/fixtures/` and `services/storage-service/test/fixtures/`. Two e2e suites start a real `https` server on an ephemeral port — the outbound-webhook sender and the remote-source fetcher — and `createServer` needs the pair on disk. Nothing verifies the certificate (the sender's dev hatch relaxes that for a localhost receiver, which is self-signed by nature), so it is generated rather than committed. Skip it and `npm run test:e2e` fails with `ENOENT … receiver-key.pem` before its first assertion. Idempotent: it exits 0 unless the pair is missing or expired, and `-- --force` replaces it.
 
