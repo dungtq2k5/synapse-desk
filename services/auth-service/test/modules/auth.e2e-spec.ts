@@ -781,7 +781,9 @@ describe('Auth core (e2e)', () => {
       );
     });
 
-    it('20. a wrong current password is UNAUTHENTICATED', async () => {
+    it('20. a wrong current password is PERMISSION_DENIED, not UNAUTHENTICATED', async () => {
+      // A 401 would tell the client its session expired: it would refresh and
+      // send the same wrong password again.
       const { user, org } = await seedTenantWithUser(fx.prisma);
 
       await expectRpc(
@@ -789,7 +791,7 @@ describe('Auth core (e2e)', () => {
           { currentPassword: 'WrongOne1!', newPassword: 'BrandNew1!' }, // NOSONAR
           memberContext({ id: user.id, organizationId: org.id }),
         ),
-        status.UNAUTHENTICATED,
+        status.PERMISSION_DENIED,
       );
     });
 

@@ -667,9 +667,72 @@ describe('Two-factor auth (e2e)', () => {
         }),
       ).toBe(0);
     });
+
+    // PERMISSION_DENIED, not UNAUTHENTICATED: the caller is signed in, and a
+    // 401 would make the client refresh and send the same password again.
+    it('10c. a wrong password is PERMISSION_DENIED, and two-step stays on', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const { secret } = await enrol(user.id);
+
+      await expectRpc(
+        twoFactor.disableTwoFactor({
+          userId: user.id,
+          password: 'WrongOne1!', // NOSONAR
+          code: generateSync({ secret }),
+        }),
+        status.PERMISSION_DENIED,
+      );
+
+      const row = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(row.isTwoFactorEnabled).toBe(true);
+    });
+
+    it('10d. a wrong code is PERMISSION_DENIED, and two-step stays on', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+
+      await expectRpc(
+        twoFactor.disableTwoFactor({
+          userId: user.id,
+          password: TEST_PASSWORD,
+          code: '000000',
+        }),
+        status.PERMISSION_DENIED,
+      );
+
+      const row = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(row.isTwoFactorEnabled).toBe(true);
+    });
   });
 
   describe('regenerateBackupCodes / getBackupCodesStatus', () => {
+    it('11a. a wrong password is PERMISSION_DENIED, and the codes stay', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+      const before = await fx.prisma.twoFactorBackupCode.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+
+      await expectRpc(
+        twoFactor.regenerateBackupCodes({
+          userId: user.id,
+          password: 'WrongOne1!', // NOSONAR
+        }),
+        status.PERMISSION_DENIED,
+      );
+
+      const after = await fx.prisma.twoFactorBackupCode.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      expect(after).toEqual(before);
+    });
+
     it('11. regeneration invalidates every previously unused code', async () => {
       const { user } = await seedTenantWithUser(fx.prisma);
       const { backupCodes } = await enrol(user.id);

@@ -962,9 +962,11 @@ export class AuthService {
       request.currentPassword,
       user.passwordHash,
     );
+    // PERMISSION_DENIED, not UNAUTHENTICATED: the caller's session is fine, and
+    // a 401 tells a client to refresh it and send the same password again.
     if (!matches) {
       throw new RpcException({
-        code: status.UNAUTHENTICATED,
+        code: status.PERMISSION_DENIED,
         message: 'Current password is incorrect',
       });
     }
