@@ -139,7 +139,12 @@ describe('the two-step section', () => {
 
   it('off: offers to turn it on', () => {
     wrap(
-      <TwoStepSection enabled={false} required={false} organizationName="N" />,
+      <TwoStepSection
+        hasPassword
+        enabled={false}
+        required={false}
+        organizationName="N"
+      />,
     );
     expect(screen.getByText('Off')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Turn on' })).toBeEnabled();
@@ -147,7 +152,12 @@ describe('the two-step section', () => {
 
   it('on: the backup codes left and when they expire', async () => {
     wrap(
-      <TwoStepSection enabled required={false} organizationName="N" />,
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
       STATUS,
     );
     expect(
@@ -157,7 +167,12 @@ describe('the two-step section', () => {
 
   it('required: Turn off is disabled, with the reason', () => {
     wrap(
-      <TwoStepSection enabled required organizationName="Northwind Health" />,
+      <TwoStepSection
+        hasPassword
+        enabled
+        required
+        organizationName="Northwind Health"
+      />,
       STATUS,
     );
     expect(screen.getByRole('button', { name: 'Turn off' })).toBeDisabled();
@@ -168,9 +183,33 @@ describe('the two-step section', () => {
     );
   });
 
+  it('without a password, on: no Regenerate or Turn off, a way to set one', async () => {
+    // Both need a password a Google-only account doesn't have.
+    wrap(
+      <TwoStepSection
+        hasPassword={false}
+        enabled
+        required={false}
+        organizationName="N"
+      />,
+      STATUS,
+    );
+    expect(
+      await screen.findByText('7 of 10 left · They expire on Oct 12, 2027.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Regenerate codes' }),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Turn off' })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Set a password' }),
+    ).toHaveAttribute('href', '#set-password');
+  });
+
   it('turning off when the organization now requires it is refused', async () => {
     const { user } = wrap(
       <TwoStepSection
+        hasPassword
         enabled
         required={false}
         organizationName="Northwind Health"
@@ -197,7 +236,12 @@ describe('the two-step section', () => {
 
   it('a wrong password (a 403) on regenerating is said on the field, sent once', async () => {
     const { calls, user } = wrap(
-      <TwoStepSection enabled required={false} organizationName="N" />,
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
       {
         ...STATUS,
         'POST /api/v1/auth/2fa/backup-codes': fail(403, 'Invalid credentials'),
@@ -219,7 +263,12 @@ describe('the two-step section', () => {
 
   it('a wrong password or code (a 403) on turning off says so, sent once', async () => {
     const { calls, user } = wrap(
-      <TwoStepSection enabled required={false} organizationName="N" />,
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
       {
         ...STATUS,
         'DELETE /api/v1/auth/2fa': fail(403, 'Invalid verification code'),
@@ -242,7 +291,12 @@ describe('the two-step section', () => {
 
   it('regenerating shows the new codes, which stay until they’re saved', async () => {
     const { calls, user } = wrap(
-      <TwoStepSection enabled required={false} organizationName="N" />,
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
       {
         ...STATUS,
         'POST /api/v1/auth/2fa/backup-codes': ok({

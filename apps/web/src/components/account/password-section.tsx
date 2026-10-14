@@ -274,6 +274,7 @@ function SetPassword({ email }: { email: string }) {
         </Alert>
       )}
       <Button
+        id="set-password"
         variant="outline"
         className="self-start"
         disabled={busy}

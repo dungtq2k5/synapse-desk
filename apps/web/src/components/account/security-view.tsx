@@ -26,6 +26,7 @@ export function SecurityView() {
         enabled={user.isTwoFactorEnabled}
         required={organization?.enforceTwoFactor ?? false}
         organizationName={organization?.name ?? 'Your organization'}
+        hasPassword={hasPassword}
       />
       <SessionsSection />
     </>

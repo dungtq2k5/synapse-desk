@@ -69,16 +69,19 @@ const refusalOf = (failed: unknown): Refusal =>
 /**
  * Two-step verification: on, with its backup codes (regenerate) and a way to
  * turn it off, unless the organization requires it; or off, with a way to
- * turn it on. Each change takes the password, and a code to turn it off.
+ * turn it on. Each change takes the password, and a code to turn it off, so
+ * an account without one (Google only) is pointed at setting one instead.
  */
 export function TwoStepSection({
   enabled,
   required,
   organizationName,
+  hasPassword,
 }: {
   enabled: boolean;
   required: boolean;
   organizationName: string;
+  hasPassword: boolean;
 }) {
   const queryClient = useQueryClient();
   const [turningOn, setTurningOn] = useState(false);
@@ -122,13 +125,30 @@ export function TwoStepSection({
         </Badge>
       }
     >
-      <BackupCodesRow onRegenerated={changed} />
+      <BackupCodesRow onRegenerated={changed} canRegenerate={hasPassword} />
       <Separator />
-      <TurnOffRow
-        required={required}
-        organizationName={organizationName}
-        onDisabled={changed}
-      />
+      {hasPassword ? (
+        <TurnOffRow
+          required={required}
+          organizationName={organizationName}
+          onDisabled={changed}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          <a
+            href="#set-password"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={(event) => {
+              // To the button itself, not just its place on the page.
+              event.preventDefault();
+              document.getElementById('set-password')?.focus();
+            }}
+          >
+            Set a password
+          </a>{' '}
+          to change two-step settings.
+        </p>
+      )}
     </SectionCard>
   );
 }
@@ -157,7 +177,14 @@ function Row({
   );
 }
 
-function BackupCodesRow({ onRegenerated }: { onRegenerated: () => void }) {
+/** The codes left; regenerating them takes a password the account may not have. */
+function BackupCodesRow({
+  onRegenerated,
+  canRegenerate,
+}: {
+  onRegenerated: () => void;
+  canRegenerate: boolean;
+}) {
   const status = useTwoFactorAuthControllerGetBackupCodesStatusV1();
   const [confirming, setConfirming] = useState(false);
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -176,10 +203,12 @@ function BackupCodesRow({ onRegenerated }: { onRegenerated: () => void }) {
           : '…'
       }
     >
-      <Button variant="outline" onClick={() => setConfirming(true)}>
-        <RefreshCwIcon />
-        Regenerate codes
-      </Button>
+      {canRegenerate && (
+        <Button variant="outline" onClick={() => setConfirming(true)}>
+          <RefreshCwIcon />
+          Regenerate codes
+        </Button>
+      )}
       <RegenerateDialog
         open={confirming}
         onOpenChange={setConfirming}

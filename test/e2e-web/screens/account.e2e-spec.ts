@@ -540,14 +540,27 @@ test.describe('security', () => {
   });
 
   test('no password yet: Set a password', async ({ page }) => {
-    await openSecurity(page, { hasPassword: false });
+    await openSecurity(page, { hasPassword: false, twoStep: false });
     await expect(page.getByText('You sign in with Google')).toBeVisible();
     await look(page, 'security-no-password');
   });
 
+  test('no password, two-step on: set one to change two-step', async ({
+    page,
+  }) => {
+    await openSecurity(page, { hasPassword: false, twoStep: true });
+    await expect(
+      page.getByRole('link', { name: 'Set a password' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Regenerate codes' }),
+    ).toHaveCount(0);
+    await look(page, 'security-no-password-two-step');
+  });
+
   test('Set a password: the link is sent', async ({ page }) => {
     await reply(page, 'POST', '/auth/password/forgot', 202, null);
-    await openSecurity(page, { hasPassword: false });
+    await openSecurity(page, { hasPassword: false, twoStep: false });
     await page.getByRole('button', { name: 'Set a password' }).click();
     await expect(page.getByText('Check your email')).toBeVisible();
     await look(page, 'security-link-sent');
