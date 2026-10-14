@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
@@ -44,6 +45,13 @@ describe('Auth core (e2e)', () => {
 
   afterAll(() => fx.close());
 
+  /** The live account a registration made: its answer carries no ids. */
+  const accountOf = (email: string) =>
+    fx.prisma.user.findFirstOrThrow({
+      where: { email, deletedAt: null },
+      select: { id: true, organizationId: true },
+    });
+
   // ---------------------------------------------------------------- register
 
   describe('register', () => {
@@ -52,7 +60,7 @@ describe('Auth core (e2e)', () => {
         allowedEmailDomains: ['acme-join.test'],
       });
 
-      const result = await auth.register(
+      await auth.register(
         {
           email: 'newcomer@acme-join.test',
           password: TEST_PASSWORD,
@@ -61,7 +69,9 @@ describe('Auth core (e2e)', () => {
         requestOrigin(),
       );
 
-      expect(result.organizationId).toBe(org.id);
+      expect((await accountOf('newcomer@acme-join.test')).organizationId).toBe(
+        org.id,
+      );
     });
 
     describe('the seat alarm', () => {
@@ -97,7 +107,7 @@ describe('Auth core (e2e)', () => {
         const alertOnSeats = spyAlarm().mockResolvedValue(undefined);
 
         try {
-          const result = await auth.register(
+          await auth.register(
             {
               email: 'second@acme-full.test',
               password: TEST_PASSWORD,
@@ -106,12 +116,9 @@ describe('Auth core (e2e)', () => {
             requestOrigin(),
           );
 
-          expect(result.organizationId).toBe(org.id);
-          await expect(
-            fx.prisma.user.findFirst({
-              where: { email: 'second@acme-full.test' },
-            }),
-          ).resolves.not.toBeNull();
+          expect(
+            (await accountOf('second@acme-full.test')).organizationId,
+          ).toBe(org.id);
 
           // **…and the crossing is reported.** Without this the usage page
           // shows `used > limit` with no event behind it, which is the half of
@@ -161,7 +168,7 @@ describe('Auth core (e2e)', () => {
         );
 
         try {
-          const result = await auth.register(
+          await auth.register(
             {
               email: 'joiner@acme-alarm-down.test',
               password: TEST_PASSWORD,
@@ -170,7 +177,9 @@ describe('Auth core (e2e)', () => {
             requestOrigin(),
           );
 
-          expect(result.organizationId).toBe(org.id);
+          expect(
+            (await accountOf('joiner@acme-alarm-down.test')).organizationId,
+          ).toBe(org.id);
           expect(alertOnSeats).toHaveBeenCalled();
         } finally {
           alertOnSeats.mockRestore();
@@ -185,7 +194,7 @@ describe('Auth core (e2e)', () => {
         allowedEmailDomains: ['acme-join2.test'],
       });
 
-      const result = await auth.register(
+      await auth.register(
         {
           email: 'joiner@acme-join2.test',
           password: TEST_PASSWORD,
@@ -195,14 +204,14 @@ describe('Auth core (e2e)', () => {
       );
 
       const user = await fx.prisma.user.findUniqueOrThrow({
-        where: { id: result.userId },
+        where: { id: (await accountOf('joiner@acme-join2.test')).id },
         include: { roles: true },
       });
       expect(user.roles.map((r) => r.name)).toEqual([SystemRoleName.END_USER]);
     });
 
     it('2. no matching domain creates a PENDING_ONBOARDING org', async () => {
-      const result = await auth.register(
+      await auth.register(
         {
           email: 'founder@brand-new.test',
           password: TEST_PASSWORD,
@@ -212,7 +221,9 @@ describe('Auth core (e2e)', () => {
       );
 
       const org = await fx.prisma.organization.findUniqueOrThrow({
-        where: { id: result.organizationId },
+        where: {
+          id: (await accountOf('founder@brand-new.test')).organizationId!,
+        },
       });
       expect(org.status).toBe(OrgStatus.PENDING_ONBOARDING);
       expect(org.allowedEmailDomains).toEqual(['brand-new.test']);
@@ -221,7 +232,7 @@ describe('Auth core (e2e)', () => {
     it('2b. the founder of a new tenant gets Org Admin', async () => {
       // Without this the workspace has no administrator and no path to one:
       // inviting an admin already requires `user.invite`.
-      const result = await auth.register(
+      await auth.register(
         {
           email: 'boss@fresh-tenant.test',
           password: TEST_PASSWORD,
@@ -231,37 +242,60 @@ describe('Auth core (e2e)', () => {
       );
 
       const user = await fx.prisma.user.findUniqueOrThrow({
-        where: { id: result.userId },
+        where: { id: (await accountOf('boss@fresh-tenant.test')).id },
         include: { roles: true },
       });
       expect(user.roles.map((r) => r.name)).toEqual([SystemRoleName.ORG_ADMIN]);
     });
 
-    it('3. the same address twice IN ONE TENANT is ALREADY_EXISTS', async () => {
+    it('3. the same address twice IN ONE TENANT answers as a new sign-up, and tells the owner', async () => {
       await createOrganization(fx.prisma, {
         allowedEmailDomains: ['dupe.test'],
       });
+      // A new address per run: the notice's window lives in Redis, which the
+      // fixture doesn't clear.
+      const email = `twice-${randomUUID()}@dupe.test`;
+      const origin = requestOrigin();
+      const signUp = (fullName: string) =>
+        auth.register({ email, password: TEST_PASSWORD, fullName }, origin);
 
-      await auth.register(
-        {
-          email: 'twice@dupe.test',
-          password: TEST_PASSWORD,
-          fullName: 'First',
-        },
-        requestOrigin(),
-      );
+      const fresh = await signUp('First');
+      fx.notifications.sendEmail.mockClear();
+      const taken = await signUp('Second');
 
-      await expectRpc(
+      expect(taken).toEqual(fresh);
+      expect(taken).toEqual({
+        userId: '',
+        organizationId: '',
+        email,
+        requiresEmailVerification: true,
+      });
+      expect(await fx.prisma.user.count({ where: { email } })).toBe(1);
+      expect(fx.notifications.sendEmail).toHaveBeenCalledTimes(1);
+      expect(fx.notifications.sendEmail).toHaveBeenCalledWith({
+        template: EmailTemplateName.SIGN_UP_ATTEMPT,
+        to: email,
+        data: { fullName: 'First', origin },
+      });
+    });
+
+    it('3b. the owner is told once an hour, however often the address is tried', async () => {
+      await createOrganization(fx.prisma, {
+        allowedEmailDomains: ['dupe-again.test'],
+      });
+      const email = `again-${randomUUID()}@dupe-again.test`;
+      const signUp = () =>
         auth.register(
-          {
-            email: 'twice@dupe.test',
-            password: TEST_PASSWORD,
-            fullName: 'Second',
-          },
+          { email, password: TEST_PASSWORD, fullName: 'Again' },
           requestOrigin(),
-        ),
-        status.ALREADY_EXISTS,
-      );
+        );
+
+      const fresh = await signUp();
+      fx.notifications.sendEmail.mockClear();
+      const answers = [await signUp(), await signUp(), await signUp()];
+
+      expect(answers).toEqual([fresh, fresh, fresh]);
+      expect(fx.notifications.sendEmail).toHaveBeenCalledTimes(1);
     });
 
     it('4. the same address in TWO tenants both succeed', async () => {
@@ -273,7 +307,7 @@ describe('Auth core (e2e)', () => {
         allowedEmailDomains: ['client-a.test'],
       });
 
-      const first = await auth.register(
+      await auth.register(
         {
           email: 'contractor@client-a.test',
           password: TEST_PASSWORD,
@@ -289,7 +323,11 @@ describe('Auth core (e2e)', () => {
         organizationId: orgB.id,
       });
 
-      expect(first.organizationId).toBe(orgA.id);
+      expect(
+        await fx.prisma.user.count({
+          where: { email: 'contractor@client-a.test', organizationId: orgA.id },
+        }),
+      ).toBe(1);
       expect(second.organizationId).toBe(orgB.id);
       expect(
         await fx.prisma.user.count({
@@ -298,7 +336,7 @@ describe('Auth core (e2e)', () => {
       ).toBe(2);
     });
 
-    it('5. two CONCURRENT identical registrations leave exactly one row', async () => {
+    it('5. two CONCURRENT identical registrations leave exactly one row and answer alike', async () => {
       // The only test that actually exercises `users_org_email_key`. The
       // service-layer findFirst cannot prevent this — both requests read
       // "free" — so if the partial index were missing, this would create two
@@ -317,19 +355,11 @@ describe('Auth core (e2e)', () => {
           requestOrigin(),
         );
 
-      const results = await Promise.allSettled([attempt(), attempt()]);
+      const [one, other] = await Promise.all([attempt(), attempt()]);
 
-      const fulfilled = results.filter((r) => r.status === 'fulfilled');
-      // A type-guard predicate, not a bare comparison: `.filter()` does not
-      // narrow a union, so `.reason` below is only reachable through one.
-      const rejected = results.filter(
-        (r): r is PromiseRejectedResult => r.status === 'rejected',
-      );
-
-      expect(fulfilled).toHaveLength(1);
-      expect(rejected).toHaveLength(1);
-      // A clean ALREADY_EXISTS, not a raw P2002 leaking through as INTERNAL.
-      expect(rpcCode(rejected[0].reason)).toBe(status.ALREADY_EXISTS);
+      // The loser of the race gets the same answer the pre-check gives, not a
+      // raw P2002 leaking through as INTERNAL.
+      expect(one).toEqual(other);
       expect(
         await fx.prisma.user.count({ where: { email: 'racer@race.test' } }),
       ).toBe(1);
@@ -349,7 +379,7 @@ describe('Auth core (e2e)', () => {
         deletedAt: new Date(),
       });
 
-      const result = await auth.register(
+      await auth.register(
         {
           email: 'boomerang@rehire.test',
           password: TEST_PASSWORD,
@@ -358,7 +388,9 @@ describe('Auth core (e2e)', () => {
         requestOrigin(),
       );
 
-      expect(result.organizationId).toBe(org.id);
+      expect((await accountOf('boomerang@rehire.test')).organizationId).toBe(
+        org.id,
+      );
     });
   });
 

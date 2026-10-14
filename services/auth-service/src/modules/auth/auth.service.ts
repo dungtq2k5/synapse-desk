@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type Redis from 'ioredis';
 import {
   CallerContext,
   ChangePasswordRequest,
@@ -73,6 +74,7 @@ import { OtpService } from '../otp/otp.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
+import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import {
   FirebaseService,
   type GoogleIdentity,
@@ -90,6 +92,24 @@ const USER_WITH_ACCESS = {
   userDepartments: { where: { department: { deletedAt: null } } },
   roles: { include: { permissions: true } },
 } satisfies Prisma.UserInclude;
+
+/** How long an address waits before it's told of another sign-up attempt. */
+export const SIGN_UP_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * How long `register` takes at least after hashing, on either path. A new
+ * account's insert, role and first code take about 40 ms (56 ms at most,
+ * measured at 12 bcrypt rounds); a taken address does none of it. Padding both
+ * to this floor keeps the response time from telling them apart, until a slow
+ * database pushes a new sign-up past it.
+ */
+export const REGISTER_FLOOR_MS = 100;
+
+/** Resolves once `ms` have passed since `since` (a `performance.now()`). */
+const untilElapsed = (since: number, ms: number): Promise<void> =>
+  new Promise((resolve) =>
+    setTimeout(resolve, Math.max(0, since + ms - performance.now())),
+  );
 
 type UserWithAccess = Prisma.UserGetPayload<{
   include: typeof USER_WITH_ACCESS;
@@ -138,6 +158,8 @@ export class AuthService {
     // takes a seat reports it through the same counter every other seat path
     // uses rather than a second one that could disagree.
     private readonly organizationsService: OrganizationsService,
+    // The sign-up attempt notice's per-address window.
+    @Inject(LIMIT_ALERT_REDIS) private readonly redis: Redis,
   ) {
     this.JWT_2FA_EXPIRES_IN =
       this.configService.getOrThrow<string>('JWT_2FA_EXPIRES_IN');
@@ -187,6 +209,13 @@ export class AuthService {
    * rides in the JWT and `EmailVerifiedGuard` in the gateway gates the routes
    * that need a proven address. Registration dispatches the first code straight
    * away so the user never has to go looking for it.
+   *
+   * **An address that already has an account in the tenant gets the same
+   * answer** as a new one: the address and `requiresEmailVerification`, never
+   * an id. Its owner is emailed instead (`SIGN_UP_ATTEMPT`, once an hour per
+   * address), so the answer can't be used to learn which addresses are
+   * registered. Both paths hash the password first and finish no sooner than
+   * {@link REGISTER_FLOOR_MS} after it.
    */
   async register(
     registerRequest: RegisterRequest,
@@ -207,6 +236,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(password, this.BCRYPT_ROUNDS);
+    const hashed = performance.now();
 
     const user = await this.createUserInResolvedTenant({
       email,
@@ -214,6 +244,19 @@ export class AuthService {
       passwordHash,
       emailDomain,
     });
+
+    const answer: RegisterResponse = {
+      userId: '',
+      organizationId: '',
+      email,
+      requiresEmailVerification: true,
+    };
+
+    if ('taken' in user) {
+      await this.tellOwnerOfSignUpAttempt(email, user.taken.fullName, device);
+      await untilElapsed(hashed, REGISTER_FLOOR_MS);
+      return answer;
+    }
 
     // Published AFTER the transaction commits, never inside it. Emitting from
     // within would announce an account that a later rollback erases — and the
@@ -245,12 +288,41 @@ export class AuthService {
       );
     }
 
-    return {
-      userId: user.created.id,
-      email: user.created.email,
-      organizationId: user.created.organizationId!,
-      requiresEmailVerification: true,
-    };
+    await untilElapsed(hashed, REGISTER_FLOOR_MS);
+    return answer;
+  }
+
+  /**
+   * Emails the owner of an address someone tried to sign up with, at most once
+   * per {@link SIGN_UP_ATTEMPT_WINDOW_MS}, so repeated attempts can't flood an
+   * inbox. Never throws: the caller's answer must not differ from a new
+   * sign-up's, so a Redis failure costs the notice, not the response.
+   */
+  private async tellOwnerOfSignUpAttempt(
+    email: string,
+    fullName: string,
+    origin: RequestOrigin,
+  ): Promise<void> {
+    try {
+      const claimed = await this.redis.set(
+        `sign-up-attempt:${email}`,
+        '1',
+        'PX',
+        SIGN_UP_ATTEMPT_WINDOW_MS,
+        'NX',
+      );
+      if (claimed !== 'OK') return;
+
+      this.notifications.sendEmail({
+        template: EmailTemplateName.SIGN_UP_ATTEMPT,
+        to: email,
+        data: { fullName, origin },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not tell the owner of a sign-up attempt: ${formatErrorMsg(error)}`,
+      );
+    }
   }
 
   /**
@@ -302,8 +374,8 @@ export class AuthService {
    * known, so it cannot live in `register()` before this runs.
    *
    * Two layers guard uniqueness and they have different jobs. The `findFirst`
-   * below produces a good error in the 99.99% non-racing case; the P2002 catch
-   * turns the race-loser's constraint violation into the same clean response.
+   * below answers `taken` in the 99.99% non-racing case; the P2002 catch gives
+   * the race-loser's constraint violation the same answer.
    * Only `users_org_email_key` actually PREVENTS the duplicate — two concurrent
    * requests both see "free", and that is what a double-clicked submit button
    * produces.
@@ -313,15 +385,18 @@ export class AuthService {
     fullName: string;
     passwordHash: string;
     emailDomain: string;
-  }): Promise<{
-    created: {
-      id: string;
-      email: string;
-      fullName: string;
-      organizationId: string | null;
-    };
-    organizationName: string;
-  }> {
+  }): Promise<
+    | {
+        created: {
+          id: string;
+          email: string;
+          fullName: string;
+          organizationId: string | null;
+        };
+        organizationName: string;
+      }
+    | { taken: { fullName: string } }
+  > {
     const { email, fullName, passwordHash, emailDomain } = input;
 
     try {
@@ -368,14 +443,9 @@ export class AuthService {
         // Now that the tenant is known, the conflict question is answerable.
         const existing = await tx.user.findFirst({
           where: { email, organizationId: org.id, deletedAt: null },
-          select: { id: true },
+          select: { fullName: true },
         });
-        if (existing) {
-          throw new RpcException({
-            code: status.ALREADY_EXISTS,
-            message: 'Email already registered',
-          });
-        }
+        if (existing) return { taken: existing };
 
         const roleId = await this.rolesService.getSystemRoleId(
           isFounder ? SystemRoleName.ORG_ADMIN : SystemRoleName.END_USER,
@@ -424,6 +494,8 @@ export class AuthService {
         };
       });
 
+      if ('taken' in result) return result;
+
       this.fireSeatAlarm(result.seatAlarm);
 
       return {
@@ -435,13 +507,14 @@ export class AuthService {
       // non-racing case. What it cannot do is be atomic: two concurrent
       // registrations both read "free" and both insert, which is exactly what a
       // double-clicked submit button produces. `users_org_email_key` is the only
-      // thing that makes that impossible; this turns the loser's violation into
-      // the same clean 409 the pre-check produces.
+      // thing that makes that impossible; this gives the loser the same answer
+      // the pre-check does.
       if (isUniqueConstraintViolation(error)) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'Email already registered',
+        const winner = await this.prisma.user.findFirst({
+          where: { email, deletedAt: null },
+          select: { fullName: true },
         });
+        return { taken: { fullName: winner?.fullName ?? fullName } };
       }
       throw error;
     }

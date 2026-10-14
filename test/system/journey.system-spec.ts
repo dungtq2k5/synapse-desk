@@ -40,6 +40,8 @@ describe('The journey', () => {
   const owner = new Session();
   const notifications = notificationDb();
 
+  /** Step 1's sign-up answer, which step 1b compares a second one against. */
+  let newcomerSignUp: Awaited<ReturnType<Session['post']>>;
   let ticketId: string;
   let ownerId: string;
   /** Who step 6 assigns to — step 7 reads THEIR feed. */
@@ -62,14 +64,12 @@ describe('The journey', () => {
     // designed and the wrong actor for a journey about what the product does.
     const newcomer = new Session();
 
-    expectOk(
-      await newcomer.post<{ user: Identified }>('/auth/register', {
-        email: NEWCOMER_EMAIL,
-        password: NEWCOMER_PASSWORD,
-        fullName: `Newcomer ${RUN}`,
-      }),
-      'register',
-    );
+    newcomerSignUp = await newcomer.post('/auth/register', {
+      email: NEWCOMER_EMAIL,
+      password: NEWCOMER_PASSWORD,
+      fullName: `Newcomer ${RUN}`,
+    });
+    expectOk(newcomerSignUp, 'register');
 
     const loggedIn = expectOk(
       await newcomer.post<{ user: Identified }>('/auth/login', {
@@ -83,6 +83,24 @@ describe('The journey', () => {
       newcomer.lastSetCookie.some((cookie) => /httponly/i.test(cookie)),
     ).toBe(true);
     expect(loggedIn.user.id).toEqual(expect.any(String));
+  });
+
+  it('1b. **signing up with a taken address answers exactly as step 1 did** — no account is revealed', async () => {
+    // Through the real auth-service: a stranger must not learn from the answer
+    // whether an address has an account. Its owner is emailed instead.
+    const again = await new Session().post('/auth/register', {
+      email: NEWCOMER_EMAIL,
+      password: NEWCOMER_PASSWORD,
+      fullName: `Someone else ${RUN}`,
+    });
+
+    expect({
+      status: again.status,
+      body: JSON.stringify(again.body),
+    }).toEqual({
+      status: newcomerSignUp.status,
+      body: JSON.stringify(newcomerSignUp.body),
+    });
   });
 
   it('1a. **log in as the SEEDED admin** — the actor for everything after', async () => {

@@ -90,8 +90,6 @@ export function toRegisterResponseDto(
   response: RegisterResponse,
 ): RegisterResponseDto {
   return {
-    userId: response.userId,
-    organizationId: response.organizationId,
     email: response.email,
     requiresEmailVerification: response.requiresEmailVerification,
   };

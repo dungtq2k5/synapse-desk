@@ -2,6 +2,7 @@ import {
   EmailTemplateName,
   NotificationOrigin,
   EmailContent,
+  WEB_ROUTES,
 } from '@synapsedesk/contracts';
 
 /** Everything a template needs that comes from config rather than the event. */
@@ -33,6 +34,8 @@ export function renderEmail(
   switch (command.template) {
     case EmailTemplateName.WELCOME:
       return welcome(command.data, branding);
+    case EmailTemplateName.SIGN_UP_ATTEMPT:
+      return signUpAttempt(command.data, branding);
     case EmailTemplateName.EMAIL_VERIFICATION:
       return emailVerification(command.data, branding);
     case EmailTemplateName.PASSWORD_RESET:
@@ -159,6 +162,35 @@ function welcome(
     text:
       `Welcome, ${data.fullName}.\n\nYour ${branding.appName} account is ready.\n${branding.appWebUrl}` +
       textOrigin(data.origin, 'registration'),
+  };
+}
+
+/**
+ * To the owner of an address someone tried to sign up with: the sign-up
+ * itself answered as if it worked, so this is the only place it's said.
+ */
+function signUpAttempt(
+  data: Data<EmailTemplateName.SIGN_UP_ATTEMPT>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  const signIn = `${branding.appWebUrl}${WEB_ROUTES.login}`;
+  const reset = `${branding.appWebUrl}${WEB_ROUTES.forgotPassword}`;
+
+  return {
+    subject: `Someone tried to sign up with your ${branding.appName} address`,
+    html: layout(
+      branding,
+      'You already have an account',
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)}, someone tried to create a ${branding.appName} account with this email address. It already has one, so no new account was made.</p>
+       <p style="margin:0;">If it was you, sign in instead, or reset your password if you've forgotten it.</p>
+       ${button(signIn, 'Sign in')}
+       ${button(reset, 'Reset your password')}
+       ${originNotice(data.origin, branding, 'sign-up attempt')}`,
+    ),
+    text:
+      `Hi ${data.fullName}, someone tried to create a ${branding.appName} account with this email address. It already has one, so no new account was made.\n\n` +
+      `Sign in: ${signIn}\nReset your password: ${reset}` +
+      textOrigin(data.origin, 'sign-up attempt'),
   };
 }
 

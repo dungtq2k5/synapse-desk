@@ -20,6 +20,13 @@ export const NOTIFICATION_PATTERNS = {
 export enum EmailTemplateName {
   WELCOME = 'WELCOME',
   /**
+   * Someone tried to sign up with an address that already has an account.
+   *
+   * Sent to that address instead of an error to the caller, at most once an
+   * hour per address.
+   */
+  SIGN_UP_ATTEMPT = 'SIGN_UP_ATTEMPT',
+  /**
    * The one-time reply to mail this system refused
    *
    * Rate-limited to one per address per day.
@@ -83,6 +90,14 @@ export type EmailContent =
       data: {
         fullName: string;
         organizationName: string | null;
+        origin: NotificationOrigin;
+      };
+    }
+  | {
+      template: EmailTemplateName.SIGN_UP_ATTEMPT;
+      to: string;
+      data: {
+        fullName: string;
         origin: NotificationOrigin;
       };
     }

@@ -139,6 +139,37 @@ describe('authentication', () => {
   );
 
   rowFor('Auth')(
+    '**register answers the address and that it needs verifying, never an id**',
+    async () => {
+      // auth-service leaves the ids empty so a taken address answers as a new
+      // one does; the gateway doesn't publish them even when a peer sends them.
+      peers.auth.on('AuthService/Register').reply({
+        userId: 'user-1',
+        organizationId: ORGANIZATION,
+        email: 'ada@example.com',
+        requiresEmailVerification: true,
+      });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/register`,
+        {
+          email: 'ada@example.com',
+          password: 'Str0ng!Passw0rd',
+          fullName: 'Ada Lovelace',
+        },
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        data: { email: 'ada@example.com', requiresEmailVerification: true },
+      });
+      expect(
+        Object.keys((response.body as { data: object }).data).sort(),
+      ).toEqual(['email', 'requiresEmailVerification']);
+    },
+  );
+
+  rowFor('Auth')(
     '**login sets the session cookies**, with the flags a browser enforces',
     async () => {
       peers.auth.on('AuthService/Login').reply({

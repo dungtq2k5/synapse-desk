@@ -13,8 +13,12 @@ message RegisterRequest {
   string full_name = 3;
 }
 
+// The same for an address that already has an account as for a new one, so
+// the answer can't be used to learn which addresses are registered.
 message RegisterResponse {
+  // Always empty: a new account's ids would set its answer apart.
   string user_id = 1;
+  // Always empty, as user_id is.
   string organization_id = 2;
   string email = 3;
   bool requires_email_verification = 4;

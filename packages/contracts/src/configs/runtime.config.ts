@@ -23,6 +23,8 @@ export type CookieSameSite = (typeof COOKIE_SAMESITE_OPTIONS)[number];
  * rather than two string literals that silently drift apart.
  */
 export const WEB_ROUTES = {
+  login: '/login',
+  forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
   verifyEmail: '/verify-email',
   acceptInvitation: '/invitations/accept',

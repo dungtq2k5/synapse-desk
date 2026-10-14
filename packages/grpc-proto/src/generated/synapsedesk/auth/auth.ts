@@ -16,8 +16,14 @@ export interface RegisterRequest {
   fullName: string;
 }
 
+/**
+ * The same for an address that already has an account as for a new one, so
+ * the answer can't be used to learn which addresses are registered.
+ */
 export interface RegisterResponse {
+  /** Always empty: a new account's ids would set its answer apart. */
   userId: string;
+  /** Always empty, as user_id is. */
   organizationId: string;
   email: string;
   requiresEmailVerification: boolean;

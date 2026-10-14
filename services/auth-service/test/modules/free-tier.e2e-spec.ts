@@ -71,7 +71,7 @@ describe('The free tier (e2e)', () => {
     // Asserted against the CONSTANT, never against literals: a test carrying
     // its own copy of the numbers is a second definition of the free tier, and
     // the whole point of this work was collapsing that to one.
-    const result = await auth.register(
+    await auth.register(
       {
         email: 'founder@free-tier-one.test',
         password: TEST_PASSWORD,
@@ -80,8 +80,11 @@ describe('The free tier (e2e)', () => {
       requestOrigin(),
     );
 
+    const { organizationId } = await fx.prisma.user.findFirstOrThrow({
+      where: { email: 'founder@free-tier-one.test' },
+    });
     const organization = await fx.prisma.organization.findUniqueOrThrow({
-      where: { id: result.organizationId },
+      where: { id: organizationId! },
     });
 
     expect(grantsOf(organization)).toEqual({
@@ -94,7 +97,7 @@ describe('The free tier (e2e)', () => {
     // ceiling, so "the most the system permits" and "what you get for free"
     // were the same number. This pins that at least one dimension differs, so
     // a change collapsing them again is visible rather than silent.
-    const result = await auth.register(
+    await auth.register(
       {
         email: 'founder@free-tier-two.test',
         password: TEST_PASSWORD,
@@ -103,8 +106,11 @@ describe('The free tier (e2e)', () => {
       requestOrigin(),
     );
 
+    const { organizationId } = await fx.prisma.user.findFirstOrThrow({
+      where: { email: 'founder@free-tier-two.test' },
+    });
     const organization = await fx.prisma.organization.findUniqueOrThrow({
-      where: { id: result.organizationId },
+      where: { id: organizationId! },
     });
 
     expect(organization.maxAgentSeats).toBe(
