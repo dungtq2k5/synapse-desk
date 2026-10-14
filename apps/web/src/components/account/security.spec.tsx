@@ -14,11 +14,11 @@ jest.mock('sonner', () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));
 
-/** A 401 on a session route refreshes once and retries before it's final. */
-const REFRESH = { 'POST /api/v1/auth/refresh': ok(null) };
+const refreshed = (calls: { url: string }[]) =>
+  calls.some((call) => call.url.endsWith('/auth/refresh'));
 
 function wrap(node: React.ReactNode, routes: Record<string, Reply> = {}) {
-  const calls = stubApi({ ...REFRESH, ...routes });
+  const calls = stubApi(routes);
   render(
     <QueryClientProvider
       client={
@@ -85,14 +85,16 @@ describe('the password section', () => {
     return wrapped;
   }
 
-  it('a wrong current password is said on that field', async () => {
-    await change({
-      'PATCH /api/v1/auth/password': fail(401, 'Current password is incorrect'),
+  it('a wrong current password (a 403) is said on that field, sent once', async () => {
+    const { calls } = await change({
+      'PATCH /api/v1/auth/password': fail(403, 'Current password is incorrect'),
     });
     expect(
       await screen.findByText('That’s not your current password.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Current password')).toHaveFocus();
+    expect(calls.filter((call) => call.method === 'PATCH')).toHaveLength(1);
+    expect(refreshed(calls)).toBe(false);
   });
 
   it('changes it, says how many devices were signed out, and clears', async () => {
@@ -191,6 +193,51 @@ describe('the two-step section', () => {
       'Northwind Health requires two-step verification',
     );
     expect(within(dialog).getByRole('button', { name: 'Close' })).toBeVisible();
+  });
+
+  it('a wrong password (a 403) on regenerating is said on the field, sent once', async () => {
+    const { calls, user } = wrap(
+      <TwoStepSection enabled required={false} organizationName="N" />,
+      {
+        ...STATUS,
+        'POST /api/v1/auth/2fa/backup-codes': fail(403, 'Invalid credentials'),
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Regenerate codes' }));
+    const confirm = screen.getByRole('alertdialog');
+    await user.type(within(confirm).getByLabelText('Password'), 'Wrong-pass-1');
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Regenerate codes' }),
+    );
+
+    expect(
+      await within(confirm).findByText('That’s not your current password.'),
+    ).toBeInTheDocument();
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+    expect(refreshed(calls)).toBe(false);
+  });
+
+  it('a wrong password or code (a 403) on turning off says so, sent once', async () => {
+    const { calls, user } = wrap(
+      <TwoStepSection enabled required={false} organizationName="N" />,
+      {
+        ...STATUS,
+        'DELETE /api/v1/auth/2fa': fail(403, 'Invalid verification code'),
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    const dialog = screen.getByRole('alertdialog');
+    await user.type(within(dialog).getByLabelText('Password'), 'Pass-word-1');
+    await user.type(within(dialog).getByRole('textbox'), '000000');
+    await user.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+
+    expect(
+      await within(dialog).findByText(
+        'Check your password and the code, then try again.',
+      ),
+    ).toBeInTheDocument();
+    expect(calls.filter((call) => call.method === 'DELETE')).toHaveLength(1);
+    expect(refreshed(calls)).toBe(false);
   });
 
   it('regenerating shows the new codes, which stay until they’re saved', async () => {

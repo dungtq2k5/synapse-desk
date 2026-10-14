@@ -514,7 +514,7 @@ test.describe('security', () => {
       page,
       'PATCH',
       '/auth/password',
-      401,
+      403,
       'Current password is incorrect',
     );
     await openSecurity(page);

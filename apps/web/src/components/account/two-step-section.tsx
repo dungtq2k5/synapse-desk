@@ -235,7 +235,7 @@ function RegenerateDialog({
       setPassword('');
       onRegenerated(answer.data?.backupCodes ?? []);
     } catch (failed) {
-      if (failed instanceof ApiError && failed.status === 401) {
+      if (failed instanceof ApiError && failed.status === 403) {
         setError('That’s not your current password.');
         passwordRef.current?.focus();
       } else {
@@ -440,7 +440,7 @@ function TurnOffDialog({
       close(false);
       onDisabled();
     } catch (failed) {
-      if (failed instanceof ApiError && failed.status === 401) {
+      if (failed instanceof ApiError && failed.status === 403) {
         // The server doesn't say which of the two was wrong.
         setError({ code: 'Check your password and the code, then try again.' });
         setCode('');

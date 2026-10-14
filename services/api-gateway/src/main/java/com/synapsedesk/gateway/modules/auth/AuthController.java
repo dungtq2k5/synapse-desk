@@ -517,7 +517,13 @@ public class AuthController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "403",
+      value = ApiErrors.WRONG_PASSWORD_OR_CODE
+    )
+  )
   @ThrottleOverride(
     tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.CHANGE_PASSWORD_TTL_MS,

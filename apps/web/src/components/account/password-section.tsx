@@ -98,7 +98,7 @@ function ChangePassword() {
         queryKey: ['/api/v1/auth/sessions'],
       });
     } catch (failed) {
-      if (failed instanceof ApiError && failed.status === 401) {
+      if (failed instanceof ApiError && failed.status === 403) {
         setErrors({ current: 'That’s not your current password.' });
         currentRef.current?.focus();
       } else if (failed instanceof ApiError && failed.status === 400) {

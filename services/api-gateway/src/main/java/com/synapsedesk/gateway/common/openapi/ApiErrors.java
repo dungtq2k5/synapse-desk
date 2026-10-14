@@ -36,4 +36,26 @@ public @interface ApiErrors {
   String[] value() default {};
 
   boolean throttled() default true;
+
+  /**
+   * A status's description for this route, where the shared one would
+   * mislead: a {@code 403} that means a wrong password rather than a missing
+   * permission.
+   */
+  Description[] descriptions() default {};
+
+  /** One status's description, overriding the shared one on this route. */
+  @Target({})
+  @Retention(RetentionPolicy.RUNTIME)
+  @interface Description {
+    String status();
+
+    String value();
+  }
+
+  /**
+   * A {@code 403} that means the password or code a signed-in caller
+   * re-entered is wrong, not a missing permission.
+   */
+  String WRONG_PASSWORD_OR_CODE = "The password or code is wrong.";
 }

@@ -291,7 +291,13 @@ public class TwoFactorAuthController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "403",
+      value = ApiErrors.WRONG_PASSWORD_OR_CODE
+    )
+  )
   public ResponseEntity<ApiResponse<Void>> twoFactorAuthControllerDisableV1(
     @Valid @RequestBody DisableTwoFactorDto disableTwoFactorDto
   ) {
@@ -317,7 +323,13 @@ public class TwoFactorAuthController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "403",
+      value = ApiErrors.WRONG_PASSWORD_OR_CODE
+    )
+  )
   public ResponseEntity<
     ApiResponse<BackupCodesResponseDto>
   > twoFactorAuthControllerRegenerateBackupCodesV1(

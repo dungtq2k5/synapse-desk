@@ -65,8 +65,17 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
       responses = new ApiResponses();
       operation.setResponses(responses);
     }
+    Map<String, String> described = new LinkedHashMap<>(DESCRIPTIONS);
+    if (declared != null) {
+      for (ApiErrors.Description description : declared.descriptions()) {
+        described.put(description.status(), description.value());
+      }
+    }
     for (String status : statuses) {
-      responses.addApiResponse(status, errorResponse(status));
+      responses.addApiResponse(
+        status,
+        errorResponse(status, described.get(status))
+      );
     }
 
     return operation;
@@ -81,7 +90,7 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
     return false;
   }
 
-  private static ApiResponse errorResponse(String status) {
+  private static ApiResponse errorResponse(String status, String description) {
     Schema<Object> schema = new Schema<>();
     schema.setTypes(Set.of("object"));
     schema.setRequired(
@@ -119,7 +128,7 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
     content.addMediaType("application/json", mediaType);
 
     ApiResponse response = new ApiResponse();
-    response.setDescription(DESCRIPTIONS.get(status));
+    response.setDescription(description);
     response.setContent(content);
     return response;
   }
