@@ -66,12 +66,12 @@ export function CodeSlots({
         aria-invalid={invalid || undefined}
         className={
           spaced
-            ? 'h-12 w-11 rounded-md border text-xl font-medium first:rounded-md last:rounded-md'
+            ? 'h-12 w-11 rounded-md border text-xl font-medium first:rounded-md last:rounded-md @max-[20rem]:w-9'
             : undefined
         }
       />
     ));
-  return (
+  const field = (
     <InputOTP
       ref={inputRef}
       maxLength={length}
@@ -101,6 +101,10 @@ export function CodeSlots({
       </InputOTPGroup>
     </InputOTP>
   );
+  // Spaced boxes need about 21rem (6 × 44px, the gaps, the dash). In a dialog
+  // on a phone (under 20rem) they narrow rather than push it wider; the
+  // container's width is what's measured, not the viewport's.
+  return spaced ? <div className="@container w-full">{field}</div> : field;
 }
 
 /**
