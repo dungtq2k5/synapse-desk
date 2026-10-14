@@ -29,13 +29,15 @@ async function personAt(
 
 /**
  * One of the requester's own tickets, as their list shows it: a seeded member
- * has no `ticket.create`, so the rows use what the demo seed gave them.
+ * has no `ticket.create`, so the rows use what the demo seed gave them. Their
+ * own by author, not just the latest they can see: another person's ticket
+ * can leave their view once an agent takes it.
  */
-async function ownTicket(page: Page): Promise<string> {
+async function ownTicket(page: Page, authorId: string): Promise<string> {
   const tickets = await api<{ items: { id: string }[] }>(
     page.request,
     'GET',
-    '/tickets?limit=1&sortBy=updatedAt&sortOrder=DESC',
+    `/tickets?limit=1&sortBy=updatedAt&sortOrder=DESC&authorId=${authorId}`,
   );
   const [ticket] = tickets.items;
   expect(ticket, 'the seeded requester has no ticket').toBeDefined();
@@ -49,7 +51,7 @@ test('a reply arrives live in the requester’s browser, and a note never does',
   const requester = await personAt(browser, colleague.email);
   const agent = await personAt(browser, admin.email);
   const stamp = Date.now();
-  const ticketId = await ownTicket(requester.page);
+  const ticketId = await ownTicket(requester.page, colleague.id);
   // Only the author or the assignee posts, so the agent takes it first; a
   // re-run finds it already theirs (409).
   // A department is required, and ticket-service only checks it exists: the
@@ -165,7 +167,7 @@ test('an expired access cookie: the page renders, refreshes once, shows the data
 }) => {
   const { colleague } = await seededActors();
   const { context, page } = await personAt(browser, colleague.email);
-  const ticketId = await ownTicket(page);
+  const ticketId = await ownTicket(page, colleague.id);
 
   await context.clearCookies({ name: 'access_token' });
   const refreshes: string[] = [];
