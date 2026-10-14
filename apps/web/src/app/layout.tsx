@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Roboto } from 'next/font/google';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
@@ -11,6 +11,12 @@ const sans = Inter({ subsets: ['latin'], variable: '--font-family-sans' });
 const mono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-family-mono',
+});
+// Google's sign-in button text, Roboto Medium, as its guidelines ask.
+const google = Roboto({
+  subsets: ['latin'],
+  weight: '500',
+  variable: '--font-family-google',
 });
 
 export const metadata: Metadata = {
@@ -31,7 +37,7 @@ export default async function RootLayout({
     // The theme script sets `class` before React hydrates.
     <html
       lang="en"
-      className={`${sans.variable} ${mono.variable}`}
+      className={`${sans.variable} ${mono.variable} ${google.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground antialiased">

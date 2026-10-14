@@ -18,9 +18,11 @@ import { parseEnvFile } from '@synapsedesk/testing/env-file';
  *   is what makes "the Next server calls only the gateway" checkable.
  * - **No color literal**, and no raw primitive: a component's color is a
  *   semantic token, which switches with the theme.
- * - **`apps/web/.env.example` declares only `GATEWAY_URL`.** The dev server
- *   proxies the socket too, so the browser needs no address of its own; and a
- *   `NEXT_PUBLIC_` variable is baked into the build, so none is wanted.
+ * - **`apps/web/.env.example` declares only `GATEWAY_URL` and Firebase's web
+ *   config.** The dev server proxies the socket too, so the browser needs no
+ *   address of its own; Firebase's public config reaches the browser per
+ *   request; and a `NEXT_PUBLIC_` variable is baked into the build, so none is
+ *   wanted.
  */
 describe('the web client', () => {
   const REPO_ROOT = join(__dirname, '../../..');
@@ -200,12 +202,18 @@ describe('the web client', () => {
 
   // ------------------------------------------------------------ environment
 
-  it('**apps/web/.env.example declares only GATEWAY_URL**', () => {
+  it('**apps/web/.env.example declares only GATEWAY_URL and Firebase’s web config**', () => {
     const [example] = readRepoFiles('apps/web/.env.example');
     expect(example).toBeDefined();
 
-    const keys = Object.keys(parseEnvFile(example.text));
-    expect(keys).toContain('GATEWAY_URL');
-    expect(keys.filter((key) => key !== 'GATEWAY_URL')).toEqual([]);
+    // Firebase's four are public (the browser receives them per request) and
+    // read at request time, so no build carries one environment's values.
+    expect(Object.keys(parseEnvFile(example.text)).sort()).toEqual([
+      'FIREBASE_API_KEY',
+      'FIREBASE_AUTH_DOMAIN',
+      'FIREBASE_AUTH_EMULATOR_URL',
+      'FIREBASE_PROJECT_ID',
+      'GATEWAY_URL',
+    ]);
   });
 });

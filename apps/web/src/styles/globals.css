@@ -104,9 +104,13 @@
   --color-note-bg: var(--note-bg);
   --color-note-fg: var(--note-fg);
   --color-note-border: var(--note-border);
+  --color-google-button-bg: var(--google-button-bg);
+  --color-google-button-fg: var(--google-button-fg);
+  --color-google-button-border: var(--google-button-border);
 
   --font-sans: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-family-mono), ui-monospace, monospace;
+  --font-google: var(--font-family-google), Roboto, sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

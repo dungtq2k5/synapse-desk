@@ -7,6 +7,9 @@
 #     node scripts/generate-k8s-config.mjs
 #
 # ConfigMap: the non-secret half of the env contract.
+#
+# Documented and deliberately absent:
+#   FIREBASE_AUTH_EMULATOR_URL — production signs in with real Google; setting this sends the browser to an emulator that is not there
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,4 +17,6 @@ metadata:
   labels:
     app.kubernetes.io/name: web
 data:
+  FIREBASE_AUTH_DOMAIN: 'REPLACE_ME'
+  FIREBASE_PROJECT_ID: 'REPLACE_ME'
   GATEWAY_URL: 'http://api-gateway:3000'

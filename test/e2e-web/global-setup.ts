@@ -5,6 +5,7 @@ import systemTeardown from '../system/global-teardown';
 import { REPO_ROOT, type ServiceSpec } from '../system/services';
 import { startStack } from '../system/stack';
 import { startBrowserServer, stopBrowserServer } from './browser-server';
+import { useAuthEmulator } from './firebase';
 import { startIngress, WEB_PORT } from './ingress';
 
 /** Where `next build` puts the server the image runs (`output: 'standalone'`). */
@@ -42,6 +43,8 @@ function completeStandalone(): void {
  * (browser-server.ts). The returned function is the teardown.
  */
 export default async function globalSetup(): Promise<() => Promise<void>> {
+  // Before the services start: auth-service reads its half as it boots.
+  useAuthEmulator();
   await systemSetup();
 
   completeStandalone();

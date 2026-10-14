@@ -275,7 +275,7 @@ services:
   # page lives here rather than in its image. Stop it with
   # `docker compose --profile docs down`.
   swagger-ui:
-    # Pinned — same rule as qdrant and firebase-storage above. Not 5.33: both
+    # Pinned — same rule as qdrant and firebase above. Not 5.33: both
     # 5.33.0 and 5.33.2 render only the first of this document's 31 tags
     # (measured); 5.32.15 renders all 230 operations.
     image: swaggerapi/swagger-ui:v5.32.15

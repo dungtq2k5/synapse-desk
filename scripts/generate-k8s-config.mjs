@@ -90,6 +90,10 @@ const BUILD_INJECTED = new Set(['APP_VERSION', 'BUILD_SHA', 'BUILD_TIME']);
 
 /** Carries a credential. Goes to a Secret, with the value blanked. */
 const SECRET = new Set([
+  // Firebase's web API key is public (the browser receives it), but it's named
+  // like a credential, and the manifest guard reads credentials by name. A
+  // Secret holds it rather than an exemption in that guard.
+  'FIREBASE_API_KEY',
   'DATABASE_URL',
   'INGESTION_DATABASE_URL',
   'REDIS_URL',
@@ -116,6 +120,9 @@ const SITE_SPECIFIC = new Set([
   'SUPPORT_EMAIL',
   'FIREBASE_STORAGE_BUCKET',
   'SUPER_ADMIN_EMAIL',
+  // The Firebase project's web app config, for Google sign-in.
+  'FIREBASE_AUTH_DOMAIN',
+  'FIREBASE_PROJECT_ID',
 ]);
 
 /**
@@ -128,6 +135,10 @@ const EXCLUDED = new Map([
   [
     'FIREBASE_STORAGE_EMULATOR_HOST',
     'production uses real Firebase Storage; setting this points the SDK at an emulator that is not there',
+  ],
+  [
+    'FIREBASE_AUTH_EMULATOR_URL',
+    'production signs in with real Google; setting this sends the browser to an emulator that is not there',
   ],
   [
     'FIREBASE_AUTH_EMULATOR_HOST',

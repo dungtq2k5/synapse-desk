@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { SignInFlow, type SignInNotice } from '@/components/auth/sign-in-flow';
+import { firebaseWebConfig } from '@/lib/firebase-config';
 import { safeNext } from '@/lib/sign-in';
 
 export const metadata: Metadata = { title: 'Sign in · SynapseDesk' };
@@ -23,7 +24,13 @@ export default async function LoginPage({
     return Array.isArray(value) ? value[0] : value;
   };
 
-  return <SignInFlow next={safeNext(one('next'))} notice={noticeOf(one)} />;
+  return (
+    <SignInFlow
+      next={safeNext(one('next'))}
+      notice={noticeOf(one)}
+      firebase={firebaseWebConfig()}
+    />
+  );
 }
 
 function noticeOf(one: (key: string) => string | undefined): SignInNotice {

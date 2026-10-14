@@ -1129,6 +1129,107 @@
         }
       }
     },
+    "google": {
+      "blue": {
+        "$type": "color",
+        "$value": "#4285f4",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-blue)"
+            }
+          }
+        }
+      },
+      "green": {
+        "$type": "color",
+        "$value": "#34a853",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-green)"
+            }
+          }
+        }
+      },
+      "yellow": {
+        "$type": "color",
+        "$value": "#fbbc05",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-yellow)"
+            }
+          }
+        }
+      },
+      "red": {
+        "$type": "color",
+        "$value": "#ea4335",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-red)"
+            }
+          }
+        }
+      },
+      "light-border": {
+        "$type": "color",
+        "$value": "#747775",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-light-border)"
+            }
+          }
+        }
+      },
+      "light-text": {
+        "$type": "color",
+        "$value": "#1f1f1f",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-light-text)"
+            }
+          }
+        }
+      },
+      "dark-fill": {
+        "$type": "color",
+        "$value": "#131314",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-dark-fill)"
+            }
+          }
+        }
+      },
+      "dark-border": {
+        "$type": "color",
+        "$value": "#8e918f",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-dark-border)"
+            }
+          }
+        }
+      },
+      "dark-text": {
+        "$type": "color",
+        "$value": "#e3e3e3",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--color-google-dark-text)"
+            }
+          }
+        }
+      }
+    },
     "black-alpha": {
       "6": {
         "$type": "color",
@@ -1220,6 +1321,17 @@
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--font-family-mono)"
+            }
+          }
+        }
+      },
+      "google": {
+        "$type": "fontFamily",
+        "$value": "Roboto",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--font-family-google)"
             }
           }
         }

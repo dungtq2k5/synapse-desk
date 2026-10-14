@@ -13,7 +13,11 @@ const config: Config = {
   testEnvironment: 'jsdom',
   testRegex: String.raw`\.spec\.tsx?$`,
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-  moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // See src/test/firebase.ts.
+    '^firebase/(app|auth)$': '<rootDir>/src/test/firebase.ts',
+  },
   // The standalone build carries its own copy of this package's manifest.
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };

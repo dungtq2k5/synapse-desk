@@ -1076,6 +1076,43 @@
       }
     }
   },
+  "google": {
+    "button": {
+      "bg": {
+        "$type": "color",
+        "$value": "{color.white}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--google-button-bg)"
+            }
+          }
+        }
+      },
+      "fg": {
+        "$type": "color",
+        "$value": "{color.google.light-text}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--google-button-fg)"
+            }
+          }
+        }
+      },
+      "border": {
+        "$type": "color",
+        "$value": "{color.google.light-border}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--google-button-border)"
+            }
+          }
+        }
+      }
+    }
+  },
   "radius": {
     "default": {
       "$type": "dimension",

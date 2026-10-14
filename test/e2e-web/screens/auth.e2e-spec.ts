@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { signInInPopup } from '../firebase';
 import { look, tabsThrough } from './look';
 
 /**
@@ -84,7 +85,20 @@ test.describe('sign-in', () => {
       /^Password$/,
       /^Show password$/,
       /^Sign in$/,
+      /^Sign up$/,
     ]);
+  });
+
+  test('Google sign-in failed: try again, or use email and password', async ({
+    page,
+  }) => {
+    await reply(page, '/auth/google', 401, 'Invalid Google token');
+    await page.goto('/login');
+    const opened = page.waitForEvent('popup');
+    await page.getByRole('button', { name: 'Continue with Google' }).click();
+    await signInInPopup(await opened, 'sam@google.example.test', 'Sam Rivera');
+    await expect(alert(page)).toContainText('Couldn’t sign in with Google');
+    await look(page, 'sign-in-google-failed');
   });
 
   test('a field left empty or malformed says how to fix it', async ({

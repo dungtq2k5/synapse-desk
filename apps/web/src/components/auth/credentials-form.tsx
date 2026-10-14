@@ -7,30 +7,40 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { FirebaseWebConfig } from '@/lib/firebase-config';
 import { deviceName, EMAIL, signInStep, type SignInStep } from '@/lib/sign-in';
 import { AuthCard } from './auth-card';
 import { Field } from './field';
+import { GoogleButton } from './google-button';
+import { OrDivider } from './or-divider';
 import { PasswordInput } from './password-input';
 import { RetryAlert } from './retry-alert';
 import type { SignInNotice } from './sign-in-flow';
+import { useGoogleSignIn } from './use-google-sign-in';
 
 type Failure =
   | { kind: 'credentials' }
   | { kind: 'throttled'; seconds: number | null }
   | { kind: 'other'; message: string };
 
-/** The first leg: email and password, with why the user is here. */
+/**
+ * The first leg: Google (when it's configured), or email and password, with
+ * why the user is here.
+ */
 export function CredentialsForm({
   notice,
   email,
   onEmail,
   onAnswer,
+  firebase = null,
 }: {
   notice: SignInNotice;
   email: string;
   onEmail: (email: string) => void;
   onAnswer: (step: SignInStep) => void;
+  firebase?: FirebaseWebConfig | null;
 }) {
+  const google = useGoogleSignIn(firebase, onAnswer);
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {},
@@ -71,7 +81,26 @@ export function CredentialsForm({
 
   return (
     <AuthCard title="Sign in" lead="Use your work email and password.">
+      {google.available && (
+        <>
+          <GoogleButton
+            disabled={google.busy || busy}
+            aria-busy={google.busy || undefined}
+            onClick={() => void google.start()}
+          />
+          <OrDivider />
+        </>
+      )}
       <NoticeAlert notice={notice} />
+      {google.failed && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>Couldn’t sign in with Google</AlertTitle>
+          <AlertDescription>
+            Try again, or sign in with your email and password.
+          </AlertDescription>
+        </Alert>
+      )}
       {failure?.kind === 'credentials' && (
         <Alert variant="destructive">
           <CircleAlertIcon />
@@ -143,6 +172,15 @@ export function CredentialsForm({
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
+      <p className="text-sm text-muted-foreground">
+        Don’t have an account?{' '}
+        <Link
+          href="/sign-up"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Sign up
+        </Link>
+      </p>
     </AuthCard>
   );
 }

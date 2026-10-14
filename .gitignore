@@ -91,3 +91,5 @@ graphify-out/
 test/e2e-web/test-results/
 test/e2e-web/playwright-report/
 test/e2e-web/results.xml
+# The run's own Auth-emulator key (firebase.ts).
+test/e2e-web/.firebase/

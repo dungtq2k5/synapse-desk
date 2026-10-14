@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { firebaseOrigins } from './lib/firebase-config';
 import { contentSecurityPolicy } from './proxy';
 
 describe('the Content-Security-Policy', () => {
@@ -27,6 +28,49 @@ describe('the Content-Security-Policy', () => {
 
   it('cannot be framed', () => {
     expect(policy()['frame-ancestors']).toEqual(["'none'"]);
+  });
+
+  it('lets Google sign-in reach the emulator, or Google, and frame its auth page', () => {
+    const directives = (
+      firebase: Parameters<typeof contentSecurityPolicy>[2],
+    ) =>
+      Object.fromEntries(
+        contentSecurityPolicy('abc', false, firebase)
+          .split('; ')
+          .map((directive) => {
+            const [name, ...values] = directive.split(' ');
+            return [name, values];
+          }),
+      );
+    const config = {
+      apiKey: 'k',
+      authDomain: 'acme.firebaseapp.com',
+      projectId: 'acme',
+      emulatorUrl: null,
+    };
+
+    const emulated = directives(
+      firebaseOrigins({ ...config, emulatorUrl: 'http://localhost:9099' }),
+    );
+    expect(emulated['connect-src']).toEqual([
+      "'self'",
+      'http://localhost:9099',
+    ]);
+    expect(emulated['frame-src']).toEqual(["'self'", 'http://localhost:9099']);
+
+    const real = directives(firebaseOrigins(config));
+    expect(real['connect-src']).toEqual([
+      "'self'",
+      'https://identitytoolkit.googleapis.com',
+      'https://securetoken.googleapis.com',
+    ]);
+    expect(real['frame-src']).toEqual([
+      "'self'",
+      'https://acme.firebaseapp.com',
+    ]);
+
+    // Not configured: nothing beyond this origin.
+    expect(directives(firebaseOrigins(null))['frame-src']).toEqual(["'self'"]);
   });
 
   it("adds eval and the dev server's socket in development only", () => {

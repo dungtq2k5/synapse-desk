@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { firebaseOrigins, firebaseWebConfig } from '@/lib/firebase-config';
 
 /**
  * The Content-Security-Policy, with a fresh script nonce per request.
@@ -16,6 +17,7 @@ export function proxy(request: NextRequest) {
   const policy = contentSecurityPolicy(
     nonce,
     process.env.NODE_ENV === 'development',
+    firebaseOrigins(firebaseWebConfig()),
   );
 
   const requestHeaders = new Headers(request.headers);
@@ -29,13 +31,19 @@ export function proxy(request: NextRequest) {
 
 /**
  * The policy for one nonce. Development adds what the dev server needs: eval
- * for React's refresh, and its own WebSocket for hot reload.
+ * for React's refresh, and its own WebSocket for hot reload. `firebase` is
+ * where Google sign-in talks to and the frame it opens (none when it isn't
+ * configured).
  *
  * @example contentSecurityPolicy('abc', false) // "default-src 'self'; script-src 'self' 'nonce-abc' …"
  */
 export function contentSecurityPolicy(
   nonce: string,
   development: boolean,
+  firebase: { connect: string[]; frame: string[] } = {
+    connect: [],
+    frame: [],
+  },
 ): string {
   return [
     "default-src 'self'",
@@ -44,7 +52,12 @@ export function contentSecurityPolicy(
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${development ? ' ws:' : ''}`,
+    [
+      "connect-src 'self'",
+      ...firebase.connect,
+      ...(development ? ['ws:'] : []),
+    ].join(' '),
+    ["frame-src 'self'", ...firebase.frame].join(' '),
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

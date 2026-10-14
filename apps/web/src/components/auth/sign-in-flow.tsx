@@ -2,6 +2,7 @@
 
 import type { TenantOptionResponseDto } from '@synapsedesk/api-client';
 import { useState } from 'react';
+import type { FirebaseWebConfig } from '@/lib/firebase-config';
 import { keepTwoStepWarning } from '@/lib/two-step-warning';
 import type { SignInStep } from '@/lib/sign-in';
 import { ChooseOrganization } from './choose-organization';
@@ -32,9 +33,12 @@ type Step =
 export function SignInFlow({
   next,
   notice,
+  firebase = null,
 }: {
   next: string;
   notice: SignInNotice;
+  /** Google sign-in's config, or null when it isn't set up. */
+  firebase?: FirebaseWebConfig | null;
 }) {
   const [step, setStep] = useState<Step>({ kind: 'credentials' });
   const [email, setEmail] = useState('');
@@ -59,6 +63,7 @@ export function SignInFlow({
           email={email}
           onEmail={setEmail}
           onAnswer={advance}
+          firebase={firebase}
         />
       );
     case 'tenant':
