@@ -144,6 +144,11 @@ export const envValidationSchema = Joi.object({
   //
   // NEVER commit this file. It is a bearer credential for the whole project.
   FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().required(),
+  // The Authentication EMULATOR, dev and test only. Read by firebase-admin
+  // itself; `host:port`, no scheme. The emulator's tokens carry its project,
+  // `synapsedesk-test`, as their audience, so the key must name that project:
+  // the one `keys:service-account` writes does.
+  FIREBASE_AUTH_EMULATOR_HOST: Joi.string().optional(),
 
   // Billing — OPTIONAL, and deliberately so.
   //

@@ -397,7 +397,10 @@ describe('the manifest contract', () => {
      * the copy that fails if they diverge: an exclusion dropped there appears
      * here as a missing key.
      */
-    const EXCLUDED = new Set(['FIREBASE_STORAGE_EMULATOR_HOST']);
+    const EXCLUDED = new Set([
+      'FIREBASE_STORAGE_EMULATOR_HOST',
+      'FIREBASE_AUTH_EMULATOR_HOST',
+    ]);
 
     /** rag-service declares its variables in Python; its guard is pytest. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {

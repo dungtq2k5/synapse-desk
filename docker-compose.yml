@@ -189,32 +189,37 @@ services:
       timeout: 3s
       retries: 5
 
-  # The Firebase Storage EMULATOR.
+  # The Firebase EMULATORS: Storage and Authentication.
   #
   # Tests point here instead of at a real bucket, for the same reason they point
   # at a test database instead of the dev one: a suite that deletes objects
   # would otherwise delete real customer files. It is also what lets the storage
-  # suite run on a fresh clone with no Google project at all.
-  firebase-storage:
+  # suite run on a fresh clone with no Google project at all. The Auth emulator
+  # does the same for Google sign-in: no Google account, no OAuth client, and a
+  # test can sign in with an unsigned credential.
+  firebase:
     # Pinned — same rule as qdrant above.
     image: andreysenov/firebase-tools:15.25.1
-    container_name: synapsedesk-firebase-storage
+    container_name: synapsedesk-firebase
     working_dir: /home/node
-    command: firebase emulators:start --only storage --project synapsedesk-test
+    command: firebase emulators:start --only storage,auth --project synapsedesk-test
     ports:
       - '9199:9199'
+      - '9099:9099'
     volumes:
       - ./docker/firebase:/home/node
     # A node image with neither curl nor wget, so `node -e` is the probe it
-    # has. More retries than its neighbours because the emulator suite is the
-    # slowest thing here to become ready — measured cold-start below the
-    # 50s ceiling this allows (10 x 5s).
+    # has. Healthy only once BOTH emulators answer: they start one after the
+    # other, so either alone would report a half-ready container. More retries
+    # than its neighbours because the emulator suite is the slowest thing here
+    # to become ready — measured cold-start below the 50s ceiling this allows
+    # (10 x 5s).
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - "require('http').get('http://127.0.0.1:9199/',r=>process.exit(0)).on('error',()=>process.exit(1))"
+        - "const g=(p)=>new Promise((y,n)=>require('http').get('http://127.0.0.1:'+p+'/',()=>y()).on('error',n));Promise.all([g(9199),g(9099)]).then(()=>process.exit(0),()=>process.exit(1))"
       interval: 5s
       timeout: 3s
       retries: 10
@@ -224,7 +229,7 @@ services:
   # Reads the alert rules nothing read before. **NOT started by a bare
   # `docker compose up`** — see the profile below.
   prometheus:
-    # Pinned — same rule as qdrant and firebase-storage above.
+    # Pinned — same rule as qdrant and firebase above.
     image: prom/prometheus:v3.7.3
     container_name: synapsedesk-prometheus
     # **The first profile in this file, so the convention is stated here.** A
