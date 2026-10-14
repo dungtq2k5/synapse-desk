@@ -886,11 +886,9 @@ export class AuthService {
     });
     if (!session) return { revokedSessionCount: 0 };
 
-    const { count } = await this.prisma.deviceSession.deleteMany({
-      where: request.allDevices
-        ? { userId: session.userId }
-        : { id: session.id },
-    });
+    const count = await this.sessionsService.deleteAndMark(
+      request.allDevices ? { userId: session.userId } : { id: session.id },
+    );
 
     return { revokedSessionCount: count };
   }
@@ -1060,9 +1058,7 @@ export class AuthService {
 
     if (session.rotatedAt) {
       // Replay of an already-spent token: burn the whole family.
-      await this.prisma.deviceSession.deleteMany({
-        where: { familyId: session.familyId },
-      });
+      await this.sessionsService.deleteAndMark({ familyId: session.familyId });
       this.logger.warn(
         `Refresh token reuse detected for user ${session.userId}; ` +
           `revoked session family ${session.familyId}`,
@@ -1088,10 +1084,8 @@ export class AuthService {
     });
     if (!user || user.isLocked) {
       // Locked or deleted mid-session: the refresh is where that takes effect,
-      // since the already-issued access token cannot be recalled.
-      await this.prisma.deviceSession.deleteMany({
-        where: { userId: session.userId },
-      });
+      // and its access tokens stop now that their families are marked.
+      await this.sessionsService.deleteAndMark({ userId: session.userId });
       throw new RpcException({
         code: status.UNAUTHENTICATED,
         message: 'Account is no longer active',
@@ -1127,7 +1121,9 @@ export class AuthService {
     });
 
     return {
-      accessToken: this.generateAccessToken(this.buildJwtPayload(user)),
+      accessToken: this.generateAccessToken(
+        this.buildJwtPayload(user, session.familyId),
+      ),
       refreshToken,
       user: toUserResponse(
         user,
@@ -1182,7 +1178,6 @@ export class AuthService {
     user: UserWithAccess,
     device: RequestOrigin & { name?: string },
   ): Promise<IssuedSession> {
-    const accessToken = this.generateAccessToken(this.buildJwtPayload(user));
     const refreshToken = generateSecureToken();
 
     const session = await this.prisma.$transaction(async (tx) => {
@@ -1198,7 +1193,7 @@ export class AuthService {
           isTrusted: false,
           expiresAt: addDays(new Date(), this.REFRESH_TOKEN_TTL_DAYS),
         },
-        select: { id: true },
+        select: { id: true, familyId: true },
       });
 
       await tx.user.update({
@@ -1208,6 +1203,10 @@ export class AuthService {
 
       return created;
     });
+    // Signed once the row exists: the token names its family.
+    const accessToken = this.generateAccessToken(
+      this.buildJwtPayload(user, session.familyId),
+    );
 
     return {
       accessToken,
@@ -1383,7 +1382,7 @@ export class AuthService {
       this.BCRYPT_ROUNDS,
     );
 
-    return this.prisma.$transaction(async (tx) => {
+    const reset = await this.prisma.$transaction(async (tx) => {
       // Invalidate all reset tokens for this user (including the one used)
       await tx.passwordResetToken.updateMany({
         where: { userId: record.userId },
@@ -1398,12 +1397,21 @@ export class AuthService {
       // The point of the whole flow. A reset that leaves the attacker's
       // session alive accomplishes nothing — and that includes their trusted
       // devices, which would otherwise let them back in without 2FA.
+      const families = await tx.deviceSession.findMany({
+        where: { userId: record.userId },
+        select: { familyId: true },
+        distinct: ['familyId'],
+      });
       const { count } = await tx.deviceSession.deleteMany({
         where: { userId: record.userId },
       });
 
-      return { revokedSessionCount: count };
+      return { count, families: families.map(({ familyId }) => familyId) };
     });
+    // After the commit: their access tokens stop now, not at expiry.
+    await this.sessionsService.markRevoked(reset.families);
+
+    return { revokedSessionCount: reset.count };
   }
 
   /**
@@ -1451,9 +1459,11 @@ export class AuthService {
     });
   }
 
-  private buildJwtPayload(user: UserWithAccess): JwtPayload {
+  /** The access token's claims; `sid` is the session family it belongs to. */
+  private buildJwtPayload(user: UserWithAccess, sid: string): JwtPayload {
     return {
       sub: user.id,
+      sid,
       organizationId: user.organizationId,
       isSuperAdmin: user.isSuperAdmin,
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),

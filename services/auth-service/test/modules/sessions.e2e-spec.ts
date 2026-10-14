@@ -1,14 +1,24 @@
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { EmailTemplateName } from '@synapsedesk/contracts';
-import { bootstrapE2eTest, E2eFixture, memberContext } from '../utils';
+import { JwtService } from '@nestjs/jwt';
+import type Redis from 'ioredis';
+import { REVOKED_SESSION_KEY_PREFIX } from '@synapsedesk/contracts';
+import {
+  bootstrapE2eTest,
+  E2eFixture,
+  memberContext,
+  requestOrigin,
+} from '../utils';
 import {
   addMember,
   createDeviceSession,
   createTrustedDeviceSession,
   seedForeignTenant,
   seedTenantWithUser,
+  TEST_PASSWORD,
 } from '../factories';
+import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 
@@ -515,6 +525,95 @@ describe('Sessions (e2e)', () => {
       const count = await sessions.revokeAllExceptFamily(t.user.id, undefined);
 
       expect(count).toBe(2);
+    });
+  });
+
+  // ------------------------------------------- revocation reaches the gateway
+
+  /**
+   * An access token names its session family in `sid`, and revoking a family
+   * writes `revoked-session:{familyId}` to the Redis the gateway reads, for as
+   * long as an access token lives: the token stops now, not at expiry.
+   */
+  describe('revoked families, for the gateway', () => {
+    let redis: Redis;
+    let jwt: JwtService;
+    beforeAll(() => {
+      redis = fx.moduleRef.get(LIMIT_ALERT_REDIS);
+      jwt = fx.moduleRef.get(JwtService);
+    });
+
+    const sidOf = (accessToken: string) =>
+      jwt.decode<{ sid?: string }>(accessToken).sid;
+    /** The mark's remaining seconds: -2 when there is none. */
+    const markOf = (familyId: string) =>
+      redis.ttl(`${REVOKED_SESSION_KEY_PREFIX}${familyId}`);
+
+    it('R1. the access token names its family, and refreshing keeps it', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const signedIn = await auth.login(
+        { email: t.user.email, password: TEST_PASSWORD },
+        requestOrigin(),
+      );
+      const [row] = await fx.prisma.deviceSession.findMany({
+        where: { userId: t.user.id },
+      });
+
+      expect(sidOf(signedIn.accessToken!)).toBe(row.familyId);
+      const refreshed = await auth.refreshToken(
+        { refreshToken: signedIn.refreshToken! },
+        memberContext(t.user),
+      );
+      expect(sidOf(refreshed.accessToken)).toBe(row.familyId);
+    });
+
+    it('R2. revoking a session marks its family for as long as a token lives', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const { session } = await createDeviceSession(fx.prisma, t.user.id);
+
+      await sessions.revokeSession(
+        { sessionId: session.id, refreshToken: '' },
+        own(t),
+      );
+
+      const ttl = await markOf(session.familyId);
+      // JWT_ACCESS_EXPIRES_IN is 15m in .env.test.
+      expect(ttl).toBeGreaterThan(890);
+      expect(ttl).toBeLessThanOrEqual(900);
+    });
+
+    it('R3. signing out everywhere marks every family', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const one = await createDeviceSession(fx.prisma, t.user.id);
+      const two = await createDeviceSession(fx.prisma, t.user.id);
+
+      await sessions.revokeAllForUser(t.user.id);
+
+      expect(await markOf(one.session.familyId)).toBeGreaterThan(0);
+      expect(await markOf(two.session.familyId)).toBeGreaterThan(0);
+    });
+
+    it("R4. a password change marks the others, never the caller's own", async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const mine = await createDeviceSession(fx.prisma, t.user.id);
+      const other = await createDeviceSession(fx.prisma, t.user.id);
+
+      await sessions.revokeAllExceptFamily(t.user.id, mine.refreshToken);
+
+      expect(await markOf(other.session.familyId)).toBeGreaterThan(0);
+      expect(await markOf(mine.session.familyId)).toBe(-2);
+    });
+
+    it('R5. signing out marks the session signed out of', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const { session, refreshToken } = await createDeviceSession(
+        fx.prisma,
+        t.user.id,
+      );
+
+      await auth.logout({ refreshToken, allDevices: false });
+
+      expect(await markOf(session.familyId)).toBeGreaterThan(0);
     });
   });
 });
