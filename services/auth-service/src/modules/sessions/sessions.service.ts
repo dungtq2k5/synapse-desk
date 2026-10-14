@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { hashToken } from '../../common/utils';
+import { RevokedSessions } from './revoked-sessions';
 import { Prisma } from '../../generated/prisma/client';
 
 /**
@@ -84,6 +85,7 @@ export class SessionsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
     private readonly notifications: NotificationPublisher,
+    private readonly revoked: RevokedSessions,
   ) {}
 
   async listSessions(
@@ -139,6 +141,7 @@ export class SessionsService {
     const { count } = await this.prisma.deviceSession.deleteMany({
       where: { familyId: session.familyId },
     });
+    await this.revoked.mark([session.familyId]);
 
     return {
       wasCurrent: currentFamilyId === session.familyId,
@@ -261,11 +264,7 @@ export class SessionsService {
     // Row DELETION rather than an update, which is what takes device trust with
     // it: `device_token_hash` and `trusted_until` live on these rows, so
     // removing the row is what stops a stolen laptop skipping 2FA.
-    const { count } = await this.prisma.deviceSession.deleteMany({
-      where: { userId },
-    });
-
-    return count;
+    return this.deleteAndMark({ userId });
   }
 
   /**
@@ -282,14 +281,31 @@ export class SessionsService {
   ): Promise<number> {
     const familyId = await this.resolveFamilyId(refreshToken);
 
-    const { count } = await this.prisma.deviceSession.deleteMany({
-      where: {
-        userId,
-        ...(familyId ? { familyId: { not: familyId } } : {}),
-      },
+    return this.deleteAndMark({
+      userId,
+      ...(familyId ? { familyId: { not: familyId } } : {}),
     });
+  }
 
+  /**
+   * Deletes the matching sessions and marks their families revoked for the
+   * gateway, so their access tokens stop at once. The families are read
+   * first: once the rows are gone nothing names them.
+   */
+  async deleteAndMark(where: Prisma.DeviceSessionWhereInput): Promise<number> {
+    const families = await this.prisma.deviceSession.findMany({
+      where,
+      select: { familyId: true },
+      distinct: ['familyId'],
+    });
+    const { count } = await this.prisma.deviceSession.deleteMany({ where });
+    await this.revoked.mark(families.map(({ familyId }) => familyId));
     return count;
+  }
+
+  /** {@link deleteAndMark}'s mark, for a caller that deleted in its own transaction. */
+  markRevoked(familyIds: Iterable<string>): Promise<void> {
+    return this.revoked.mark(familyIds);
   }
 
   // -------------------------------------------------------------------------

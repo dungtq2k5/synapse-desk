@@ -27,7 +27,22 @@ export type JwtPayload = {
    * — the rotation is what picks up the new claim.
    */
   isEmailVerified: boolean;
+
+  /**
+   * The session family the token was issued to (`device_sessions.family_id`):
+   * a family survives refresh rotation, and revoking a session revokes its
+   * family. The gateway refuses a token whose family is under
+   * {@link REVOKED_SESSION_KEY_PREFIX} in Redis. Absent from tokens issued
+   * before it existed, which are accepted until they expire.
+   */
+  sid?: string;
 };
+
+/**
+ * Where a revoked session family is recorded for the gateway:
+ * `revoked-session:{familyId}`, for as long as an access token lives.
+ */
+export const REVOKED_SESSION_KEY_PREFIX = 'revoked-session:';
 
 export type TwoFactorJwtPayload = Pick<JwtPayload, 'sub'> & {
   is2faPending: true;
