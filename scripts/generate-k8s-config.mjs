@@ -129,6 +129,10 @@ const EXCLUDED = new Map([
     'FIREBASE_STORAGE_EMULATOR_HOST',
     'production uses real Firebase Storage; setting this points the SDK at an emulator that is not there',
   ],
+  [
+    'FIREBASE_AUTH_EMULATOR_HOST',
+    'production verifies real Google sign-ins; setting this points the SDK at an emulator that is not there',
+  ],
 ]);
 
 /** Host address → in-cluster address. Lifted from `generate-docker-env.mjs`. */

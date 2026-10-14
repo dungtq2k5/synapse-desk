@@ -55,7 +55,8 @@ const SUBSTITUTIONS = [
   ['localhost:4222', 'nats:4222'],
   ['localhost:8222', 'nats:8222'],
   ['localhost:6333', 'qdrant:6333'],
-  ['localhost:9199', 'firebase-storage:9199'],
+  ['localhost:9199', 'firebase:9199'],
+  ['localhost:9099', 'firebase:9099'],
   // The application peers, by their eventual compose service names.
   ['localhost:5001', 'auth-service:5001'],
   ['localhost:5002', 'ticket-service:5002'],

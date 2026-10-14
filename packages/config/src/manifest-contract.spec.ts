@@ -448,7 +448,10 @@ describe('the manifest contract', () => {
      * the copy that fails if they diverge: an exclusion dropped there appears
      * here as a missing key.
      */
-    const EXCLUDED = new Set(['FIREBASE_STORAGE_EMULATOR_HOST']);
+    const EXCLUDED = new Set([
+      'FIREBASE_STORAGE_EMULATOR_HOST',
+      'FIREBASE_AUTH_EMULATOR_HOST',
+    ]);
 
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */
     const GUARDED_ELSEWHERE: Readonly<Record<string, string>> = {

@@ -7,6 +7,9 @@
 #     node scripts/generate-k8s-config.mjs
 #
 # ConfigMap: the non-secret half of the env contract.
+#
+# Documented and deliberately absent:
+#   FIREBASE_AUTH_EMULATOR_HOST — production verifies real Google sign-ins; setting this points the SDK at an emulator that is not there
 apiVersion: v1
 kind: ConfigMap
 metadata:
