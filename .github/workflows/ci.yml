@@ -337,12 +337,14 @@ jobs:
       # Every service reads its own `.env`, and docker-compose.yml the root's;
       # all gitignored, so the examples stand in.
       # auth-service refuses its published SUPER_ADMIN_PASSWORD outside tests,
-      # so this run makes one of its own, as a developer is told to.
+      # so this run makes one of its own, as a developer is told to. Hex alone
+      # has no uppercase letter or symbol; the prefix gives it every class
+      # PASSWORD_POLICY asks for.
       - name: stack env
         run: |
           cp .env.example .env
           for example in services/*/.env.example; do cp "$example" "${example%.example}"; done
-          sed -i "s/^SUPER_ADMIN_PASSWORD = .*/SUPER_ADMIN_PASSWORD = $(openssl rand -hex 16)/" services/auth-service/.env
+          sed -i "s/^SUPER_ADMIN_PASSWORD = .*/SUPER_ADMIN_PASSWORD = Aa1-$(openssl rand -hex 16)/" services/auth-service/.env
       - name: credentials
         run: |
           npm run keys:generate -- --force
