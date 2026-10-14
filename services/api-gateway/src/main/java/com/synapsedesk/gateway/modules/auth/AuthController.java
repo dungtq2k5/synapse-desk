@@ -191,8 +191,6 @@ public class AuthController {
     ).register(wire);
 
     RegisterResponseDto data = new RegisterResponseDto()
-      .userId(response.getUserId())
-      .organizationId(response.getOrganizationId())
       .email(response.getEmail())
       .requiresEmailVerification(response.getRequiresEmailVerification());
 

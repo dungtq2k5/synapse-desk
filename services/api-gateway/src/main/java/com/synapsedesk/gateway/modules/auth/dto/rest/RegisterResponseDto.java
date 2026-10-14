@@ -6,14 +6,11 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * RegisterResponseDto
+ * What the register route returns: the same for an address that already has an
+ * account as for a new one, so it carries no ids.
  */
 
 public class RegisterResponseDto {
-
-  private String userId;
-
-  private String organizationId;
 
   private String email;
 
@@ -26,56 +23,9 @@ public class RegisterResponseDto {
   /**
    * Constructor with only required parameters
    */
-  public RegisterResponseDto(
-    String userId,
-    String organizationId,
-    String email,
-    Boolean requiresEmailVerification
-  ) {
-    this.userId = userId;
-    this.organizationId = organizationId;
+  public RegisterResponseDto(String email, Boolean requiresEmailVerification) {
     this.email = email;
     this.requiresEmailVerification = requiresEmailVerification;
-  }
-
-  public RegisterResponseDto userId(String userId) {
-    this.userId = userId;
-    return this;
-  }
-
-  /**
-   * Get userId
-   * @return userId
-   */
-  @NotNull
-  @JsonProperty("userId")
-  public String getUserId() {
-    return userId;
-  }
-
-  @JsonProperty("userId")
-  public void setUserId(String userId) {
-    this.userId = userId;
-  }
-
-  public RegisterResponseDto organizationId(String organizationId) {
-    this.organizationId = organizationId;
-    return this;
-  }
-
-  /**
-   * Get organizationId
-   * @return organizationId
-   */
-  @NotNull
-  @JsonProperty("organizationId")
-  public String getOrganizationId() {
-    return organizationId;
-  }
-
-  @JsonProperty("organizationId")
-  public void setOrganizationId(String organizationId) {
-    this.organizationId = organizationId;
   }
 
   public RegisterResponseDto email(String email) {
@@ -130,8 +80,6 @@ public class RegisterResponseDto {
     }
     RegisterResponseDto registerResponseDto = (RegisterResponseDto) o;
     return (
-      Objects.equals(this.userId, registerResponseDto.userId) &&
-      Objects.equals(this.organizationId, registerResponseDto.organizationId) &&
       Objects.equals(this.email, registerResponseDto.email) &&
       Objects.equals(
         this.requiresEmailVerification,
@@ -142,22 +90,13 @@ public class RegisterResponseDto {
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-      userId,
-      organizationId,
-      email,
-      requiresEmailVerification
-    );
+    return Objects.hash(email, requiresEmailVerification);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class RegisterResponseDto {\n");
-    sb.append("    userId: ").append(toIndentedString(userId)).append("\n");
-    sb.append("    organizationId: ")
-      .append(toIndentedString(organizationId))
-      .append("\n");
     sb.append("    email: ").append(toIndentedString(email)).append("\n");
     sb.append("    requiresEmailVerification: ")
       .append(toIndentedString(requiresEmailVerification))

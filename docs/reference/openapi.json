@@ -59460,12 +59460,6 @@
       "RegisterResponseDto": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string"
-          },
-          "organizationId": {
-            "type": "string"
-          },
           "email": {
             "type": "string"
           },
@@ -59473,12 +59467,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "email",
-          "organizationId",
-          "requiresEmailVerification",
-          "userId"
-        ]
+        "required": ["email", "requiresEmailVerification"]
       },
       "VerifyOtpDto": {
         "type": "object",
