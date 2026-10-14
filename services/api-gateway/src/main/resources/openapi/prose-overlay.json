@@ -1242,6 +1242,12 @@
     "RequestOtpResponseDto.target": {
       "description": "Masked: `a***e@acme.com` or `+44******1234`."
     },
+    "RequestOtpResponseDto.codeLength": {
+      "description": "How many digits the code has."
+    },
+    "OtpStatusResponseDto.codeLength": {
+      "description": "How many digits a code has, pending or not."
+    },
     "RequestPhoneVerificationDto.phoneNumber": {
       "description": "Becomes `otps.target`. `users.phone_number` is not touched until a code for\nthis exact number verifies, which is what lets one endpoint serve both\nfirst-time verification and change-of-number."
     },

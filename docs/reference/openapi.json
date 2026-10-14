@@ -59565,9 +59565,13 @@
           },
           "expiresInMinutes": {
             "type": "number"
+          },
+          "codeLength": {
+            "type": "number",
+            "description": "How many digits the code has."
           }
         },
-        "required": ["expiresInMinutes", "target"]
+        "required": ["codeLength", "expiresInMinutes", "target"]
       },
       "ResetPasswordDto": {
         "type": "object",
@@ -63817,9 +63821,19 @@
           },
           "attemptsRemaining": {
             "type": "number"
+          },
+          "codeLength": {
+            "type": "number",
+            "description": "How many digits a code has, pending or not."
           }
         },
-        "required": ["attemptsRemaining", "expiresAt", "pending", "target"]
+        "required": [
+          "attemptsRemaining",
+          "codeLength",
+          "expiresAt",
+          "pending",
+          "target"
+        ]
       },
       "ApiResponseBackupCodesStatusResponseDto": {
         "type": "object",

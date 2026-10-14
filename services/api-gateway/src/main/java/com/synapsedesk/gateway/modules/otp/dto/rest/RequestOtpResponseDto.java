@@ -17,6 +17,8 @@ public class RequestOtpResponseDto {
 
   private BigDecimal expiresInMinutes;
 
+  private BigDecimal codeLength;
+
   public RequestOtpResponseDto() {
     super();
   }
@@ -24,9 +26,14 @@ public class RequestOtpResponseDto {
   /**
    * Constructor with only required parameters
    */
-  public RequestOtpResponseDto(String target, BigDecimal expiresInMinutes) {
+  public RequestOtpResponseDto(
+    String target,
+    BigDecimal expiresInMinutes,
+    BigDecimal codeLength
+  ) {
     this.target = target;
     this.expiresInMinutes = expiresInMinutes;
+    this.codeLength = codeLength;
   }
 
   public RequestOtpResponseDto target(String target) {
@@ -70,6 +77,27 @@ public class RequestOtpResponseDto {
     this.expiresInMinutes = expiresInMinutes;
   }
 
+  public RequestOtpResponseDto codeLength(BigDecimal codeLength) {
+    this.codeLength = codeLength;
+    return this;
+  }
+
+  /**
+   * How many digits the code has.
+   * @return codeLength
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("codeLength")
+  public BigDecimal getCodeLength() {
+    return codeLength;
+  }
+
+  @JsonProperty("codeLength")
+  public void setCodeLength(BigDecimal codeLength) {
+    this.codeLength = codeLength;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -84,13 +112,14 @@ public class RequestOtpResponseDto {
       Objects.equals(
         this.expiresInMinutes,
         requestOtpResponseDto.expiresInMinutes
-      )
+      ) &&
+      Objects.equals(this.codeLength, requestOtpResponseDto.codeLength)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(target, expiresInMinutes);
+    return Objects.hash(target, expiresInMinutes, codeLength);
   }
 
   @Override
@@ -100,6 +129,9 @@ public class RequestOtpResponseDto {
     sb.append("    target: ").append(toIndentedString(target)).append("\n");
     sb.append("    expiresInMinutes: ")
       .append(toIndentedString(expiresInMinutes))
+      .append("\n");
+    sb.append("    codeLength: ")
+      .append(toIndentedString(codeLength))
       .append("\n");
     sb.append("}");
     return sb.toString();

@@ -24,6 +24,8 @@ public class OtpStatusResponseDto {
 
   private BigDecimal attemptsRemaining;
 
+  private BigDecimal codeLength;
+
   public OtpStatusResponseDto() {
     super();
   }
@@ -35,12 +37,14 @@ public class OtpStatusResponseDto {
     Boolean pending,
     String target,
     OffsetDateTime expiresAt,
-    BigDecimal attemptsRemaining
+    BigDecimal attemptsRemaining,
+    BigDecimal codeLength
   ) {
     this.pending = pending;
     this.target = target;
     this.expiresAt = expiresAt;
     this.attemptsRemaining = attemptsRemaining;
+    this.codeLength = codeLength;
   }
 
   public OtpStatusResponseDto pending(Boolean pending) {
@@ -124,6 +128,27 @@ public class OtpStatusResponseDto {
     this.attemptsRemaining = attemptsRemaining;
   }
 
+  public OtpStatusResponseDto codeLength(BigDecimal codeLength) {
+    this.codeLength = codeLength;
+    return this;
+  }
+
+  /**
+   * How many digits a code has, pending or not.
+   * @return codeLength
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("codeLength")
+  public BigDecimal getCodeLength() {
+    return codeLength;
+  }
+
+  @JsonProperty("codeLength")
+  public void setCodeLength(BigDecimal codeLength) {
+    this.codeLength = codeLength;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -140,13 +165,20 @@ public class OtpStatusResponseDto {
       Objects.equals(
         this.attemptsRemaining,
         otpStatusResponseDto.attemptsRemaining
-      )
+      ) &&
+      Objects.equals(this.codeLength, otpStatusResponseDto.codeLength)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pending, target, expiresAt, attemptsRemaining);
+    return Objects.hash(
+      pending,
+      target,
+      expiresAt,
+      attemptsRemaining,
+      codeLength
+    );
   }
 
   @Override
@@ -160,6 +192,9 @@ public class OtpStatusResponseDto {
       .append("\n");
     sb.append("    attemptsRemaining: ")
       .append(toIndentedString(attemptsRemaining))
+      .append("\n");
+    sb.append("    codeLength: ")
+      .append(toIndentedString(codeLength))
       .append("\n");
     sb.append("}");
     return sb.toString();

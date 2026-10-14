@@ -245,7 +245,8 @@ public class OtpController {
           ? toOffsetDateTime(response.getExpiresAt())
           : null
       )
-      .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()));
+      .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()))
+      .codeLength(BigDecimal.valueOf(response.getCodeLength()));
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
@@ -272,7 +273,8 @@ public class OtpController {
   ) {
     return new RequestOtpResponseDto()
       .target(response.getTarget())
-      .expiresInMinutes(BigDecimal.valueOf(response.getExpiresInMinutes()));
+      .expiresInMinutes(BigDecimal.valueOf(response.getExpiresInMinutes()))
+      .codeLength(BigDecimal.valueOf(response.getCodeLength()));
   }
 
   private static VerifyOtpResponseDto toVerifyOtpDto(
