@@ -258,8 +258,9 @@ test.describe('phone number', () => {
     );
     // The minute skipped below is past socket.io's ping timeout too, and a
     // dropped connection says so in a toast. This row needs no live updates,
-    // so the socket never connects, and has nothing to drop.
-    await page.route('**/socket.io/**', (route) => route.abort());
+    // so the socket never connects, and has nothing to drop. A WebSocket
+    // route: the client connects over one, which `page.route` never sees.
+    await page.routeWebSocket('**/socket.io/**', (socket) => socket.close());
     await page.clock.install({ time: NOW });
     const { maya } = await tenant('profile');
     await openProfile(page, maya);
