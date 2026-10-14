@@ -619,25 +619,41 @@ export class OrganizationsService {
    */
   async getOnboarding(context: CallerContext): Promise<OnboardingResponse> {
     const organization = await this.load(context);
+    const steps = await this.onboardingSteps(organization.id);
 
+    return {
+      steps,
+      // Only from PENDING_ONBOARDING, and only once every step is done.
+      // `String(...)` because `organizations.status` is a plain VarChar while
+      // OrgStatus is a TS enum — the enum's VALUE is deliberately the column's
+      // contents, but comparing them directly is an unsafe-enum comparison.
+      canComplete:
+        organization.status === String(OrgStatus.PENDING_ONBOARDING) &&
+        steps.every((step) => step.complete),
+      status: toProtoOrgStatus(organization.status),
+    };
+  }
+
+  /** The setup checklist, each step read from the data as it is now. */
+  private async onboardingSteps(organizationId: string) {
     const [departmentCount, memberCount, verifiedAdminCount] =
       await Promise.all([
         this.prisma.department.count({
-          where: { organizationId: organization.id, deletedAt: null },
+          where: { organizationId, deletedAt: null },
         }),
         this.prisma.user.count({
-          where: { organizationId: organization.id, deletedAt: null },
+          where: { organizationId, deletedAt: null },
         }),
         this.prisma.user.count({
           where: {
-            organizationId: organization.id,
+            organizationId,
             deletedAt: null,
             isEmailVerified: true,
           },
         }),
       ]);
 
-    const steps = [
+    return [
       {
         key: 'verify_email',
         label: 'Verify an administrator email address',
@@ -654,22 +670,11 @@ export class OrganizationsService {
         complete: memberCount > 1,
       },
     ];
-
-    return {
-      steps,
-      // Only from PENDING_ONBOARDING, and only once every step is done.
-      // `String(...)` because `organizations.status` is a plain VarChar while
-      // OrgStatus is a TS enum — the enum's VALUE is deliberately the column's
-      // contents, but comparing them directly is an unsafe-enum comparison.
-      canComplete:
-        organization.status === String(OrgStatus.PENDING_ONBOARDING) &&
-        steps.every((step) => step.complete),
-      status: toProtoOrgStatus(organization.status),
-    };
   }
 
   /**
-   * PENDING_ONBOARDING -> ACTIVE, and nothing else.
+   * PENDING_ONBOARDING -> ACTIVE, and nothing else, once every setup step is
+   * done (FAILED_PRECONDITION naming the open ones otherwise).
    *
    * **409 from any other status.** This must not un-freeze a FROZEN tenant or
    * revive a SUSPENDED_PAST_DUE one — those transitions are the platform's to
@@ -686,6 +691,19 @@ export class OrganizationsService {
       throw new RpcException({
         code: status.ABORTED,
         message: `This workspace is ${existing.status}, not pending onboarding`,
+      });
+    }
+
+    // The checklist decides, not the client: `canComplete` only says so.
+    const open = (await this.onboardingSteps(existing.id)).filter(
+      (step) => !step.complete,
+    );
+    if (open.length > 0) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: `Finish every setup step first: ${open
+          .map((step) => step.label)
+          .join(', ')}`,
       });
     }
 

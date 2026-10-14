@@ -1,6 +1,7 @@
 import type { UpdateOrganizationSettingsRequest } from '@synapsedesk/grpc-proto';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { InvitationStatus, OrgStatus } from '@synapsedesk/contracts';
 import {
@@ -11,6 +12,7 @@ import {
 } from '../utils';
 import {
   addMember,
+  createDepartment,
   createDeviceSession,
   createInvitation,
   seedTenantWithUser,
@@ -230,14 +232,39 @@ describe('Organizations (e2e)', () => {
       }
     });
 
-    it('5b. completing onboarding from PENDING_ONBOARDING activates the tenant', async () => {
+    it('5b. completing onboarding from PENDING_ONBOARDING with every step done activates the tenant', async () => {
       const t = await seedTenantWithUser(fx.prisma, {
         organization: { status: OrgStatus.PENDING_ONBOARDING },
       });
+      // A verified admin (seeded), a department and a second member.
+      await createDepartment(fx.prisma, t.org.id);
+      await addMember(fx.prisma, t.org.id);
 
       const result = await organizations.completeOnboarding({}, ctx(t));
 
       expect(result.status).toBe(toProtoOrgStatus(OrgStatus.ACTIVE));
+    });
+
+    it('5c. a step still open refuses finishing, names it, and changes nothing', async () => {
+      // `canComplete` only says so: a client calling finish directly must not
+      // skip the checklist.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { status: OrgStatus.PENDING_ONBOARDING },
+      });
+      await createDepartment(fx.prisma, t.org.id);
+
+      const finishing = organizations.completeOnboarding({}, ctx(t));
+      await expectRpc(finishing, status.FAILED_PRECONDITION);
+      await finishing.catch((error: RpcException) =>
+        expect(error.getError()).toMatchObject({
+          message: 'Finish every setup step first: Invite a colleague',
+        }),
+      );
+
+      const unchanged = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+      expect(unchanged.status).toBe(OrgStatus.PENDING_ONBOARDING);
     });
   });
 
