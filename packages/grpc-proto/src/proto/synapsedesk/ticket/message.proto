@@ -274,6 +274,8 @@ message PresignAttachmentResponse {
   string upload_url = 1;
   string object_path = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // storage-service's PresignUploadResponse.upload_method, relayed.
+  string upload_method = 4;
 }
 
 message ConfirmAttachmentRequest {

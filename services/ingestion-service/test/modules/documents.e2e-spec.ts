@@ -187,6 +187,7 @@ describe('Documents (e2e)', () => {
       (input: { documentId: string; contentType: string }) =>
         Promise.resolve({
           uploadUrl: 'https://storage.example/signed-put',
+          uploadMethod: 'PUT',
           objectPath: `organizations/${tenant.organizationId}/documents/${input.documentId}/${faker.string.uuid()}.pdf`,
           expiresAt: new Date(Date.now() + 600_000),
         }),

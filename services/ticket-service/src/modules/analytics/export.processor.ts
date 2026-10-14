@@ -448,7 +448,8 @@ export class ExportProcessor extends WorkerHost {
     );
 
     const response = await fetch(presigned.uploadUrl, {
-      method: 'PUT',
+      // PUT to a signed URL; POST to the local Storage emulator.
+      method: presigned.uploadMethod || 'PUT',
       headers: { 'Content-Type': 'text/csv' },
       body: new Uint8Array(body),
     });

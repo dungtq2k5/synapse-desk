@@ -36,6 +36,18 @@ export class FirebaseStorageService implements OnModuleInit {
 
   constructor(private readonly configService: ConfigService) {}
 
+  /**
+   * The Storage emulator's origin (`http://localhost:9199`), or `null`
+   * against a real bucket. Never set in production: the env validation
+   * refuses it there.
+   */
+  emulatorOrigin(): string | null {
+    const host = this.configService.get<string>(
+      'FIREBASE_STORAGE_EMULATOR_HOST',
+    );
+    return host ? `http://${host}` : null;
+  }
+
   onModuleInit(): void {
     const keyPath = resolve(
       process.cwd(),

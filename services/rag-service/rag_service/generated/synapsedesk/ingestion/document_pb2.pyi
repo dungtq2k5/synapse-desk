@@ -146,14 +146,16 @@ class PresignDocumentRequest(_message.Message):
     def __init__(self, content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., file_name: _Optional[str] = ...) -> None: ...
 
 class PresignDocumentResponse(_message.Message):
-    __slots__ = ("upload_url", "object_path", "expires_at")
+    __slots__ = ("upload_url", "object_path", "expires_at", "upload_method")
     UPLOAD_URL_FIELD_NUMBER: _ClassVar[int]
     OBJECT_PATH_FIELD_NUMBER: _ClassVar[int]
     EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    UPLOAD_METHOD_FIELD_NUMBER: _ClassVar[int]
     upload_url: str
     object_path: str
     expires_at: _timestamp_pb2.Timestamp
-    def __init__(self, upload_url: _Optional[str] = ..., object_path: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    upload_method: str
+    def __init__(self, upload_url: _Optional[str] = ..., object_path: _Optional[str] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., upload_method: _Optional[str] = ...) -> None: ...
 
 class ConfirmDocumentRequest(_message.Message):
     __slots__ = ("object_path", "title", "is_organization_wide", "department_ids", "file_name", "ocr_languages")

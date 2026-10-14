@@ -59,7 +59,8 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
 }
 
 /**
- * PUTs bytes to a signed upload URL, the way a browser would.
+ * Sends bytes to an upload URL, the way a browser would: PUT to a signed URL,
+ * or the presign answer's `uploadMethod` (POST to the emulator).
  *
  * The whole point of presign/confirm is that the bytes bypass every application
  * server, so a test that wrote through the Admin SDK instead would skip the one
@@ -68,11 +69,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
  */
 export async function uploadTo(
   uploadUrl: string,
-  body: string,
+  body: RequestInit['body'],
   contentType: string,
+  method = 'PUT',
 ): Promise<number> {
   const response = await fetch(uploadUrl, {
-    method: 'PUT',
+    method,
     headers: { 'Content-Type': contentType },
     body,
   });

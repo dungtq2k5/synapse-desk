@@ -74,6 +74,7 @@ describe('Attachments bound at message create (e2e)', () => {
     });
     presign = jest.spyOn(storage, 'presignAttachment').mockResolvedValue({
       uploadUrl: 'https://storage.example/put',
+      uploadMethod: 'PUT',
       objectPath: 'organizations/o/tickets/t/attachments/f.png',
       expiresAt: new Date(),
     });

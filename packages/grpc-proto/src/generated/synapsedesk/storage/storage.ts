@@ -47,7 +47,16 @@ export interface PresignUploadRequest {
 export interface PresignUploadResponse {
   uploadUrl: string;
   objectPath: string;
-  expiresAt: Timestamp | undefined;
+  expiresAt:
+    | Timestamp
+    | undefined;
+  /**
+   * How to send the bytes to upload_url: "PUT" (a V4 signed URL, production)
+   * or "POST" (the Storage emulator's upload endpoint, which doesn't
+   * implement signed URLs). Empty from a storage-service that predates it,
+   * which means "PUT".
+   */
+  uploadMethod: string;
 }
 
 export interface ConfirmUploadRequest {

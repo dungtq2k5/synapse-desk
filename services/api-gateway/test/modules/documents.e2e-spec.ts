@@ -158,6 +158,7 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       fx.stubs.document.presignDocument.mockReturnValue(
         of({
           uploadUrl: 'https://storage.example/put',
+          uploadMethod: 'PUT',
           objectPath: 'organizations/o/documents/d/abc.pdf',
           expiresAt: timestamp(),
         }),
@@ -216,6 +217,7 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       fx.stubs.document.presignDocument.mockReturnValue(
         of({
           uploadUrl: 'u',
+          uploadMethod: 'PUT',
           objectPath: 'p',
           expiresAt: timestamp(),
         }),
@@ -456,7 +458,12 @@ describe('Documents at the HTTP boundary (e2e)', () => {
 
     it('2. POST /documents/presign is not swallowed by :id', async () => {
       fx.stubs.document.presignDocument.mockReturnValue(
-        of({ uploadUrl: 'u', objectPath: 'p', expiresAt: timestamp() }),
+        of({
+          uploadUrl: 'u',
+          uploadMethod: 'PUT',
+          objectPath: 'p',
+          expiresAt: timestamp(),
+        }),
       );
 
       await authenticatedAgent(fx.app, { permissionCodes: ['document.create'] })

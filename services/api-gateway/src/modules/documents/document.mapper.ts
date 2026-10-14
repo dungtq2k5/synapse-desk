@@ -17,6 +17,7 @@ import {
   ListDocumentsResponse,
   PresignDocumentResponse,
   requireProtoTimestamp,
+  uploadMethodOf,
   StorageUsageResponse,
   toPageRequest,
   toProtoDocumentFileType,
@@ -242,6 +243,7 @@ export function toPresignDocumentResponseDto(
 ): PresignDocumentResponseDto {
   return {
     uploadUrl: response.uploadUrl,
+    uploadMethod: uploadMethodOf(response.uploadMethod),
     objectPath: response.objectPath,
     expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
   };

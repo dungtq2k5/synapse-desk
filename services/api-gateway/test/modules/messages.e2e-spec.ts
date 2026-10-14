@@ -455,6 +455,7 @@ describe('Ticket messages at the HTTP boundary (e2e)', () => {
     const presigned = () =>
       of({
         uploadUrl: 'https://storage.example/signed-put',
+        uploadMethod: 'PUT',
         objectPath: 'organizations/o/tickets/t/attachments/m/abc.png',
         expiresAt: timestamp(),
       });

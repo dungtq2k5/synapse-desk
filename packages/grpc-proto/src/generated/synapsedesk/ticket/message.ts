@@ -335,7 +335,11 @@ export interface IngestAttachmentResponse {
 export interface PresignAttachmentResponse {
   uploadUrl: string;
   objectPath: string;
-  expiresAt: Timestamp | undefined;
+  expiresAt:
+    | Timestamp
+    | undefined;
+  /** storage-service's PresignUploadResponse.upload_method, relayed. */
+  uploadMethod: string;
 }
 
 export interface ConfirmAttachmentRequest {

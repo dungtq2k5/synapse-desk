@@ -81,7 +81,12 @@ export const envValidationSchema = Joi.object({
   // and neither fails everything — firebase-admin 14 translates this one down
   // to the GCS layer itself, so the second was the both-layers workaround
   // older SDKs needed, kept alive by copy-paste. `host:port`, no scheme.
-  FIREBASE_STORAGE_EMULATOR_HOST: Joi.string().optional(),
+  //
+  // Refused under NODE_ENV=production: presigning then hands out the
+  // emulator's unsigned upload endpoint instead of a signed URL.
+  FIREBASE_STORAGE_EMULATOR_HOST: Joi.string()
+    .optional()
+    .when('NODE_ENV', { is: 'production', then: Joi.forbidden() }),
 
   // The SSRF escape hatch for fetching an inbound attachment from a localhost
   // source. Honoured ONLY when NODE_ENV is development — `privateTargetsAllowed`

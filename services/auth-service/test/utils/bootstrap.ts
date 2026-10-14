@@ -142,6 +142,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       .mockImplementation((_input, context) =>
         Promise.resolve({
           uploadUrl: 'https://upload.test/signed',
+          uploadMethod: 'PUT',
           objectPath: avatarObjectPath(
             context.organizationId ?? 'no-tenant',
             context.sub ?? 'no-actor',

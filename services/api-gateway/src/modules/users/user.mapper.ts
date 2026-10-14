@@ -8,6 +8,7 @@ import {
   PresignAvatarUploadResponse,
   requireField,
   requireProtoTimestamp,
+  uploadMethodOf,
   toPageRequest,
   toProtoGender,
   toProtoTimestamp,
@@ -217,6 +218,7 @@ export function toPresignAvatarResponseDto(
 ): PresignAvatarResponseDto {
   return {
     uploadUrl: response.uploadUrl,
+    uploadMethod: uploadMethodOf(response.uploadMethod),
     objectPath: response.objectPath,
     expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
   };

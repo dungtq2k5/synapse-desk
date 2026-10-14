@@ -10,6 +10,7 @@ import {
   PresignAttachmentResponse,
   requireField,
   requireProtoTimestamp,
+  uploadMethodOf,
 } from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
@@ -109,6 +110,7 @@ export function toPresignAttachmentResponseDto(
 ): PresignAttachmentResponseDto {
   return {
     uploadUrl: response.uploadUrl,
+    uploadMethod: uploadMethodOf(response.uploadMethod),
     objectPath: response.objectPath,
     expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
   };

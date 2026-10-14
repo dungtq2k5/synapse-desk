@@ -62122,6 +62122,11 @@
           "uploadUrl": {
             "type": "string"
           },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
           "objectPath": {
             "type": "string"
           },
@@ -62130,7 +62135,7 @@
             "type": "string"
           }
         },
-        "required": ["uploadUrl", "objectPath", "expiresAt"]
+        "required": ["uploadUrl", "uploadMethod", "objectPath", "expiresAt"]
       },
       "PresignAvatarDto": {
         "type": "object",
@@ -63408,6 +63413,11 @@
           "uploadUrl": {
             "type": "string"
           },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
           "objectPath": {
             "type": "string"
           },
@@ -63416,7 +63426,7 @@
             "type": "string"
           }
         },
-        "required": ["uploadUrl", "objectPath", "expiresAt"]
+        "required": ["uploadUrl", "uploadMethod", "objectPath", "expiresAt"]
       },
       "PresignDocumentDto": {
         "type": "object",

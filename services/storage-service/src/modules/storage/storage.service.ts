@@ -79,7 +79,8 @@ export class StorageService {
   }
 
   /**
-   * Validate, build a path, record what was authorized, mint a signed PUT.
+   * Validate, build a path, record what was authorized, mint a signed PUT
+   * (against the emulator, its unsigned POST endpoint: see `uploadMethod`).
    *
    * The order matters: `contentType` and `sizeBytes` are checked against the
    * purpose's policy BEFORE any Firebase call, so a rejected request never
@@ -122,6 +123,20 @@ export class StorageService {
       this.uploadTtlSeconds,
     );
 
+    const emulator = this.firebase.emulatorOrigin();
+    if (emulator) {
+      // The emulator answers 501 to every signed URL, so locally the upload
+      // goes to its JSON-API endpoint instead, unsigned: a POST of the bytes.
+      // Nothing is pinned there; confirming checks the stored object as ever.
+      const bucket = encodeURIComponent(this.firebase.bucket.name);
+      return {
+        uploadUrl: `${emulator}/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(objectPath)}`,
+        uploadMethod: 'POST',
+        objectPath,
+        expiresAt: toProtoTimestamp(expiresAt),
+      };
+    }
+
     const [uploadUrl] = await this.firebase.bucket
       .file(objectPath)
       .getSignedUrl({
@@ -134,7 +149,12 @@ export class StorageService {
         contentType: request.contentType,
       });
 
-    return { uploadUrl, objectPath, expiresAt: toProtoTimestamp(expiresAt) };
+    return {
+      uploadUrl,
+      uploadMethod: 'PUT',
+      objectPath,
+      expiresAt: toProtoTimestamp(expiresAt),
+    };
   }
 
   /**

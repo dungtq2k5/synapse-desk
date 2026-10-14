@@ -145,6 +145,7 @@ describe('The analytics export (e2e)', () => {
     tenant = buildTenant();
     presignExport.mockResolvedValue({
       uploadUrl: 'https://storage.example/signed-put',
+      uploadMethod: 'PUT',
       objectPath: OBJECT_PATH,
       expiresAt: new Date(Date.now() + 600_000),
     });
