@@ -14,6 +14,7 @@ import { SessionsModule } from '../sessions/sessions.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { AuditModule } from '../audit/audit.module';
+import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 import { readFileSync } from 'node:fs';
 
 @Module({
@@ -32,6 +33,8 @@ import { readFileSync } from 'node:fs';
     // `OrganizationsModule` imports Prisma, Audit, Notifications, Sessions and
     // LimitAlerts, none of which reaches back here.
     OrganizationsModule,
+    // Its Redis holds the sign-up attempt notice's per-address window.
+    LimitAlertsModule,
     // Access-token defaults live here; generate2faToken() overrides them
     // per-call with the 2FA secret and TTL.
     JwtModule.registerAsync({

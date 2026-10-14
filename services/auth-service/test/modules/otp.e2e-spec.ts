@@ -220,6 +220,34 @@ describe('OTP (e2e)', () => {
     });
   });
 
+  describe('the code length', () => {
+    it("is the sent code's digit count, in the request's answer and the status", async () => {
+      const { user } = await seedTenantWithUser(fx.prisma, {
+        user: { isEmailVerified: false },
+      });
+
+      const requested = await otp.requestEmailVerification({ userId: user.id });
+      const [[sent]] = fx.notifications.sendEmail.mock.calls as [
+        [{ data: { code: string } }],
+      ];
+      const pending = await otp.getOtpStatus({
+        userId: user.id,
+        purpose: ProtoOtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION,
+      });
+      const none = await otp.getOtpStatus({
+        userId: user.id,
+        purpose: ProtoOtpPurpose.OTP_PURPOSE_PHONE_VERIFICATION,
+      });
+
+      expect(requested.codeLength).toBe(sent.data.code.length);
+      expect([pending.codeLength, none.codeLength]).toEqual([
+        requested.codeLength,
+        requested.codeLength,
+      ]);
+      expect(none.pending).toBe(false);
+    });
+  });
+
   describe('getOtpStatus', () => {
     it('5. status returns a MASKED target, never the hash', async () => {
       const { user } = await seedTenantWithUser(fx.prisma);
@@ -263,7 +291,11 @@ describe('OTP (e2e)', () => {
           userId: user.id,
           purpose: ProtoOtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION,
         }),
-      ).resolves.toEqual({ pending: false, attemptsRemaining: 0 });
+      ).resolves.toEqual({
+        pending: false,
+        attemptsRemaining: 0,
+        codeLength: 6,
+      });
     });
 
     it('6b. an EXPIRED code counts as no pending challenge', async () => {
@@ -278,7 +310,11 @@ describe('OTP (e2e)', () => {
           userId: user.id,
           purpose: ProtoOtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION,
         }),
-      ).resolves.toEqual({ pending: false, attemptsRemaining: 0 });
+      ).resolves.toEqual({
+        pending: false,
+        attemptsRemaining: 0,
+        codeLength: 6,
+      });
     });
   });
 

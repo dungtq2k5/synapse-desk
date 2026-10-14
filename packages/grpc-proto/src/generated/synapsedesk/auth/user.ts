@@ -26,6 +26,11 @@ export interface CurrentUserResponse {
   user: UserResponse | undefined;
   permissionCodes: string[];
   departmentIds: string[];
+  /**
+   * Whether the account has a password; a Google-only one doesn't. Never the
+   * hash.
+   */
+  hasPassword: boolean;
 }
 
 /**

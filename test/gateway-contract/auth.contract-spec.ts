@@ -139,6 +139,37 @@ describe('authentication', () => {
   );
 
   rowFor('Auth')(
+    '**register answers the address and that it needs verifying, never an id**',
+    async () => {
+      // auth-service leaves the ids empty so a taken address answers as a new
+      // one does; the gateway doesn't publish them even when a peer sends them.
+      peers.auth.on('AuthService/Register').reply({
+        userId: 'user-1',
+        organizationId: ORGANIZATION,
+        email: 'ada@example.com',
+        requiresEmailVerification: true,
+      });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/register`,
+        {
+          email: 'ada@example.com',
+          password: 'Str0ng!Passw0rd',
+          fullName: 'Ada Lovelace',
+        },
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        data: { email: 'ada@example.com', requiresEmailVerification: true },
+      });
+      expect(
+        Object.keys((response.body as { data: object }).data).sort(),
+      ).toEqual(['email', 'requiresEmailVerification']);
+    },
+  );
+
+  rowFor('Auth')(
     '**login sets the session cookies**, with the flags a browser enforces',
     async () => {
       peers.auth.on('AuthService/Login').reply({
@@ -235,6 +266,31 @@ describe('authentication', () => {
 
       const [call] = peers.auth.calls('AuthService/Login');
       expect(call.metadata.ip_address).toBe('203.0.113.9');
+    },
+  );
+
+  rowFor('Users')(
+    '**the current user says whether a password exists**, both ways, and never the hash',
+    async () => {
+      const session = new Session(gateway.baseUrl);
+      const me = async (hasPassword: boolean) => {
+        peers.auth.on('UserService/GetCurrentUser').reply({
+          user: wireUser(),
+          permissionCodes: [],
+          departmentIds: [],
+          hasPassword,
+        });
+        return session.get(`${API}/users/me`, {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+        });
+      };
+
+      for (const hasPassword of [true, false]) {
+        const response = await me(hasPassword);
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ data: { hasPassword } });
+        expect(JSON.stringify(response.body)).not.toMatch(/passwordHash/i);
+      }
     },
   );
 

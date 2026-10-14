@@ -19,6 +19,9 @@ message CurrentUserResponse {
   UserResponse user = 1;
   repeated string permission_codes = 2;
   repeated string department_ids = 3;
+  // Whether the account has a password; a Google-only one doesn't. Never the
+  // hash.
+  bool has_password = 4;
 }
 
 // ---------------------------------------------------------------------------

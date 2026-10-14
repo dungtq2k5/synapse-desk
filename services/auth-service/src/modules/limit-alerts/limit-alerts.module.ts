@@ -8,7 +8,10 @@ import {
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthGenerationStore } from './generation.store';
 
-/** The Redis this service's alarm LEVELS live in. */
+/**
+ * This service's Redis: the alarm LEVELS, and the sign-up attempt notice's
+ * per-address window.
+ */
 export const LIMIT_ALERT_REDIS = Symbol('AUTH_LIMIT_ALERT_REDIS');
 
 /** The level alarm for seats — the one dimension auth counts. */

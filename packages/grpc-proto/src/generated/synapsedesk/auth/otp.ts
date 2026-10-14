@@ -45,6 +45,8 @@ export interface RequestOtpResponse {
   /** Masked, so the UI can say "we sent a code to +44 ***** 1234". */
   target: string;
   expiresInMinutes: number;
+  /** How many digits the code has, so a client's code field can match it. */
+  codeLength: number;
 }
 
 export interface VerifyOtpRequest {
@@ -72,6 +74,8 @@ export interface OtpStatusResponse {
   target?: string | undefined;
   expiresAt?: Timestamp | undefined;
   attemptsRemaining: number;
+  /** How many digits a code has, pending or not. */
+  codeLength: number;
 }
 
 export interface OtpServiceClient {
