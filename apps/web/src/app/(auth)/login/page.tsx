@@ -10,7 +10,7 @@ type Search = Record<string, string | string[] | undefined>;
 /**
  * Sign-in, with every leg after it on the same page. The query says why the
  * user is here: `next` (sent back from inside the app: the session ended),
- * `signed-out`, or `reset` (a new password, `others=1` when other devices
+ * `signed-out`, `signed-out-everywhere` (how many sessions ended), or `reset` (a new password, `others=1` when other devices
  * were signed out).
  */
 export default async function LoginPage({
@@ -37,6 +37,8 @@ function noticeOf(one: (key: string) => string | undefined): SignInNotice {
   if (one('reset') !== undefined) {
     return one('others') === '1' ? 'reset-signed-out-elsewhere' : 'reset';
   }
+  const everywhere = Number(one('signed-out-everywhere'));
+  if (Number.isInteger(everywhere) && everywhere > 0) return { everywhere };
   if (one('signed-out') !== undefined) return 'signed-out';
   if (one('next') !== undefined) return 'session-ended';
   return null;

@@ -5,6 +5,7 @@ import { look, tabsThrough } from './look';
 import {
   givePhoto,
   setEmailVerified,
+  setAccount,
   setPhone,
   signInAs,
   tenant,
@@ -357,5 +358,307 @@ test.describe('phone number', () => {
       ),
     ).toBeVisible();
     await look(page, 'phone-change');
+  });
+});
+
+const STRONG = 'Northwind-2026';
+const MAC =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36';
+const SESSIONS = [
+  {
+    id: '00000000-0000-4000-8000-0000000000a1',
+    deviceName: null,
+    ipAddress: '203.0.113.24',
+    userAgent: MAC,
+    current: true,
+    isTrusted: true,
+    trustedUntil: '2026-11-12T12:00:00Z',
+    expiresAt: '2026-11-12T12:00:00Z',
+    createdAt: '2026-10-13T09:12:00Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a2',
+    deviceName: 'Maya’s iPhone',
+    ipAddress: '198.51.100.7',
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    current: false,
+    isTrusted: true,
+    trustedUntil: '2026-11-02T12:00:00Z',
+    expiresAt: '2026-11-02T12:00:00Z',
+    createdAt: '2026-10-03T19:40:00Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a3',
+    deviceName: null,
+    ipAddress: '192.0.2.44',
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0',
+    current: false,
+    isTrusted: false,
+    trustedUntil: null,
+    expiresAt: '2026-10-18T12:00:00Z',
+    createdAt: '2026-10-11T14:05:00Z',
+  },
+];
+const SECRET = {
+  otpauthUri:
+    'otpauth://totp/SynapseDesk:maya%40northwind.example?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=SynapseDesk',
+  // A blank 1×1 PNG: the QR's place, without a picture that varies.
+  qrCodeDataUrl:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+};
+const BACKUP_CODES = [
+  'V8KQ2-MX7PL',
+  'J8KPD-4WZNC',
+  'N3TRW-6HDBA',
+  'L5XRA-3JGVM',
+  'Q9ZEX-2KCMR',
+  'D6NQW-9TBEK',
+  'F4WNJ-8RLTY',
+  'G3ZYK-5PDRF',
+  'B2VMC-7QHXP',
+  'Y7MFH-2XQAL',
+];
+
+test.describe('security', () => {
+  /**
+   * The security page for Maya: two-step on and optional unless said, with
+   * her backup codes and three sessions, all as the frames draw them. Her
+   * account is set after signing in. The gateway keeps the organization for a
+   * minute, so the row that has it require two-step uses its own tenant.
+   */
+  async function openSecurity(
+    page: Page,
+    { twoStep = true, required = false, hasPassword = true } = {},
+  ) {
+    const { maya } = await tenant(required ? 'security-required' : 'security');
+    await reply(page, 'GET', '/auth/2fa/backup-codes', 200, {
+      remaining: 7,
+      used: 3,
+      expiresAt: '2027-10-12T12:00:00Z',
+    });
+    await reply(page, 'GET', '/auth/sessions', 200, SESSIONS);
+    await setAccount(maya);
+    await signInAs(page, maya);
+    await setAccount(maya, { twoStep, password: hasPassword, required });
+    await page.goto('/security');
+    await expect(
+      page.getByRole('heading', { name: 'Security', level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByText('Chrome on macOS')).toBeVisible();
+  }
+
+  const dialog = (page: Page) => page.getByRole('alertdialog');
+
+  test('overview: two-step on, and where you’re signed in', async ({
+    page,
+  }) => {
+    await openSecurity(page);
+    await expect(
+      page.getByText('7 of 10 left · They expire on Oct 12, 2027.'),
+    ).toBeVisible();
+    await look(page, 'security');
+  });
+
+  test('its focus order', async ({ page }) => {
+    await openSecurity(page);
+    await page.getByLabel('Current password').focus();
+    await tabsThrough(page, [
+      /^Show password$/,
+      /^New password$/,
+      /^Show password$/,
+      /^Confirm new password$/,
+      /^Show password$/,
+      /^Change password$/,
+      /^Regenerate codes$/,
+      /^Turn off$/,
+      /^Remove trust from Chrome on macOS$/,
+      /^Remove trust from Maya’s iPhone$/,
+      /^Sign out of Maya’s iPhone$/,
+      /^Sign out of Firefox on Windows$/,
+      /^Remove all trusted devices$/,
+      /^Sign out everywhere$/,
+    ]);
+  });
+
+  test('two-step required: Turn off is disabled, with the reason', async ({
+    page,
+  }) => {
+    await openSecurity(page, { required: true });
+    await expect(page.getByRole('button', { name: 'Turn off' })).toBeDisabled();
+    await look(page, 'security-required');
+  });
+
+  test('two-step off: Turn on', async ({ page }) => {
+    await openSecurity(page, { twoStep: false });
+    await expect(page.getByRole('button', { name: 'Turn on' })).toBeVisible();
+    await look(page, 'security-off');
+  });
+
+  async function changePassword(page: Page, current: string) {
+    await page.getByLabel('Current password').fill(current);
+    await page.getByLabel('New password', { exact: true }).fill(STRONG);
+    await page.getByLabel('Confirm new password').fill(STRONG);
+    await page.getByRole('button', { name: 'Change password' }).click();
+  }
+
+  test('the current password is wrong', async ({ page }) => {
+    await reply(
+      page,
+      'PATCH',
+      '/auth/password',
+      401,
+      'Current password is incorrect',
+    );
+    await openSecurity(page);
+    await changePassword(page, 'Northwind');
+    await expect(
+      page.getByText('That’s not your current password.'),
+    ).toBeVisible();
+    await look(page, 'security-wrong-current');
+  });
+
+  test('password changed: how many devices were signed out', async ({
+    page,
+  }) => {
+    await reply(page, 'PATCH', '/auth/password', 200, {
+      revokedSessionCount: 2,
+    });
+    await openSecurity(page);
+    await changePassword(page, 'Northwind-2025');
+    await expect(
+      page.getByText('You were signed out on 2 other devices.'),
+    ).toBeVisible();
+    await look(page, 'security-password-changed');
+  });
+
+  test('no password yet: Set a password', async ({ page }) => {
+    await openSecurity(page, { hasPassword: false });
+    await expect(page.getByText('You sign in with Google')).toBeVisible();
+    await look(page, 'security-no-password');
+  });
+
+  test('Set a password: the link is sent', async ({ page }) => {
+    await reply(page, 'POST', '/auth/password/forgot', 202, null);
+    await openSecurity(page, { hasPassword: false });
+    await page.getByRole('button', { name: 'Set a password' }).click();
+    await expect(page.getByText('Check your email')).toBeVisible();
+    await look(page, 'security-link-sent');
+  });
+
+  test('regenerating codes asks for the password', async ({ page }) => {
+    await openSecurity(page);
+    await page.getByRole('button', { name: 'Regenerate codes' }).click();
+    await expect(
+      dialog(page).getByLabel('Password', { exact: true }),
+    ).toBeFocused();
+    await look(page, 'security-regenerate');
+  });
+
+  test('the new codes, shown once', async ({ page }) => {
+    await reply(page, 'POST', '/auth/2fa/backup-codes', 200, {
+      backupCodes: BACKUP_CODES,
+    });
+    await openSecurity(page);
+    await page.getByRole('button', { name: 'Regenerate codes' }).click();
+    await dialog(page).getByLabel('Password', { exact: true }).fill(STRONG);
+    await dialog(page)
+      .getByRole('button', { name: 'Regenerate codes' })
+      .click();
+    const codes = page.getByRole('dialog', { name: 'Your new backup codes' });
+    await expect(codes.getByText('V8KQ2-MX7PL')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(codes.getByRole('button', { name: 'Done' })).toBeDisabled();
+    await look(page, 'security-new-codes');
+  });
+
+  test('turning two-step off asks for the password and a code', async ({
+    page,
+  }) => {
+    await openSecurity(page);
+    await page.getByRole('button', { name: 'Turn off' }).click();
+    await expect(
+      dialog(page).getByLabel('Password', { exact: true }),
+    ).toBeFocused();
+    await look(page, 'security-turn-off');
+  });
+
+  test('turning off is refused while the organization requires it', async ({
+    page,
+  }) => {
+    await reply(
+      page,
+      'DELETE',
+      '/auth/2fa',
+      400,
+      'Your organization requires two-factor authentication',
+    );
+    await openSecurity(page);
+    await page.getByRole('button', { name: 'Turn off' }).click();
+    await dialog(page).getByLabel('Password', { exact: true }).fill(STRONG);
+    await dialog(page)
+      .getByRole('textbox', { name: 'Code from your app' })
+      .fill('204815');
+    await dialog(page).getByRole('button', { name: 'Turn off' }).click();
+    await expect(dialog(page).getByRole('alert')).toContainText(
+      'Northwind Health requires two-step verification',
+    );
+    await look(page, 'security-turn-off-refused');
+  });
+
+  test('signing out everywhere asks first', async ({ page }) => {
+    await openSecurity(page);
+    await page.getByRole('button', { name: 'Sign out everywhere' }).click();
+    await expect(
+      dialog(page).getByRole('button', { name: 'Cancel' }),
+    ).toBeFocused();
+    await look(page, 'security-sign-out-everywhere');
+  });
+
+  test('turning two-step on: scan, then confirm', async ({ page }) => {
+    await reply(page, 'POST', '/auth/2fa/setup', 200, SECRET);
+    await openSecurity(page, { twoStep: false });
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByText('JBSW Y3DP EHPK 3PXP')).toBeVisible();
+    await look(page, 'security-turn-on');
+  });
+
+  test('turning two-step on: the backup codes', async ({ page }) => {
+    await reply(page, 'POST', '/auth/2fa/setup', 200, SECRET);
+    await reply(page, 'POST', '/auth/2fa/enable', 200, {
+      backupCodes: BACKUP_CODES,
+      user: null,
+    });
+    await openSecurity(page, { twoStep: false });
+    await page.getByRole('button', { name: 'Turn on' }).click();
+    await page.getByLabel('Enter the 6-digit code from the app').fill('204815');
+    await page.getByRole('button', { name: 'Verify and continue' }).click();
+    await page.getByLabel('I’ve saved my backup codes somewhere safe').check();
+    await expect(page.getByRole('button', { name: 'Done' })).toBeEnabled();
+    await look(page, 'security-turn-on-codes');
+  });
+
+  test('a session signed out: a toast, and it leaves the list', async ({
+    page,
+  }) => {
+    let sessions = SESSIONS;
+    await openSecurity(page);
+    await page.route(`${API}/auth/sessions**`, (route) => {
+      const method = route.request().method();
+      if (method === 'DELETE') {
+        sessions = SESSIONS.slice(0, 2);
+        return answer(route, 200, { count: 1 });
+      }
+      return answer(route, 200, sessions);
+    });
+    await page
+      .getByRole('button', { name: 'Sign out of Firefox on Windows' })
+      .click();
+    await expect(
+      page.getByText('Signed out of Firefox on Windows'),
+    ).toBeVisible();
+    await expect(page.getByText('192.0.2.44', { exact: false })).toBeHidden();
+    await look(page, 'security-session-signed-out');
   });
 });

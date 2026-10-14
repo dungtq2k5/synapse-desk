@@ -37,6 +37,9 @@ export function CodeSlots({
   length = 6,
   disabled,
   spaced = false,
+  autoFocus = true,
+  id,
+  label = 'Verification code',
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -48,6 +51,11 @@ export function CodeSlots({
   disabled?: boolean;
   /** Each digit its own box, as an emailed or texted code is shown. */
   spaced?: boolean;
+  /** False where another field comes first, as a password does. */
+  autoFocus?: boolean;
+  /** For a visible `Label`'s `htmlFor`; `label` is then its text. */
+  id?: string;
+  label?: string;
 }) {
   const half = Math.ceil(length / 2);
   const slots = (from: number, to: number) =>
@@ -74,12 +82,13 @@ export function CodeSlots({
       // for a password manager's badge, and after a resize it pushes the page
       // 24px wider than a 390px phone.
       pushPasswordManagerStrategy="none"
-      autoFocus
+      autoFocus={autoFocus}
       value={value}
       onChange={onChange}
       onComplete={onComplete}
       disabled={disabled}
-      aria-label="Verification code"
+      id={id}
+      aria-label={label}
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
     >

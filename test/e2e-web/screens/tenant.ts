@@ -338,6 +338,47 @@ export async function setPhone(
   }
 }
 
+/** Each person's password hash, kept while `setAccount` has removed it. */
+const savedHashes = new Map<string, string>();
+
+/**
+ * Sets this person's account as a security screen draws it, in auth-service's
+ * database: two-step on or off, a password or none (Google only), and
+ * whether their organization requires two-step. Call it with the defaults
+ * before signing in, then with the screen's state: two-step on, or no
+ * password, would stop the demo password signing in.
+ */
+export async function setAccount(
+  person: Person,
+  { twoStep = false, password = true, required = false } = {},
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: person.id },
+      select: { passwordHash: true, organizationId: true },
+    });
+    if (user.passwordHash) savedHashes.set(person.id, user.passwordHash);
+    await prisma.user.update({
+      where: { id: person.id },
+      data: {
+        isTwoFactorEnabled: twoStep,
+        passwordHash: password ? savedHashes.get(person.id) : null,
+      },
+    });
+    if (user.organizationId) {
+      await prisma.organization.update({
+        where: { id: user.organizationId },
+        data: { enforceTwoFactor: required },
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 /**
  * Gives this person a profile photo: a signed upload URL from the gateway, the
  * bytes written where it points, then the confirm. Written with the Admin SDK,

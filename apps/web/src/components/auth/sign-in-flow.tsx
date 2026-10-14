@@ -18,6 +18,8 @@ export type SignInNotice =
   | 'signed-out'
   | 'reset'
   | 'reset-signed-out-elsewhere'
+  /** Signed out everywhere, ending this many sessions. */
+  | { everywhere: number }
   | null;
 
 type Step =

@@ -120,6 +120,22 @@ export function calendarDate(at: string | Date, timeZone?: string): string {
 }
 
 /**
+ * A date with its time, as the account screens write one.
+ *
+ * @example calendarTime('2026-10-13T09:12:00Z', 'UTC') // 'Oct 13, 2026, 9:12 AM'
+ */
+export function calendarTime(at: string | Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(at));
+}
+
+/**
  * Items joined in a sentence.
  *
  * @example andList(['Agent', 'Knowledge manager']) // 'Agent and Knowledge manager'

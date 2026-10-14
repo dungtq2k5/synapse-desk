@@ -202,6 +202,19 @@ function failureOf(error: unknown): Failure {
 }
 
 function NoticeAlert({ notice }: { notice: SignInNotice }) {
+  if (typeof notice === 'object' && notice !== null) {
+    const ended =
+      notice.everywhere === 1 ? '1 session' : `${notice.everywhere} sessions`;
+    return (
+      <Alert variant="info">
+        <InfoIcon />
+        <AlertTitle>You’ve signed out everywhere</AlertTitle>
+        <AlertDescription>
+          {ended} ended. Sign in again to continue.
+        </AlertDescription>
+      </Alert>
+    );
+  }
   switch (notice) {
     case 'session-ended':
       return (

@@ -156,6 +156,11 @@ test.describe('sign-in', () => {
       '?reset&others=1',
       'You’ve been signed out on your other devices.',
     ],
+    [
+      'signed-out-everywhere',
+      '?signed-out-everywhere=3',
+      '3 sessions ended. Sign in again to continue.',
+    ],
   ] as const) {
     test(`why you're here: ${name}`, async ({ page }) => {
       await page.goto(`/login${query}`);
@@ -283,12 +288,15 @@ test.describe('two-step setup', () => {
 
   test('step 1: its focus order', async ({ page }) => {
     await page.locator('code').click();
-    await tabsThrough(page, [/^Copy key$/, /^Verification code$/]);
+    await tabsThrough(page, [
+      /^Copy key$/,
+      /^Enter the 6-digit code from the app$/,
+    ]);
   });
 
   test("step 1: a code that didn't match", async ({ page }) => {
     await reply(page, '/auth/2fa/enable', 401, 'Invalid authentication code');
-    await page.getByLabel('Verification code').fill('123456');
+    await page.getByLabel('Enter the 6-digit code from the app').fill('123456');
     await page.getByRole('button', { name: 'Verify and continue' }).click();
     await expect(alert(page)).toContainText('That code didn’t match.');
     await look(page, 'two-step-setup-wrong');
@@ -299,7 +307,7 @@ test.describe('two-step setup', () => {
       backupCodes: BACKUP_CODES,
       user: null,
     });
-    await page.getByLabel('Verification code').fill('123456');
+    await page.getByLabel('Enter the 6-digit code from the app').fill('123456');
     await page.getByRole('button', { name: 'Verify and continue' }).click();
     await expect(
       page.getByRole('heading', { name: 'Save your backup codes' }),
@@ -315,7 +323,7 @@ test.describe('two-step setup', () => {
       backupCodes: BACKUP_CODES,
       user: null,
     });
-    await page.getByLabel('Verification code').fill('123456');
+    await page.getByLabel('Enter the 6-digit code from the app').fill('123456');
     await page.getByRole('button', { name: 'Verify and continue' }).click();
     await expect(
       page.getByRole('heading', { name: 'Save your backup codes' }),

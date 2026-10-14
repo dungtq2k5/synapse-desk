@@ -1,4 +1,9 @@
-import { expect, request as newRequest, test } from '@playwright/test';
+import {
+  expect,
+  request as newRequest,
+  test,
+  type Page,
+} from '@playwright/test';
 import { WEB_URL } from './ingress';
 import {
   api,
@@ -50,6 +55,17 @@ async function founder(email: string) {
   return session;
 }
 
+/**
+ * A new founder's sign-in stops at their email code first (registration sent
+ * one); these journeys are about what comes before, so they leave it for later.
+ */
+async function verifyLater(page: Page) {
+  await expect(
+    page.getByRole('heading', { name: 'Verify your email' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Verify later' }).click();
+}
+
 const run = Date.now();
 const domain = (name: string) => `${name}-${run}.example.test`;
 
@@ -88,6 +104,7 @@ test('one email in two organizations: choose one', async ({ page }) => {
     .getByRole('button', { name: new RegExp(`Workspace for ${secondEmail}`) })
     .click();
 
+  await verifyLater(page);
   await expect(page).toHaveURL(/\/tickets$/);
 });
 
@@ -109,7 +126,7 @@ test('an organization that requires two-step: setting it up signs you in', async
   // The key renders after the heading: wait for it, then read it.
   await expect(page.locator('code')).toHaveText(/^[A-Z2-7 ]+$/);
   const key = (await page.locator('code').innerText()).trim();
-  await page.getByLabel('Verification code').fill(totp(key));
+  await page.getByLabel('Enter the 6-digit code from the app').fill(totp(key));
   await page.getByRole('button', { name: 'Verify and continue' }).click();
 
   await expect(
@@ -120,7 +137,9 @@ test('an organization that requires two-step: setting it up signs you in', async
   await page.getByLabel('I’ve saved my backup codes somewhere safe').check();
   await continueButton.click();
 
-  // The code that enabled two-step also signed in: no second code is asked.
+  // The code that enabled two-step also signed in: no second two-step code
+  // is asked, only the new founder's email code.
+  await verifyLater(page);
   await expect(page).toHaveURL(/\/tickets$/);
   await expect(page.getByLabel('Verification code')).toHaveCount(0);
 });

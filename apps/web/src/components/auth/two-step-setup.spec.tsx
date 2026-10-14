@@ -20,7 +20,7 @@ const setup = (routes: Record<string, Reply>) => {
   return { calls, onEnrolled, onBack, user: userEvent.setup() };
 };
 
-const code = () => screen.getByLabelText('Verification code');
+const code = () => screen.getByLabelText('Enter the 6-digit code from the app');
 
 /** A blob's text: jsdom's `Blob` has no `text()`. */
 const textOf = (blob: Blob | undefined) =>

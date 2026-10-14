@@ -188,6 +188,19 @@ describe('the sign-in form', () => {
     );
   });
 
+  it.each([
+    [1, '1 session ended. Sign in again to continue.'],
+    [3, '3 sessions ended. Sign in again to continue.'],
+  ])(
+    'after signing out everywhere (%i), says how many ended',
+    (count, text) => {
+      setup({ everywhere: count });
+      expect(screen.getByRole('status')).toHaveTextContent(
+        `You’ve signed out everywhere${text}`,
+      );
+    },
+  );
+
   it('with no notice, shows no alert', () => {
     setup();
     expect(screen.queryByRole('status')).toBeNull();

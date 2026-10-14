@@ -85,7 +85,10 @@ describe('the sign-in flow', () => {
   const enrol = async (user: ReturnType<typeof userEvent.setup>) => {
     await signIn(user);
     await screen.findByText('JBSW Y3DP EHPK 3PXP');
-    await user.type(screen.getByLabelText('Verification code'), '123456');
+    await user.type(
+      screen.getByLabelText('Enter the 6-digit code from the app'),
+      '123456',
+    );
     await user.click(
       screen.getByRole('button', { name: 'Verify and continue' }),
     );

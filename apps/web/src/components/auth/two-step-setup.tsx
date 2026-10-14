@@ -37,6 +37,30 @@ export function manualKey(otpauthUri: string): string {
 }
 
 /**
+ * The secret to enrol, asked for once: a second one would replace the secret
+ * the QR code shows.
+ */
+export function useSetupSecret() {
+  const [secret, setSecret] = useState<GenerateTwoFactorResponseDto | null>(
+    null,
+  );
+  const [failed, setFailed] = useState<string | null>(null);
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    twoFactorAuthControllerGenerateV1()
+      .then((answer) => setSecret(answer.data ?? null))
+      .catch((error: unknown) =>
+        setFailed(error instanceof Error ? error.message : String(error)),
+      );
+  }, []);
+
+  return { secret, failed };
+}
+
+/**
  * Two-step setup, for an organization that requires it: scan the QR code
  * (or type the key), confirm with a code, then the backup codes, shown once.
  * Both calls are allowed on the sign-in challenge alone, which is what lets a
@@ -50,26 +74,9 @@ export function TwoStepSetup({
   onEnrolled: (signedIn: boolean) => void;
   onBack: () => void;
 }) {
-  const [secret, setSecret] = useState<GenerateTwoFactorResponseDto | null>(
-    null,
-  );
-  const [enabled, setEnabled] = useState<{
-    codes: string[];
-    signedIn: boolean;
-  } | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    // Once: a second secret would replace the one the QR code shows.
-    if (started.current) return;
-    started.current = true;
-    twoFactorAuthControllerGenerateV1()
-      .then((answer) => setSecret(answer.data ?? null))
-      .catch((error: unknown) =>
-        setFailed(error instanceof Error ? error.message : String(error)),
-      );
-  }, []);
+  const { secret, failed } = useSetupSecret();
+  const [enabled, setEnabled] = useState<Enabled | null>(null);
+  const [saved, setSaved] = useState(false);
 
   if (failed) {
     return (
@@ -90,24 +97,81 @@ export function TwoStepSetup({
     );
   }
 
-  return enabled ? (
-    <BackupCodes
-      codes={enabled.codes}
-      onContinue={() => onEnrolled(enabled.signedIn)}
-    />
-  ) : (
-    <ScanAndConfirm secret={secret} onEnabled={setEnabled} onBack={onBack} />
+  if (enabled) {
+    return (
+      <AuthCard
+        above="Step 2 of 2"
+        title="Save your backup codes"
+        lead="If you lose your phone, each of these codes lets you sign in once."
+      >
+        <Alert variant="warning">
+          <TriangleAlertIcon />
+          <AlertTitle>You won’t see these codes again</AlertTitle>
+          <AlertDescription>
+            Copy or download them now and keep them somewhere safe.
+          </AlertDescription>
+        </Alert>
+        <BackupCodeList
+          codes={enabled.codes}
+          saved={saved}
+          onSavedChange={setSaved}
+          label="I’ve saved my backup codes somewhere safe"
+        />
+        <Button
+          aria-disabled={!saved}
+          className="aria-disabled:opacity-50"
+          onClick={() => saved && onEnrolled(enabled.signedIn)}
+        >
+          Continue
+        </Button>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard
+      above="Step 1 of 2"
+      title="Set up two-step verification"
+      lead="Your organization requires a second step when you sign in. Scan this QR code with an authenticator app."
+      busy={!secret}
+    >
+      <ScanAndConfirm
+        secret={secret}
+        onEnabled={setEnabled}
+        actions={(busy) => (
+          <Button
+            type="submit"
+            disabled={busy || !secret}
+            aria-busy={busy || undefined}
+          >
+            Verify and continue
+          </Button>
+        )}
+      />
+      <Button variant="link" className="h-auto self-start p-0" onClick={onBack}>
+        Back to sign in
+      </Button>
+    </AuthCard>
   );
 }
 
-function ScanAndConfirm({
+type Enabled = { codes: string[]; signedIn: boolean };
+
+/**
+ * The QR code, the key to type instead, and the code that confirms it: the
+ * first step of setup, in the sign-in card or in a dialog. `actions` are the
+ * form's buttons, given whether the code is being checked.
+ */
+export function ScanAndConfirm({
   secret,
   onEnabled,
-  onBack,
+  actions,
+  spaced,
 }: {
   secret: GenerateTwoFactorResponseDto | null;
-  onEnabled: (enabled: { codes: string[]; signedIn: boolean }) => void;
-  onBack: () => void;
+  onEnabled: (enabled: Enabled) => void;
+  actions: (busy: boolean) => React.ReactNode;
+  spaced?: boolean;
 }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -151,12 +215,7 @@ function ScanAndConfirm({
   };
 
   return (
-    <AuthCard
-      above="Step 1 of 2"
-      title="Set up two-step verification"
-      lead="Your organization requires a second step when you sign in. Scan this QR code with an authenticator app."
-      busy={!secret}
-    >
+    <>
       <div className="flex justify-center">
         {secret ? (
           // Black on white in both themes, so a phone can scan it.
@@ -204,11 +263,14 @@ function ScanAndConfirm({
             Enter the 6-digit code from the app
           </Label>
           <CodeSlots
+            id="setup-code"
+            label="Enter the 6-digit code from the app"
             inputRef={codeRef}
             value={code}
             onChange={setCode}
             invalid={Boolean(error)}
             describedBy={error ? 'setup-code-error' : undefined}
+            spaced={spaced}
           />
           {error && (
             <p
@@ -220,30 +282,27 @@ function ScanAndConfirm({
             </p>
           )}
         </div>
-        <Button
-          type="submit"
-          disabled={busy || !secret}
-          aria-busy={busy || undefined}
-        >
-          Verify and continue
-        </Button>
+        {actions(busy)}
       </form>
-
-      <Button variant="link" className="h-auto self-start p-0" onClick={onBack}>
-        Back to sign in
-      </Button>
-    </AuthCard>
+    </>
   );
 }
 
-function BackupCodes({
+/**
+ * Backup codes, shown once: the list, copy and download, and the box that
+ * says they're saved. Whoever shows them decides what saving unlocks.
+ */
+export function BackupCodeList({
   codes,
-  onContinue,
+  saved,
+  onSavedChange,
+  label,
 }: {
   codes: string[];
-  onContinue: () => void;
+  saved: boolean;
+  onSavedChange: (saved: boolean) => void;
+  label: string;
 }) {
-  const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -266,19 +325,7 @@ function BackupCodes({
   };
 
   return (
-    <AuthCard
-      above="Step 2 of 2"
-      title="Save your backup codes"
-      lead="If you lose your phone, each of these codes lets you sign in once."
-    >
-      <Alert variant="warning">
-        <TriangleAlertIcon />
-        <AlertTitle>You won’t see these codes again</AlertTitle>
-        <AlertDescription>
-          Copy or download them now and keep them somewhere safe.
-        </AlertDescription>
-      </Alert>
-
+    <>
       <ul className="grid grid-cols-2 gap-2 rounded-md bg-muted p-4 font-mono text-sm">
         {codes.map((code) => (
           <li key={code}>{code}</li>
@@ -300,20 +347,10 @@ function BackupCodes({
         <Checkbox
           id="codes-saved"
           checked={saved}
-          onCheckedChange={(checked) => setSaved(checked === true)}
+          onCheckedChange={(checked) => onSavedChange(checked === true)}
         />
-        <Label htmlFor="codes-saved">
-          I’ve saved my backup codes somewhere safe
-        </Label>
+        <Label htmlFor="codes-saved">{label}</Label>
       </div>
-
-      <Button
-        aria-disabled={!saved}
-        className="aria-disabled:opacity-50"
-        onClick={() => saved && onContinue()}
-      >
-        Continue
-      </Button>
-    </AuthCard>
+    </>
   );
 }

@@ -18,6 +18,8 @@ export function useViewer() {
   return {
     query,
     user: query.data?.data?.user ?? null,
+    /** False for someone who has only ever signed in with Google. */
+    hasPassword: query.data?.data?.hasPassword ?? true,
     can: (code: PermissionCode) => codes.includes(code),
     isAgent:
       codes.includes('ticket.read.all') ||

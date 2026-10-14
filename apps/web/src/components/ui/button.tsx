@@ -13,6 +13,11 @@ const buttonVariants = cva(
           'bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40',
         outline:
           'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
+        // A destructive action that opens a confirmation: quieter than the
+        // confirming button. No input tint in dark, where red text loses
+        // contrast on it.
+        'destructive-outline':
+          'border border-destructive-border bg-background text-destructive shadow-xs hover:bg-destructive-subtle dark:bg-transparent dark:hover:bg-destructive-subtle',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:
