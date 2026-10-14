@@ -1,3 +1,4 @@
+import type * as bcrypt from 'bcrypt';
 import { randomUUID } from 'node:crypto';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
@@ -398,6 +399,42 @@ describe('Auth core (e2e)', () => {
   // ------------------------------------------------------------------- login
 
   describe('login', () => {
+    it('with no password to check, still runs one comparison: an unknown address takes as long as a wrong password', async () => {
+      // Spied, not timed: the comparison is what costs the time.
+      const { org } = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.user.create({
+        data: {
+          email: 'only-google@timing.test',
+          fullName: 'Google Only',
+          organizationId: org.id,
+          passwordHash: null,
+        },
+      });
+      // The module itself: `import * as` hands this file a frozen copy, and the
+      // service reads through to the module on every call.
+      const compare = jest.spyOn(
+        jest.requireActual<typeof bcrypt>('bcrypt'),
+        'compare',
+      );
+
+      try {
+        for (const email of ['nobody@timing.test', 'only-google@timing.test']) {
+          compare.mockClear();
+          await expectRpc(
+            auth.login({ email, password: 'Whatever1!' }, requestOrigin()),
+            status.UNAUTHENTICATED,
+          );
+          expect(compare).toHaveBeenCalledTimes(1);
+          expect(compare.mock.calls[0]).toEqual([
+            'Whatever1!',
+            expect.stringMatching(/^\$2[aby]\$/),
+          ]);
+        }
+      } finally {
+        compare.mockRestore();
+      }
+    });
+
     it("10. loginWithTenant refuses an org outside the token's verified set", async () => {
       const a = await seedTenantWithUser(fx.prisma);
       const b = await seedTenantWithUser(fx.prisma);

@@ -62,7 +62,7 @@ import {
   maskEmail,
   flattenPermissionCodes,
 } from '../../common/utils';
-import { createPublicKey } from 'node:crypto';
+import { createPublicKey, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
@@ -105,7 +105,17 @@ export const SIGN_UP_ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
  */
 export const REGISTER_FLOOR_MS = 100;
 
-/** Resolves once `ms` have passed since `since` (a `performance.now()`). */
+/**
+ * How long `forgotPassword` takes at least, on either path. Issuing tokens and
+ * queuing the email took 6.5 ms (median, 15.6 ms at most) against 3.6 ms for an
+ * unknown address, measured through the gateway.
+ */
+export const FORGOT_PASSWORD_FLOOR_MS = 50;
+
+/**
+ * Resolves once `ms` have passed since `since` (a `performance.now()`): the
+ * one rule for making two paths take the same time.
+ */
 const untilElapsed = (since: number, ms: number): Promise<void> =>
   new Promise((resolve) =>
     setTimeout(resolve, Math.max(0, since + ms - performance.now())),
@@ -136,6 +146,12 @@ export class AuthService {
   /** Derived from the private half — see TwoFactorAuthService for the reasoning. */
   private readonly JWT_2FA_PUBLIC_KEY: string;
   private readonly BCRYPT_ROUNDS: number;
+  /**
+   * What sign-in compares a password against when the address has no password
+   * to check: a hash of a random value at the configured cost, made at boot and
+   * never stored, so an unknown address takes as long as a wrong password.
+   */
+  private readonly DUMMY_PASSWORD_HASH: Promise<string>;
   private readonly REFRESH_TOKEN_TTL_DAYS: number;
   private readonly TRUSTED_DEVICE_TTL_DAYS: number;
   private readonly PASSWORD_RESET_TTL_MINUTES: number;
@@ -172,6 +188,10 @@ export class AuthService {
       .export({ type: 'spki', format: 'pem' })
       .toString();
     this.BCRYPT_ROUNDS = this.configService.getOrThrow<number>('BCRYPT_ROUNDS');
+    this.DUMMY_PASSWORD_HASH = bcrypt.hash(
+      randomBytes(32).toString('hex'),
+      this.BCRYPT_ROUNDS,
+    );
     this.REFRESH_TOKEN_TTL_DAYS = this.configService.getOrThrow<number>(
       'REFRESH_TOKEN_TTL_DAYS',
     );
@@ -548,16 +568,23 @@ export class AuthService {
     });
 
     const matched: UserWithAccess[] = [];
+    let compared = false;
     for (const candidate of candidates) {
       // OAuth-only account: no password to compare against.
       if (!candidate.passwordHash) continue;
+      compared = true;
       if (await bcrypt.compare(password, candidate.passwordHash)) {
         matched.push(candidate);
       }
       // Deliberately NOT short-circuiting on the first match. Stopping early
       // would make response time a side channel for how many tenants own an
-      // address.
+      // address. An address in N tenants still takes about N comparisons;
+      // hiding that would make every sign-in pay for the largest case.
     }
+    // No password to check (no account, or only Google-only ones): one
+    // comparison anyway, so the time doesn't say which.
+    if (!compared)
+      await bcrypt.compare(password, await this.DUMMY_PASSWORD_HASH);
 
     if (matched.length === 0) {
       throw new RpcException({
@@ -1225,6 +1252,7 @@ export class AuthService {
     device: RequestOrigin,
   ): Promise<ForgotPasswordResponse> {
     const email = normalizeEmail(request.email);
+    const started = performance.now();
 
     // findMany: one address may hold accounts in several tenants, and each
     // needs its own reset token.
@@ -1242,8 +1270,12 @@ export class AuthService {
     // Unchanged contract: ALWAYS accepted, whether or not anything matched.
     // Throwing NOT_FOUND here — as this used to — turns the endpoint into an
     // account-enumeration oracle, and a locked account must not be
-    // distinguishable from a missing one either.
-    if (users.length === 0) return {};
+    // distinguishable from a missing one either. Nor its time: every path
+    // finishes no sooner than FORGOT_PASSWORD_FLOOR_MS.
+    if (users.length === 0) {
+      await untilElapsed(started, FORGOT_PASSWORD_FLOOR_MS);
+      return {};
+    }
 
     const links = await Promise.all(
       users
@@ -1254,7 +1286,10 @@ export class AuthService {
         })),
     );
 
-    if (links.length === 0) return {};
+    if (links.length === 0) {
+      await untilElapsed(started, FORGOT_PASSWORD_FLOOR_MS);
+      return {};
+    }
 
     // ONE email with one labelled link per organization, not N near-identical
     // messages the recipient cannot tell apart.
@@ -1269,6 +1304,7 @@ export class AuthService {
       },
     });
 
+    await untilElapsed(started, FORGOT_PASSWORD_FLOOR_MS);
     return {};
   }
 
