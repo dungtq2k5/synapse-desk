@@ -17,11 +17,12 @@ const badgeVariants = cva(
           'border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         ghost: '[a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 [a&]:hover:underline',
-        // Verified / Not verified: subtle, with an icon and the word.
+        // Subtle, with an icon and the word: Verified, Not verified, Setup in progress.
         success:
           'border-success-border bg-success-subtle text-success-subtle-foreground',
         warning:
           'border-warning-border bg-warning-subtle text-warning-subtle-foreground',
+        info: 'border-info-border bg-info-subtle text-info-subtle-foreground',
       },
     },
     defaultVariants: {

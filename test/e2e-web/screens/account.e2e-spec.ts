@@ -662,3 +662,102 @@ test.describe('security', () => {
     await look(page, 'security-session-signed-out');
   });
 });
+
+test.describe('onboarding', () => {
+  /** The checklist as auth-service words it, each step done or not. */
+  const checklist = (status: string, ...complete: boolean[]) => ({
+    steps: [
+      { key: 'verify_email', label: 'Verify an administrator email address' },
+      { key: 'create_department', label: 'Create your first department' },
+      { key: 'invite_team', label: 'Invite a colleague' },
+    ].map((step, index) => ({ ...step, complete: complete[index] ?? false })),
+    canComplete: complete.length === 3 && complete.every(Boolean),
+    status,
+  });
+  const ONBOARDING = '/organizations/current/onboarding';
+
+  async function openTickets(page: Page, person: Person) {
+    await signInAs(page, person);
+    await page.goto('/tickets');
+    await expect(
+      page.getByRole('heading', { name: 'Set up Northwind Health' }),
+    ).toBeVisible();
+  }
+
+  test('the founder, 1 of 3 done', async ({ page }) => {
+    const { maya } = await tenant('onboarding');
+    await reply(
+      page,
+      'GET',
+      ONBOARDING,
+      200,
+      checklist('PENDING_ONBOARDING', true, false, false),
+    );
+    await openTickets(page, maya);
+    await expect(page.getByText('1 of 3 steps done')).toBeVisible();
+    await look(page, 'onboarding');
+  });
+
+  test('unverified: inviting waits for the email', async ({ page }) => {
+    const { maya } = await tenant('onboarding-unverified');
+    await setEmailVerified([maya], false);
+    await reply(
+      page,
+      'GET',
+      ONBOARDING,
+      200,
+      checklist('PENDING_ONBOARDING', false, true, false),
+    );
+    await openTickets(page, maya);
+    await expect(page.getByText('Verify your email first')).toBeVisible();
+    await look(page, 'onboarding-unverified');
+  });
+
+  test('every step done: Finish setup', async ({ page }) => {
+    const { maya } = await tenant('onboarding');
+    await reply(
+      page,
+      'GET',
+      ONBOARDING,
+      200,
+      checklist('PENDING_ONBOARDING', true, true, true),
+    );
+    await openTickets(page, maya);
+    await expect(
+      page.getByRole('button', { name: 'Finish setup' }),
+    ).toBeEnabled();
+    await look(page, 'onboarding-done');
+  });
+
+  test('setup is already finished: a toast, and the panel goes', async ({
+    page,
+  }) => {
+    const { maya } = await tenant('onboarding');
+    let finished = false;
+    await page.route(`${API}${ONBOARDING}**`, (route) => {
+      if (route.request().method() === 'POST') {
+        finished = true;
+        return answer(
+          route,
+          409,
+          'This workspace is ACTIVE, not pending onboarding',
+        );
+      }
+      return answer(
+        route,
+        200,
+        finished
+          ? checklist('ACTIVE', true, true, true)
+          : checklist('PENDING_ONBOARDING', true, true, true),
+      );
+    });
+    await openTickets(page, maya);
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await expect(page.getByText('Setup is already finished')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Set up Northwind Health' }),
+    ).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Tickets' })).toBeFocused();
+    await look(page, 'onboarding-already-finished');
+  });
+});

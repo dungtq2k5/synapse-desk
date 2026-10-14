@@ -153,6 +153,9 @@ async function build(slug: string): Promise<Tenant> {
     '/departments',
     { name: 'Workplace' },
   );
+  // Set up, as a team at work would be: the setup checklist is drawn by the
+  // rows that need it.
+  await api(mayaSession, 'POST', '/organizations/current/onboarding/complete');
 
   const tickets = {} as Record<TicketKey, string>;
   for (const [key, spec] of Object.entries(TICKETS) as [
