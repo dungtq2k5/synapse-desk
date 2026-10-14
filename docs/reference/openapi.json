@@ -55884,6 +55884,11 @@
           "uploadUrl": {
             "type": "string"
           },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
           "objectPath": {
             "type": "string"
           },
@@ -55892,7 +55897,7 @@
             "format": "date-time"
           }
         },
-        "required": ["expiresAt", "objectPath", "uploadUrl"]
+        "required": ["expiresAt", "objectPath", "uploadMethod", "uploadUrl"]
       },
       "ConfirmAvatarDto": {
         "type": "object",
@@ -56845,6 +56850,11 @@
           "uploadUrl": {
             "type": "string"
           },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
           "objectPath": {
             "type": "string"
           },
@@ -56853,7 +56863,7 @@
             "format": "date-time"
           }
         },
-        "required": ["expiresAt", "objectPath", "uploadUrl"]
+        "required": ["expiresAt", "objectPath", "uploadMethod", "uploadUrl"]
       },
       "ConfirmAttachmentDto": {
         "type": "object",
@@ -59037,6 +59047,11 @@
           "uploadUrl": {
             "type": "string"
           },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
           "objectPath": {
             "type": "string"
           },
@@ -59045,7 +59060,7 @@
             "format": "date-time"
           }
         },
-        "required": ["expiresAt", "objectPath", "uploadUrl"]
+        "required": ["expiresAt", "objectPath", "uploadMethod", "uploadUrl"]
       },
       "ResolveDocumentFlagDto": {
         "type": "object",

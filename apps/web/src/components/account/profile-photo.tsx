@@ -25,19 +25,20 @@ import { announce } from '@/lib/toast';
 type Problem = 'too-large' | 'failed';
 
 /**
- * Puts the file where storage signed for: a PUT straight to Firebase Storage
- * (or its emulator), with the declared type the signature pins, reporting
- * progress as it goes. XHR rather than `fetch`, which can't report upload
- * progress.
+ * Sends the file where storage said: straight to Firebase Storage with the
+ * method the presign named (PUT to a signed URL; POST to the local emulator),
+ * with the declared type the signature pins, reporting progress as it goes.
+ * XHR rather than `fetch`, which can't report upload progress.
  */
-function put(
+function send(
   url: string,
+  method: string,
   file: File,
   onProgress: (percent: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open('PUT', url);
+    request.open(method, url);
     request.setRequestHeader('Content-Type', file.type);
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -94,7 +95,12 @@ export function ProfilePhoto({ user }: { user: UserResponseDto }) {
         fileName: file.name,
       });
       if (!signed.data) throw new Error('No upload URL');
-      await put(signed.data.uploadUrl, file, setProgress);
+      await send(
+        signed.data.uploadUrl,
+        signed.data.uploadMethod,
+        file,
+        setProgress,
+      );
       await usersControllerConfirmAvatarV1({
         objectPath: signed.data.objectPath,
       });

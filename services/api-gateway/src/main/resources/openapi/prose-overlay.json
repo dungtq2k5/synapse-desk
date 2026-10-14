@@ -1451,6 +1451,15 @@
     },
     "MessageResponseDto.sender": {
       "description": "Who wrote the message, resolved from `senderId`. Always null for an AI-generated message: no user wrote it. For a human message, null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it."
+    },
+    "PresignAttachmentResponseDto.uploadMethod": {
+      "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator."
+    },
+    "PresignAvatarResponseDto.uploadMethod": {
+      "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator."
+    },
+    "PresignDocumentResponseDto.uploadMethod": {
+      "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator."
     }
   }
 }

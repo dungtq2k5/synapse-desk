@@ -6,6 +6,7 @@ import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.cache.EvictsCache;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.common.dto.UploadMethod;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.openapi.CachedRead;
@@ -558,6 +559,7 @@ public class DocumentsController {
         "OK",
         new PresignDocumentResponseDto(
           response.getUploadUrl(),
+          UploadMethod.of(response.getUploadMethod()),
           response.getObjectPath(),
           toOffsetDateTime(response.getExpiresAt())
         )

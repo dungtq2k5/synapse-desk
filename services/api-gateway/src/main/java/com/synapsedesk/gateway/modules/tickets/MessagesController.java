@@ -5,6 +5,7 @@ import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CitationResponseDto;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.common.dto.UploadMethod;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.security.RequirePermission;
@@ -424,6 +425,7 @@ public class MessagesController {
   ) {
     return new PresignAttachmentResponseDto(
       response.getUploadUrl(),
+      UploadMethod.of(response.getUploadMethod()),
       response.getObjectPath(),
       toOffsetDateTime(response.getExpiresAt())
     );

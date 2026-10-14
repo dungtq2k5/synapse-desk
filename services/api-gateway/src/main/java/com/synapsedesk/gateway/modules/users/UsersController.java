@@ -5,6 +5,7 @@ import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.common.dto.UploadMethod;
 import com.synapsedesk.gateway.common.dto.UserResponseDto;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
@@ -183,6 +184,7 @@ public class UsersController {
 
     PresignAvatarResponseDto data = new PresignAvatarResponseDto()
       .uploadUrl(response.getUploadUrl())
+      .uploadMethod(UploadMethod.of(response.getUploadMethod()))
       .objectPath(response.getObjectPath())
       .expiresAt(toOffsetDateTime(response.getExpiresAt()));
 

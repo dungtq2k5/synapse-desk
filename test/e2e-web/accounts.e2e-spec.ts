@@ -6,6 +6,8 @@ import {
   type Browser,
   type Page,
 } from '@playwright/test';
+import { join } from 'node:path';
+import { REPO_ROOT } from '../system/services';
 import { emailCode, invitationLink, markVerified, resetLink } from './emailed';
 import { emulatorIdToken } from './firebase';
 import { WEB_URL } from './ingress';
@@ -241,6 +243,28 @@ test('a Google-only account sets a password through the link, then signs in with
 
   await signIn(page, email, 'Harbor-Lights-26');
   await expect(page).toHaveURL(/\/tickets$/);
+});
+
+test('a profile photo uploads through the real flow, and shows', async ({
+  page,
+}) => {
+  // The presign, the bytes from the browser to Storage (the emulator, with
+  // the method the presign names) and the confirm: nothing written around it.
+  const email = founderEmail('ines');
+  await leave(await founder(email));
+  await signIn(page, email, DEMO_PASSWORD);
+  await expect(page).toHaveURL(/\/tickets$/);
+  await page.goto('/profile');
+
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(join(REPO_ROOT, 'test/fixtures/images/avatar.png'));
+
+  await expect(
+    page.getByRole('button', { name: 'Change photo' }),
+  ).toBeVisible();
+  // Read back from Storage: the avatar shows the stored object.
+  await expect(page.locator('main img[src*="/avatars/"]')).toBeVisible();
 });
 
 test('a founder finishes setup', async ({ page }) => {

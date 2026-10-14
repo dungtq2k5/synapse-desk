@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.modules.tickets.dto.rest;
 
+import com.synapsedesk.gateway.common.dto.UploadMethod;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 
@@ -16,6 +17,8 @@ import java.time.OffsetDateTime;
  */
 public record PresignAttachmentResponseDto(
   @NotNull String uploadUrl,
+  /** How to send the bytes to {@code uploadUrl}: see {@link UploadMethod}. */
+  @NotNull UploadMethod uploadMethod,
   @NotNull String objectPath,
   @NotNull OffsetDateTime expiresAt
 ) {}

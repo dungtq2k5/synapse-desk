@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.documents.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.synapsedesk.gateway.common.dto.UploadMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.OffsetDateTime;
@@ -16,6 +17,8 @@ public class PresignDocumentResponseDto {
 
   private String uploadUrl;
 
+  private UploadMethod uploadMethod;
+
   private String objectPath;
 
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
@@ -30,10 +33,12 @@ public class PresignDocumentResponseDto {
    */
   public PresignDocumentResponseDto(
     String uploadUrl,
+    UploadMethod uploadMethod,
     String objectPath,
     OffsetDateTime expiresAt
   ) {
     this.uploadUrl = uploadUrl;
+    this.uploadMethod = uploadMethod;
     this.objectPath = objectPath;
     this.expiresAt = expiresAt;
   }
@@ -56,6 +61,26 @@ public class PresignDocumentResponseDto {
   @JsonProperty("uploadUrl")
   public void setUploadUrl(String uploadUrl) {
     this.uploadUrl = uploadUrl;
+  }
+
+  public PresignDocumentResponseDto uploadMethod(UploadMethod uploadMethod) {
+    this.uploadMethod = uploadMethod;
+    return this;
+  }
+
+  /**
+   * How to send the bytes to `uploadUrl`, with the declared `Content-Type`: `PUT` to a signed URL, or `POST` to the local Storage emulator.
+   * @return uploadMethod
+   */
+  @NotNull
+  @JsonProperty("uploadMethod")
+  public UploadMethod getUploadMethod() {
+    return uploadMethod;
+  }
+
+  @JsonProperty("uploadMethod")
+  public void setUploadMethod(UploadMethod uploadMethod) {
+    this.uploadMethod = uploadMethod;
   }
 
   public PresignDocumentResponseDto objectPath(String objectPath) {
@@ -111,6 +136,10 @@ public class PresignDocumentResponseDto {
       (PresignDocumentResponseDto) o;
     return (
       Objects.equals(this.uploadUrl, presignDocumentResponseDto.uploadUrl) &&
+      Objects.equals(
+        this.uploadMethod,
+        presignDocumentResponseDto.uploadMethod
+      ) &&
       Objects.equals(this.objectPath, presignDocumentResponseDto.objectPath) &&
       Objects.equals(this.expiresAt, presignDocumentResponseDto.expiresAt)
     );
@@ -118,7 +147,7 @@ public class PresignDocumentResponseDto {
 
   @Override
   public int hashCode() {
-    return Objects.hash(uploadUrl, objectPath, expiresAt);
+    return Objects.hash(uploadUrl, uploadMethod, objectPath, expiresAt);
   }
 
   @Override
@@ -127,6 +156,9 @@ public class PresignDocumentResponseDto {
     sb.append("class PresignDocumentResponseDto {\n");
     sb.append("    uploadUrl: ")
       .append(toIndentedString(uploadUrl))
+      .append("\n");
+    sb.append("    uploadMethod: ")
+      .append(toIndentedString(uploadMethod))
       .append("\n");
     sb.append("    objectPath: ")
       .append(toIndentedString(objectPath))
