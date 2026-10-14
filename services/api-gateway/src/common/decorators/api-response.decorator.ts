@@ -234,6 +234,12 @@ export function ApiWrappedResponse(
 }
 
 /**
+ * A `403` that means the password or code a signed-in caller re-entered is
+ * wrong, not a missing permission: for `ApiFilterErrors`' `descriptions`.
+ */
+export const WRONG_PASSWORD_OR_CODE = 'The password or code is wrong.';
+
+/**
  * Documents the ERROR responses a route can produce.
  *
  * `500` is added unconditionally and `429` by default, because the global
@@ -260,6 +266,12 @@ export function ApiFilterErrors(
      * carrying `@SkipThrottle()` — it removes the documented `429`.
      */
     throttled?: boolean;
+    /**
+     * A status's description for this route, where the shared one would
+     * mislead: a `403` that means a wrong password rather than a missing
+     * permission.
+     */
+    descriptions?: Partial<Record<ApiErrorStatus, string>>;
   } = {},
 ): MethodDecorator & ClassDecorator {
   const automatic = options.throttled === false ? ['500'] : ['429', '500'];
@@ -290,7 +302,11 @@ export function ApiFilterErrors(
         .sort((a, b) => Number(a) - Number(b))
         .map((status) =>
           ApiResponse(
-            errorResponse(Number(status), ERROR_DESCRIPTIONS[status]),
+            errorResponse(
+              Number(status),
+              options.descriptions?.[status as ApiErrorStatus] ??
+                ERROR_DESCRIPTIONS[status],
+            ),
           ),
         ),
     )(target, key as string, descriptor as PropertyDescriptor);

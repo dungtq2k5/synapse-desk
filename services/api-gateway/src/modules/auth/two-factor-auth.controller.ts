@@ -54,6 +54,7 @@ import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
   ApiFilterErrors,
   ApiWrappedResponse,
+  WRONG_PASSWORD_OR_CODE,
 } from '../../common/decorators/api-response.decorator';
 
 /**
@@ -211,7 +212,9 @@ export class TwoFactorAuthController {
 
   @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
   @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '403'], {
+    descriptions: { '403': WRONG_PASSWORD_OR_CODE },
+  })
   @Delete()
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -233,7 +236,9 @@ export class TwoFactorAuthController {
 
   @ApiOperation({ summary: 'Regenerate two_factor_backup_codes (30d expiry)' })
   @ApiWrappedResponse(BackupCodesResponseDto)
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '403'], {
+    descriptions: { '403': WRONG_PASSWORD_OR_CODE },
+  })
   @Post('backup-codes')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)

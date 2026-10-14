@@ -1541,6 +1541,44 @@
               }
             }
           },
+          "403": {
+            "description": "The password or code is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 403
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
             "content": {
@@ -3308,6 +3346,44 @@
               }
             }
           },
+          "403": {
+            "description": "The password or code is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 403
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
             "content": {
@@ -3539,6 +3615,44 @@
                     "statusCode": {
                       "type": "number",
                       "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The password or code is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 403
                     },
                     "path": {
                       "type": "string",

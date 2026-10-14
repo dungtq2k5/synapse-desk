@@ -370,7 +370,7 @@ export class TwoFactorAuthService {
 
     if (!(await this.acceptTotp(user, user.twoFactorSecret, request.code))) {
       throw new RpcException({
-        code: status.UNAUTHENTICATED,
+        code: status.PERMISSION_DENIED,
         message: 'Invalid verification code',
       });
     }
@@ -661,6 +661,11 @@ export class TwoFactorAuthService {
     });
   }
 
+  /**
+   * The signed-in caller's password, re-checked before a two-step change.
+   * PERMISSION_DENIED when wrong: the session is fine, and a 401 would tell a
+   * client to refresh it and send the same password again.
+   */
   private async assertPassword(
     passwordHash: string | null,
     password: string,
@@ -669,7 +674,7 @@ export class TwoFactorAuthService {
     // available to them.
     if (!passwordHash || !(await bcrypt.compare(password, passwordHash))) {
       throw new RpcException({
-        code: status.UNAUTHENTICATED,
+        code: status.PERMISSION_DENIED,
         message: 'Invalid credentials',
       });
     }

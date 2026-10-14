@@ -6,6 +6,7 @@
  * cross-key rejection, a property with no harness row before now.
  */
 
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -339,6 +340,72 @@ describe('two-factor-auth', () => {
       });
     },
   );
+
+  /**
+   * A wrong password or code inside a session is auth-service's
+   * PERMISSION_DENIED, and reaches the client as a 403 with its message. A
+   * 401 would read as "your session expired": the browser would refresh and
+   * send the same wrong password again.
+   */
+  describe('a wrong password inside a session is a 403, not a 401', () => {
+    rowFor('Auth')('**`PATCH /auth/password`**', async () => {
+      peers.auth
+        .on('AuthService/ChangePassword')
+        .fail(GrpcStatus.PERMISSION_DENIED, 'Current password is incorrect');
+
+      const response = await new Session(gateway.baseUrl).request(
+        'PATCH',
+        `${API}/auth/password`,
+        {
+          body: { currentPassword: 'Wrong-pass-1', newPassword: 'Brand-new-1' },
+          headers: accessCookie(),
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: expect.stringContaining('Current password is incorrect'),
+      });
+      expect(peers.auth.calls('AuthService/ChangePassword')).toHaveLength(1);
+    });
+
+    rowFor('Two Factor Auth')('**`DELETE /auth/2fa`**', async () => {
+      peers.auth
+        .on('TwoFactorAuthService/DisableTwoFactor')
+        .fail(GrpcStatus.PERMISSION_DENIED, 'Invalid verification code');
+
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/auth/2fa`,
+        {
+          body: { code: '000000', password: 'super-secret-1' },
+          headers: accessCookie(),
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: expect.stringContaining('Invalid verification code'),
+      });
+    });
+
+    rowFor('Two Factor Auth')('**`POST /auth/2fa/backup-codes`**', async () => {
+      peers.auth
+        .on('TwoFactorAuthService/RegenerateBackupCodes')
+        .fail(GrpcStatus.PERMISSION_DENIED, 'Invalid credentials');
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/2fa/backup-codes`,
+        { password: 'Wrong-pass-1' },
+        accessCookie(),
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: expect.stringContaining('Invalid credentials'),
+      });
+    });
+  });
 
   rowFor('Two Factor Auth')(
     '**`getBackupCodesStatus` reports counts only**',

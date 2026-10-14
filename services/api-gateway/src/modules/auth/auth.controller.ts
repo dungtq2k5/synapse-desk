@@ -67,6 +67,7 @@ import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
   ApiFilterErrors,
   ApiWrappedResponse,
+  WRONG_PASSWORD_OR_CODE,
 } from '../../common/decorators/api-response.decorator';
 
 @ApiTags('Auth')
@@ -338,7 +339,9 @@ export class AuthController {
    */
   @ApiOperation({ summary: 'Change password (requires current password)' })
   @ApiWrappedResponse(ChangePasswordResponseDto)
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '403'], {
+    descriptions: { '403': WRONG_PASSWORD_OR_CODE },
+  })
   @Patch('password')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.changePassword })
   @HttpCode(HttpStatus.OK)
