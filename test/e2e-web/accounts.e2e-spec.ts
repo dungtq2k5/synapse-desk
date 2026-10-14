@@ -58,12 +58,14 @@ async function anotherDevice(
 }
 
 /**
- * Signed out: once its access token lapses (dropped here, rather than waited
- * for), refreshing fails and the next page sends this browser to sign in.
+ * Signed out at once: the gateway refuses the revoked session's still-unexpired
+ * access token, refreshing fails, and the next page sends this browser to
+ * sign in.
  */
 async function expectSignedOut(page: Page) {
-  await page.context().clearCookies({ name: 'access_token' });
-  await page.goto('/tickets');
+  // It may already be on its way there: its socket was closed, its next call
+  // refused, and that navigation aborts this one.
+  await page.goto('/tickets').catch(() => undefined);
   await expect(page).toHaveURL(/\/login/);
 }
 

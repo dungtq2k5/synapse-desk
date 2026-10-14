@@ -73,6 +73,113 @@ class RedisOutageIT {
     }
   }
 
+  /**
+   * A revoked session's token is refused while Redis answers, and accepted
+   * once it can't, with a warning: the check fails open, and the token's own
+   * expiry is the backstop.
+   */
+  @Test
+  void aRevokedSessionIsRefusedWithRedisAndAcceptedWithoutIt()
+    throws Exception {
+    String sid = java.util.UUID.randomUUID().toString();
+    String cookie = "access_token=" + accessToken(sid);
+
+    try (Cut redis = Cut.toRealRedis()) {
+      try (
+        ConfigurableApplicationContext gateway = boot(
+          redis.url(),
+          Map.of(
+            "JWT_ACCESS_PUBLIC_KEY_PATH",
+            TEST_KEYS + "jwt-access.test.pub"
+          )
+        )
+      ) {
+        int port = portOf(gateway);
+        // Attached after boot: Spring Boot resets logging as it starts.
+        ch.qos.logback.classic.Logger logger =
+          (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(
+            com.synapsedesk.gateway.common.auth.RevokedSessions.class
+          );
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logged =
+          new ch.qos.logback.core.read.ListAppender<>();
+        logged.start();
+        logger.addAppender(logged);
+        // Tests run with logging off; this row reads a warning.
+        ch.qos.logback.classic.Level level = logger.getLevel();
+        logger.setLevel(ch.qos.logback.classic.Level.WARN);
+        gateway
+          .getBean(
+            org.springframework.data.redis.core.StringRedisTemplate.class
+          )
+          .opsForValue()
+          .set(
+            com.synapsedesk.gateway.common.contracts.SessionKeys.REVOKED_SESSION_KEY_PREFIX +
+              sid,
+            "1",
+            Duration.ofMinutes(1)
+          );
+
+        assertThat(sessions(port, cookie).status()).isEqualTo(401);
+
+        redis.sever();
+
+        // Past authentication: auth-service isn't running here, so not a 401.
+        assertThat(sessions(port, cookie).status()).isNotEqualTo(401);
+        assertThat(logged.list)
+          .extracting(
+            ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage
+          )
+          .anyMatch(message ->
+            message.startsWith("Couldn't read whether session " + sid)
+          );
+        logger.detachAppender(logged);
+        logger.setLevel(level);
+      }
+    }
+  }
+
+  private static final String TEST_KEYS = "../../test/fixtures/keys/";
+
+  private static HttpProbe sessions(int port, String cookie) {
+    return prompt(() ->
+      HttpProbe.get(port, "/api/v1/auth/sessions", Map.of("Cookie", cookie))
+    );
+  }
+
+  /** An access token for session family {@code sid}, signed with the test key. */
+  private static String accessToken(String sid) throws Exception {
+    String pem = java.nio.file.Files.readString(
+      java.nio.file.Path.of(TEST_KEYS + "jwt-access.test.key")
+    )
+      .replace("-----BEGIN PRIVATE KEY-----", "")
+      .replace("-----END PRIVATE KEY-----", "")
+      .replaceAll("\\s", "");
+    java.security.PrivateKey key = java.security.KeyFactory.getInstance(
+      "RSA"
+    ).generatePrivate(
+      new java.security.spec.PKCS8EncodedKeySpec(
+        java.util.Base64.getDecoder().decode(pem)
+      )
+    );
+    com.nimbusds.jwt.SignedJWT jwt = new com.nimbusds.jwt.SignedJWT(
+      new com.nimbusds.jose.JWSHeader(com.nimbusds.jose.JWSAlgorithm.RS256),
+      new com.nimbusds.jwt.JWTClaimsSet.Builder()
+        .subject("aaaaaaaa-4444-4444-8444-aaaaaaaaaaaa")
+        .claim("organizationId", "aaaaaaaa-3333-4333-8333-aaaaaaaaaaaa")
+        .claim("isSuperAdmin", false)
+        .claim("departmentIds", List.of())
+        .claim("permissionCodes", List.of())
+        .claim("isEmailVerified", true)
+        .claim("sid", sid)
+        .expirationTime(
+          new java.util.Date(System.currentTimeMillis() + 900_000)
+        )
+        .build()
+    );
+    jwt.sign(new com.nimbusds.jose.crypto.RSASSASigner(key));
+    return jwt.serialize();
+  }
+
   private static void assertReadyWithRedis(int port, String redis) {
     HttpProbe ready = prompt(() -> HttpProbe.get(port, "/health/ready"));
 
@@ -95,7 +202,15 @@ class RedisOutageIT {
   }
 
   private static ConfigurableApplicationContext boot(String redisUrl) {
+    return boot(redisUrl, Map.of());
+  }
+
+  private static ConfigurableApplicationContext boot(
+    String redisUrl,
+    Map<String, Object> overrides
+  ) {
     Map<String, Object> properties = new HashMap<>(SharedEnvironment.values());
+    properties.putAll(overrides);
     properties.put("REDIS_URL", redisUrl);
     properties.put("server.port", "0");
     properties.put("management.server.port", "0");

@@ -11,6 +11,10 @@ import java.util.List;
  * anyway rather than as two: {@code JwtAuthFilter} needs a single shape to
  * reject a challenge token presented where a full session is required, which
  * is what {@link #isFullSession()} is for.
+ *
+ * <p>{@code sid} is the session family the token was issued to, which
+ * {@link RevokedSessions} checks; {@code null} on a token from before tokens
+ * carried it, accepted until it expires.
  */
 public record JwtPrincipal(
   String sub,
@@ -19,8 +23,34 @@ public record JwtPrincipal(
   List<String> departmentIds,
   List<String> permissionCodes,
   boolean isEmailVerified,
-  boolean is2faPending
+  boolean is2faPending,
+  String sid
 ) {
+  /**
+   * Without a session family: a 2FA challenge, or an access token issued
+   * before tokens named theirs.
+   */
+  public JwtPrincipal(
+    String sub,
+    String organizationId,
+    boolean isSuperAdmin,
+    List<String> departmentIds,
+    List<String> permissionCodes,
+    boolean isEmailVerified,
+    boolean is2faPending
+  ) {
+    this(
+      sub,
+      organizationId,
+      isSuperAdmin,
+      departmentIds,
+      permissionCodes,
+      isEmailVerified,
+      is2faPending,
+      null
+    );
+  }
+
   /** A caller mid-2FA-challenge has none of the rest — never treat one as authenticated. */
   public boolean isFullSession() {
     return !is2faPending;

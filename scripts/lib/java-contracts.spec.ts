@@ -65,6 +65,16 @@ describe('the Java contracts generator', () => {
       ).toThrow('GONE_PATTERNS');
     });
 
+    it('emits a plain string export as one constant, named as the export is', () => {
+      const source = renderClass(
+        { className: 'Keys', purpose: 'p', exports: ['A_PREFIX'] },
+        { A_PREFIX: 'a-prefix:' },
+      );
+      expect(source).toContain(
+        'public static final String A_PREFIX = "a-prefix:";',
+      );
+    });
+
     it('emits an integer as an `int`, so Java compares it as a number', () => {
       const source = renderClass(
         { className: 'PasswordPolicy', purpose: 'probe', exports: ['POLICY'] },
@@ -120,6 +130,7 @@ describe('the Java contracts generator', () => {
         'GrpcMetadata.java',
         'PasswordPolicy.java',
         'RealtimeEvents.java',
+        'SessionKeys.java',
         'Subjects.java',
       ]);
     });

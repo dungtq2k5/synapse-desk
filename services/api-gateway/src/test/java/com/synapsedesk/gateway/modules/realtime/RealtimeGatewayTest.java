@@ -64,6 +64,8 @@ class RealtimeGatewayTest {
   );
   private final AiStreamService aiStreams = mock(AiStreamService.class);
   private final TicketViewers viewers = mock(TicketViewers.class);
+  private final com.synapsedesk.gateway.common.auth.RevokedSessions revokedSessions =
+    mock(com.synapsedesk.gateway.common.auth.RevokedSessions.class);
   private final com.synapsedesk.gateway.modules.tickets.TicketReferences references =
     mock(com.synapsedesk.gateway.modules.tickets.TicketReferences.class);
   private final synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub messagesStub =
@@ -103,7 +105,8 @@ class RealtimeGatewayTest {
       aiStreams,
       messagesStub,
       viewers,
-      references
+      references,
+      revokedSessions
     );
     verify(realtimeNamespace).addConnectListener(connectCaptor.capture());
     verify(realtimeNamespace).addDisconnectListener(disconnectCaptor.capture());
@@ -270,6 +273,31 @@ class RealtimeGatewayTest {
   void anInvalidOrExpiredTokenIsRefused() {
     when(jwtVerifier.verifyAccess("bad")).thenReturn(Optional.empty());
     SocketIOClient client = clientWithCookie("access_token=bad");
+
+    connectCaptor.getValue().onConnect(client);
+
+    verify(client).disconnect();
+    verify(metrics, never()).socketOpened();
+  }
+
+  @Test
+  void aRevokedSessionsTokenIsRefusedAtTheHandshake() {
+    when(jwtVerifier.verifyAccess("revoked")).thenReturn(
+      Optional.of(
+        new JwtPrincipal(
+          "u1",
+          "o1",
+          false,
+          List.of(),
+          List.of(),
+          true,
+          false,
+          "family-1"
+        )
+      )
+    );
+    when(revokedSessions.isRevoked("family-1")).thenReturn(true);
+    SocketIOClient client = clientWithCookie("access_token=revoked");
 
     connectCaptor.getValue().onConnect(client);
 

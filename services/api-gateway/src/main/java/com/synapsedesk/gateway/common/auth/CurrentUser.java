@@ -18,12 +18,22 @@ import org.springframework.stereotype.Component;
 @Component
 public class CurrentUser {
 
+  /** Where {@link #read} keeps its revocation answer, so a request asks Redis once. */
+  private static final String REVOKED_ATTRIBUTE =
+    CurrentUser.class.getName() + ".revoked";
+
   private final JwtVerifier verifier;
   private final JwtProperties jwt;
+  private final RevokedSessions revokedSessions;
 
-  public CurrentUser(JwtVerifier verifier, JwtProperties jwt) {
+  public CurrentUser(
+    JwtVerifier verifier,
+    JwtProperties jwt,
+    RevokedSessions revokedSessions
+  ) {
     this.verifier = verifier;
     this.jwt = jwt;
+    this.revokedSessions = revokedSessions;
   }
 
   /**
@@ -42,12 +52,26 @@ public class CurrentUser {
     );
   }
 
-  /** The access cookie, verified — empty if absent, invalid, expired, or a 2FA challenge. */
+  /**
+   * The access cookie, verified — empty if absent, invalid, expired, a 2FA
+   * challenge, or of a revoked session ({@link RevokedSessions}). Revocation
+   * is read once per request, however often this is called.
+   */
   public Optional<RequestContext> read(HttpServletRequest request) {
     return accessToken(request)
       .flatMap(verifier::verifyAccess)
       .filter(JwtPrincipal::isFullSession)
+      .filter(principal -> !revoked(request, principal))
       .map(principal -> toContext(principal, origin(request)));
+  }
+
+  private boolean revoked(HttpServletRequest request, JwtPrincipal principal) {
+    if (request.getAttribute(REVOKED_ATTRIBUTE) instanceof Boolean known) {
+      return known;
+    }
+    boolean revoked = revokedSessions.isRevoked(principal.sid());
+    request.setAttribute(REVOKED_ATTRIBUTE, revoked);
+    return revoked;
   }
 
   /** Throws 401 {@code "Unauthorized"} if the caller has no valid full session. */
@@ -60,9 +84,15 @@ public class CurrentUser {
     );
   }
 
-  /** Cryptographic validity only — for `GuestCheck`, which does not care WHO. */
+  /**
+   * A live session's token — for `GuestCheck`, which does not care WHO. A
+   * revoked session's isn't: its device must be able to sign in again.
+   */
   boolean isValidAccessToken(String token) {
-    return verifier.verifyAccess(token).isPresent();
+    return verifier
+      .verifyAccess(token)
+      .filter(principal -> !revokedSessions.isRevoked(principal.sid()))
+      .isPresent();
   }
 
   /**

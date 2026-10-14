@@ -58,6 +58,12 @@ const GROUPS = [
       'The rule every password a person sets meets, read by `@StrongPassword`. A stale copy is a gateway and a web checklist that disagree on what a password needs.',
     exports: ['PASSWORD_POLICY'],
   },
+  {
+    className: 'SessionKeys',
+    purpose:
+      'The Redis keys auth-service writes and the gateway reads. A stale prefix is a revoked session the gateway never refuses.',
+    exports: ['REVOKED_SESSION_KEY_PREFIX'],
+  },
 ];
 
 /** Every `*_PATTERNS` export must be in a group, or named here with a reason. */
@@ -91,6 +97,15 @@ function renderClass(group, common) {
     }
 
     lines.push(`  /** {@code ${exportName}} in \`packages/contracts\`. */`);
+
+    // A plain string is one constant, named as the export is.
+    if (typeof value === 'string') {
+      lines.push(
+        `  public static final String ${exportName} = ${javaString(value)};`,
+        '',
+      );
+      continue;
+    }
 
     for (const key of Object.keys(value).sort()) {
       const name = `${constantName(exportName.replace(/_PATTERNS$/u, ''))}_${constantName(key)}`;

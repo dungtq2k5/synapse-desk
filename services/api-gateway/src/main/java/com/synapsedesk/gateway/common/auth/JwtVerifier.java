@@ -98,7 +98,8 @@ public class JwtVerifier {
       (List<String>) claims.getClaim("departmentIds"),
       (List<String>) claims.getClaim("permissionCodes"),
       Boolean.TRUE.equals(claims.getClaim("isEmailVerified")),
-      isChallenge(claims)
+      isChallenge(claims),
+      claims.getClaim("sid") instanceof String sid ? sid : null
     );
   }
 

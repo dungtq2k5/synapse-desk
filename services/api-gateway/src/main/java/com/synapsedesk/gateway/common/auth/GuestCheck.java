@@ -9,8 +9,9 @@ import org.springframework.web.server.ResponseStatusException;
  * Blocks `register`/`login`/`login/tenant`/`google` for a caller who already
  * holds a LIVE session.
  *
- * <p><b>Only the access token is checked</b>, and only its cryptographic
- * validity — presence alone is not enough, and neither is any other cookie.
+ * <p><b>Only the access token is checked</b>: that it verifies and its
+ * session isn't revoked — presence alone is not enough, and neither is any
+ * other cookie. A revoked session's device signs in again.
  * The refresh and device-token cookies are deliberately not consulted: this
  * is a UX guard, not a security control, so failing open on any doubt is
  * correct.
@@ -25,9 +26,9 @@ public class GuestCheck {
   }
 
   /**
-   * Passes through silently unless a CRYPTOGRAPHICALLY VALID access token is
-   * present — an absent, expired or tampered one lets the request continue so
-   * the route can overwrite the cookie with a fresh one.
+   * Passes through silently unless a live access token is present — an
+   * absent, expired, tampered or revoked one lets the request continue so the
+   * route can overwrite the cookie with a fresh one.
    */
   public void requireNoActiveSession(HttpServletRequest request) {
     boolean hasValidToken = currentUser

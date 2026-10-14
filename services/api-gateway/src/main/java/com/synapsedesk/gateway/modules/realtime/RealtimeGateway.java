@@ -6,6 +6,7 @@ import com.corundumstudio.socketio.SocketIONamespace;
 import com.corundumstudio.socketio.SocketIOServer;
 import com.synapsedesk.gateway.common.auth.JwtPrincipal;
 import com.synapsedesk.gateway.common.auth.JwtVerifier;
+import com.synapsedesk.gateway.common.auth.RevokedSessions;
 import com.synapsedesk.gateway.common.config.JwtProperties;
 import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import com.synapsedesk.gateway.common.dto.UserReferenceResponseDto;
@@ -86,6 +87,8 @@ public class RealtimeGateway implements RuntimeParticipant {
 
   private volatile boolean started;
 
+  private final RevokedSessions revokedSessions;
+
   public RealtimeGateway(
     SocketIOServer server,
     SocketIONamespace realtimeNamespace,
@@ -99,7 +102,8 @@ public class RealtimeGateway implements RuntimeParticipant {
     AiStreamService aiStreams,
     MessageServiceGrpc.MessageServiceBlockingStub messages,
     TicketViewers viewers,
-    TicketReferences references
+    TicketReferences references,
+    RevokedSessions revokedSessions
   ) {
     this.server = server;
     this.jwtVerifier = jwtVerifier;
@@ -113,6 +117,7 @@ public class RealtimeGateway implements RuntimeParticipant {
     this.messages = messages;
     this.viewers = viewers;
     this.references = references;
+    this.revokedSessions = revokedSessions;
 
     // On the `/ws` namespace specifically — `SocketIOServer.addConnectListener`
     // attaches to the DEFAULT namespace ("/"), which this gateway never
@@ -740,10 +745,14 @@ public class RealtimeGateway implements RuntimeParticipant {
       .findFirst()
       .orElseThrow(() -> new IllegalStateException("Access token missing"));
 
-    return jwtVerifier
+    JwtPrincipal principal = jwtVerifier
       .verifyAccess(token)
       .orElseThrow(() ->
         new IllegalStateException("Invalid or expired access token")
       );
+    if (revokedSessions.isRevoked(principal.sid())) {
+      throw new IllegalStateException("Session revoked");
+    }
+    return principal;
   }
 }
