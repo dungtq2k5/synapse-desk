@@ -153,6 +153,43 @@ describe('a live ticket', () => {
     }
   });
 
+  it('says "typing" once the room is joined, when the person typed before it was', () => {
+    const { socket, result } = setup({ ready: false });
+
+    // A keystroke while the socket is still connecting: nothing can be sent.
+    act(() => result.current.signalTyping(true));
+    expect(socket.sent(CLIENT_EVENTS.typingStart)).toEqual([]);
+
+    act(() => socket.receive(REALTIME_EVENTS.connectionReady));
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.ticketJoined,
+        frame({ ticketId: 'other' }),
+      ),
+    );
+    expect(socket.sent(CLIENT_EVENTS.typingStart)).toEqual([]);
+
+    act(() =>
+      socket.receive(REALTIME_EVENTS.ticketJoined, frame({ ticketId: 't1' })),
+    );
+    expect(socket.sent(CLIENT_EVENTS.typingStart)).toEqual([
+      { ticketId: 't1' },
+    ]);
+  });
+
+  it('says nothing on joining when the person has stopped typing', () => {
+    const { socket, result } = setup({ ready: false });
+
+    act(() => result.current.signalTyping(true));
+    act(() => result.current.signalTyping(false));
+    act(() => socket.receive(REALTIME_EVENTS.connectionReady));
+    act(() =>
+      socket.receive(REALTIME_EVENTS.ticketJoined, frame({ ticketId: 't1' })),
+    );
+
+    expect(socket.sent(CLIENT_EVENTS.typingStart)).toEqual([]);
+  });
+
   it('lists the agents viewing this ticket', () => {
     const { socket, result } = setup();
     const viewers = [{ id: 'ana', fullName: 'Ana Ruiz' }];

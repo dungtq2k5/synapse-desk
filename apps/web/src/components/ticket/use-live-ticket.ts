@@ -12,7 +12,7 @@ import {
   type TicketViewersPayload,
 } from '@synapsedesk/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useRealtime,
   useRealtimeEvent,
@@ -62,6 +62,8 @@ export function useLiveTicket(
   const [notices, setNotices] = useState<Notice[]>([]);
   const [typing, setTyping] = useState<Record<string, number>>({});
   const [viewers, setViewers] = useState<TicketViewer[]>([]);
+  // Whether the person is typing now, whether or not the signal could be sent.
+  const typingNow = useRef(false);
 
   const refetch = useCallback(
     (what: { messages?: boolean; ticket?: boolean }) => {
@@ -137,6 +139,18 @@ export function useLiveTicket(
         });
       },
       [ticketId],
+    ),
+  );
+  // A signal sent before the room was joined went nowhere: once it is, say
+  // "typing" again if the person still is, rather than at their next keystroke.
+  useRealtimeEvent(
+    REALTIME_EVENTS.ticketJoined,
+    useCallback(
+      (frame: Frame<{ ticketId: string }>) => {
+        if (frame.data?.ticketId !== ticketId || !typingNow.current) return;
+        socket?.emit(CLIENT_EVENTS.typingStart, { ticketId });
+      },
+      [socket, ticketId],
     ),
   );
   // Agents only: the gateway sends the list to the ticket's internal room.
@@ -348,6 +362,7 @@ export function useLiveTicket(
 
   const signalTyping = useCallback(
     (isTyping: boolean) => {
+      typingNow.current = isTyping;
       if (!socket || !ready) return;
       socket.emit(
         isTyping ? CLIENT_EVENTS.typingStart : CLIENT_EVENTS.typingStop,
