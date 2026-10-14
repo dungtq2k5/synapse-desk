@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { connect } from 'node:net';
 import { join } from 'node:path';
 import { REPO_ROOT } from '../system/services';
 
@@ -59,7 +58,7 @@ export async function startBrowserServer(): Promise<void> {
     ],
     { stdio: 'pipe' },
   );
-  await waitForPort(BROWSER_PORT, 60_000);
+  await waitForServer(BROWSER_PORT, 60_000);
 }
 
 export function stopBrowserServer(): void {
@@ -70,18 +69,23 @@ export function stopBrowserServer(): void {
   }
 }
 
-async function waitForPort(port: number, timeoutMs: number): Promise<void> {
+/**
+ * Waits for the server itself to answer, not just the port: Docker's proxy
+ * accepts a connection on the published port before the server inside is
+ * listening, and the first row's connection then hangs up. The server answers
+ * a plain HTTP request once it's ready.
+ */
+async function waitForServer(port: number, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const open = await new Promise<boolean>((resolve) => {
-      const socket = connect(port, '127.0.0.1', () => {
-        socket.end();
-        resolve(true);
-      });
-      socket.on('error', () => resolve(false));
-    });
-    if (open) return;
+    const ready = await fetch(`http://127.0.0.1:${port}/`, {
+      signal: AbortSignal.timeout(2_000),
+    }).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (ready) return;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`The Playwright browser server never listened on ${port}`);
+  throw new Error(`The Playwright browser server never answered on ${port}`);
 }
