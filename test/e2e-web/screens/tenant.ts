@@ -437,7 +437,7 @@ function storageBucket() {
 }
 
 /** A service's database, as its own `.env` names it. */
-function databaseUrl(service: string): string {
+export function databaseUrl(service: string): string {
   const env = readFileSync(join(REPO_ROOT, `services/${service}/.env`), 'utf8');
   const url = /^DATABASE_URL\s*=\s*(.*)$/m.exec(env)?.[1]?.trim();
   if (!url) throw new Error(`No DATABASE_URL in ${service}/.env`);
