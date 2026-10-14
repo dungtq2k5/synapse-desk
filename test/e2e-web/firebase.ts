@@ -5,13 +5,16 @@ import { REPO_ROOT } from '../system/services';
 
 /** Compose's Auth emulator (the `firebase` service). */
 export const AUTH_EMULATOR = 'http://localhost:9099';
+/** Its Storage emulator, in the same container. */
+const STORAGE_EMULATOR = 'http://localhost:9199';
 
 /** The emulator's project: its tokens name it as their audience. */
 const PROJECT = 'synapsedesk-test';
 
 /**
- * Points Google sign-in at the Auth emulator for the whole stack: the web's
- * Firebase config, and auth-service's emulator host and service-account key.
+ * Points Google sign-in at the Auth emulator for the whole stack (the web's
+ * Firebase config, and auth-service's emulator host and service-account key),
+ * and photo uploads at the Storage emulator.
  * The key is generated for the emulator's project, since a real project's key
  * refuses the emulator's tokens; it's the run's own, so a developer's real key
  * isn't touched. Only auth-service reads these two, and only the web the rest.
@@ -29,6 +32,10 @@ export function useAuthEmulator(): void {
     FIREBASE_AUTH_DOMAIN: 'localhost',
     FIREBASE_PROJECT_ID: PROJECT,
     FIREBASE_AUTH_EMULATOR_URL: AUTH_EMULATOR,
+    // Storage too: storage-service signs uploads for the emulator, and the
+    // web's page policy lets the browser reach it.
+    FIREBASE_STORAGE_EMULATOR_HOST: new URL(STORAGE_EMULATOR).host,
+    FIREBASE_STORAGE_EMULATOR_URL: STORAGE_EMULATOR,
   });
 }
 

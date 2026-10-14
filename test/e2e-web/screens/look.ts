@@ -98,6 +98,17 @@ async function normalize(page: Page): Promise<void> {
         element.textContent = '#0000';
       }
     }
+    // A read-only field shows an address too (the profile's email).
+    for (const input of document.querySelectorAll('input')) {
+      if (/@[\w.-]+\.example\.test$/.test(input.value)) {
+        input.value = 'person@northwind.example.test';
+        // Chrome can keep a glyph of the longer address painted; take the
+        // field out of the layout and back so it's drawn afresh.
+        input.style.display = 'none';
+        void input.offsetHeight;
+        input.style.display = '';
+      }
+    }
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,

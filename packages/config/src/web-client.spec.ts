@@ -206,13 +206,15 @@ describe('the web client', () => {
     const [example] = readRepoFiles('apps/web/.env.example');
     expect(example).toBeDefined();
 
-    // Firebase's four are public (the browser receives them per request) and
-    // read at request time, so no build carries one environment's values.
+    // Firebase's are public (the browser receives them per request, or its
+    // page policy names them) and read at request time, so no build carries
+    // one environment's values.
     expect(Object.keys(parseEnvFile(example.text)).sort()).toEqual([
       'FIREBASE_API_KEY',
       'FIREBASE_AUTH_DOMAIN',
       'FIREBASE_AUTH_EMULATOR_URL',
       'FIREBASE_PROJECT_ID',
+      'FIREBASE_STORAGE_EMULATOR_URL',
       'GATEWAY_URL',
     ]);
   });

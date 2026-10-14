@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { firebaseOrigins, firebaseWebConfig } from '@/lib/firebase-config';
+import {
+  firebaseOrigins,
+  firebaseWebConfig,
+  storageOrigin,
+} from '@/lib/firebase-config';
 
 /**
  * The Content-Security-Policy, with a fresh script nonce per request.
@@ -18,6 +22,7 @@ export function proxy(request: NextRequest) {
     nonce,
     process.env.NODE_ENV === 'development',
     firebaseOrigins(firebaseWebConfig()),
+    storageOrigin(),
   );
 
   const requestHeaders = new Headers(request.headers);
@@ -33,7 +38,7 @@ export function proxy(request: NextRequest) {
  * The policy for one nonce. Development adds what the dev server needs: eval
  * for React's refresh, and its own WebSocket for hot reload. `firebase` is
  * where Google sign-in talks to and the frame it opens (none when it isn't
- * configured).
+ * configured); `storage` is where a photo is uploaded to and read from.
  *
  * @example contentSecurityPolicy('abc', false) // "default-src 'self'; script-src 'self' 'nonce-abc' …"
  */
@@ -44,17 +49,20 @@ export function contentSecurityPolicy(
     connect: [],
     frame: [],
   },
+  storage?: string,
 ): string {
+  const media = storage ? [storage] : [];
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ''}`,
     // Component libraries position popovers with style attributes.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    ["img-src 'self' data: blob:", ...media].join(' '),
     "font-src 'self'",
     [
       "connect-src 'self'",
       ...firebase.connect,
+      ...media,
       ...(development ? ['ws:'] : []),
     ].join(' '),
     ["frame-src 'self'", ...firebase.frame].join(' '),

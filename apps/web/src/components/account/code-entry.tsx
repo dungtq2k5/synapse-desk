@@ -14,15 +14,20 @@ import { countdown, maskedLabel, wrongCode } from '@/lib/codes';
 import { minutesFrom } from '@/lib/sign-in';
 import type { CodeProblem, useCodeChallenge } from './use-code-challenge';
 
-/** "We sent a 6-digit code to m***a@northwind.health. It expires in 10 minutes." */
+/**
+ * "We sent a 6-digit code to m***a@northwind.health. It expires in 10
+ * minutes." The phone's says "a code", without the count.
+ */
 export function SentTo({
   challenge,
+  digits = true,
 }: {
   challenge: NonNullable<ReturnType<typeof useCodeChallenge>['challenge']>;
+  digits?: boolean;
 }) {
   return (
     <>
-      We sent a {challenge.codeLength}-digit code to{' '}
+      We sent a {digits ? `${challenge.codeLength}-digit ` : ''}code to{' '}
       <span aria-label={maskedLabel(challenge.target)}>{challenge.target}</span>
       . It expires in {challenge.expiresInMinutes} minutes.
     </>

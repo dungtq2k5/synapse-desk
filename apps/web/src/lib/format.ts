@@ -130,3 +130,39 @@ export function andList(items: string[]): string {
     ? (items[0] ?? '')
     : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }
+
+/**
+ * An ISO calendar date as the date-of-birth field shows it.
+ *
+ * @example usDate('1990-03-14') // '03/14/1990'
+ */
+export function usDate(iso: string): string {
+  const [year, month, day] = iso.split('-');
+  return `${month}/${day}/${year}`;
+}
+
+/**
+ * A typed MM/DD/YYYY date as the ISO calendar date the API takes, or null when
+ * it isn't a real date in the past.
+ *
+ * @example isoDate('03/14/1990') // '1990-03-14'
+ * @example isoDate('02/30/1990') // null
+ */
+export function isoDate(
+  typed: string,
+  today: Date = new Date(),
+): string | null {
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(typed.trim());
+  if (!match) return null;
+  const [month, day, year] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date > today
+  ) {
+    return null;
+  }
+  return date.toISOString().slice(0, 10);
+}

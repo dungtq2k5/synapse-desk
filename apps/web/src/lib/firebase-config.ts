@@ -57,3 +57,18 @@ export function firebaseOrigins(config: FirebaseWebConfig | null): {
     frame: [`https://${config.authDomain}`],
   };
 }
+
+/**
+ * Where the browser uploads a photo and reads it back from: Firebase Storage
+ * (Google's storage host), or the Storage emulator when
+ * `FIREBASE_STORAGE_EMULATOR_URL` is set (development and tests).
+ *
+ * @example storageOrigin({}) // 'https://storage.googleapis.com'
+ * @example storageOrigin({ FIREBASE_STORAGE_EMULATOR_URL: 'http://localhost:9199' }) // 'http://localhost:9199'
+ */
+export function storageOrigin(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const emulator = env.FIREBASE_STORAGE_EMULATOR_URL;
+  return emulator ? new URL(emulator).origin : 'https://storage.googleapis.com';
+}

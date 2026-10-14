@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 import {
   request as newRequest,
   type APIRequestContext,
@@ -313,6 +315,81 @@ export async function setEmailVerified(
   } finally {
     await prisma.$disconnect();
   }
+}
+
+/**
+ * Gives this person a verified phone number, in auth-service's database, as
+ * verifying a texted code does. (Texting one needs a provider.)
+ */
+export async function setPhone(
+  person: Person,
+  phoneNumber: string,
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    await prisma.user.update({
+      where: { id: person.id },
+      data: { phoneNumber, isPhoneVerified: true },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * Gives this person a profile photo: a signed upload URL from the gateway, the
+ * bytes written where it points, then the confirm. Written with the Admin SDK,
+ * not PUT to the URL: the Storage emulator doesn't implement V4 signed uploads
+ * (it answers 501; storage-service pins that), though it serves signed reads.
+ */
+export async function givePhoto(person: Person): Promise<void> {
+  const file = readFileSync(join(REPO_ROOT, 'test/fixtures/images/avatar.png'));
+  const session = await sessionAs(person);
+  try {
+    const signed = await api<{ uploadUrl: string; objectPath: string }>(
+      session,
+      'POST',
+      '/users/me/avatar/upload-url',
+      { contentType: 'image/png', sizeBytes: file.length, fileName: 'me.png' },
+    );
+    await storageBucket()
+      .file(signed.objectPath)
+      .save(file, { contentType: 'image/png' });
+    await api(session, 'POST', '/users/me/avatar/confirm', {
+      objectPath: signed.objectPath,
+    });
+  } finally {
+    await session.dispose();
+  }
+}
+
+/** storage-service's bucket, in the Storage emulator, as its `.env` names it. */
+function storageBucket() {
+  const env = readFileSync(
+    join(REPO_ROOT, 'services/storage-service/.env'),
+    'utf8',
+  );
+  const value = (key: string) =>
+    new RegExp(`^${key}\\s*=\\s*(.*)$`, 'm').exec(env)?.[1]?.trim() ?? '';
+  process.env.FIREBASE_STORAGE_EMULATOR_HOST ??= 'localhost:9199';
+  const app =
+    getApps().find(({ name }) => name === 'screens') ??
+    initializeApp(
+      {
+        credential: cert(
+          join(
+            REPO_ROOT,
+            'services/storage-service',
+            value('FIREBASE_STORAGE_SERVICE_ACCOUNT_PATH'),
+          ),
+        ),
+        storageBucket: value('FIREBASE_STORAGE_BUCKET'),
+      },
+      'screens',
+    );
+  return getStorage(app).bucket();
 }
 
 /** A service's database, as its own `.env` names it. */

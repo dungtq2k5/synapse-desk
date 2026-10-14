@@ -2,7 +2,13 @@
 
 import { authControllerLogoutV1 } from '@synapsedesk/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronsUpDownIcon, LogOutIcon } from 'lucide-react';
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  ShieldCheckIcon,
+  UserIcon,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
 import {
@@ -44,7 +50,11 @@ export function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <SidebarMenuButton size="lg" aria-label="Account">
-          <UserAvatar name={user?.fullName ?? null} className="size-8" />
+          <UserAvatar
+            name={user?.fullName ?? null}
+            src={user?.avatarUrl}
+            className="size-8"
+          />
           <span className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{user?.fullName}</span>
             <span className="truncate text-xs text-muted-foreground">
@@ -59,6 +69,19 @@ export function UserMenu() {
           <span className="font-medium">{user?.fullName}</span>
           <span className="text-xs text-muted-foreground">{user?.email}</span>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/profile">
+            <UserIcon />
+            Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/security">
+            <ShieldCheckIcon />
+            Security
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           Theme

@@ -137,6 +137,10 @@ const EXCLUDED = new Map([
     'production uses real Firebase Storage; setting this points the SDK at an emulator that is not there',
   ],
   [
+    'FIREBASE_STORAGE_EMULATOR_URL',
+    "production stores photos in Firebase Storage; setting this points the browser's uploads at an emulator that is not there",
+  ],
+  [
     'FIREBASE_AUTH_EMULATOR_URL',
     'production signs in with real Google; setting this sends the browser to an emulator that is not there',
   ],

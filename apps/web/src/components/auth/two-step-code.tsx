@@ -46,7 +46,7 @@ export function CodeSlots({
   describedBy?: string;
   length?: number;
   disabled?: boolean;
-  /** Each digit its own box, as design 03 draws an emailed or texted code. */
+  /** Each digit its own box, as an emailed or texted code is shown. */
   spaced?: boolean;
 }) {
   const half = Math.ceil(length / 2);

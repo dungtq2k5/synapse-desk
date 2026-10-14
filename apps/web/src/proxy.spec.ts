@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { firebaseOrigins } from './lib/firebase-config';
+import { firebaseOrigins, storageOrigin } from './lib/firebase-config';
 import { contentSecurityPolicy } from './proxy';
 
 describe('the Content-Security-Policy', () => {
@@ -71,6 +71,20 @@ describe('the Content-Security-Policy', () => {
 
     // Not configured: nothing beyond this origin.
     expect(directives(firebaseOrigins(null))['frame-src']).toEqual(["'self'"]);
+  });
+
+  it('lets a photo be uploaded to storage and shown from it', () => {
+    const directives = Object.fromEntries(
+      contentSecurityPolicy('abc', false, undefined, 'http://localhost:9199')
+        .split('; ')
+        .map((directive) => {
+          const [name, ...values] = directive.split(' ');
+          return [name, values];
+        }),
+    );
+    expect(directives['connect-src']).toContain('http://localhost:9199');
+    expect(directives['img-src']).toContain('http://localhost:9199');
+    expect(storageOrigin({})).toBe('https://storage.googleapis.com');
   });
 
   it("adds eval and the dev server's socket in development only", () => {
