@@ -220,6 +220,19 @@ test.describe('an answer from the AI, live', () => {
   });
 });
 
+/** Settles when the page's socket is told it joined a ticket's room. */
+function joined(page: Page): Promise<void> {
+  return new Promise((resolve) => {
+    page.on('websocket', (socket) =>
+      socket.on('framereceived', ({ payload }) => {
+        if (String(payload).includes(`"${REALTIME_EVENTS.ticketJoined}"`)) {
+          resolve();
+        }
+      }),
+    );
+  });
+}
+
 test.describe('the thread, live', () => {
   test('who else is viewing, and who is typing', async ({ page, browser }) => {
     const { maya, jordan, priya, tickets } = await tenant('presence');
@@ -229,7 +242,11 @@ test.describe('the thread, live', () => {
       [jordan, priya].map(async (person) => {
         const context = await browser.newContext();
         const other = await context.newPage();
+        const inRoom = joined(other);
         await open(other, person, tickets.desk);
+        // A keystroke before the socket is in the room isn't sent, and the
+        // next one within 2 s isn't either.
+        await inRoom;
         return { context, page: other };
       }),
     );
