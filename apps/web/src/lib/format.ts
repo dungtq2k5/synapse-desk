@@ -104,3 +104,29 @@ export function initials(fullName: string): string {
 export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
+
+/**
+ * A date as the account screens write one.
+ *
+ * @example calendarDate('2026-10-20T12:00:00Z') // 'Oct 20, 2026'
+ */
+export function calendarDate(at: string | Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone,
+  }).format(new Date(at));
+}
+
+/**
+ * Items joined in a sentence.
+ *
+ * @example andList(['Agent', 'Knowledge manager']) // 'Agent and Knowledge manager'
+ * @example andList(['A', 'B', 'C']) // 'A, B and C'
+ */
+export function andList(items: string[]): string {
+  return items.length <= 1
+    ? (items[0] ?? '')
+    : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}

@@ -280,3 +280,84 @@ test.describe('verify your email', () => {
     await look(page, 'verify-email-verified');
   });
 });
+
+test.describe('accept an invitation', () => {
+  const VALID = {
+    valid: true,
+    organizationName: 'Northwind Health',
+    inviterName: 'Jordan Lee',
+    email: 'priya@northwind.health',
+    roleNames: ['Agent', 'Knowledge manager'],
+    expiresAt: '2026-10-20T12:00:00Z',
+  };
+  const PREVIEW = '/users/invitations/token/tok-1';
+
+  async function open(page: Page) {
+    await reply(page, PREVIEW, 200, VALID);
+    await page.goto('/invitations/accept?token=tok-1');
+    await expect(
+      page.getByRole('heading', { name: 'Join Northwind Health' }),
+    ).toBeVisible();
+  }
+
+  async function fill(page: Page, name: string, password: string) {
+    await page.getByLabel('Full name').fill(name);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+  }
+
+  test('checking the link', async ({ page }) => {
+    await hold(page, PREVIEW);
+    await page.goto('/invitations/accept?token=tok-1');
+    await expect(page.getByText('This takes a moment.')).toBeVisible();
+    await look(page, 'invitation-checking');
+  });
+
+  test('valid: who invited you, to what, as what', async ({ page }) => {
+    await open(page);
+    await fill(page, 'Priya Shah', 'northwind12');
+    await look(page, 'invitation');
+  });
+
+  test('its focus order', async ({ page }) => {
+    await open(page);
+    await page.getByLabel('Email').focus();
+    await tabsThrough(page, [
+      /^Full name$/,
+      /^Password$/,
+      /^Show password$/,
+      /^Join Northwind Health$/,
+    ]);
+  });
+
+  test('field errors', async ({ page }) => {
+    await open(page);
+    await fill(page, 'P', 'northwind12');
+    await page.getByRole('button', { name: 'Join Northwind Health' }).click();
+    await expect(
+      page.getByText('Your password needs an uppercase letter and a symbol.'),
+    ).toBeVisible();
+    await look(page, 'invitation-invalid');
+  });
+
+  test('joining', async ({ page }) => {
+    await hold(page, '/users/invitations/accept');
+    await open(page);
+    await fill(page, 'Priya Shah', 'Northwind-26');
+    await page.getByRole('button', { name: 'Join Northwind Health' }).click();
+    await expect(page.getByRole('button', { name: 'Joining…' })).toBeDisabled();
+    await look(page, 'invitation-joining');
+  });
+
+  test('can’t be used: one state for used, expired, revoked and unknown', async ({
+    page,
+  }) => {
+    await reply(page, PREVIEW, 200, { ...VALID, valid: false });
+    await page.goto('/invitations/accept?token=tok-1');
+    await expect(
+      page.getByRole('heading', {
+        name: 'This invitation can’t be used anymore',
+      }),
+    ).toBeVisible();
+    await look(page, 'invitation-cant-be-used');
+  });
+});

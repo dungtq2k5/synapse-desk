@@ -7,6 +7,7 @@ import { keepTwoStepWarning } from '@/lib/two-step-warning';
 import { afterSignIn, type SignInStep } from '@/lib/sign-in';
 import { ChooseOrganization } from './choose-organization';
 import { CredentialsForm } from './credentials-form';
+import { InvitationAccept } from './invitation-accept';
 import { SignUpForm } from './sign-up-form';
 import { TwoStepCode } from './two-step-code';
 import { TwoStepSetup } from './two-step-setup';
@@ -36,13 +37,18 @@ export function SignInFlow({
   notice,
   firebase = null,
   start = 'sign-in',
+  invitationToken = '',
 }: {
   next: string;
   notice: SignInNotice;
   /** Google sign-in's config, or null when it isn't set up. */
   firebase?: FirebaseWebConfig | null;
-  /** The first screen: sign in, or sign up (whose Google answer goes on through these legs). */
-  start?: 'sign-in' | 'sign-up';
+  /**
+   * The first screen: sign in, sign up (whose Google answer goes on through
+   * these legs), or accept an invitation (joining signs in).
+   */
+  start?: 'sign-in' | 'sign-up' | 'invitation';
+  invitationToken?: string;
 }) {
   const [step, setStep] = useState<Step>({ kind: 'credentials' });
   const [email, setEmail] = useState('');
@@ -63,6 +69,9 @@ export function SignInFlow({
     case 'credentials':
       if (start === 'sign-up') {
         return <SignUpForm firebase={firebase} onAnswer={advance} />;
+      }
+      if (start === 'invitation') {
+        return <InvitationAccept token={invitationToken} onAnswer={advance} />;
       }
       return (
         <CredentialsForm

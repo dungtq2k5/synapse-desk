@@ -35,6 +35,7 @@ it.each([
   // The sign-up attempt email's two links.
   WEB_ROUTES.login,
   WEB_ROUTES.forgotPassword,
+  WEB_ROUTES.acceptInvitation,
 ])('serves %s, where an email links', (route) => {
   const page = join(__dirname, '../app/(auth)', route, 'page.tsx');
   expect(existsSync(page)).toBe(true);
