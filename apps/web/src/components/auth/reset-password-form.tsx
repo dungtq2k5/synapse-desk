@@ -5,7 +5,7 @@ import {
   authControllerResetPasswordV1,
   useAuthControllerValidatePasswordResetTokenV1,
 } from '@synapsedesk/api-client';
-import { CircleAlertIcon, CircleCheckIcon, CircleXIcon } from 'lucide-react';
+import { CircleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -16,6 +16,7 @@ import { announce } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { AuthCard } from './auth-card';
 import { Field } from './field';
+import { PasswordChecklist } from './password-checklist';
 import { PasswordInput } from './password-input';
 import { RetryAlert } from './retry-alert';
 
@@ -160,30 +161,7 @@ function NewPasswordForm({
         <Field
           id="new-password"
           label="New password"
-          description={
-            <ul className="flex flex-col gap-1">
-              {PASSWORD_RULES.map((rule) => {
-                const ok = rule.test(password);
-                return (
-                  <li
-                    key={rule.label}
-                    aria-label={`${rule.label}, ${ok ? 'met' : 'not met'}`}
-                    className="flex items-center gap-2"
-                  >
-                    {ok ? (
-                      <CircleCheckIcon
-                        aria-hidden
-                        className="size-4 text-success"
-                      />
-                    ) : (
-                      <CircleXIcon aria-hidden className="size-4" />
-                    )}
-                    {rule.label}
-                  </li>
-                );
-              })}
-            </ul>
-          }
+          description={<PasswordChecklist value={password} />}
         >
           {(aria) => (
             <PasswordInput

@@ -22,7 +22,11 @@ import { AuthCard } from './auth-card';
 import { Field } from './field';
 import { RetryAlert } from './retry-alert';
 
-/** Six slots, 3 + 3, for a code from an authenticator app. */
+/**
+ * The slots for a numeric code, split in two halves (6 is 3 + 3): an
+ * authenticator app's code, or a code sent by email or text, whose length the
+ * server says. `disabled` once the code can't be used any more.
+ */
 export function CodeSlots({
   value,
   onChange,
@@ -30,6 +34,9 @@ export function CodeSlots({
   invalid,
   inputRef,
   describedBy,
+  length = 6,
+  disabled,
+  spaced = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -37,11 +44,29 @@ export function CodeSlots({
   invalid?: boolean;
   inputRef?: React.Ref<HTMLInputElement>;
   describedBy?: string;
+  length?: number;
+  disabled?: boolean;
+  /** Each digit its own box, as design 03 draws an emailed or texted code. */
+  spaced?: boolean;
 }) {
+  const half = Math.ceil(length / 2);
+  const slots = (from: number, to: number) =>
+    Array.from({ length: to - from }, (_, offset) => (
+      <InputOTPSlot
+        key={from + offset}
+        index={from + offset}
+        aria-invalid={invalid || undefined}
+        className={
+          spaced
+            ? 'h-12 w-11 rounded-md border text-xl font-medium first:rounded-md last:rounded-md'
+            : undefined
+        }
+      />
+    ));
   return (
     <InputOTP
       ref={inputRef}
-      maxLength={6}
+      maxLength={length}
       inputMode="numeric"
       pattern="^[0-9]*$"
       autoComplete="one-time-code"
@@ -53,20 +78,17 @@ export function CodeSlots({
       value={value}
       onChange={onChange}
       onComplete={onComplete}
+      disabled={disabled}
       aria-label="Verification code"
       aria-invalid={invalid || undefined}
       aria-describedby={describedBy}
     >
-      <InputOTPGroup>
-        <InputOTPSlot index={0} aria-invalid={invalid || undefined} />
-        <InputOTPSlot index={1} aria-invalid={invalid || undefined} />
-        <InputOTPSlot index={2} aria-invalid={invalid || undefined} />
+      <InputOTPGroup className={spaced ? 'gap-2' : undefined}>
+        {slots(0, half)}
       </InputOTPGroup>
       <InputOTPSeparator />
-      <InputOTPGroup>
-        <InputOTPSlot index={3} aria-invalid={invalid || undefined} />
-        <InputOTPSlot index={4} aria-invalid={invalid || undefined} />
-        <InputOTPSlot index={5} aria-invalid={invalid || undefined} />
+      <InputOTPGroup className={spaced ? 'gap-2' : undefined}>
+        {slots(half, length)}
       </InputOTPGroup>
     </InputOTP>
   );

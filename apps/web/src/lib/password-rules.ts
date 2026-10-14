@@ -43,3 +43,24 @@ export const PASSWORD_RULES: PasswordRule[] = [
     test: (p) => count(p, (c) => SYMBOLS.has(c)) >= PASSWORD_POLICY.minSymbols,
   },
 ];
+
+/**
+ * What a password still needs, as a sentence, or null when it meets every
+ * rule: the error under a password field.
+ *
+ * @example passwordNeeds('Abcdefgh') // 'Your password needs a number and a symbol.'
+ */
+export function passwordNeeds(
+  password: string,
+  rules: PasswordRule[] = PASSWORD_RULES,
+): string | null {
+  const unmet = rules
+    .filter((rule) => !rule.test(password))
+    .map((rule) => rule.label.charAt(0).toLowerCase() + rule.label.slice(1));
+  if (unmet.length === 0) return null;
+  const list =
+    unmet.length === 1
+      ? unmet[0]
+      : `${unmet.slice(0, -1).join(', ')} and ${unmet.at(-1)}`;
+  return `Your password needs ${list}.`;
+}

@@ -1,3 +1,4 @@
+import { CircleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Label } from '@/components/ui/label';
 
@@ -59,8 +60,9 @@ export function Field({
         <p
           id={`${id}-error`}
           role={announce ? 'alert' : undefined}
-          className="text-sm text-destructive"
+          className="flex items-start gap-1.5 text-sm text-destructive"
         >
+          <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
       )}

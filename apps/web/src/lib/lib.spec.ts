@@ -30,13 +30,13 @@ describe('safeNext', () => {
   });
 });
 
-it('serves the reset page where the reset email links', () => {
-  const page = join(
-    __dirname,
-    '../app/(auth)',
-    WEB_ROUTES.resetPassword,
-    'page.tsx',
-  );
+it.each([
+  WEB_ROUTES.resetPassword,
+  // The sign-up attempt email's two links.
+  WEB_ROUTES.login,
+  WEB_ROUTES.forgotPassword,
+])('serves %s, where an email links', (route) => {
+  const page = join(__dirname, '../app/(auth)', route, 'page.tsx');
   expect(existsSync(page)).toBe(true);
 });
 

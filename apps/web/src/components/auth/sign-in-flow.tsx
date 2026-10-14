@@ -4,9 +4,10 @@ import type { TenantOptionResponseDto } from '@synapsedesk/api-client';
 import { useState } from 'react';
 import type { FirebaseWebConfig } from '@/lib/firebase-config';
 import { keepTwoStepWarning } from '@/lib/two-step-warning';
-import type { SignInStep } from '@/lib/sign-in';
+import { afterSignIn, type SignInStep } from '@/lib/sign-in';
 import { ChooseOrganization } from './choose-organization';
 import { CredentialsForm } from './credentials-form';
+import { SignUpForm } from './sign-up-form';
 import { TwoStepCode } from './two-step-code';
 import { TwoStepSetup } from './two-step-setup';
 
@@ -34,21 +35,24 @@ export function SignInFlow({
   next,
   notice,
   firebase = null,
+  start = 'sign-in',
 }: {
   next: string;
   notice: SignInNotice;
   /** Google sign-in's config, or null when it isn't set up. */
   firebase?: FirebaseWebConfig | null;
+  /** The first screen: sign in, or sign up (whose Google answer goes on through these legs). */
+  start?: 'sign-in' | 'sign-up';
 }) {
   const [step, setStep] = useState<Step>({ kind: 'credentials' });
   const [email, setEmail] = useState('');
 
-  const finish = (warning?: string | null) => {
+  const finish = async (warning?: string | null) => {
     if (warning) keepTwoStepWarning(warning);
-    globalThis.location.assign(next);
+    globalThis.location.assign(await afterSignIn(next));
   };
   const advance = (answer: SignInStep) => {
-    if (answer.kind === 'signed-in') finish();
+    if (answer.kind === 'signed-in') void finish();
     else if (answer.kind === 'code')
       setStep({ kind: 'code', justEnrolled: false });
     else setStep(answer);
@@ -57,6 +61,9 @@ export function SignInFlow({
 
   switch (step.kind) {
     case 'credentials':
+      if (start === 'sign-up') {
+        return <SignUpForm firebase={firebase} onAnswer={advance} />;
+      }
       return (
         <CredentialsForm
           notice={notice}
@@ -79,7 +86,7 @@ export function SignInFlow({
       return (
         <TwoStepCode
           justEnrolled={step.justEnrolled}
-          onSignedIn={finish}
+          onSignedIn={(warning) => void finish(warning)}
           onBack={back}
         />
       );
@@ -87,7 +94,9 @@ export function SignInFlow({
       return (
         <TwoStepSetup
           onEnrolled={(signedIn) =>
-            signedIn ? finish() : setStep({ kind: 'code', justEnrolled: true })
+            signedIn
+              ? void finish()
+              : setStep({ kind: 'code', justEnrolled: true })
           }
           onBack={back}
         />

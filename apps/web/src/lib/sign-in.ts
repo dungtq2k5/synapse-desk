@@ -1,8 +1,9 @@
-import type {
-  LoginResponseDto,
-  TenantOptionResponseDto,
-  TenantSelectionResponseDto,
-  TwoFactorRequiredResponseDto,
+import {
+  otpControllerGetOtpStatusV1,
+  type LoginResponseDto,
+  type TenantOptionResponseDto,
+  type TenantSelectionResponseDto,
+  type TwoFactorRequiredResponseDto,
 } from '@synapsedesk/api-client';
 
 /** Where a signed-in user lands when no `next` says otherwise. */
@@ -18,6 +19,25 @@ export const HOME = '/tickets';
  */
 export function safeNext(next: string | null | undefined): string {
   if (!next?.startsWith('/') || /^\/[/\\]/.test(next)) return HOME;
+  return next;
+}
+
+/**
+ * Where a person goes once signed in: "Verify your email" first while the code
+ * sent at sign-up is still out, then `next`; otherwise `next`. The app works
+ * unverified (the banner asks), so a failed check goes straight on.
+ */
+export async function afterSignIn(next: string): Promise<string> {
+  try {
+    const answer = await otpControllerGetOtpStatusV1({
+      purpose: 'EMAIL_VERIFICATION',
+    });
+    if (answer.data?.pending) {
+      return `/verify-email?next=${encodeURIComponent(next)}`;
+    }
+  } catch {
+    // Unverified is allowed; the banner says so.
+  }
   return next;
 }
 

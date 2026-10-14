@@ -6,6 +6,7 @@ import {
   type APIRequestContext,
   type Page,
 } from '@playwright/test';
+import { PrismaClient as AuthPrisma } from '../../../services/auth-service/src/generated/prisma/client';
 import { PrismaClient as TicketPrisma } from '../../../services/ticket-service/src/generated/prisma/client';
 import { REPO_ROOT } from '../../system/services';
 import { WEB_URL } from '../ingress';
@@ -128,6 +129,9 @@ async function build(slug: string): Promise<Tenant> {
   const maya = await me(mayaSession);
   const priya = await me(priyaSession);
   const jordan = await me(jordanSession);
+  // Verified, as a team at work would be: a code can't be read back from the
+  // database, and the verify-email banner is drawn by the row that needs it.
+  await setEmailVerified([maya, priya, jordan], true);
 
   const { items: roles } = await api<{ items: { id: string; name: string }[] }>(
     mayaSession,
@@ -290,14 +294,39 @@ async function ai(ticketId: string, attachTo: string): Promise<void> {
   }
 }
 
-function ticketPrisma(): TicketPrisma {
-  const env = readFileSync(
-    join(REPO_ROOT, 'services/ticket-service/.env'),
-    'utf8',
-  );
+/**
+ * Marks these people's emails verified or not, in auth-service's database, as
+ * verifying the emailed code does.
+ */
+export async function setEmailVerified(
+  people: Person[],
+  verified: boolean,
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    await prisma.user.updateMany({
+      where: { id: { in: people.map(({ id }) => id) } },
+      data: { isEmailVerified: verified },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/** A service's database, as its own `.env` names it. */
+function databaseUrl(service: string): string {
+  const env = readFileSync(join(REPO_ROOT, `services/${service}/.env`), 'utf8');
   const url = /^DATABASE_URL\s*=\s*(.*)$/m.exec(env)?.[1]?.trim();
-  if (!url) throw new Error('No DATABASE_URL in ticket-service/.env');
-  return new TicketPrisma({ adapter: new PrismaPg({ connectionString: url }) });
+  if (!url) throw new Error(`No DATABASE_URL in ${service}/.env`);
+  return url;
+}
+
+function ticketPrisma(): TicketPrisma {
+  return new TicketPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('ticket-service') }),
+  });
 }
 
 async function register(email: string, fullName: string) {
