@@ -256,6 +256,10 @@ test.describe('phone number', () => {
         ? answer(route, 202, SENT)
         : answer(route, 429, 'Too many requests', 480),
     );
+    // The minute skipped below is past socket.io's ping timeout too, and a
+    // dropped connection says so in a toast. This row needs no live updates,
+    // so the socket never connects, and has nothing to drop.
+    await page.route('**/socket.io/**', (route) => route.abort());
     await page.clock.install({ time: NOW });
     const { maya } = await tenant('profile');
     await openProfile(page, maya);
@@ -267,8 +271,10 @@ test.describe('phone number', () => {
     await expect(
       dialog(page).getByText('Too many code requests'),
     ).toBeVisible();
-    // The countdown frozen where it is: timers run, the time doesn't.
-    await page.clock.setFixedTime(new Date(NOW.getTime() + 62_000));
+    // The countdown frozen where it is: timers run, the time doesn't. At the
+    // page's own time, which the clicks above moved on by a varying amount.
+    await page.clock.setFixedTime(await page.evaluate(() => Date.now()));
+    await expect(dialog(page).getByText('Resend code in 8:00')).toBeVisible();
     await look(page, 'phone-too-many-requests');
   });
 
