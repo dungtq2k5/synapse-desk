@@ -39,6 +39,11 @@ message PresignUploadResponse {
   string upload_url = 1;
   string object_path = 2;
   google.protobuf.Timestamp expires_at = 3;
+  // How to send the bytes to upload_url: "PUT" (a V4 signed URL, production)
+  // or "POST" (the Storage emulator's upload endpoint, which doesn't
+  // implement signed URLs). Empty from a storage-service that predates it,
+  // which means "PUT".
+  string upload_method = 4;
 }
 
 message ConfirmUploadRequest { string object_path = 1; }

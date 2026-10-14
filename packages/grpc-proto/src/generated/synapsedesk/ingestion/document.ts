@@ -168,7 +168,11 @@ export interface PresignDocumentRequest {
 export interface PresignDocumentResponse {
   uploadUrl: string;
   objectPath: string;
-  expiresAt: Timestamp | undefined;
+  expiresAt:
+    | Timestamp
+    | undefined;
+  /** storage-service's PresignUploadResponse.upload_method, relayed. */
+  uploadMethod: string;
 }
 
 export interface ConfirmDocumentRequest {

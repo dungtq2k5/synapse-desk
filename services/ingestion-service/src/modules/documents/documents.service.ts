@@ -250,6 +250,7 @@ export class DocumentsService {
 
     return {
       uploadUrl: presigned.uploadUrl,
+      uploadMethod: presigned.uploadMethod,
       objectPath: presigned.objectPath,
       expiresAt: toProtoTimestamp(presigned.expiresAt),
     };

@@ -941,6 +941,7 @@ describe('Ticket messages & attachments (e2e)', () => {
         .spyOn(storage, 'presignAttachment')
         .mockResolvedValue({
           uploadUrl: 'https://storage.example/put',
+          uploadMethod: 'PUT',
           // Presign hands back a `pending/` path.
           objectPath: 'organizations/o/tickets/t/attachments/pending/m/abc.png',
           expiresAt: new Date(Date.now() + 600_000),

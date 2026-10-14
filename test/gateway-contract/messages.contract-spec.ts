@@ -212,6 +212,7 @@ describe('messages', () => {
     async () => {
       peers.ticket.on('MessageService/UploadAttachment').reply({
         uploadUrl: 'https://storage.test/upload',
+        uploadMethod: 'PUT',
         objectPath: 'pending/xyz',
         expiresAt: { seconds: 1_756_685_400, nanos: 0 },
       });
@@ -230,6 +231,7 @@ describe('messages', () => {
       expect(response.body).toMatchObject({
         data: {
           uploadUrl: 'https://storage.test/upload',
+          uploadMethod: 'PUT',
           objectPath: 'pending/xyz',
         },
       });
@@ -244,6 +246,7 @@ describe('messages', () => {
       const id = '55555555-1111-4111-8111-555555555555';
       peers.ticket.on('MessageService/UploadAttachment').reply({
         uploadUrl: 'https://storage.test/upload2',
+        uploadMethod: 'PUT',
         objectPath: 'pending/abc',
         expiresAt: { seconds: 1_756_685_400, nanos: 0 },
       });

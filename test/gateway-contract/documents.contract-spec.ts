@@ -146,6 +146,7 @@ describe('documents', () => {
     async () => {
       peers.ingestion.on('DocumentService/PresignDocument').reply({
         uploadUrl: 'https://storage.test/upload',
+        uploadMethod: 'PUT',
         objectPath: 'pending/documents/abc123',
         expiresAt: { seconds: 1_756_684_800, nanos: 0 },
       });
@@ -164,6 +165,39 @@ describe('documents', () => {
       expect(response.body).toMatchObject({
         data: { objectPath: 'pending/documents/abc123' },
       });
+    },
+  );
+
+  /**
+   * How to send the bytes rides along: `POST` against the Storage emulator,
+   * `PUT` to a signed URL, and an empty value (a storage-service from before
+   * the field) is `PUT`, as it always was.
+   */
+  rowFor('Documents')(
+    '**presign relays `uploadMethod`, and an empty one is `PUT`**',
+    async () => {
+      const presign = async (uploadMethod: string) => {
+        peers.ingestion.on('DocumentService/PresignDocument').reply({
+          uploadUrl: 'https://storage.test/upload',
+          uploadMethod,
+          objectPath: 'pending/documents/abc123',
+          expiresAt: { seconds: 1_756_684_800, nanos: 0 },
+        });
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/documents/presign`,
+          {
+            contentType: 'application/pdf',
+            sizeBytes: 1024,
+            fileName: 'refund.pdf',
+          },
+          cookie(['document.create']),
+        );
+        return (response.body as { data: { uploadMethod: string } }).data
+          .uploadMethod;
+      };
+
+      expect(await presign('POST')).toBe('POST');
+      expect(await presign('')).toBe('PUT');
     },
   );
 

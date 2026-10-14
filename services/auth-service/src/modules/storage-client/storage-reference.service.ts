@@ -22,6 +22,8 @@ import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
 
 export type PresignedUpload = {
   uploadUrl: string;
+  /** `PUT` or `POST`: storage-service's `upload_method`. */
+  uploadMethod: string;
   objectPath: string;
   expiresAt: Date;
 };
@@ -73,6 +75,7 @@ export class StorageReferenceService implements OnModuleInit {
 
     return {
       uploadUrl: response.uploadUrl,
+      uploadMethod: response.uploadMethod,
       objectPath: response.objectPath,
       expiresAt: new Date((response.expiresAt?.seconds ?? 0) * 1000),
     };

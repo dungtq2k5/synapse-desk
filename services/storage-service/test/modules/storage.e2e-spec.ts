@@ -21,6 +21,7 @@ import {
   memberContext,
   startSourceServer,
   type SourceServer,
+  uploadTo,
 } from '../utils';
 import { RemoteSourceFetcher } from '../../src/modules/storage/remote-source.fetcher';
 import { SIGNATURE_SAMPLE_BYTES } from '../../src/common/content-signature';
@@ -31,8 +32,9 @@ import { PendingUploadStore } from '../../src/modules/storage/pending-upload.sto
  * Presign, Confirm and batched read URLs.
  *
  * **The emulator does not honour signed URLs** (it answers 501 — pinned in
- * `bootstrap.e2e-spec.ts`), so the byte upload in these tests goes through the
- * Admin SDK rather than through the returned `uploadUrl`. That is a real gap
+ * `bootstrap.e2e-spec.ts`), so against it presign returns the emulator's own
+ * upload endpoint (presign row 1c sends bytes through it). Most rows still
+ * write the bytes through the Admin SDK rather than the returned `uploadUrl`. That is a real gap
  * against the presign test, and it is worth being precise about what it costs: the
  * SIGNATURE is unproven end-to-end, but everything the signature protects is
  * not. The path construction, the tenant boundary, the PendingUpload lifecycle
@@ -102,7 +104,11 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
     it('1. returns a URL, a scoped path and an expiry, and records the pending upload', async () => {
       const result = await storage.presignUpload(avatarRequest(), caller());
 
-      expect(result.uploadUrl).toContain('X-Goog-Signature=');
+      // The emulator's upload endpoint: these tests run against it.
+      expect(result.uploadUrl).toContain(
+        '/upload/storage/v1/b/synapsedesk-test.appspot.com/o?uploadType=media&name=',
+      );
+      expect(result.uploadMethod).toBe('POST');
       expect(result.objectPath).toMatch(
         new RegExp(`^organizations/${organizationId}/avatars/${userId}/`),
       );
@@ -111,6 +117,37 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       const pending = await pendingStore.get(result.objectPath);
       expect(pending?.organizationId).toBe(organizationId);
       expect(pending?.actorId).toBe(userId);
+    });
+
+    it('1b. against a real bucket: a V4 signed URL, sent with PUT', async () => {
+      jest.spyOn(fx.firebase, 'emulatorOrigin').mockReturnValueOnce(null);
+
+      const result = await storage.presignUpload(avatarRequest(), caller());
+
+      expect(result.uploadUrl).toContain('X-Goog-Signature=');
+      expect(result.uploadMethod).toBe('PUT');
+    });
+
+    it('1c. the bytes go through the returned URL and method, then confirm finds them', async () => {
+      // The flow a browser runs, end to end against the emulator. The emulator
+      // answers 501 to a signed URL (`bootstrap.e2e-spec.ts` row 7), so its
+      // presign returns its own upload endpoint, and this row is what proves
+      // that path works.
+      const presigned = await storage.presignUpload(avatarRequest(), caller());
+
+      expect(
+        await uploadTo(
+          presigned.uploadUrl,
+          new Uint8Array(bytesFor('image/png')),
+          'image/png',
+          presigned.uploadMethod,
+        ),
+      ).toBe(200);
+      const confirmed = await storage.confirmUpload(
+        { objectPath: presigned.objectPath },
+        caller(),
+      );
+      expect(confirmed.sizeBytes).toBe(bytesFor('image/png').length);
     });
 
     it('2. gives the pending record a TTL matching the URL', async () => {
