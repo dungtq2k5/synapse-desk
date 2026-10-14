@@ -1,5 +1,6 @@
 import {
   otpControllerGetOtpStatusV1,
+  usersControllerGetCurrentUserV1,
   type LoginResponseDto,
   type TenantOptionResponseDto,
   type TenantSelectionResponseDto,
@@ -24,15 +25,20 @@ export function safeNext(next: string | null | undefined): string {
 
 /**
  * Where a person goes once signed in: "Verify your email" first while the code
- * sent at sign-up is still out, then `next`; otherwise `next`. The app works
- * unverified (the banner asks), so a failed check goes straight on.
+ * sent at sign-up is still out and the address unverified, then `next`;
+ * otherwise `next`. (An address can be verified with a code still out: Google
+ * sign-in verifies it too.) The app works unverified (the banner asks), so a
+ * failed check goes straight on.
  */
 export async function afterSignIn(next: string): Promise<string> {
   try {
     const answer = await otpControllerGetOtpStatusV1({
       purpose: 'EMAIL_VERIFICATION',
     });
-    if (answer.data?.pending) {
+    if (
+      answer.data?.pending &&
+      !(await usersControllerGetCurrentUserV1()).data?.user.isEmailVerified
+    ) {
       return `/verify-email?next=${encodeURIComponent(next)}`;
     }
   } catch {

@@ -13,7 +13,14 @@ import {
   relativeTime,
 } from './format';
 import { PASSWORD_RULES } from './password-rules';
-import { deviceName, minutesFrom, safeNext, signInStep } from './sign-in';
+import { ok, stubApi } from '@/test/api';
+import {
+  afterSignIn,
+  deviceName,
+  minutesFrom,
+  safeNext,
+  signInStep,
+} from './sign-in';
 
 describe('safeNext', () => {
   it.each([
@@ -39,6 +46,33 @@ it.each([
 ])('serves %s, where an email links', (route) => {
   const page = join(__dirname, '../app/(auth)', route, 'page.tsx');
   expect(existsSync(page)).toBe(true);
+});
+
+describe('afterSignIn', () => {
+  const status = (pending: boolean) =>
+    ok({ pending, target: null, expiresAt: null, attemptsRemaining: 5 });
+  const me = (isEmailVerified: boolean) =>
+    ok({ user: { isEmailVerified }, permissionCodes: [], hasPassword: true });
+
+  it.each([
+    [true, false, '/verify-email?next=%2Ftickets%2F42'],
+    [true, true, '/tickets/42'],
+    [false, false, '/tickets/42'],
+  ])(
+    'a code pending: %s, the address verified: %s, goes to %s',
+    async (pending, verified, where) => {
+      stubApi({
+        'GET /api/v1/auth/otp/status': status(pending),
+        'GET /api/v1/users/me': me(verified),
+      });
+      await expect(afterSignIn('/tickets/42')).resolves.toBe(where);
+    },
+  );
+
+  it('goes straight on when the check fails', async () => {
+    stubApi({});
+    await expect(afterSignIn('/tickets/42')).resolves.toBe('/tickets/42');
+  });
 });
 
 describe('signInStep', () => {
