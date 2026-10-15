@@ -34,12 +34,33 @@ export class TicketAccessService {
    * theirs: "you may not see this" confirms the ticket exists, which turns id
    * enumeration into a tenant-membership oracle.
    */
-  async load(ticketId: string, context: CallerContext): Promise<Ticket> {
+  load(ticketId: string, context: CallerContext): Promise<Ticket> {
+    return this.find(ticketId, context, false);
+  }
+
+  /**
+   * `load` for a read, which also finds a soft-deleted ticket when the caller
+   * may restore it (`ticket.delete`): they open it from "Show deleted" to
+   * decide. Writes keep `load`, so a deleted ticket takes no reply or change
+   * until it's restored.
+   */
+  loadForReading(ticketId: string, context: CallerContext): Promise<Ticket> {
+    const mayRestore =
+      context.isSuperAdmin || context.permissionCodes.includes('ticket.delete');
+    return this.find(ticketId, context, mayRestore);
+  }
+
+  private async find(
+    ticketId: string,
+    context: CallerContext,
+    withDeleted: boolean,
+  ): Promise<Ticket> {
     const ticket = await this.prisma.ticket.findFirst({
       where: {
         id: ticketId,
         ...tenantScope(context),
         ...this.visibilityScope(context),
+        ...(withDeleted ? { deletedAt: undefined } : {}),
       },
     });
     if (!ticket) {

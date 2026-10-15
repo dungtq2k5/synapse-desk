@@ -602,6 +602,28 @@ describe('Assignment & reassignment (e2e)', () => {
       expect(items.at(-1)!.isCurrent).toBe(true);
     });
 
+    it("**a deleted ticket's assignments read only for whoever can restore it**", async () => {
+      const { ticket } = await createAssignedTicket(fx.prisma, tenant);
+      await fx.prisma.ticket.update({
+        where: { id: ticket.id },
+        data: { deletedAt: new Date(), deletedById: tenant.agentId },
+      });
+      const restorer = memberContext(
+        { id: tenant.agentId, organizationId: tenant.organizationId },
+        ['ticket.read.all', 'ticket.delete'],
+      );
+
+      await expectRpc(
+        assignments.listAssignments({ ticketId: ticket.id }, supervisor()),
+        status.NOT_FOUND,
+      );
+      const { items } = await assignments.listAssignments(
+        { ticketId: ticket.id },
+        restorer,
+      );
+      expect(items).toHaveLength(1);
+    });
+
     it('3. marks ZERO entries current after an unassign', async () => {
       const { ticket } = await createAssignedTicket(fx.prisma, tenant);
       await assignments.unassignTicket({ ticketId: ticket.id }, supervisor());
