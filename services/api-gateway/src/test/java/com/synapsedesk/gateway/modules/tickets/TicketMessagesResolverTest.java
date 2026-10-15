@@ -66,6 +66,7 @@ class TicketMessagesResolverTest {
       null,
       null,
       null,
+      null,
       null
     );
   }

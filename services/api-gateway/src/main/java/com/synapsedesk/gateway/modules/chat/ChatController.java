@@ -514,6 +514,11 @@ public class ChatController {
           : null
       )
       .createdAt(toOffsetDateTime(message.getCreatedAt()))
+      .editableUntil(
+        message.hasEditableUntil()
+          ? toOffsetDateTime(message.getEditableUntil())
+          : null
+      )
       .attachments(
         message
           .getAttachmentsList()

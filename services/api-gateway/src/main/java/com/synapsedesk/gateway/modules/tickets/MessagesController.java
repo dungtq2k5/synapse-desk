@@ -476,6 +476,10 @@ public class MessagesController {
             .map(MessagesController::toCitationResponseDto)
             .toList()
         : null
+    ).editableUntil(
+      message.hasEditableUntil()
+        ? toOffsetDateTime(message.getEditableUntil())
+        : null
     );
   }
 

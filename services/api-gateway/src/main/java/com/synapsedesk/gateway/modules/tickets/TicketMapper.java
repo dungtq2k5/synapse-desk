@@ -83,6 +83,9 @@ public final class TicketMapper {
         ? toOffsetDateTime(message.getRedactedAt())
         : null,
       toOffsetDateTime(message.getCreatedAt()),
+      message.hasEditableUntil()
+        ? toOffsetDateTime(message.getEditableUntil())
+        : null,
       toAnswerStatus(message.getAnswerStatus()),
       message.hasCitations()
         ? message

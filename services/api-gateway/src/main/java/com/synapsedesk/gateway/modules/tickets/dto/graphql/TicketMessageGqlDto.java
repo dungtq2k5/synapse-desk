@@ -21,6 +21,8 @@ public record TicketMessageGqlDto(
   OffsetDateTime editedAt,
   OffsetDateTime redactedAt,
   OffsetDateTime createdAt,
+  /** When the caller may still edit it; null when they can't. */
+  OffsetDateTime editableUntil,
   String answerStatus,
   List<CitationGqlDto> citations
 ) {}

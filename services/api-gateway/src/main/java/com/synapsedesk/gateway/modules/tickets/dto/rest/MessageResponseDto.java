@@ -50,6 +50,9 @@ public class MessageResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime createdAt;
 
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime editableUntil = null;
+
   private List<@Valid AttachmentResponseDto> attachments = new ArrayList<>();
 
   private Boolean excludedFromAiContext;
@@ -398,6 +401,26 @@ public class MessageResponseDto {
     this.createdAt = createdAt;
   }
 
+  public MessageResponseDto editableUntil(OffsetDateTime editableUntil) {
+    this.editableUntil = editableUntil;
+    return this;
+  }
+
+  /**
+   * Get editableUntil
+   * @return editableUntil
+   */
+  @Valid
+  @JsonProperty("editableUntil")
+  public OffsetDateTime getEditableUntil() {
+    return editableUntil;
+  }
+
+  @JsonProperty("editableUntil")
+  public void setEditableUntil(OffsetDateTime editableUntil) {
+    this.editableUntil = editableUntil;
+  }
+
   public MessageResponseDto attachments(
     List<@Valid AttachmentResponseDto> attachments
   ) {
@@ -530,6 +553,7 @@ public class MessageResponseDto {
       Objects.equals(this.editedAt, messageResponseDto.editedAt) &&
       Objects.equals(this.redactedAt, messageResponseDto.redactedAt) &&
       Objects.equals(this.createdAt, messageResponseDto.createdAt) &&
+      Objects.equals(this.editableUntil, messageResponseDto.editableUntil) &&
       Objects.equals(this.attachments, messageResponseDto.attachments) &&
       Objects.equals(
         this.excludedFromAiContext,
@@ -555,6 +579,7 @@ public class MessageResponseDto {
       editedAt,
       redactedAt,
       createdAt,
+      editableUntil,
       attachments,
       excludedFromAiContext,
       answerStatus,
@@ -588,6 +613,9 @@ public class MessageResponseDto {
     sb.append("    editedAt: ").append(toIndentedString(editedAt)).append("\n");
     sb.append("    redactedAt: ")
       .append(toIndentedString(redactedAt))
+      .append("\n");
+    sb.append("    editableUntil: ")
+      .append(toIndentedString(editableUntil))
       .append("\n");
     sb.append("    createdAt: ")
       .append(toIndentedString(createdAt))

@@ -1460,6 +1460,9 @@
     },
     "PresignDocumentResponseDto.uploadMethod": {
       "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator."
+    },
+    "MessageResponseDto.editableUntil": {
+      "description": "When the caller may still edit this message, or `null` when they can't:\nthe sender until the edit window closes; a moderator editing an internal\nnote has no window, which reads as `9999-12-31T23:59:59.999Z`. Offer Edit\nwhile it's ahead."
     }
   }
 }
