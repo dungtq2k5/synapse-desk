@@ -146,7 +146,7 @@ _Audit actions:_ `USER_LOGIN`, `USER_LOGIN_FAILED`, `USER_LOGOUT_ALL`, `REFRESH_
 
 ### 1.3 Device Sessions — `/auth/sessions`
 
-**auth-service records each revocation** (`revoked-session:{family}` in Redis, for one access-token lifetime) for a gateway to enforce, and every access token carries `sid`, its session family. **This gateway doesn't check it:** a revoked device keeps working until its access token expires, up to 15 minutes. The Java gateway refuses it at once.
+**auth-service records each revocation** (`revoked-session:{family}` in Redis, for one access-token lifetime, in `REDIS_URL`'s database, never `REDIS_DB`'s) for a gateway to enforce, and every access token carries `sid`, its session family. **This gateway doesn't check it:** a revoked device keeps working until its access token expires, up to 15 minutes. The Java gateway refuses it at once.
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
