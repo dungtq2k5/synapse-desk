@@ -40,12 +40,13 @@ test.describe('the thread', () => {
     await expect(page.getByText('This message was removed.')).toBeVisible();
 
     await page.getByRole('radio', { name: 'Reply' }).focus();
-    await page.keyboard.press('Tab');
-    await expect(page.locator(':focus')).toHaveAccessibleName(
+    await tabsThrough(page, [
+      /^Preview$/,
+      /^Draft with AI$/,
       /^Reply to Priya$/,
-    );
+    ]);
     await page.keyboard.type('On it.');
-    await tabsThrough(page, [/^Send reply$/]);
+    await tabsThrough(page, [/^Attach files$/, /^Send reply$/]);
   });
 
   test('as the assignee, writing an internal note', async ({ page }) => {

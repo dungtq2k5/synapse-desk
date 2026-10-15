@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,8 +23,11 @@ import { VerifyEmailBanner } from './verify-email-banner';
  */
 export function AppHeader({
   crumbs,
+  actions,
 }: {
   crumbs: { label: string; href?: string }[];
+  /** At the bar's end: a page's own buttons. */
+  actions?: ReactNode;
 }) {
   const { isMobile } = useSidebar();
 
@@ -54,6 +57,7 @@ export function AppHeader({
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+        {actions && <div className="ml-auto flex items-center">{actions}</div>}
       </header>
       {isMobile && <VerifyEmailBanner />}
     </>

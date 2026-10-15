@@ -45,6 +45,10 @@ function completeStandalone(): void {
 export default async function globalSetup(): Promise<() => Promise<void>> {
   // Before the services start: auth-service reads its half as it boots.
   useAuthEmulator();
+  // A one-minute edit window (15 in development): a journey watches Edit go
+  // away without waiting a quarter of an hour, and a screen row's own fresh
+  // message is still well inside it. The services inherit this environment.
+  process.env.MESSAGE_EDIT_WINDOW_MINUTES = '1';
   await systemSetup();
 
   completeStandalone();

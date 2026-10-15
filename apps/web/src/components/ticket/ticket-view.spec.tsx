@@ -314,14 +314,30 @@ describe('the ticket page', () => {
           messageOf({ isInternalNote: true, content: 'Check with Finance.' }),
           messageOf({ senderId: 'gone', sender: null, redactedAt: AT }),
         ],
+        routes: {
+          'GET /api/v1/attachments/a1/download': ok({
+            downloadUrl: 'https://files.test/signed/receipt.pdf',
+            expiresAt: AT,
+          }),
+        },
       });
       await loaded();
       const log = await screen.findByRole('log', { name: 'Conversation' });
 
       expect(within(log).getByText('Any news?')).toBeInTheDocument();
-      expect(
-        within(log).getByRole('link', { name: /receipt\.pdf/ }),
-      ).toHaveAttribute('href', 'https://files.test/receipt.pdf');
+      // A file opens through a fresh download link, never its stored path.
+      const tab = { opener: {}, location: { href: '' }, close: jest.fn() };
+      const open = jest
+        .spyOn(window, 'open')
+        .mockReturnValue(tab as unknown as Window);
+      await userEvent.click(
+        within(log).getByRole('button', { name: /^receipt\.pdf/ }),
+      );
+      await waitFor(() =>
+        expect(tab.location.href).toBe('https://files.test/signed/receipt.pdf'),
+      );
+      expect(tab.opener).toBeNull();
+      open.mockRestore();
       expect(within(log).getByText('Edited')).toBeInTheDocument();
       expect(
         within(log).getByText('INTERNAL NOTE · Only agents can see this'),
@@ -627,7 +643,7 @@ describe('the ticket page', () => {
         }),
       });
       await loaded();
-      const details = screen.getByRole('region', { name: 'Details' });
+      const details = screen.getByRole('tabpanel', { name: 'Details' });
 
       expect(within(details).getByText('Unknown user')).toBeInTheDocument();
       expect(

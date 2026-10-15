@@ -22,4 +22,46 @@ const config: Config = {
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };
 
-export default createJestConfig(config);
+/**
+ * The Markdown renderer and its unified/micromark dependencies ship as ES
+ * modules only, so they are compiled like the source, as Next compiles its
+ * own client code.
+ */
+const ESM_ONLY = [
+  'react-markdown',
+  'unified',
+  'bail',
+  'ccount',
+  'devlop',
+  'trough',
+  'zwitch',
+  'vfile.*',
+  'unist-.*',
+  'mdast-.*',
+  'hast-.*',
+  'micromark.*',
+  'remark-.*',
+  'character-.*',
+  'is-(alphabetical|alphanumerical|decimal|hexadecimal|plain-obj)',
+  '.*-separated-tokens',
+  'decode-named-character-reference',
+  'estree-util-.*',
+  'html-url-attributes',
+  'longest-streak',
+  'parse-entities',
+  'property-information',
+  'stringify-entities',
+  'trim-lines',
+  '@ungap/structured-clone',
+].join('|');
+
+export default async function jestConfig(): Promise<Config> {
+  const resolved = await createJestConfig(config)();
+  // Next's first pattern names the packages it compiles; these join them.
+  const [nextPattern, ...rest] = resolved.transformIgnorePatterns ?? [];
+  const compiled = nextPattern?.replace('(?!(geist|', `(?!(geist|${ESM_ONLY}|`);
+  if (!compiled || compiled === nextPattern) {
+    throw new Error(`Next's transformIgnorePatterns changed: ${nextPattern}`);
+  }
+  return { ...resolved, transformIgnorePatterns: [compiled, ...rest] };
+}

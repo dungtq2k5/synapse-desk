@@ -1,14 +1,17 @@
 'use client';
 
 import {
+  aiControllerGenerateDraftV1,
   ApiError,
+  messagesControllerPresignNewAttachmentV1,
   ticketsControllerEscalateV1,
+  type UploadAttachmentDtoMimeType,
   useMessagesControllerListV1,
   useTicketsControllerGetV1,
   useTicketsControllerListStatusChangesV1,
   type TicketResponseDto,
 } from '@synapsedesk/api-client';
-import { ChevronDownIcon, LoaderCircleIcon, UsersIcon } from 'lucide-react';
+import { LoaderCircleIcon, UsersIcon } from 'lucide-react';
 import Link from 'next/link';
 import {
   useCallback,
@@ -19,16 +22,9 @@ import {
   useState,
 } from 'react';
 import { AppHeader } from '@/components/shell/app-header';
-import { UserAvatar } from '@/components/shell/user-avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useViewer } from '@/hooks/use-viewer';
-import { absoluteTime } from '@/lib/format';
 import { buildThread, lastNonAnswerId, type Entry } from '@/lib/thread';
 import {
   BEFORE_ESCALATION,
@@ -37,27 +33,36 @@ import {
   THREAD_PAGE,
 } from '@/lib/tickets';
 import { announce, toastError } from '@/lib/toast';
-import {
-  PriorityBadge,
-  SourceLabel,
-  StatusBadge,
-} from '@/components/tickets/badges';
+import { PriorityBadge, StatusBadge } from '@/components/tickets/badges';
 import { ActionBar, DeletedNotice } from './action-bar';
+import { AssignDialog, type Suggestion } from './assign-dialog';
 import { Composer } from './composer';
 import {
-  AiMessage,
   LiveAnswerEntry,
   NoticeEntry,
   PendingEntry,
   PersonEntry,
   type Perspective,
 } from './entries';
+import { SidePanel, SidePanelSheet } from './side-panel';
+import { useTicketCache } from './use-directory';
 import { useLiveTicket } from './use-live-ticket';
+import { ThreadAiMessage, ThreadMessage } from './message-tools';
 
 /** One ticket: its header, the live thread with the composer, and its details. */
 export function TicketView({ ticketId }: { ticketId: string }) {
   const ticket = useTicketsControllerGetV1(ticketId);
   const data = ticket.data?.data;
+  const { can } = useViewer();
+  const refresh = useTicketCache(ticketId);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  // The AI's "Assign to {department}", where the agent may assign.
+  const onAssignTo =
+    data &&
+    !data.deletedAt &&
+    can(data.currentAssigneeId ? 'ticket.reassign' : 'ticket.assign')
+      ? (suggested: Suggestion) => setSuggestion(suggested)
+      : undefined;
 
   if (ticket.isError) {
     const gone =
@@ -73,15 +78,37 @@ export function TicketView({ ticketId }: { ticketId: string }) {
           { label: 'Tickets', href: '/tickets' },
           { label: data ? `#${data.ticketNumber}` : '…' },
         ]}
+        actions={
+          data && (
+            <div className="lg:hidden">
+              <SidePanelSheet ticket={data} onAssignTo={onAssignTo} />
+            </div>
+          )
+        }
       />
       <main id="main" tabIndex={-1} className="outline-none">
-        {data ? <Loaded ticket={data} /> : <Loading />}
+        {data ? <Loaded ticket={data} onAssignTo={onAssignTo} /> : <Loading />}
       </main>
+      {data && (
+        <AssignDialog
+          ticket={data}
+          open={suggestion !== null}
+          onOpenChange={(open) => !open && setSuggestion(null)}
+          onAssigned={refresh}
+          suggestion={suggestion ?? undefined}
+        />
+      )}
     </>
   );
 }
 
-function Loaded({ ticket }: { ticket: TicketResponseDto }) {
+function Loaded({
+  ticket,
+  onAssignTo,
+}: {
+  ticket: TicketResponseDto;
+  onAssignTo?: (suggestion: Suggestion) => void;
+}) {
   const { user, isAgent, can } = useViewer();
   const viewerId = user?.id ?? null;
   const requester = viewerId !== null && ticket.authorId === viewerId;
@@ -141,11 +168,14 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
   const focusEscalation = useRef(false);
   const askAPerson = async () => {
     setAsking(true);
+    // Before the call: the room's update can bring the notice before the
+    // call itself answers, and the notice takes focus as it appears.
+    focusEscalation.current = true;
     try {
       await ticketsControllerEscalateV1(ticket.id, {});
-      focusEscalation.current = true;
       live.refetch({ ticket: true });
     } catch {
+      focusEscalation.current = false;
       toastError('Couldn’t reach the support team', 'Try again in a moment.', {
         label: 'Try again',
         onClick: () => void askAPerson(),
@@ -222,19 +252,6 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
           isAgent && <ActionBar ticket={ticket} />
         )}
 
-        <Collapsible className="rounded-lg border lg:hidden">
-          <CollapsibleTrigger className="group flex w-full items-center justify-between px-4 py-3 text-sm font-medium">
-            Details
-            <ChevronDownIcon
-              aria-hidden
-              className="size-4 transition-transform group-data-[state=open]:rotate-180"
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="px-4 pb-4">
-            <Details ticket={ticket} agent={isAgent} />
-          </CollapsibleContent>
-        </Collapsible>
-
         <Thread
           entries={entries}
           loading={messages.isPending}
@@ -254,33 +271,19 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
                 );
               case 'message': {
                 const message = entry.message;
-                if (message.isAiGenerated) {
-                  return (
-                    <AiMessage
-                      message={message}
-                      perspective={perspective}
-                      askAPerson={offerFor === entry.id ? askButton : undefined}
-                    />
-                  );
-                }
-                return (
-                  <PersonEntry
+                return message.isAiGenerated ? (
+                  <ThreadAiMessage
+                    ticket={ticket}
+                    message={message}
+                    perspective={perspective}
+                    askAPerson={offerFor === entry.id ? askButton : undefined}
+                  />
+                ) : (
+                  <ThreadMessage
+                    ticket={ticket}
+                    message={message}
                     mine={entry.mine}
-                    name={message.sender?.fullName ?? null}
-                    unknown={Boolean(message.senderId) && !message.sender}
-                    role={
-                      message.senderId === ticket.authorId
-                        ? 'Requester'
-                        : 'Support agent'
-                    }
-                    at={message.createdAt}
-                    editedAt={message.editedAt}
-                    note={message.isInternalNote}
-                    removed={Boolean(message.redactedAt)}
-                    attachments={message.attachments}
-                  >
-                    {message.content}
-                  </PersonEntry>
+                  />
                 );
               }
               case 'pending':
@@ -335,20 +338,32 @@ function Loaded({ ticket }: { ticket: TicketResponseDto }) {
             requesterName={ticket.author?.fullName ?? null}
             onSend={live.send}
             onTyping={live.signalTyping}
+            generateDraft={
+              isAgent && can('ticket.ai.use')
+                ? async (instruction, signal) =>
+                    (
+                      await aiControllerGenerateDraftV1(
+                        ticket.id,
+                        { instruction },
+                        { signal },
+                      )
+                    ).data
+                : undefined
+            }
+            presign={async (file) =>
+              (
+                await messagesControllerPresignNewAttachmentV1(ticket.id, {
+                  ...file,
+                  mimeType: file.mimeType as UploadAttachmentDtoMimeType,
+                })
+              ).data
+            }
           />
         )}
       </div>
 
       <aside className="hidden lg:block">
-        <section
-          aria-labelledby="details-heading"
-          className="flex flex-col gap-4 rounded-lg border p-4"
-        >
-          <h2 id="details-heading" className="font-semibold">
-            Details
-          </h2>
-          <Details ticket={ticket} agent={isAgent} />
-        </section>
+        <SidePanel ticket={ticket} onAssignTo={onAssignTo} />
       </aside>
     </div>
   );
@@ -447,64 +462,6 @@ function useChangeAnnouncements(ticket: TicketResponseDto) {
       announce(`Assigned to ${ticket.assignee.fullName}`);
     }
   }, [ticket]);
-}
-
-function Details({
-  ticket,
-  agent,
-}: {
-  ticket: TicketResponseDto;
-  agent: boolean;
-}) {
-  const when = (at: string | null) =>
-    at ? <time dateTime={at}>{absoluteTime(at)}</time> : '—';
-  const rows: [string, React.ReactNode][] = [
-    ['Status', <StatusBadge key="s" status={ticket.status} />],
-    ['Priority', <PriorityBadge key="p" priority={ticket.priority} />],
-    [
-      'Assignee',
-      !ticket.currentAssigneeId ? (
-        <span className="text-muted-foreground">Unassigned</span>
-      ) : (
-        <span className="inline-flex items-center gap-2">
-          <UserAvatar name={ticket.assignee?.fullName ?? null} />
-          {ticket.assignee?.fullName ?? (
-            <span className="text-muted-foreground">Unknown user</span>
-          )}
-        </span>
-      ),
-    ],
-    [
-      'Department',
-      !ticket.currentDepartmentId
-        ? '—'
-        : (ticket.department?.name ?? (
-            <span className="text-muted-foreground">Unknown department</span>
-          )),
-    ],
-    ...(agent
-      ? [
-          ['Source', <SourceLabel key="src" source={ticket.source} />] as [
-            string,
-            React.ReactNode,
-          ],
-        ]
-      : []),
-    ['Created', when(ticket.createdAt)],
-    ['Updated', when(ticket.updatedAt)],
-    ['Escalated', when(ticket.escalatedAt)],
-    ['Resolved', when(ticket.resolvedAt)],
-  ];
-  return (
-    <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-3 text-sm">
-      {rows.map(([term, value]) => (
-        <div key={term} className="contents">
-          <dt className="text-muted-foreground">{term}</dt>
-          <dd>{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 
 function Loading() {

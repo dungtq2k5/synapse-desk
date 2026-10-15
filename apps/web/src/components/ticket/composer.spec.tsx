@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import { ApiError } from '@synapsedesk/api-client';
 import userEvent from '@testing-library/user-event';
 import { Composer } from './composer';
 
@@ -25,7 +26,10 @@ describe('the composer', () => {
     expect(screen.getByText('Priya will see this reply.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Send reply' }));
-    expect(onSend).toHaveBeenCalledWith('Thanks, Priya.', false);
+    expect(onSend).toHaveBeenCalledWith('Thanks, Priya.', false, {
+      attachments: [],
+      generatedFromId: null,
+    });
     expect(onTyping).toHaveBeenLastCalledWith(false);
   });
 
@@ -38,7 +42,10 @@ describe('the composer', () => {
     expect(screen.getByText('Priya won’t see this note.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add internal note' }));
-    expect(onSend).toHaveBeenCalledWith('Check with Finance first.', true);
+    expect(onSend).toHaveBeenCalledWith('Check with Finance first.', true, {
+      attachments: [],
+      generatedFromId: null,
+    });
     expect(onTyping).not.toHaveBeenCalled();
   });
 
@@ -80,6 +87,134 @@ describe('the composer', () => {
     expect(screen.queryByRole('radio', { name: 'Internal note' })).toBeNull();
     await user.type(screen.getByRole('textbox'), 'Any update?');
     await user.click(screen.getByRole('button', { name: 'Send' }));
-    expect(onSend).toHaveBeenCalledWith('Any update?', false);
+    expect(onSend).toHaveBeenCalledWith('Any update?', false, {
+      attachments: [],
+      generatedFromId: null,
+    });
+  });
+  describe('Draft with AI', () => {
+    const DRAFT = {
+      content: 'Hi Priya, you can claim up to **€450**.',
+      modelName: 'demo',
+      promptTokens: 1,
+      completionTokens: 1,
+      generationId: 'gen-1',
+      citations: [
+        {
+          chunkId: 'c1',
+          documentId: 'd1',
+          documentTitle: 'Remote Work Policy.pdf',
+          pageNumber: 4,
+        },
+      ],
+    };
+    const draftSetup = (
+      generateDraft: (
+        instruction: string | null,
+        signal: AbortSignal,
+      ) => Promise<typeof DRAFT>,
+    ) => {
+      const onSend = jest.fn();
+      render(
+        <Composer
+          agent
+          requesterName="Priya Shah"
+          onSend={onSend}
+          onTyping={jest.fn()}
+          generateDraft={generateDraft}
+        />,
+      );
+      return { onSend, user: userEvent.setup() };
+    };
+
+    it('**never sends by itself**: the draft lands in the box, then the agent sends it', async () => {
+      const generate = jest.fn().mockResolvedValue(DRAFT);
+      const { onSend, user } = draftSetup(generate);
+
+      await user.click(screen.getByRole('button', { name: 'Draft with AI' }));
+      await user.type(
+        screen.getByRole('textbox', { name: 'Instruction (optional)' }),
+        'make it shorter',
+      );
+      await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+
+      expect(
+        await screen.findByRole('textbox', { name: 'Reply to Priya' }),
+      ).toHaveValue(DRAFT.content);
+      expect(generate).toHaveBeenCalledWith(
+        'make it shorter',
+        expect.any(AbortSignal),
+      );
+      expect(screen.getByText('AI draft')).toBeInTheDocument();
+      expect(
+        screen.getByText('[1] Remote Work Policy.pdf · p. 4'),
+      ).toBeInTheDocument();
+      expect(onSend).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: 'Send reply' }));
+      expect(onSend).toHaveBeenCalledWith(DRAFT.content, false, {
+        attachments: [],
+        generatedFromId: 'gen-1',
+      });
+      expect(screen.queryByText('AI draft')).not.toBeInTheDocument();
+    });
+
+    it('Cancel leaves the box as it was', async () => {
+      let signal: AbortSignal | undefined;
+      const { onSend, user } = draftSetup(
+        (_instruction, given) =>
+          new Promise((_resolve, reject) => {
+            signal = given;
+            given.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      );
+
+      await user.type(screen.getByRole('textbox'), 'My own words');
+      await user.click(screen.getByRole('button', { name: 'Draft with AI' }));
+      await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+      expect(
+        screen.getByText('Writing a draft… This takes a few seconds.'),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(signal?.aborted).toBe(true);
+      expect(
+        screen.getByRole('textbox', { name: 'Reply to Priya' }),
+      ).toHaveValue('My own words');
+      expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it('a 402 says the plan has no AI right now', async () => {
+      const { user } = draftSetup(() =>
+        Promise.reject(new ApiError(402, { message: 'Payment required' })),
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Draft with AI' }));
+      await act(() =>
+        user.click(screen.getByRole('button', { name: 'Generate draft' })),
+      );
+
+      expect(
+        await screen.findByText('AI isn’t available on your plan right now'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Write your reply as usual.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('Preview shows the Markdown, and Send still works', async () => {
+    const { onSend, user } = setup(true);
+
+    await user.type(screen.getByRole('textbox'), 'Claim **€450**');
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(screen.getByText('€450').tagName).toBe('STRONG');
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Send reply' }));
+    expect(onSend).toHaveBeenCalledWith('Claim **€450**', false, {
+      attachments: [],
+      generatedFromId: null,
+    });
   });
 });

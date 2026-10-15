@@ -43,9 +43,10 @@ test.describe('the ticket list, as an agent', () => {
     await expect(
       page.getByRole('link', { name: /Allowance for a standing desk/ }),
     ).toBeVisible();
-    await page.getByRole('searchbox', { name: 'Search tickets' }).focus();
+    await page.getByRole('combobox', { name: 'Search tickets' }).focus();
     await tabsThrough(page, [
       /^Assigned to me$/,
+      /^Show deleted$/,
       /^Status/,
       /^Priority/,
       /^Source/,
@@ -82,7 +83,7 @@ test.describe('the ticket list, as an agent', () => {
   });
 
   test('no results for a search', async ({ page }) => {
-    await page.getByRole('searchbox', { name: 'Search tickets' }).fill('zzzz');
+    await page.getByRole('combobox', { name: 'Search tickets' }).fill('zzzz');
     await expect(
       page.getByRole('heading', { name: 'No tickets match' }),
     ).toBeVisible();

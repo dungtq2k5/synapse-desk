@@ -5,6 +5,7 @@ import type {
   CitationResponseDto,
   MessageResponseDto,
 } from '@synapsedesk/api-client';
+import { attachmentsControllerDownloadV1 } from '@synapsedesk/api-client';
 import {
   BotIcon,
   CircleAlertIcon,
@@ -15,10 +16,12 @@ import {
   RotateCwIcon,
   SearchXIcon,
   SquareIcon,
+  Trash2Icon,
   UsersIcon,
   ZapOffIcon,
 } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
+import { Markdown } from '@/components/markdown';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 import { absoluteTime, clockTime, fileSize } from '@/lib/format';
 import type { LiveAnswer, Notice, PendingSend } from '@/lib/thread';
+import { toastError } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 /** Who is reading: decides each footer's wording and the "Ask a person" offer. */
@@ -80,6 +84,10 @@ export function PersonEntry({
   note,
   removed,
   attachments,
+  markdown,
+  actions,
+  editor,
+  onDeleteAttachment,
   children,
 }: {
   mine: boolean;
@@ -92,7 +100,15 @@ export function PersonEntry({
   note?: boolean;
   removed?: boolean;
   attachments?: AttachmentResponseDto[];
-  children: ReactNode;
+  /** An agent's words render as Markdown; a requester's stay as typed. */
+  markdown?: boolean;
+  /** Edit, or a moderator's menu, at the header's end. */
+  actions?: ReactNode;
+  /** In place of the text while it's being edited. */
+  editor?: ReactNode;
+  /** Offered to the uploader and to moderators. */
+  onDeleteAttachment?: (attachment: AttachmentResponseDto) => void;
+  children: string;
 }) {
   const headerId = useId();
   const author = mine ? 'You' : (name ?? 'Unknown user');
@@ -112,54 +128,82 @@ export function PersonEntry({
                 : 'border-author-user-border bg-author-user-bg text-author-user-fg',
         )}
       >
-        <header
-          id={headerId}
+        {/* The actions sit beside the header, not in it: the header names the
+            entry, and "Edit" is no part of its name. */}
+        <div
           className={cn(
-            'flex flex-wrap items-center gap-x-2 gap-y-1 text-xs',
+            'flex items-center gap-2',
             mine && !note && 'justify-end',
           )}
         >
-          <span className="sr-only">{author}</span>
-          {note && (
-            <span className="inline-flex items-center gap-1 font-medium">
-              <LockIcon aria-hidden className="size-3.5" />
-              INTERNAL NOTE · Only agents can see this
-            </span>
-          )}
-          {!mine && (
-            <>
-              <UserAvatar name={unknown ? null : name} />
-              <span
-                aria-hidden
-                className={cn(
-                  'font-medium',
-                  unknown && 'text-muted-foreground',
-                )}
-              >
-                {name ?? 'Unknown user'}
-              </span>
-              <span aria-hidden>· {role} ·</span>
-            </>
-          )}
-          <span
-            className={cn('text-muted-foreground', mine && note && 'ml-auto')}
+          {mine && !note && actions}
+          <header
+            id={headerId}
+            className={cn(
+              'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs',
+              mine && !note && 'justify-end',
+              note && 'flex-1',
+            )}
           >
-            <Time at={at} edited={editedAt} />
-          </span>
-        </header>
+            <span className="sr-only">{author}</span>
+            {note && (
+              <span className="inline-flex items-center gap-1 font-medium">
+                <LockIcon aria-hidden className="size-3.5" />
+                INTERNAL NOTE · Only agents can see this
+              </span>
+            )}
+            {!mine && (
+              <>
+                <UserAvatar name={unknown ? null : name} />
+                <span
+                  aria-hidden
+                  className={cn(
+                    'font-medium',
+                    unknown && 'text-muted-foreground',
+                  )}
+                >
+                  {name ?? 'Unknown user'}
+                </span>
+                <span aria-hidden>· {role} ·</span>
+              </>
+            )}
+            <span
+              className={cn('text-muted-foreground', mine && note && 'ml-auto')}
+            >
+              <Time at={at} edited={editedAt} />
+            </span>
+          </header>
+          {(!mine || note) && actions && (
+            <span className="ml-auto inline-flex">{actions}</span>
+          )}
+        </div>
         {removed ? (
           <p className="flex items-center gap-2 text-muted-foreground">
             <EyeOffIcon aria-hidden className="size-4" />
             This message was removed.
           </p>
+        ) : editor ? (
+          editor
+        ) : markdown ? (
+          <Markdown>{children}</Markdown>
         ) : (
           <div className="whitespace-pre-wrap break-words">{children}</div>
         )}
         {!removed && attachments && attachments.length > 0 && (
           <ul className="flex flex-wrap gap-2">
             {attachments.map((attachment) => (
-              <li key={attachment.id}>
+              <li key={attachment.id} className="flex items-center gap-1">
                 <AttachmentChip attachment={attachment} />
+                {onDeleteAttachment && (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Delete ${attachment.fileName}`}
+                    onClick={() => onDeleteAttachment(attachment)}
+                  >
+                    <Trash2Icon aria-hidden />
+                  </Button>
+                )}
               </li>
             ))}
           </ul>
@@ -169,20 +213,39 @@ export function PersonEntry({
   );
 }
 
+/**
+ * Opens a file through a short-lived download link. The tab opens on the
+ * click, so no popup blocker stops it, and is pointed at the link once known.
+ */
+async function download(attachment: AttachmentResponseDto) {
+  const tab = window.open('', '_blank');
+  if (tab) tab.opener = null;
+  try {
+    const answer = await attachmentsControllerDownloadV1(attachment.id);
+    if (!answer.data) throw new Error('No download link');
+    if (tab) tab.location.href = answer.data.downloadUrl;
+  } catch {
+    tab?.close();
+    toastError(
+      `Couldn’t open ${attachment.fileName}`,
+      'Check your connection and try again.',
+    );
+  }
+}
+
 function AttachmentChip({ attachment }: { attachment: AttachmentResponseDto }) {
   return (
-    <a
-      href={attachment.fileUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1 text-foreground hover:bg-accent"
+    <button
+      type="button"
+      onClick={() => void download(attachment)}
+      className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1 text-foreground outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <FileTextIcon aria-hidden className="size-4 text-muted-foreground" />
       <span className="font-medium">{attachment.fileName}</span>
       <span className="text-xs text-muted-foreground">
         {fileSize(attachment.fileSizeBytes)}
       </span>
-    </a>
+    </button>
   );
 }
 
@@ -211,12 +274,14 @@ function AiFrame({
   sources,
   at,
   busy,
+  actions,
   children,
 }: {
   label: 'AI answer' | 'AI';
   sources?: number;
   at: string;
   busy?: boolean;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   const headerId = useId();
@@ -227,24 +292,27 @@ function AiFrame({
         aria-busy={busy || undefined}
         className="flex flex-col gap-2 rounded-lg border border-l-4 border-author-ai-border bg-author-ai-bg p-4 text-sm text-author-ai-fg"
       >
-        <header
-          id={headerId}
-          className="flex flex-wrap items-center gap-2 text-xs"
-        >
-          <Badge>
-            <BotIcon aria-hidden />
-            {label}
-          </Badge>
-          <span className="font-medium">
-            SynapseDesk AI
-            {sources
-              ? ` · from ${sources} ${sources === 1 ? 'source' : 'sources'}`
-              : ''}
-          </span>
-          <span className="text-muted-foreground">
-            · <Time at={at} />
-          </span>
-        </header>
+        <div className="flex items-center gap-2">
+          <header
+            id={headerId}
+            className="flex flex-wrap items-center gap-2 text-xs"
+          >
+            <Badge>
+              <BotIcon aria-hidden />
+              {label}
+            </Badge>
+            <span className="font-medium">
+              SynapseDesk AI
+              {sources
+                ? ` · from ${sources} ${sources === 1 ? 'source' : 'sources'}`
+                : ''}
+            </span>
+            <span className="text-muted-foreground">
+              · <Time at={at} />
+            </span>
+          </header>
+          {actions && <span className="ml-auto inline-flex">{actions}</span>}
+        </div>
         {children}
       </article>
     </Side>
@@ -297,10 +365,16 @@ export function AiMessage({
   message,
   perspective,
   askAPerson,
+  actions,
+  feedback,
 }: {
   message: MessageResponseDto;
   perspective: Perspective;
   askAPerson?: ReactNode;
+  /** A moderator's menu. */
+  actions?: ReactNode;
+  /** Helpful? and its form. */
+  feedback?: ReactNode;
 }) {
   const status = message.answerStatus;
   const citations = message.citations ?? [];
@@ -309,6 +383,7 @@ export function AiMessage({
       label={status === 'DOC_ANSWER' ? 'AI answer' : 'AI'}
       sources={status === 'DOC_ANSWER' ? citations.length : undefined}
       at={message.createdAt}
+      actions={actions}
     >
       {message.redactedAt ? (
         <p className="flex items-center gap-2 text-muted-foreground">
@@ -316,11 +391,12 @@ export function AiMessage({
           This message was removed.
         </p>
       ) : (
-        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        <Markdown>{message.content}</Markdown>
       )}
       {status === 'DOC_ANSWER' && citations.length > 0 && (
         <Citations citations={citations} />
       )}
+      {!message.redactedAt && feedback}
       {status === 'DOC_MISSING' && (
         <Footer icon={<SearchXIcon aria-hidden />}>
           {FOOTER.DOC_MISSING[perspective]}
@@ -351,9 +427,7 @@ export function LiveAnswerEntry({
   const streaming = answer.state === 'streaming';
   return (
     <AiFrame label="AI" at={answer.startedAt} busy={streaming}>
-      {answer.text && (
-        <div className="whitespace-pre-wrap break-words">{answer.text}</div>
-      )}
+      {answer.text && <Markdown>{answer.text}</Markdown>}
       {streaming && (
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="inline-flex items-center gap-2">

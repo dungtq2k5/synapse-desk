@@ -2,6 +2,7 @@
 
 import {
   getTicketsControllerGetV1QueryOptions,
+  ticketsControllerRestoreV1,
   useTicketsControllerListV1,
   type TicketResponseDto,
   type TicketsControllerListV1Params,
@@ -22,7 +23,9 @@ import {
   ChevronRightIcon,
   CircleAlertIcon,
   InboxIcon,
+  PlusIcon,
   SearchXIcon,
+  Trash2Icon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useState, type ReactNode } from 'react';
@@ -30,7 +33,8 @@ import { toast } from 'sonner';
 import { useRealtimeEvent } from '@/components/realtime/realtime-provider';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -55,9 +59,10 @@ import {
 import { useViewer } from '@/hooks/use-viewer';
 import { absoluteTime, relativeTime } from '@/lib/format';
 import { FIRST_PAGE } from '@/lib/tickets';
-import { announce } from '@/lib/toast';
+import { announce, toastError } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, SourceLabel, StatusBadge } from './badges';
+import { ExportButton } from './export-dialog';
 import { TicketFilters, type Filters } from './ticket-filters';
 
 /** How long a ticket that arrived live stays highlighted. */
@@ -69,7 +74,7 @@ const FRESH_MS = 2000;
  * The first page arrives server-rendered; everything after is fetched here.
  */
 export function TicketList() {
-  const { isAgent, user, query: viewer } = useViewer();
+  const { isAgent, user, can, query: viewer } = useViewer();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<Filters>({});
   const [paging, setPaging] =
@@ -81,7 +86,33 @@ export function TicketList() {
     query: { placeholderData: keepPreviousData },
   });
   const page = list.data?.data;
-  const filtered = Object.values(filters).some((value) => value !== undefined);
+  const { includeDeleted, ...narrowing } = filters;
+  const filtered = Object.values(narrowing).some(
+    (value) => value !== undefined,
+  );
+  // With Show deleted on, how many of them are deleted: the same list without
+  // them, counted.
+  const live = useTicketsControllerListV1(
+    { ...params, includeDeleted: undefined, page: 1, limit: 1 },
+    { query: { enabled: Boolean(includeDeleted) } },
+  );
+  const deleted =
+    includeDeleted && page && live.data?.data
+      ? page.meta.totalItems - live.data.data.meta.totalItems
+      : null;
+
+  const restore = async (ticket: TicketResponseDto) => {
+    try {
+      await ticketsControllerRestoreV1(ticket.id);
+      toast.success(`Ticket #${ticket.ticketNumber} restored`);
+      await queryClient.invalidateQueries({ queryKey: ['/api/v1/tickets'] });
+    } catch {
+      toastError(
+        'Couldn’t restore the ticket',
+        'Check your connection and try again.',
+      );
+    }
+  };
 
   const changeFilters = useCallback((next: Filters) => {
     setFilters(next);
@@ -146,12 +177,28 @@ export function TicketList() {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p aria-live="polite" className="text-sm text-muted-foreground">
-          {page &&
-            `${total} ${total === 1 ? 'ticket' : 'tickets'}${filtered ? ' match' : ''}`}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <p aria-live="polite" className="text-sm text-muted-foreground">
+            {page &&
+              `${total} ${total === 1 ? 'ticket' : 'tickets'}${filtered ? ' match' : ''}${
+                deleted !== null ? ` · ${deleted} deleted` : ''
+              }`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAgent && can('ticket.export') && <ExportButton />}
+          {can('ticket.create') && (
+            <Link
+              href="/tickets/new"
+              className={buttonVariants({ size: 'sm' })}
+            >
+              <PlusIcon aria-hidden />
+              New ticket
+            </Link>
+          )}
+        </div>
       </div>
 
       <TicketFilters filters={filters} onChange={changeFilters} />
@@ -278,7 +325,15 @@ export function TicketList() {
                       </>
                     )}
                     <TableCell className="text-muted-foreground">
-                      <When at={ticket.updatedAt} />
+                      {ticket.deletedAt ? (
+                        <RestoreButton
+                          ticket={ticket}
+                          className="h-7 px-2"
+                          onRestore={restore}
+                        />
+                      ) : (
+                        <When at={ticket.updatedAt} />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -303,6 +358,13 @@ export function TicketList() {
                   <StatusBadge status={ticket.status} />
                   {isAgent && <PriorityBadge priority={ticket.priority} />}
                 </div>
+                {ticket.deletedAt && (
+                  <RestoreButton
+                    ticket={ticket}
+                    className="self-start"
+                    onRestore={restore}
+                  />
+                )}
                 <p className="text-sm text-muted-foreground">
                   {isAgent && (
                     <>
@@ -352,13 +414,57 @@ function TicketLink({ ticket }: { ticket: TicketResponseDto }) {
       <span className="font-mono text-sm text-muted-foreground">
         #{ticket.ticketNumber}
       </span>
-      <span className="truncate font-medium">{ticket.title}</span>
+      <span
+        className={cn(
+          'truncate font-medium',
+          ticket.deletedAt && 'font-normal text-muted-foreground',
+        )}
+      >
+        {ticket.title}
+      </span>
+      {ticket.deletedAt && (
+        <Badge
+          variant="outline"
+          className="shrink-0 bg-muted text-muted-foreground"
+        >
+          <Trash2Icon aria-hidden />
+          Deleted
+        </Badge>
+      )}
       {unread > 0 && (
         <span className="ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
           {unread}
         </span>
       )}
     </Link>
+  );
+}
+
+/** Restore on a deleted row, above the row's link so it can be pressed. */
+function RestoreButton({
+  ticket,
+  className,
+  onRestore,
+}: {
+  ticket: TicketResponseDto;
+  className?: string;
+  onRestore: (ticket: TicketResponseDto) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-label={`Restore ticket #${ticket.ticketNumber}`}
+      disabled={busy}
+      className={cn('relative z-10', className)}
+      onClick={() => {
+        setBusy(true);
+        void onRestore(ticket).finally(() => setBusy(false));
+      }}
+    >
+      Restore
+    </Button>
   );
 }
 

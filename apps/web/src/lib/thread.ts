@@ -13,6 +13,9 @@ export type PendingSend = {
   state: 'sending' | 'failed';
   /** Set once the server acknowledged it: the stored message's id. */
   messageId?: string;
+  /** Uploaded files to bind, and the AI draft it started from; sent again on a retry. */
+  attachments?: { objectPath: string; fileName: string }[];
+  generatedFromId?: string | null;
 };
 
 /** An AI answer this tab asked for, as it streams in. Never stored as such. */

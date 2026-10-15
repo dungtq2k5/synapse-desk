@@ -2,11 +2,19 @@
 
 import {
   useDepartmentsControllerListV1,
+  useTicketsControllerGetByNumberV1,
   useUserAdminControllerListV1,
   type TicketsControllerListV1Params,
 } from '@synapsedesk/api-client';
-import { CheckIcon, SearchIcon, UserIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  SearchIcon,
+  Trash2Icon,
+  UserIcon,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -29,7 +37,11 @@ export type Filters = Pick<
   | 'source'
   | 'assigneeId'
   | 'departmentId'
+  | 'includeDeleted'
 >;
+
+/** "#1042" or "1042": a ticket number to go to. */
+const NUMBER = /^#?(\d{1,9})$/;
 
 const ALL = 'all';
 
@@ -47,11 +59,15 @@ export function TicketFilters({
 }) {
   const { user, isAgent, can } = useViewer();
   const [search, setSearch] = useState(filters.searchTerm ?? '');
+  const number = NUMBER.exec(search.trim())?.[1];
 
   // The search is sent once typing pauses.
   useEffect(() => {
     const timer = globalThis.setTimeout(() => {
-      const searchTerm = search.trim() || undefined;
+      // A ticket number is found by number, not searched for as text.
+      const searchTerm = NUMBER.test(search.trim())
+        ? undefined
+        : search.trim() || undefined;
       if (searchTerm !== filters.searchTerm)
         onChange({ ...filters, searchTerm });
     }, 300);
@@ -65,20 +81,11 @@ export function TicketFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative w-full md:w-72">
-        <SearchIcon
-          aria-hidden
-          className="absolute top-2.5 left-3 size-4 text-muted-foreground"
-        />
-        <Input
-          type="search"
-          aria-label="Search tickets"
-          placeholder="Search tickets"
-          className="pl-9"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      <FindByNumber
+        search={search}
+        number={number ? Number(number) : null}
+        onSearch={setSearch}
+      />
 
       {isAgent && user && (
         <Toggle
@@ -92,6 +99,21 @@ export function TicketFilters({
         >
           {mine ? <CheckIcon /> : <UserIcon />}
           Assigned to me
+        </Toggle>
+      )}
+
+      {isAgent && can('ticket.delete') && (
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={Boolean(filters.includeDeleted)}
+          onPressedChange={(pressed) =>
+            onChange({ ...filters, includeDeleted: pressed || undefined })
+          }
+          className="data-[state=on]:border-primary"
+        >
+          {filters.includeDeleted ? <CheckIcon /> : <Trash2Icon />}
+          Show deleted
         </Toggle>
       )}
 
@@ -227,5 +249,103 @@ function DepartmentFilter({
       options={options}
       onValue={onValue}
     />
+  );
+}
+
+/**
+ * The search box, which also finds a ticket by its number: "#1042" or "1042"
+ * offers "Go to #1042" with its title, or says there's no such ticket. The
+ * box is a combobox; Enter goes to the ticket found.
+ */
+function FindByNumber({
+  search,
+  number,
+  onSearch,
+}: {
+  search: string;
+  number: number | null;
+  onSearch: (value: string) => void;
+}) {
+  const router = useRouter();
+  const listId = useId();
+  const optionId = useId();
+  const [open, setOpen] = useState(true);
+  const found = useTicketsControllerGetByNumberV1(number ?? 0, {
+    query: { enabled: number !== null, retry: false, staleTime: 30_000 },
+  });
+  const ticket = number !== null ? found.data?.data : undefined;
+  const missing = number !== null && found.isError;
+  const showing = open && number !== null && (Boolean(ticket) || missing);
+
+  return (
+    <div className="relative w-full md:w-72">
+      <SearchIcon
+        aria-hidden
+        className="absolute top-2.5 left-3 size-4 text-muted-foreground"
+      />
+      <Input
+        type="search"
+        role="combobox"
+        aria-label="Search tickets"
+        aria-expanded={showing && Boolean(ticket)}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={showing && ticket ? optionId : undefined}
+        placeholder="Search tickets"
+        className="pl-9"
+        value={search}
+        onChange={(event) => {
+          setOpen(true);
+          onSearch(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && ticket) {
+            event.preventDefault();
+            router.push(`/tickets/${ticket.id}`);
+          } else if (event.key === 'Escape') {
+            setOpen(false);
+          }
+        }}
+        onBlur={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+      />
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label="Go to a ticket"
+        hidden={!(showing && ticket)}
+        className="absolute top-full left-0 z-20 mt-1 w-full rounded-md border bg-popover p-1 shadow-md"
+      >
+        {ticket && (
+          <li
+            id={optionId}
+            role="option"
+            aria-selected
+            className="flex cursor-pointer items-center gap-2 rounded-sm bg-accent px-2 py-1.5 text-sm text-accent-foreground"
+            // Before the input's blur closes the list.
+            onMouseDown={(event) => {
+              event.preventDefault();
+              router.push(`/tickets/${ticket.id}`);
+            }}
+          >
+            <ArrowRightIcon aria-hidden className="size-4 shrink-0" />
+            <span className="shrink-0 font-medium">{`Go to #${ticket.ticketNumber}`}</span>
+            <span className="truncate text-muted-foreground">
+              {ticket.title}
+            </span>
+          </li>
+        )}
+      </ul>
+      <p
+        aria-live="polite"
+        className={
+          showing && missing
+            ? 'absolute top-full left-0 z-20 mt-1 w-full rounded-md border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md'
+            : 'sr-only'
+        }
+      >
+        {showing && missing ? `No ticket #${number}` : ''}
+      </p>
+    </div>
   );
 }

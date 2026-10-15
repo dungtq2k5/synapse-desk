@@ -79,6 +79,9 @@ export function useLiveTicket(
         void queryClient.invalidateQueries({
           queryKey: [`/api/v1/tickets/${ticketId}/history`],
         });
+        void queryClient.invalidateQueries({
+          queryKey: [`/api/v1/tickets/${ticketId}/assignments`],
+        });
       }
     },
     [queryClient, ticketId],
@@ -92,7 +95,15 @@ export function useLiveTicket(
       .catch(() => undefined);
   }, [queryClient, ticketId]);
 
-  useEffect(markRead, [markRead]);
+  // Read when opened, and again when the tab comes back into view.
+  useEffect(() => {
+    markRead();
+    const onShow = () => {
+      if (document.visibilityState === 'visible') markRead();
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, [markRead]);
 
   // The room, joined once the server says the socket may talk, and again
   // after every reconnect.
@@ -108,7 +119,13 @@ export function useLiveTicket(
     (event: TicketDomainEvent) => {
       if (event.ticketId !== ticketId) return;
       refetch({ messages: true });
-      if (event.pattern === 'ticket.message_created') markRead();
+      // Only while it's seen: a hidden tab catches up when it's shown.
+      if (
+        event.pattern === 'ticket.message_created' &&
+        document.visibilityState === 'visible'
+      ) {
+        markRead();
+      }
     },
     [ticketId, refetch, markRead],
   );
@@ -285,6 +302,7 @@ export function useLiveTicket(
               clientMessageId: send.clientMessageId,
               isInternalNote: send.isInternalNote,
               invokeAi: true,
+              attachments: send.attachments,
             })) as Frame<SendAck>;
           if (!ack.success || !ack.data) throw new Error(ack.message);
           settle({ state: 'sending', messageId: ack.data.messageId });
@@ -295,6 +313,8 @@ export function useLiveTicket(
             content: send.content,
             isInternalNote: send.isInternalNote,
             invokeAi: askAi,
+            attachments: send.attachments,
+            generatedFromId: send.generatedFromId ?? undefined,
           });
           settle({ state: 'sending', messageId: answer.data?.message.id });
         }
@@ -308,13 +328,21 @@ export function useLiveTicket(
   );
 
   const send = useCallback(
-    (content: string, isInternalNote: boolean) => {
+    (
+      content: string,
+      isInternalNote: boolean,
+      extras?: Pick<PendingSend, 'attachments' | 'generatedFromId'>,
+    ) => {
       const item: PendingSend = {
         clientMessageId: crypto.randomUUID(),
         content,
         isInternalNote,
         createdAt: new Date().toISOString(),
         state: 'sending',
+        attachments: extras?.attachments?.length
+          ? extras.attachments
+          : undefined,
+        generatedFromId: extras?.generatedFromId ?? undefined,
       };
       setPending((current) => [...current, item]);
       void deliver(item);

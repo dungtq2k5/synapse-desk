@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { announce } from '@/lib/toast';
+import { sendFile } from '@/lib/upload';
 
 type Problem = 'too-large' | 'failed';
 
@@ -30,30 +31,6 @@ type Problem = 'too-large' | 'failed';
  * with the declared type the signature pins, reporting progress as it goes.
  * XHR rather than `fetch`, which can't report upload progress.
  */
-function send(
-  url: string,
-  method: string,
-  file: File,
-  onProgress: (percent: number) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    request.open(method, url);
-    request.setRequestHeader('Content-Type', file.type);
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    request.onload = () =>
-      request.status < 300
-        ? resolve()
-        : reject(new Error(`Storage answered ${request.status}`));
-    request.onerror = () => reject(new Error('The upload failed'));
-    request.send(file);
-  });
-}
-
 /**
  * The profile photo: upload or change it (JPEG, PNG or WebP, up to 2 MB),
  * shown at once and uploaded straight to storage, then confirmed; or remove
@@ -95,7 +72,7 @@ export function ProfilePhoto({ user }: { user: UserResponseDto }) {
         fileName: file.name,
       });
       if (!signed.data) throw new Error('No upload URL');
-      await send(
+      await sendFile(
         signed.data.uploadUrl,
         signed.data.uploadMethod,
         file,

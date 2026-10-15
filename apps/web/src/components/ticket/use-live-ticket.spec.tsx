@@ -107,7 +107,7 @@ describe('a live ticket', () => {
     expect(calls[1].url).toBe('/api/v1/tickets/t1/read');
   });
 
-  it('refetches the ticket and its history when the ticket changes', () => {
+  it('refetches the ticket, its history and its assignments when the ticket changes', () => {
     const { socket, keys, invalidate } = setup();
     invalidate.mockClear();
 
@@ -120,6 +120,7 @@ describe('a live ticket', () => {
     expect(keys()).toEqual([
       '/api/v1/tickets/t1',
       '/api/v1/tickets/t1/history',
+      '/api/v1/tickets/t1/assignments',
     ]);
   });
 

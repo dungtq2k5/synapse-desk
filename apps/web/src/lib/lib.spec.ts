@@ -13,6 +13,7 @@ import {
   relativeTime,
 } from './format';
 import { PASSWORD_RULES } from './password-rules';
+import { historyTimeline } from './history';
 import { statusMoves } from './tickets';
 import { ok, stubApi } from '@/test/api';
 import {
@@ -225,5 +226,65 @@ describe('statusMoves', () => {
         ).map(({ to }) => to),
       ).toEqual(allowed);
     }
+  });
+});
+
+describe('historyTimeline', () => {
+  const assignment = (
+    id: string,
+    assignedAt: string,
+    unassignedAt: string | null,
+    reason: 'INITIAL' | 'DEPARTMENT_CHANGE' | null,
+  ) => ({
+    id,
+    ticketId: 't1',
+    assignedToId: `person-${id}`,
+    assignedById: 'maya',
+    departmentId: `department-${id}`,
+    assignedAt,
+    unassignedAt,
+    reason,
+    isCurrent: unassignedAt === null,
+    createdAt: assignedAt,
+  });
+
+  it('merges both lists newest first, and finds the unassign', () => {
+    const events = historyTimeline(
+      [
+        {
+          id: 's1',
+          ticketId: 't1',
+          fromStatus: 'NEW',
+          toStatus: 'OPEN',
+          changedById: 'maya',
+          reason: 'Asked for the price',
+          changedAt: '2026-10-10T09:13:00.000Z',
+        },
+      ],
+      [
+        // Ended when the next began: a reassign, no unassign of its own.
+        assignment(
+          'a1',
+          '2026-10-10T09:14:00.000Z',
+          '2026-10-10T09:16:00.000Z',
+          'INITIAL',
+        ),
+        assignment(
+          'a2',
+          '2026-10-10T09:16:00.000Z',
+          '2026-10-10T09:20:00.000Z',
+          'DEPARTMENT_CHANGE',
+        ),
+      ],
+    );
+
+    expect(events.map(({ kind, at }) => [kind, at.slice(11, 16)])).toEqual([
+      ['unassigned', '09:20'],
+      ['moved', '09:16'],
+      ['assigned', '09:14'],
+      ['status', '09:13'],
+    ]);
+    expect(events[1]).toMatchObject({ reason: 'department change' });
+    expect(events[3]).toMatchObject({ from: 'New', to: 'Open' });
   });
 });

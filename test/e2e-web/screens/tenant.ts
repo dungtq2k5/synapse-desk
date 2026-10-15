@@ -259,6 +259,58 @@ async function thread(
   const quote = await post(requester, 'Here’s the quote from the shop.');
 
   await ai(ticketId, quote.id);
+  await backdate(ticketId);
+}
+
+/**
+ * Moves the ticket an hour back (its creation, thread and history together,
+ * so their order holds), past the 15-minute edit window: what a baseline
+ * draws can't depend on how long ago the run started. A row that draws Edit
+ * posts its own message.
+ */
+async function backdate(ticketId: string): Promise<void> {
+  const earlier = (at: Date) => new Date(at.getTime() - 60 * 60 * 1000);
+  const prisma = ticketPrisma();
+  try {
+    const ticket = await prisma.ticket.findUniqueOrThrow({
+      where: { id: ticketId },
+      select: { createdAt: true },
+    });
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { createdAt: earlier(ticket.createdAt) },
+    });
+    for (const { id, createdAt } of await prisma.ticketMessage.findMany({
+      where: { ticketId },
+    })) {
+      await prisma.ticketMessage.update({
+        where: { id },
+        data: { createdAt: earlier(createdAt) },
+      });
+    }
+    for (const { id, changedAt } of await prisma.ticketStatusChange.findMany({
+      where: { ticketId },
+    })) {
+      await prisma.ticketStatusChange.update({
+        where: { id },
+        data: { changedAt: earlier(changedAt) },
+      });
+    }
+    for (const row of await prisma.ticketAssignment.findMany({
+      where: { ticketId },
+    })) {
+      await prisma.ticketAssignment.update({
+        where: { id: row.id },
+        data: {
+          assignedAt: earlier(row.assignedAt),
+          createdAt: earlier(row.createdAt),
+          unassignedAt: row.unassignedAt && earlier(row.unassignedAt),
+        },
+      });
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 /** The AI's answers in each status, and an attachment, straight to the database. */

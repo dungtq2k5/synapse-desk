@@ -15,6 +15,9 @@ jest.mock('@/components/realtime/realtime-provider', () => ({
   },
 }));
 
+const push = jest.fn();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
 // Radix Select measures and captures the pointer; jsdom has neither.
 beforeAll(() => {
   Element.prototype.hasPointerCapture = () => false;
@@ -276,7 +279,7 @@ describe('the ticket list for an agent', () => {
     await screen.findByText('3 tickets');
 
     await user.type(
-      screen.getByRole('searchbox', { name: 'Search tickets' }),
+      screen.getByRole('combobox', { name: 'Search tickets' }),
       '  toner ',
     );
     expect(
@@ -507,5 +510,83 @@ describe('the ticket list for an end user', () => {
     failing = false;
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('1 ticket')).toBeInTheDocument();
+  });
+});
+
+describe("the agent's list additions", () => {
+  it('Show deleted asks for them, counts them, and restores one from its row', async () => {
+    const gone = ticket(1045, { deletedAt: UPDATED, deletedById: 'u-1' });
+    const { calls, user } = show({
+      'GET /api/v1/users/me': me([...AGENT, 'ticket.delete']),
+      'GET /api/v1/tickets': () =>
+        asked().get('includeDeleted') === 'true'
+          ? page([...THREE, gone])
+          : page(THREE),
+      'GET /api/v1/users': ok({ items: [], meta: {} }),
+      'GET /api/v1/departments': ok({ items: [], meta: {} }),
+      'POST /api/v1/tickets/t-1045/restore': ok(gone),
+    });
+    const success = jest.spyOn(toast, 'success').mockImplementation(() => 'id');
+    await screen.findByRole('table');
+
+    await user.click(screen.getByRole('button', { name: 'Show deleted' }));
+
+    expect(
+      await screen.findByText('4 tickets · 1 deleted'),
+    ).toBeInTheDocument();
+    const row = within(table()).getByText('Printer jam 1045').closest('tr')!;
+    expect(within(row).getByText('Deleted')).toBeInTheDocument();
+    await user.click(
+      within(row).getByRole('button', { name: 'Restore ticket #1045' }),
+    );
+    await waitFor(() =>
+      expect(success).toHaveBeenCalledWith('Ticket #1045 restored'),
+    );
+    expect(
+      calls.some(
+        ({ method, url }) => method === 'POST' && url.endsWith('/restore'),
+      ),
+    ).toBe(true);
+  });
+
+  it('offers Show deleted only with ticket.delete', async () => {
+    show({
+      'GET /api/v1/users/me': me(AGENT),
+      'GET /api/v1/tickets': page(THREE),
+      'GET /api/v1/users': ok({ items: [], meta: {} }),
+      'GET /api/v1/departments': ok({ items: [], meta: {} }),
+    });
+    await screen.findByRole('table');
+
+    expect(
+      screen.queryByRole('button', { name: 'Show deleted' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('finds a ticket by its number, or says there is none', async () => {
+    const { user } = show({
+      'GET /api/v1/users/me': me(AGENT),
+      'GET /api/v1/tickets': page(THREE),
+      'GET /api/v1/users': ok({ items: [], meta: {} }),
+      'GET /api/v1/departments': ok({ items: [], meta: {} }),
+      'GET /api/v1/tickets/by-number/1042': ok(ticket(1042)),
+      'GET /api/v1/tickets/by-number/1077': fail(
+        404,
+        'No ticket with that number',
+      ),
+    });
+    await screen.findByRole('table');
+    const search = screen.getByRole('combobox', { name: 'Search tickets' });
+
+    // Built, not quoted: a quoted '#' and digits reads as a hex color.
+    await user.type(search, `#${1042}`);
+    const option = await screen.findByRole('option', { name: /Go to #1042/ });
+    expect(search).toHaveAttribute('aria-activedescendant', option.id);
+    await user.keyboard('{Enter}');
+    expect(push).toHaveBeenCalledWith('/tickets/t-1042');
+
+    await user.clear(search);
+    await user.type(search, '1077');
+    expect(await screen.findByText('No ticket #1077')).toBeInTheDocument();
   });
 });
