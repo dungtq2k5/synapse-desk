@@ -55,6 +55,7 @@ export function toMessageResponseDto(
     editedAt: fromProtoTimestamp(message.editedAt) ?? null,
     redactedAt: fromProtoTimestamp(message.redactedAt) ?? null,
     createdAt: requireProtoTimestamp(message.createdAt, 'createdAt'),
+    editableUntil: fromProtoTimestamp(message.editableUntil) ?? null,
     attachments: message.attachments.map(toAttachmentResponseDto),
     excludedFromAiContext: message.excludedFromAiContext,
     answerStatus: fromProtoMessageAnswerStatus(message.answerStatus),

@@ -54,6 +54,13 @@ export class MessageResponseDto {
   editedAt!: Date | null;
   redactedAt!: Date | null;
   createdAt!: Date;
+  /**
+   * When the caller may still edit this message, or `null` when they can't:
+   * the sender until the edit window closes; a moderator editing an internal
+   * note has no window, which reads as `9999-12-31T23:59:59.999Z`. Offer Edit
+   * while it's ahead.
+   */
+  editableUntil!: Date | null;
   attachments!: AttachmentResponseDto[];
   /**
    * Kept OUT of AI prompts.

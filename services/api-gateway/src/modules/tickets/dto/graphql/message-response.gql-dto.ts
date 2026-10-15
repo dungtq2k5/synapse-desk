@@ -84,6 +84,14 @@ export class TicketMessageResponseGqlDto {
   createdAt!: Date;
 
   /**
+   * When the caller may still edit this message, or null when they can't. A
+   * moderator editing an internal note has no window:
+   * `9999-12-31T23:59:59.999Z`.
+   */
+  @Field(() => Date, { nullable: true })
+  editableUntil!: Date | null;
+
+  /**
    * How this AI message was produced — `REFUSED`, `DOC_ANSWER`, `DOC_MISSING`.
    * Null for a human message.
    *

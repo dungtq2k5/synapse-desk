@@ -65306,6 +65306,12 @@
             "format": "date-time",
             "type": "string"
           },
+          "editableUntil": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the caller may still edit this message, or `null` when they can't:\nthe sender until the edit window closes; a moderator editing an internal\nnote has no window, which reads as `9999-12-31T23:59:59.999Z`. Offer Edit\nwhile it's ahead."
+          },
           "attachments": {
             "type": "array",
             "items": {
@@ -65350,6 +65356,7 @@
           "editedAt",
           "redactedAt",
           "createdAt",
+          "editableUntil",
           "attachments",
           "excludedFromAiContext",
           "answerStatus",

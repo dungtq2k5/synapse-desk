@@ -103,7 +103,17 @@ export interface MessageResponse {
    * Absent for a human message and for an AI message written before citations
    * were persisted; present (possibly empty) for every AI answer since.
    */
-  citations?: MessageCitations | undefined;
+  citations?:
+    | MessageCitations
+    | undefined;
+  /**
+   * When THIS caller may still edit the message; absent when they can't.
+   * The sender gets the end of the edit window
+   * (MESSAGE_EDIT_WINDOW_MINUTES). A moderator editing an internal note has
+   * no window: 9999-12-31T23:59:59.999Z, the end of time, so "Edit while it's
+   * ahead" stays one rule for a client.
+   */
+  editableUntil?: Timestamp | undefined;
 }
 
 export interface CreateMessageRequest {
