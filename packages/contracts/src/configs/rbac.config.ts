@@ -187,7 +187,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<
     'ticket.ai.use',
     'ticket.message.moderate',
     'document.read',
+    // Assigning picks a person in a department: the Assign dialog lists both.
     'user.read',
+    'department.read',
   ],
 
   [SystemRoleName.END_USER]: [],

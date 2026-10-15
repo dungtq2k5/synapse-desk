@@ -119,6 +119,12 @@ type NotifiableTicket = {
  * The first is a security property, the second an audit one, and both are
  * easier to get subtly wrong than to get right — see the comments at each.
  */
+/**
+ * `editableUntil` for an edit with no window (a moderator's, on an internal
+ * note): the end of time, so a client's "Edit while it's ahead" holds.
+ */
+export const NO_EDIT_DEADLINE = new Date('9999-12-31T23:59:59.999Z');
+
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
@@ -184,7 +190,7 @@ export class MessagesService {
     ]);
 
     return {
-      items: items.map(toMessageResponse),
+      items: items.map((item) => this.respond(item, context)),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -253,7 +259,10 @@ export class MessagesService {
       // NOT_FOUND as an expiry, so a re-emit would report every attachment as
       // skipped for a message that has them.
       if (existing)
-        return { message: toMessageResponse(existing), skippedAttachments: [] };
+        return {
+          message: this.respond(existing, context),
+          skippedAttachments: [],
+        };
     }
 
     // `min(platform, tenant)`, resolved once for this message. The constant
@@ -337,7 +346,7 @@ export class MessagesService {
           request.clientMessageId,
         );
         if (winner)
-          return { message: toMessageResponse(winner), skippedAttachments };
+          return { message: this.respond(winner, context), skippedAttachments };
       }
       throw error;
     }
@@ -368,7 +377,7 @@ export class MessagesService {
       await this.tryAppendAiReply(ticket, context);
     }
 
-    return { message: toMessageResponse(message), skippedAttachments };
+    return { message: this.respond(message, context), skippedAttachments };
   }
 
   /**
@@ -546,7 +555,7 @@ export class MessagesService {
       );
     }
 
-    return toMessageResponse(message);
+    return this.respond(message, context);
   }
 
   /**
@@ -580,7 +589,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    return toMessageResponse(updated);
+    return this.respond(updated, context);
   }
 
   /**
@@ -644,7 +653,7 @@ export class MessagesService {
       editedAt: (message.editedAt ?? new Date()).toISOString(),
     });
 
-    return toMessageResponse(message);
+    return this.respond(message, context);
   }
 
   /**
@@ -707,7 +716,7 @@ export class MessagesService {
       redactedAt: (message.redactedAt ?? new Date()).toISOString(),
     });
 
-    return { message: toMessageResponse(message) };
+    return { message: this.respond(message, context) };
   }
 
   // ------------------------------------------------------------------------- Attachments
@@ -1149,6 +1158,42 @@ export class MessagesService {
       // notification group nobody would notice until a user complained.
       groupKey: ticketMessageGroupKey(message.ticketId),
     });
+  }
+
+  /**
+   * The message as this caller reads it: with `editableUntil`, when they may
+   * still edit it.
+   */
+  private respond(
+    message: MessageWithAttachments,
+    context: CallerContext,
+  ): MessageResponse {
+    return {
+      ...toMessageResponse(message),
+      editableUntil: toProtoTimestamp(this.editableUntil(message, context)),
+    };
+  }
+
+  /**
+   * Until when this caller may edit the message, by {@link assertMayEdit}'s
+   * rules: the sender until the window closes; a moderator, an internal note
+   * with no window ({@link NO_EDIT_DEADLINE}); anyone else, or a redacted or
+   * generated message, never (`null`).
+   */
+  private editableUntil(
+    message: TicketMessage,
+    context: CallerContext,
+  ): Date | null {
+    if (message.redactedAt || message.isAiGenerated) return null;
+    if (message.isInternalNote && this.canModerate(context)) {
+      return NO_EDIT_DEADLINE;
+    }
+    if (!context.sub || message.senderId !== context.sub) return null;
+
+    const deadline = new Date(
+      message.createdAt.getTime() + this.editWindowMinutes * 60_000,
+    );
+    return deadline > new Date() ? deadline : null;
   }
 
   /**

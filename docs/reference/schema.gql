@@ -433,6 +433,7 @@ type TicketMessage {
   completionTokens: Int
   content: String!
   createdAt: DateTime!
+  editableUntil: DateTime
   editedAt: DateTime
   id: ID!
   isAiGenerated: Boolean!

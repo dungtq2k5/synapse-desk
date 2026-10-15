@@ -730,6 +730,89 @@ describe('Ticket messages & attachments (e2e)', () => {
 
   // ----------------------------------------------------------------- edit
 
+  /**
+   * `editableUntil`: when THIS caller may still edit a message, by the same
+   * rules `updateMessage` enforces, so a client offers Edit exactly while the
+   * server would accept it.
+   */
+  describe('editableUntil', () => {
+    /** The message as `context` lists it. */
+    const asSeenBy = async (
+      ticketId: string,
+      messageId: string,
+      context: ReturnType<typeof author>,
+    ) =>
+      (await messages.listMessages(listRequest(ticketId), context)).items.find(
+        (item) => item.id === messageId,
+      )!;
+    const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
+
+    it('E1. the sender: the end of the window; anyone else: none', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const message = await createMessage(fx.prisma, ticket.id, {
+        senderId: tenant.userId,
+      });
+
+      const mine = await asSeenBy(ticket.id, message.id, author());
+      const theirs = await asSeenBy(ticket.id, message.id, moderator());
+
+      // MESSAGE_EDIT_WINDOW_MINUTES is 15 in .env.test.
+      expect(mine.editableUntil?.seconds).toBe(
+        seconds(message.createdAt) + 15 * 60,
+      );
+      expect(theirs.editableUntil).toBeUndefined();
+    });
+
+    it('E2. past the window: none, for the sender too', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const message = await fx.prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          senderId: tenant.userId,
+          content: 'Long ago',
+          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
+
+      expect(
+        (await asSeenBy(ticket.id, message.id, author())).editableUntil,
+      ).toBeUndefined();
+    });
+
+    it('E3. a moderator, an internal note: no window, the end of time; an agent without moderation: none', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const note = await fx.prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          senderId: faker.string.uuid(),
+          content: 'Triage note',
+          isInternalNote: true,
+          createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
+
+      expect(
+        (await asSeenBy(ticket.id, note.id, moderator())).editableUntil
+          ?.seconds,
+      ).toBe(seconds(new Date('9999-12-31T23:59:59.999Z')));
+      expect(
+        (await asSeenBy(ticket.id, note.id, agent())).editableUntil,
+      ).toBeUndefined();
+    });
+
+    it('E4. a redacted message: none, for its sender too', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const message = await createMessage(fx.prisma, ticket.id, {
+        senderId: tenant.userId,
+        redactedAt: new Date(),
+      });
+
+      expect(
+        (await asSeenBy(ticket.id, message.id, author())).editableUntil,
+      ).toBeUndefined();
+    });
+  });
+
   describe('updateMessage', () => {
     it('1. lets the SENDER edit inside the window, stamping editedAt', async () => {
       const ticket = await createTicket(fx.prisma, tenant);

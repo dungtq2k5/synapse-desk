@@ -101,6 +101,46 @@ describe('messages', () => {
     },
   );
 
+  /**
+   * `editableUntil` is ticket-service's answer for this caller; the gateway
+   * relays it, and an absent one (the caller can't edit) is `null`.
+   */
+  rowFor('Messages')(
+    '**`list` relays `editableUntil`, and an absent one is `null`**',
+    async () => {
+      peers.ticket.on('MessageService/ListMessages').reply({
+        items: [
+          wireMessage('mine', {
+            editableUntil: { seconds: 1_756_685_700, nanos: 0 },
+          }),
+          wireMessage('theirs'),
+        ],
+        meta: {
+          totalItems: 2,
+          itemCount: 2,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/tickets/${TICKET}/messages`,
+        headers([]),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          items: [
+            { id: 'mine', editableUntil: '2025-09-01T00:15:00.000Z' },
+            { id: 'theirs', editableUntil: null },
+          ],
+        },
+      });
+    },
+  );
+
   rowFor('Messages')(
     '**`create` needs no permission, forwards `isInternalNote`/`generatedFromId`/attachments, and answers 201**',
     async () => {
