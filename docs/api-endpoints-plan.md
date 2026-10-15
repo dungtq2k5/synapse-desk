@@ -314,7 +314,7 @@ _Audit actions:_ `BILLING_SUBSCRIPTION_CHANGED`, `BILLING_ENTITLEMENTS_APPLIED`,
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
 | GET | `/tickets` | Queue view. Filters: `?status=&priority=&departmentId=&assigneeId=&authorId=&createdFrom=&createdTo=&q=`. Non-agents see only their own. | USER |
-| POST | `/tickets` ✎ | Create a ticket directly (form submission path). Sets `source = WEB`. Emits `ticket.created`. | perm:`ticket.create` |
+| POST | `/tickets` ✎ | Create a ticket directly (form submission path). Sets `source = WEB`. Emits `ticket.created`. **`authorId` raises it on behalf of someone else, and only an agent may** (a super admin, or `ticket.read.all` or `ticket.message.moderate`); anyone else naming another person gets 403, and nothing is written. | perm:`ticket.create` |
 | GET | `/tickets/:id` | Full detail: ticket + author + current_assignee + current_department + status + `ai_summaries` + attachment counts. | USER / perm:`ticket.read.all` |
 | PATCH | `/tickets/:id` | Update `title`, `description`, `priority`. **Never `status`** — that moves through the state machine and nowhere else. Priority is here rather than on a route of its own precisely because it has no machine: any value to any value, so there is no transition to validate and no 409 to raise. | perm:`ticket.update` |
 | DELETE | `/tickets/:id` ✎ | Soft delete. | perm:`ticket.delete` |
