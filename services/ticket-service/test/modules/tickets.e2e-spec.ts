@@ -200,6 +200,29 @@ describe('Tickets (e2e)', () => {
         expect.objectContaining({ organizationId: tenant.organizationId }),
       );
     });
+
+    it("11d. only an agent raises a ticket on behalf of someone else: an end user's is PERMISSION_DENIED, and nothing is written", async () => {
+      // Otherwise an end user (who holds `ticket.create`) could raise a ticket
+      // in a colleague's name: in the colleague's list, theirs to answer.
+      await expectRpc(
+        tickets.createTicket(
+          createRequest({ authorId: faker.string.uuid() }),
+          member(),
+        ),
+        status.PERMISSION_DENIED,
+      );
+
+      expect(await fx.prisma.ticket.count()).toBe(0);
+      expect(assertUserExists).not.toHaveBeenCalled();
+    });
+
+    it('11e. without authorId the caller is the author, agent or not', async () => {
+      const own = await tickets.createTicket(createRequest(), member());
+      const agents = await tickets.createTicket(createRequest(), agent());
+
+      expect(own.authorId).toBe(member().sub);
+      expect(agents.authorId).toBe(agent().sub);
+    });
   });
 
   // ---------------------------------------------------------------- read

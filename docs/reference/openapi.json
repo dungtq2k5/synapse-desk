@@ -64767,7 +64767,7 @@
           },
           "authorId": {
             "type": "string",
-            "description": "Raising a ticket on behalf of an end user.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database.",
+            "description": "Raising a ticket on behalf of an end user. Only an agent may (a super\nadmin, or a holder of `ticket.read.all` or `ticket.message.moderate`);\nanyone else naming someone other than themselves gets a 403.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database.",
             "format": "uuid"
           }
         },

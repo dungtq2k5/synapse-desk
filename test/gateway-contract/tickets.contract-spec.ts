@@ -7,6 +7,7 @@
  * the item level per the user's explicit instruction.
  */
 
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -175,6 +176,44 @@ describe('tickets', () => {
       );
 
       expect(response.status).toBe(201);
+    },
+  );
+
+  /**
+   * Only an agent raises a ticket on behalf of someone else. ticket-service
+   * decides (it knows who is an agent) and answers PERMISSION_DENIED; the
+   * gateway forwards `authorId` and relays the refusal as a 403, its message
+   * kept.
+   */
+  rowFor('Tickets')(
+    '**`create` on behalf of someone else, refused by ticket-service, is a 403**',
+    async () => {
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .fail(
+          GrpcStatus.PERMISSION_DENIED,
+          'Only an agent can raise a ticket on behalf of someone else',
+        );
+      const colleague = 'aaaaaaaa-7777-4777-8777-aaaaaaaaaaaa';
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets`,
+        {
+          title: 'A new ticket',
+          description: 'Something broke',
+          authorId: colleague,
+        },
+        headersWithCodes(['ticket.create']),
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: expect.stringContaining(
+          'Only an agent can raise a ticket on behalf of someone else',
+        ),
+      });
+      const [call] = peers.ticket.calls('TicketService/CreateTicket');
+      expect(call.request).toMatchObject({ authorId: colleague });
     },
   );
 

@@ -56,7 +56,9 @@ export class CreateTicketDto {
   readonly source?: TicketSource;
 
   /**
-   * Raising a ticket on behalf of an end user.
+   * Raising a ticket on behalf of an end user. Only an agent may (a super
+   * admin, or a holder of `ticket.read.all` or `ticket.message.moderate`);
+   * anyone else naming someone other than themselves gets a 403.
    *
    * Absent means "the caller", which is the ordinary case and needs no
    * validation because the id comes from a verified token. When present it is
