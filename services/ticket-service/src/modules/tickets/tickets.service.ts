@@ -91,7 +91,9 @@ export class TicketsService {
     request: GetTicketRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return toTicketResponse(await this.load(request.id, context));
+    return toTicketResponse(
+      await this.access.loadForReading(request.id, context),
+    );
   }
 
   /**
@@ -236,7 +238,7 @@ export class TicketsService {
     request: TicketIdRequest,
     context: CallerContext,
   ): Promise<ListTicketStatusChangesResponse> {
-    const ticket = await this.load(request.id, context);
+    const ticket = await this.access.loadForReading(request.id, context);
 
     const rows = await this.prisma.ticketStatusChange.findMany({
       where: { ticketId: ticket.id },
@@ -735,6 +737,10 @@ export class TicketsService {
 
   load(ticketId: string, context: CallerContext): Promise<Ticket> {
     return this.access.load(ticketId, context);
+  }
+
+  loadForReading(ticketId: string, context: CallerContext): Promise<Ticket> {
+    return this.access.loadForReading(ticketId, context);
   }
 
   /** The row a new ticket is, in one place — both branches above build it. */

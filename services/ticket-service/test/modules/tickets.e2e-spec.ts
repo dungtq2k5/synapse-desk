@@ -1502,14 +1502,42 @@ describe('Tickets (e2e)', () => {
       );
     });
 
-    it('a deleted ticket is invisible to getTicket too', async () => {
+    it('a deleted ticket is invisible to getTicket for anyone who cannot restore it', async () => {
       // The list filter alone is not the guarantee: an id that still resolves
       // by direct read is a row that never really went away.
       const gone = await createTicket(fx.prisma, tenant);
       await tickets.deleteTicket({ id: gone.id }, agent());
+      const queueOnly = memberContext(
+        { id: tenant.agentId, organizationId: tenant.organizationId },
+        ['ticket.read.all', 'ticket.update'],
+      );
 
       await expectRpc(
-        tickets.getTicket({ id: gone.id }, agent()),
+        tickets.getTicket({ id: gone.id }, queueOnly),
+        status.NOT_FOUND,
+      );
+      await expectRpc(
+        tickets.listTicketStatusChanges({ id: gone.id }, queueOnly),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('**whoever can restore a deleted ticket can open it, but not change it**', async () => {
+      const gone = await createTicket(fx.prisma, tenant);
+      await tickets.deleteTicket({ id: gone.id }, agent());
+
+      const opened = await tickets.getTicket({ id: gone.id }, agent());
+      expect(opened.id).toBe(gone.id);
+      expect(opened.deletedAt).toBeDefined();
+      await expect(
+        tickets.listTicketStatusChanges({ id: gone.id }, agent()),
+      ).resolves.toBeDefined();
+
+      await expectRpc(
+        tickets.updateTicket(
+          { id: gone.id, title: 'Renamed while deleted' } as never,
+          agent(),
+        ),
         status.NOT_FOUND,
       );
     });

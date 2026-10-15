@@ -124,20 +124,19 @@ describe('messages', () => {
         },
       });
 
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/tickets/${TICKET}/messages`,
-        headers([]),
-      );
+      const response = await new Session(gateway.baseUrl).get<{
+        data: { items: { id: string; editableUntil: string | null }[] };
+      }>(`${API}/tickets/${TICKET}/messages`, headers([]));
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({
-        data: {
-          items: [
-            { id: 'mine', editableUntil: '2025-09-01T00:15:00.000Z' },
-            { id: 'theirs', editableUntil: null },
-          ],
-        },
-      });
+      const [mine, theirs] = response.body.data.items;
+      expect(mine.id).toBe('mine');
+      // Parsed rather than matched as a string: the instant is the contract,
+      // not how many fractional digits a serializer writes.
+      expect(new Date(mine.editableUntil!).toISOString()).toBe(
+        '2025-09-01T00:15:00.000Z',
+      );
+      expect(theirs).toMatchObject({ id: 'theirs', editableUntil: null });
     },
   );
 

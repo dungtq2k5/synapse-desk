@@ -155,7 +155,7 @@ export class MessagesService {
     request: ListMessagesRequest,
     context: CallerContext,
   ): Promise<ListMessagesResponse> {
-    const ticket = await this.tickets.load(request.ticketId, context);
+    const ticket = await this.tickets.loadForReading(request.ticketId, context);
     const page = request.page ?? emptyPage();
     const { skip, take, orderBy } = toPrismaPage(
       page,

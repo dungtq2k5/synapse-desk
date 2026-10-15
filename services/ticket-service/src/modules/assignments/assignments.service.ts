@@ -151,7 +151,7 @@ export class AssignmentsService {
     // Through `load`, so the tenant and author/assignee filters apply. Querying
     // `ticket_assignments` by `ticketId` alone would be an unscoped read — the
     // table has no `organization_id` of its own to filter on.
-    const ticket = await this.tickets.load(request.ticketId, context);
+    const ticket = await this.tickets.loadForReading(request.ticketId, context);
 
     const items = await this.prisma.ticketAssignment.findMany({
       where: { ticketId: ticket.id },

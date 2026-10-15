@@ -130,6 +130,29 @@ describe('Ticket messages & attachments (e2e)', () => {
       expect(items).toHaveLength(2);
     });
 
+    it("**a deleted ticket's thread reads only for whoever can restore it**", async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      await createMessage(fx.prisma, ticket.id);
+      await fx.prisma.ticket.update({
+        where: { id: ticket.id },
+        data: { deletedAt: new Date(), deletedById: tenant.agentId },
+      });
+      const restorer = memberContext(
+        { id: tenant.agentId, organizationId: tenant.organizationId },
+        ['ticket.read.all', 'ticket.delete'],
+      );
+
+      await expectRpc(
+        messages.listMessages(listRequest(ticket.id), agent()),
+        status.NOT_FOUND,
+      );
+      const { items } = await messages.listMessages(
+        listRequest(ticket.id),
+        restorer,
+      );
+      expect(items).toHaveLength(1);
+    });
+
     it('3. excludes notes from the non-agent COUNT, not just the rows', async () => {
       // The test that matters: a filter applied at serialization
       // leaves the count intact, and `totalItems` would then tell an end user
