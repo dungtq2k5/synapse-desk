@@ -211,7 +211,8 @@ Socket.IO reconnects on its own. Your responsibilities on each reconnect:
 3. **Refetch what you missed.** The socket is a *delivery optimisation, not a channel of record*: every event here has a REST equivalent, and rows are always written before the frame is emitted. After a gap, re-read the feed and the thread rather than assuming continuity.
 
    **Not everything has a REST equivalent.** `typing`, `presence:*` and the AI stream chunks are socket-only — there is no presence or typing controller in the gateway. Those are ephemeral by design: after a gap there is nothing to refetch and nothing was lost that matters. Everything durable — tickets, messages, notifications, documents — does have a REST read.
-4. **Re-authenticate first if the cookie expired.** A refused handshake is a hard disconnect; reconnect attempts against an expired cookie will keep failing until you refresh the session over REST.
+4. **A revoked session is cut off.** Signing out, "sign out everywhere", a password change or a revoked session refuses the handshake, and a connected socket is disconnected within 5 seconds. Don't reconnect in a loop: refresh over REST first, and when that fails too, the person is signed out.
+5. **Re-authenticate first if the cookie expired.** A refused handshake is a hard disconnect; reconnect attempts against an expired cookie will keep failing until you refresh the session over REST.
 
 ---
 

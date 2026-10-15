@@ -49,7 +49,7 @@ A Turborepo monorepo in three parts: `apps/` holds the clients, `services/` hold
 | [`docker/`](docker/) | The Dockerfiles and the image checks |
 | [`scripts/`](scripts/) | Key generation, seeding, schema verification, generators |
 
-Backing services, all from `docker-compose.yml`: four Postgres instances (one per schema-owning service — there are no cross-service foreign keys), Redis, NATS with JetStream, Qdrant, and the Firebase emulators (the `firebase` service: Storage on 9199, Authentication on 9099, so Google sign-in works locally with no Google account).
+Backing services, all from `docker-compose.yml`: four Postgres instances (one per schema-owning service — there are no cross-service foreign keys), Redis, NATS with JetStream, Qdrant, and the Firebase emulators (the `firebase` service: Storage on 9199, Authentication on 9099, so Google sign-in works locally with no Google account; presigned uploads work against it too: storage-service hands out the emulator's own upload URL, with `uploadMethod: POST`, since the emulator refuses signed URLs).
 
 ## Documentation
 
