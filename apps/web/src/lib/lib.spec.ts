@@ -3,7 +3,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { WEB_ROUTES } from '@synapsedesk/contracts';
+import { TICKET_STATUS_TRANSITIONS, WEB_ROUTES } from '@synapsedesk/contracts';
 import {
   absoluteTime,
   clockTime,
@@ -13,6 +13,7 @@ import {
   relativeTime,
 } from './format';
 import { PASSWORD_RULES } from './password-rules';
+import { statusMoves } from './tickets';
 import { ok, stubApi } from '@/test/api';
 import {
   afterSignIn,
@@ -192,5 +193,37 @@ describe('format', () => {
     expect(initials('Priya Anand Shah')).toBe('PS');
     expect(initials('Cher')).toBe('C');
     expect(firstName('Priya Shah')).toBe('Priya');
+  });
+});
+
+describe('statusMoves', () => {
+  const moves = (from: Parameters<typeof statusMoves>[0]) =>
+    statusMoves(from, TICKET_STATUS_TRANSITIONS).map(
+      ({ item, route, permission }) => [item, route, permission],
+    );
+
+  it('from New: open through the status route, escalate through its own', () => {
+    expect(moves('NEW')).toEqual([
+      ['Mark as open…', 'status', 'ticket.update'],
+      ['Escalate…', 'escalate', null],
+    ]);
+  });
+
+  it('from Resolved: back to Open is a reopen; Close needs ticket.resolve', () => {
+    expect(moves('RESOLVED')).toEqual([
+      ['Close…', 'close', 'ticket.resolve'],
+      ['Reopen…', 'reopen', 'ticket.update'],
+    ]);
+  });
+
+  it('every status offers exactly the moves the server allows', () => {
+    for (const [from, allowed] of Object.entries(TICKET_STATUS_TRANSITIONS)) {
+      expect(
+        statusMoves(
+          from as keyof typeof TICKET_STATUS_TRANSITIONS,
+          TICKET_STATUS_TRANSITIONS,
+        ).map(({ to }) => to),
+      ).toEqual(allowed);
+    }
   });
 });

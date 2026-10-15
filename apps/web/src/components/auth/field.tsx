@@ -1,5 +1,6 @@
 import { CircleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { CharacterCount } from '@/components/ui/character-count';
 import { Label } from '@/components/ui/label';
 
 /**
@@ -18,6 +19,7 @@ export function Field({
   description,
   error,
   announce = false,
+  count,
   children,
 }: {
   id: string;
@@ -31,12 +33,15 @@ export function Field({
    * so it is announced (`role="alert"`) as well as tied to the control.
    */
   announce?: boolean;
+  /** A length limit: "{n}/{max}" beside the label, read near the limit. */
+  count?: { length: number; max: number };
   children: (aria: {
     'aria-describedby'?: string;
     'aria-invalid'?: true;
   }) => ReactNode;
 }) {
   const described = [
+    count ? `${id}-count` : null,
     description ? `${id}-description` : null,
     error ? `${id}-error` : null,
   ].filter(Boolean);
@@ -46,6 +51,7 @@ export function Field({
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor={id}>{label}</Label>
         {labelAside}
+        {count && <CharacterCount id={`${id}-count`} {...count} />}
       </div>
       {children({
         'aria-describedby': described.length ? described.join(' ') : undefined,

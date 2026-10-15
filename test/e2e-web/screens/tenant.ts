@@ -19,7 +19,8 @@ import { api, clearThrottles, DEMO_PASSWORD } from '../support';
  *
  * Built through the gateway as people would make it: Maya Chen founds
  * "Northwind Health", Priya Shah joins as a member, Jordan Lee joins and is
- * made a Support Agent. Tickets are raised on Priya's behalf. The AI's
+ * made a Support Agent. Maya works in Workplace and Facilities, Jordan in
+ * Workplace. Tickets are raised on Priya's behalf. The AI's
  * answers and an attachment are written to ticket-service's database
  * directly: the AI needs a model, and an upload needs object storage.
  *
@@ -32,6 +33,7 @@ export type Tenant = {
   jordan: Person;
   priya: Person;
   departmentId: string;
+  facilitiesId: string;
   tickets: Record<TicketKey, string>;
 };
 type TicketKey = keyof typeof TICKETS;
@@ -151,6 +153,20 @@ async function build(slug: string): Promise<Tenant> {
     '/departments',
     { name: 'Workplace' },
   );
+  const { id: facilitiesId } = await api<{ id: string }>(
+    mayaSession,
+    'POST',
+    '/departments',
+    { name: 'Facilities' },
+  );
+  // Maya works in both, Jordan in Workplace: "Assign to me" asks which, and
+  // the Assign dialog has people to list.
+  await api(mayaSession, 'POST', `/departments/${departmentId}/members`, {
+    userIds: [maya.id, jordan.id],
+  });
+  await api(mayaSession, 'POST', `/departments/${facilitiesId}/members`, {
+    userIds: [maya.id],
+  });
   // Set up, as a team at work would be: the setup checklist is drawn by the
   // rows that need it.
   await api(mayaSession, 'POST', '/organizations/current/onboarding/complete');
@@ -206,7 +222,7 @@ async function build(slug: string): Promise<Tenant> {
   for (const session of [mayaSession, priyaSession, jordanSession]) {
     await session.dispose();
   }
-  return { maya, jordan, priya, departmentId, tickets };
+  return { maya, jordan, priya, departmentId, facilitiesId, tickets };
 }
 
 /** Every kind of entry, in the order a reader meets them. */

@@ -20,6 +20,8 @@ export function useViewer() {
     user: query.data?.data?.user ?? null,
     /** False for someone who has only ever signed in with Google. */
     hasPassword: query.data?.data?.hasPassword ?? true,
+    /** The departments they belong to, by id. */
+    departmentIds: query.data?.data?.departmentIds ?? [],
     can: (code: PermissionCode) => codes.includes(code),
     isAgent:
       codes.includes('ticket.read.all') ||

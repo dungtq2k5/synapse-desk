@@ -14,6 +14,8 @@ import { lastSocket } from '@/test/socket';
 import { TicketView } from './ticket-view';
 
 jest.mock('socket.io-client', () => jest.requireActual('@/test/socket'));
+const push = jest.fn();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 // The header needs the sidebar's provider; its crumbs are all this page sets.
 jest.mock('@/components/shell/app-header', () => ({
   AppHeader: ({ crumbs }: { crumbs: { label: string }[] }) => (
@@ -74,6 +76,7 @@ const messageOf = (over: Partial<MessageResponseDto>): MessageResponseDto => ({
   excludedFromAiContext: false,
   answerStatus: null,
   citations: null,
+  editableUntil: null,
   ...over,
 });
 
@@ -83,6 +86,8 @@ const page = (items: MessageResponseDto[]) =>
 type Setup = {
   viewer?: typeof PRIYA;
   agent?: boolean;
+  /** The viewer's permissions; an agent without them holds `ticket.read.all`. */
+  codes?: string[];
   ticket?: TicketResponseDto;
   messages?: MessageResponseDto[];
   routes?: Parameters<typeof stubApi>[0];
@@ -91,6 +96,7 @@ type Setup = {
 function setup({
   viewer = PRIYA,
   agent = false,
+  codes = agent ? ['ticket.read.all'] : [],
   ticket = ticketOf(),
   messages = [],
   routes = {},
@@ -99,7 +105,7 @@ function setup({
   const calls = stubApi({
     'GET /api/v1/users/me': ok({
       user: viewer,
-      permissionCodes: agent ? ['ticket.read.all'] : [],
+      permissionCodes: codes,
       departmentIds: [],
     }),
     'GET /api/v1/tickets/t1': () => state.ticket,
@@ -684,6 +690,83 @@ describe('the ticket page', () => {
       } finally {
         polite.remove();
       }
+    });
+  });
+  describe('the action bar', () => {
+    it('offers an agent only what their permissions allow', async () => {
+      const { user } = setup({ viewer: ANA, agent: true });
+      await loaded();
+      const bar = screen.getByRole('toolbar', { name: 'Ticket actions' });
+
+      // From Open, escalating needs no permission; the rest need theirs.
+      expect(within(bar).getAllByRole('button')).toHaveLength(1);
+      await user.click(
+        within(bar).getByRole('button', {
+          name: 'Status: Open. Change status',
+        }),
+      );
+      expect(
+        (await screen.findAllByRole('menuitem')).map(
+          (item) => item.textContent,
+        ),
+      ).toEqual(['Escalate…']);
+    });
+
+    it('is not there for the person who raised the ticket', async () => {
+      setup();
+      await loaded();
+
+      expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
+    });
+
+    it('Undo after Unassign assigns the same person in the same department', async () => {
+      const success = jest
+        .spyOn(toast, 'success')
+        .mockImplementation(() => 'id');
+      const { calls, user } = setup({
+        viewer: ANA,
+        agent: true,
+        codes: ['ticket.read.all', 'ticket.assign'],
+        ticket: ticketOf({
+          currentAssigneeId: 'ben',
+          assignee: { id: 'ben', fullName: 'Ben Ito', avatarUrl: null },
+          currentDepartmentId: 'd1',
+          department: { id: 'd1', name: 'Billing' },
+        }),
+        routes: {
+          'DELETE /api/v1/tickets/t1/assign': { status: 204 },
+          'POST /api/v1/tickets/t1/assign': ok({}),
+          'GET /api/v1/tickets/t1/assignments': ok([]),
+          'GET /api/v1/tickets': ok({ items: [] }),
+        },
+      });
+      await loaded();
+
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+      await user.click(
+        await screen.findByRole('menuitem', { name: 'Unassign' }),
+      );
+      await waitFor(() =>
+        expect(success).toHaveBeenCalledWith(
+          'Ticket #1042 is unassigned',
+          expect.anything(),
+        ),
+      );
+      const [, options] = success.mock.calls[0] as [
+        string,
+        { action: { label: string; onClick: () => void } },
+      ];
+      expect(options.action.label).toBe('Undo');
+      act(() => options.action.onClick());
+
+      await waitFor(() =>
+        expect(
+          calls.find(
+            (call) => call.method === 'POST' && call.url.endsWith('/assign'),
+          )?.body,
+        ).toEqual({ assigneeId: 'ben', departmentId: 'd1' }),
+      );
+      success.mockRestore();
     });
   });
 });
