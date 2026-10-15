@@ -1,9 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
-import type Redis from 'ioredis';
+import Redis from 'ioredis';
 import { REVOKED_SESSION_KEY_PREFIX } from '@synapsedesk/contracts';
-import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 
 /**
  * Tells the gateway a session family is gone, so its access tokens stop
@@ -16,10 +15,18 @@ import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
  *
  * A failed write is logged, not thrown: the rows are already deleted, and the
  * token's own expiry is the backstop.
+ *
+ * **Its own client, on `REDIS_URL`'s database alone**, not the limit-alerts
+ * client: that one applies `REDIS_DB`, and the gateway reads the key from the
+ * database `REDIS_URL` names and nothing else. With `REDIS_DB` set, a write
+ * through it would land where the gateway never looks, and a signed-out
+ * device would keep working with no error anywhere.
  */
 @Injectable()
-export class RevokedSessions {
+export class RevokedSessions implements OnModuleDestroy {
   private readonly logger = new Logger(RevokedSessions.name);
+
+  private readonly redis: Redis;
 
   /**
    * An access token's lifetime in seconds, as `JwtModule` reads
@@ -28,10 +35,11 @@ export class RevokedSessions {
    */
   private readonly ttlSeconds: number;
 
-  constructor(
-    @Inject(LIMIT_ALERT_REDIS) private readonly redis: Redis,
-    config: ConfigService,
-  ) {
+  constructor(config: ConfigService) {
+    this.redis = new Redis(config.getOrThrow<string>('REDIS_URL'), {
+      // Two retries, then fail: `mark` logs a failure rather than waiting.
+      maxRetriesPerRequest: 2,
+    });
     const probe = new JwtService({
       secret: 'lifetime-probe',
       signOptions: {
@@ -42,6 +50,10 @@ export class RevokedSessions {
       probe.sign({}),
     );
     this.ttlSeconds = exp - iat;
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.redis.quit();
   }
 
   /** Marks these families revoked for the gateway. */
