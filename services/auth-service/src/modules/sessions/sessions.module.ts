@@ -5,7 +5,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { SessionsService } from './sessions.service';
 import { SessionsGrpcController } from './sessions-grpc.controller';
 import { RevokedSessions } from './revoked-sessions';
-import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 
 /**
  * Exports SessionsService because `POST /auth/logout/all`, `PATCH
@@ -14,7 +13,7 @@ import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
  * device trust with it?" a single answer rather than four.
  */
 @Module({
-  imports: [PrismaModule, AuditModule, NotificationsModule, LimitAlertsModule],
+  imports: [PrismaModule, AuditModule, NotificationsModule],
   controllers: [SessionsGrpcController],
   // The expired-records pruner has moved to `SchedulerModule`.
   // It used to live here and run itself via `@Cron`; it is a plain method now,

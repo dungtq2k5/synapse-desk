@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { EmailTemplateName } from '@synapsedesk/contracts';
 import { JwtService } from '@nestjs/jwt';
-import type Redis from 'ioredis';
+import Redis from 'ioredis';
+import { ConfigService } from '@nestjs/config';
 import { REVOKED_SESSION_KEY_PREFIX } from '@synapsedesk/contracts';
 import {
   bootstrapE2eTest,
@@ -18,7 +20,7 @@ import {
   seedTenantWithUser,
   TEST_PASSWORD,
 } from '../factories';
-import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
+import { RevokedSessions } from '../../src/modules/sessions/revoked-sessions';
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 
@@ -536,12 +538,14 @@ describe('Sessions (e2e)', () => {
    * long as an access token lives: the token stops now, not at expiry.
    */
   describe('revoked families, for the gateway', () => {
+    /** The database the gateway reads: `REDIS_URL`'s, nothing else. */
     let redis: Redis;
     let jwt: JwtService;
     beforeAll(() => {
-      redis = fx.moduleRef.get(LIMIT_ALERT_REDIS);
+      redis = new Redis(process.env.REDIS_URL!);
       jwt = fx.moduleRef.get(JwtService);
     });
+    afterAll(() => redis.quit());
 
     const sidOf = (accessToken: string) =>
       jwt.decode<{ sid?: string }>(accessToken).sid;
@@ -602,6 +606,30 @@ describe('Sessions (e2e)', () => {
 
       expect(await markOf(other.session.familyId)).toBeGreaterThan(0);
       expect(await markOf(mine.session.familyId)).toBe(-2);
+    });
+
+    it("R6. with REDIS_DB set, the mark still lands in REDIS_URL's database", async () => {
+      // REDIS_DB steers the BullMQ-facing clients; the gateway never reads it.
+      const config = fx.moduleRef.get(ConfigService);
+      const elsewhere = new Redis(process.env.REDIS_URL!, { db: 1 });
+      const revoked = new RevokedSessions({
+        get: (key: string) => (key === 'REDIS_DB' ? 1 : config.get(key)),
+        getOrThrow: (key: string) =>
+          key === 'REDIS_DB' ? 1 : config.getOrThrow(key),
+      } as unknown as ConfigService);
+      const familyId = randomUUID();
+
+      try {
+        await revoked.mark([familyId]);
+
+        expect(await markOf(familyId)).toBeGreaterThan(0);
+        expect(
+          await elsewhere.exists(`${REVOKED_SESSION_KEY_PREFIX}${familyId}`),
+        ).toBe(0);
+      } finally {
+        await revoked.onModuleDestroy();
+        await elsewhere.quit();
+      }
     });
 
     it('R5. signing out marks the session signed out of', async () => {
