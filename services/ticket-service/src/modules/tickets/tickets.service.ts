@@ -288,9 +288,17 @@ export class TicketsService {
     // Defaults to the caller. An explicit `authorId` exists so an agent can
     // raise a ticket on behalf of an end user — which is exactly the case that
     // must be validated, since it is the only one where the id did not come
-    // from a verified token.
+    // from a verified token. Only an agent may: anyone else could raise a
+    // ticket in a colleague's name, in their list and their history.
+    // (Inbound mail passes the resolved sender, who is also the caller.)
     const authorId = request.authorId || actorId;
     if (authorId !== actorId) {
+      if (!this.access.isAgent(context)) {
+        throw new RpcException({
+          code: status.PERMISSION_DENIED,
+          message: 'Only an agent can raise a ticket on behalf of someone else',
+        });
+      }
       await this.authReference.assertUserExists(authorId, context);
     }
 
