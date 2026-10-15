@@ -146,7 +146,7 @@ _Audit actions:_ `USER_LOGIN`, `USER_LOGIN_FAILED`, `USER_LOGOUT_ALL`, `REFRESH_
 
 ### 1.3 Device Sessions — `/auth/sessions`
 
-**Revocation is immediate.** Each access token carries `sid`, its session family. Every revocation (revoke a session, sign out, sign out everywhere, a password change or reset, an admin revoke, a locked or deleted account, refresh-token reuse) writes `revoked-session:{family}` to Redis for one access-token lifetime. The gateway refuses a revoked family on the next request (401) and at the socket handshake, and disconnects a connected socket within 5 seconds. **If Redis is down it fails open**, logged at WARN: the token's own 15 minutes are then the limit.
+**Revocation is immediate.** Each access token carries `sid`, its session family. Every revocation (revoke a session, sign out, sign out everywhere, a password change or reset, an admin revoke, a locked or deleted account, refresh-token reuse) writes `revoked-session:{family}` to Redis for one access-token lifetime. auth-service writes it to the database in `REDIS_URL`, the one the gateway reads, never to `REDIS_DB`'s. The gateway refuses a revoked family on the next request (401) and at the socket handshake, and disconnects a connected socket within 5 seconds. **If Redis is down it fails open**, logged at WARN: the token's own 15 minutes are then the limit.
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
