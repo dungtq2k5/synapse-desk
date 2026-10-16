@@ -154,9 +154,12 @@ export enum SystemRoleName {
 /**
  * Default grants per system role (api-endpoints-plan).
  *
- * END_USER holds no permission rows on purpose: own-ticket access, `/chat/*`
- * and `/knowledge/search` are authorized by ownership and tenancy, not RBAC.
- * It exists so every registered user has a role to carry.
+ * END_USER holds one permission, `ticket.create`: opening a ticket from the
+ * form. A member can already create tickets by chat and by email, and the form
+ * is the same act without the AI. Raising one for someone else stays an
+ * agent's (the on-behalf rule). Everything else a member does (their own
+ * tickets, `/chat/*`, `/knowledge/search`) is authorized by ownership and
+ * tenancy, not RBAC.
  */
 export const SYSTEM_ROLE_PERMISSIONS: Record<
   SystemRoleName,
@@ -192,7 +195,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<
     'department.read',
   ],
 
-  [SystemRoleName.END_USER]: [],
+  [SystemRoleName.END_USER]: ['ticket.create'],
 };
 
 export const SYSTEM_ROLE_DESCRIPTIONS: Record<SystemRoleName, string> = {
