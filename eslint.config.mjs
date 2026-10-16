@@ -103,6 +103,11 @@ export default defineConfig(
     languageOptions: {
       globals: { ...globals.browser },
       sourceType: 'module',
+      // Only the web's own program. With the whole list above, a web file's
+      // type information was looked for project by project, building the
+      // services' programs on the way: the web lint peaked at 4.8 GB, over
+      // Node's default heap, and now at 1.7 GB.
+      parserOptions: { project: ['./apps/web/tsconfig.json'] },
     },
     plugins: { '@next/next': nextPlugin, 'react-hooks': reactHooks },
     // The Next.js rules look for the app from the repository root otherwise.
