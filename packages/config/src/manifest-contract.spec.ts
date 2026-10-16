@@ -400,6 +400,7 @@ describe('the manifest contract', () => {
     const EXCLUDED = new Set([
       'FIREBASE_STORAGE_EMULATOR_HOST',
       'FIREBASE_AUTH_EMULATOR_HOST',
+      'RAG_OFFLINE_MODEL',
     ]);
 
     /** rag-service declares its variables in Python; its guard is pytest. */
@@ -482,6 +483,7 @@ describe('the manifest contract', () => {
             ({ doc }) => doc.metadata?.name === 'rag-service-secret',
           )?.doc.stringData ?? {},
         ),
+        ...EXCLUDED,
       ]);
 
       // Narrowed to the ones `.env.example` also documents, so a plain string

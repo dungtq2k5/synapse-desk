@@ -56,6 +56,7 @@ from rag_service.generation.parts import Attachment
 from rag_service.ledger.client import LedgerClient
 from rag_service.ledger.metered import MeteredGenerator
 from rag_service.ledger.quota import QuotaCounter
+from rag_service.offline import OfflineEmbeddingClient, OfflineGenerator
 from rag_service.preprocess.greeting import Intent, refusal_reply
 from rag_service.preprocess.injection import InjectionGuard, LlmInjectionClassifier
 from rag_service.preprocess.pipeline import (
@@ -813,15 +814,28 @@ def build_injection_guard(config: Config, metered) -> InjectionGuard:
     )
 
 
-# Real clients only; the tests build their own collaborators.
-async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cover
-    """Constructs the real collaborators. Tests build their own.
+def select_providers(config: Config) -> tuple[EmbeddingClient, ProviderClient]:
+    """The embedding client and the generator: the real provider, or with
+    `RAG_OFFLINE_MODEL` the model-free one (`rag_service.offline`).
 
-    Which is why the key check lives HERE and not in `load_config`: the suite
-    never reaches this function, so a developer running the tests needs no
-    Gemini key — the embedding client is substituted outright — while anyone
-    starting a real server needs one before the first question, not after it.
+    The offline model is refused under `APP_ENV=production`, at boot: real
+    questions answered by fixed text would look like a working assistant.
+    The real provider needs `GEMINI_API_KEY`, checked here for the same
+    reason: the first failure should name the variable, not a frame inside
+    `google.genai`.
     """
+    if config.offline_model:
+        if config.app_env == "production":
+            raise RuntimeError(
+                "RAG_OFFLINE_MODEL is set under APP_ENV=production. The offline "
+                "model answers with fixed text and is for the end-to-end stack "
+                "only; unset it."
+            )
+        logger.warning(
+            "RAG_OFFLINE_MODEL is set: answering with the model-free provider"
+        )
+        return OfflineEmbeddingClient(), OfflineGenerator()
+
     if not config.gemini_api_key:
         # Checked before constructing anything. Without it the first failure is
         # `ValueError: Missing key inputs argument!` raised inside
@@ -832,6 +846,22 @@ async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cove
             "generation; set it in services/rag-service/.env. (The test suite does "
             "not — it substitutes the embedding client.)"
         )
+    return GeminiEmbeddingClient(config.gemini_api_key), GeminiGenerator(
+        config.gemini_api_key
+    )
+
+
+# Real clients only; the tests build their own collaborators.
+async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cover
+    """Constructs the real collaborators. Tests build their own.
+
+    Which is why the provider checks (`select_providers`) run HERE and not in
+    `load_config`: the suite never reaches this function, so a developer
+    running the tests needs no Gemini key — the embedding client is substituted
+    outright — while anyone starting a real server needs one before the first
+    question, not after it.
+    """
+    embeddings, generator = select_providers(config)
 
     qdrant = AsyncQdrantClient(url=config.qdrant_url)
     await ensure_collection(qdrant)
@@ -847,14 +877,13 @@ async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cove
     # One provider client, shared. Layer B's classification is the same cheap
     # tier the preprocessing steps already use, so giving it its own client
     # would mean a second connection pool for the same model.
-    generator = GeminiGenerator(config.gemini_api_key)
     ledger = LedgerClient(channel)
 
     return Dependencies(
         qdrant=qdrant,
         pool=pool,
         redis=client,
-        embeddings=GeminiEmbeddingClient(config.gemini_api_key),
+        embeddings=embeddings,
         reranker=FlashRankReranker(),
         injection=build_injection_guard(
             config, MeteredGenerator(generator, ledger, QuotaCounter(client))

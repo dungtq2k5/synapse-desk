@@ -47,6 +47,14 @@ class Config:
     #: would mean the common deployment has no injection defence at all.
     injection_regex_enabled: bool
 
+    #: `production` in a cluster, `development` anywhere else. Read only to
+    #: refuse the offline model where real answers are expected.
+    app_env: str
+
+    #: The model-free provider (`rag_service.offline`), for the end-to-end
+    #: stack only. Off by default, and refused under `app_env == "production"`.
+    offline_model: bool
+
     #: Layer B, the cheap-tier classification. On by default — unlike its
     #: predecessor, it costs one label on a call `Chat` was already making, and
     #: it is multilingual because the provider is.
@@ -80,6 +88,8 @@ def load_config() -> Config:
         # kind of strict.
         injection_regex_enabled=_flag("INJECTION_REGEX_ENABLED", default=True),
         injection_llm_enabled=_flag("INJECTION_LLM_ENABLED", default=True),
+        app_env=os.environ.get("APP_ENV", "development"),
+        offline_model=_flag("RAG_OFFLINE_MODEL", default=False),
     )
 
 

@@ -133,6 +133,10 @@ const EXCLUDED = new Map([
     'FIREBASE_AUTH_EMULATOR_HOST',
     'production verifies real Google sign-ins; setting this points the SDK at an emulator that is not there',
   ],
+  [
+    'RAG_OFFLINE_MODEL',
+    'production answers with the real model; rag-service refuses to boot with the offline one under APP_ENV=production',
+  ],
 ]);
 
 /** Host address → in-cluster address. Lifted from `generate-docker-env.mjs`. */
@@ -166,6 +170,8 @@ const CLUSTER = {
     SWAGGER_ENABLED: 'false',
   },
   'rag-service': {
+    // Python documents no `NODE_ENV`; this is its name for the same thing.
+    APP_ENV: 'production',
     GRPC_HOST: '0.0.0.0',
     GRPC_PORT: '50255',
   },
