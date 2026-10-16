@@ -49,6 +49,10 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // away without waiting a quarter of an hour, and a screen row's own fresh
   // message is still well inside it. The services inherit this environment.
   process.env.MESSAGE_EDIT_WINDOW_MINUTES = '1';
+  // rag-service's model-free mode: fixed embeddings, and answers in fixed
+  // text that cite their sources, with no key and no network. A run means
+  // the same on every machine; the real model is the Python job's to test.
+  process.env.RAG_OFFLINE_MODEL = 'true';
   await systemSetup();
 
   completeStandalone();

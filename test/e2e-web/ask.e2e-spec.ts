@@ -1,18 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
-import { sessionAs, signInAs, tenant } from './screens/tenant';
 import {
-  api,
-  clearThrottles,
-  DEMO_PASSWORD,
-  seededActors,
-  signIn,
-} from './support';
+  knowledgeDocument,
+  sessionAs,
+  signInAs,
+  tenant,
+} from './screens/tenant';
+import { api, clearThrottles } from './support';
 
 /**
- * Asking and the knowledge base, end to end, through the real services. The
- * stack's rag-service calls a real model, so what it answers is not asserted:
- * only that an answer, or the hand-over to a person, arrives in the thread.
- * The knowledge rows read the demo seed's documents.
+ * Asking and the knowledge base, end to end, through the real services, with
+ * rag-service in its model-free mode (global-setup.ts): its answers are fixed
+ * text citing their sources, so they are asserted word for word. The knowledge
+ * journeys read one policy written for their tenant (`knowledgeDocument`).
  */
 test.beforeEach(clearThrottles);
 
@@ -41,36 +40,29 @@ test('an end user asks; the answer comes, they hand over, and an agent replies i
     ),
   ).toBeVisible();
 
-  // The first answer: written by the model, or the team told instead.
+  // The tenant has no documents, so the first answer is a miss (rag-service
+  // runs its model-free mode here), and the thread offers a person.
   await expect(
-    thread(page)
-      .getByText(/^(AI answer|AI)$/)
-      .or(thread(page).getByText(/Escalated to the support team/))
-      .first(),
-  ).toBeVisible({ timeout: 90_000 });
+    thread(page).getByText(
+      'Not what you needed? A person from the support team can take over.',
+    ),
+  ).toBeVisible({ timeout: 30_000 });
   await expect(thread(page).getByText('Writing an answer…')).toBeHidden();
-
-  const priyas = await sessionAs(priya);
-  await api(priyas, 'POST', `/tickets/${ticketId}/escalate`, {
-    reason: 'Asked for a person',
-  }).catch(() => undefined);
-  await priyas.dispose();
+  await thread(page).getByRole('button', { name: 'Ask a person' }).click();
+  await expect(
+    thread(page).getByText(
+      'Escalated to the support team. A person will reply here.',
+    ),
+  ).toBeVisible();
 
   const mayas = await sessionAs(maya);
+  await api(mayas, 'POST', `/tickets/${ticketId}/assign/self`, {
+    departmentId,
+  });
   await api(mayas, 'POST', `/tickets/${ticketId}/messages`, {
     content: 'Yes, desks are in scope. Send me the quote.',
     isInternalNote: false,
     invokeAi: false,
-  }).catch(async () => {
-    // Only the holder may reply: take it first.
-    await api(mayas, 'POST', `/tickets/${ticketId}/assign/self`, {
-      departmentId,
-    });
-    await api(mayas, 'POST', `/tickets/${ticketId}/messages`, {
-      content: 'Yes, desks are in scope. Send me the quote.',
-      isInternalNote: false,
-      invokeAi: false,
-    });
   });
   await mayas.dispose();
   await expect(
@@ -140,69 +132,62 @@ test('an agent asks from Ask, and finds it under their latest questions', async 
 });
 
 test.describe('the knowledge base', () => {
-  /** The demo seed's member, whose organization has documents. */
-  const asColleague = async (page: Page) => {
-    const { colleague } = await seededActors();
-    await signIn(page, colleague.email, DEMO_PASSWORD);
-    await expect(page).toHaveURL(/\/ask$/);
+  /**
+   * Priya, in a tenant with one searchable policy across two pages of blocks
+   * (the reader pages twenty at a time), signed in on Knowledge.
+   */
+  const withPolicy = async (page: Page, name: string) => {
+    const { maya, priya } = await tenant(name);
+    const mayas = await sessionAs(maya);
+    const { id: organizationId } = await api<{ id: string }>(
+      mayas,
+      'GET',
+      '/organizations/current',
+    );
+    await mayas.dispose();
+    const policy = await knowledgeDocument(maya, organizationId, {
+      title: 'Remote Work Policy.pdf',
+      passages: Array.from({ length: 25 }, (_, index) => ({
+        page: index + 1,
+        text:
+          index === 21
+            ? 'Each employee has a home-office allowance of 450 a year. The allowance resets on 1 January.'
+            : `Section ${index + 1} covers working hours, equipment and expenses.`,
+      })),
+    });
+    await signInAs(page, priya);
+    return policy;
   };
 
-  test('an article from the list: paged, opened at a cited passage, its original downloaded', async ({
+  test('an article from the list: paged, opened at a cited passage, its original asked for', async ({
     page,
   }) => {
-    await asColleague(page);
+    const policy = await withPolicy(page, 'j-article');
     await page.goto('/knowledge');
-    const first = page
+    await page
       .getByRole('region', { name: 'Articles' })
-      .getByRole('link')
-      .first();
-    await expect(first).toBeVisible();
-    const title = (await first.textContent())!;
-
-    // Paged: the next page lists other articles, when there is one.
-    const next = page.getByRole('button', { name: 'Next' });
-    if (await next.isEnabled()) {
-      await next.click();
-      await expect(page.getByText(/^Showing 9–/)).toBeVisible();
-      await page.getByRole('button', { name: 'Previous' }).click();
-    }
-
-    await page.getByRole('link', { name: title }).first().click();
+      .getByRole('link', { name: 'Remote Work Policy.pdf' })
+      .click();
     await expect(
-      page.getByRole('heading', { name: title, level: 1 }),
+      page.getByRole('heading', { name: 'Remote Work Policy.pdf', level: 1 }),
     ).toBeVisible();
-    const href = page.url();
+    // Paged by blocks: the second page is a click away.
+    await page.getByRole('button', { name: 'Show later passages' }).click();
+    await expect(
+      page.getByText('Section 25 covers working hours'),
+    ).toBeVisible();
 
-    // A passage of it, found the way a citation names one.
-    const firstBlock = await page
-      .getByRole('article')
-      .locator('p.text-base')
-      .first()
-      .textContent();
-    const word = firstBlock!.split(/\s+/).find((w) => /^\w{6,}$/.test(w))!;
-    const found = await page.request.post('/api/v1/knowledge/search', {
-      data: { query: word },
-    });
-    const { chunks } = (
-      (await found.json()) as {
-        data: { chunks: { chunkId: string; documentId: string }[] };
-      }
-    ).data;
-    const documentId = href.split('/').at(-1)!.split('?')[0];
-    const passage = chunks.find((chunk) => chunk.documentId === documentId);
-    if (passage) {
-      await page.goto(
-        `/knowledge/articles/${documentId}?passage=${passage.chunkId}`,
-      );
-      await expect(
-        page.getByRole('region', { name: 'Cited passage' }),
-      ).toBeFocused();
-    }
+    // Opened at a passage on the second page, the way a citation opens it.
+    await page.goto(
+      `/knowledge/articles/${policy.id}?passage=${policy.passageIds[21]}`,
+    );
+    const cited = page.getByRole('region', { name: 'Cited passage' });
+    await expect(cited).toBeFocused();
+    await expect(cited).toContainText('The allowance resets on 1 January.');
 
-    // The demo seed writes documents' rows, not their files, so the gateway
-    // answers this one's download with a 404: the reader says so.
+    // The fixture stores no file, so the gateway answers 404: the reader says so.
     const asked = page.waitForResponse((response) =>
-      response.url().endsWith(`/api/v1/documents/${documentId}/download`),
+      response.url().endsWith(`/api/v1/documents/${policy.id}/download`),
     );
     await page
       .getByRole('button', { name: 'Download original' })
@@ -214,61 +199,44 @@ test.describe('the knowledge base', () => {
     ).toBeVisible();
   });
 
-  test('a search: the passages and the answer card; a miss asks it as a conversation', async ({
+  test('a search: the passages and the answer card, citing them; a miss asks it as a conversation', async ({
     page,
   }) => {
-    await asColleague(page);
+    await withPolicy(page, 'j-search');
     await page.goto('/knowledge');
     await page
       .getByRole('searchbox', { name: 'Search the knowledge base' })
-      .fill('policy');
-    // Whatever the model says, the passages and the card settle.
-    await expect(
-      page
-        .getByText(/^\d+ passages?$/)
-        .or(page.getByRole('heading', { name: /^No passages match/ })),
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(
-      page.getByRole('main').getByText('Couldn’t search the knowledge base'),
-    ).toHaveCount(0);
+      .fill('allowance');
+    await expect(page.getByText('1 passage', { exact: true })).toBeVisible();
 
-    // A miss, played in at the network: the model decides when it misses.
-    await page.route('**/api/v1/knowledge/ask', (route) =>
-      route.fulfill({
-        json: {
-          success: true,
-          statusCode: 200,
-          message: 'OK',
-          data: {
-            content: 'Not in the documents.',
-            status: 'DOC_MISSING',
-            citations: [],
-            generationId: 'g1',
-          },
-        },
-      }),
-    );
-    // The new query's own card, not the last one's: wait for its question.
-    const asked = page.waitForRequest(
-      (request) =>
-        request.url().endsWith('/api/v1/knowledge/ask') &&
-        (request.postData() ?? '').includes('parking permit for visitors'),
-    );
+    // rag-service's model-free answer: fixed text, citing what it was given.
+    const card = page.getByRole('region', { name: 'AI answer' });
+    await expect(
+      card.getByText('This answer comes from the offline model, citing [1].'),
+    ).toBeVisible();
+    await card
+      .getByRole('link', { name: 'Remote Work Policy.pdf, page 22, source 1' })
+      .click();
+    await expect(
+      page.getByRole('region', { name: 'Cited passage' }),
+    ).toContainText('The allowance resets on 1 January.');
+
+    // Nothing retrieved: the answer is a miss, which offers a conversation.
+    await page.goto('/knowledge');
     await page
       .getByRole('searchbox', { name: 'Search the knowledge base' })
-      .fill('parking permit for visitors');
-    await asked;
+      .fill('parking permit');
     await page.getByRole('button', { name: 'Ask as a conversation' }).click();
     await expect(page).toHaveURL(/\/ask$/);
     await expect(
       page.getByRole('textbox', { name: 'Your question' }),
-    ).toHaveValue('parking permit for visitors');
+    ).toHaveValue('parking permit');
   });
 
   test('the allowance used up: the answer card steps aside, the passages stay', async ({
     page,
   }) => {
-    await asColleague(page);
+    await withPolicy(page, 'j-at-cap');
     await page.route('**/api/v1/knowledge/ask', (route) =>
       route.fulfill({
         status: 402,
@@ -278,10 +246,11 @@ test.describe('the knowledge base', () => {
     await page.goto('/knowledge');
     await page
       .getByRole('searchbox', { name: 'Search the knowledge base' })
-      .fill('policy');
+      .fill('allowance');
     await expect(
       page.getByText(/AI answers aren’t available on your plan right now/),
     ).toBeVisible();
+    await expect(page.getByText('1 passage', { exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'AI answer' })).toHaveCount(
       0,
     );

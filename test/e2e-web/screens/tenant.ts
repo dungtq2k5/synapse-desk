@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -7,6 +8,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { PrismaClient as AuthPrisma } from '../../../services/auth-service/src/generated/prisma/client';
+import { PrismaClient as IngestionPrisma } from '../../../services/ingestion-service/src/generated/prisma/client';
 import { PrismaClient as TicketPrisma } from '../../../services/ticket-service/src/generated/prisma/client';
 import { REPO_ROOT } from '../../system/services';
 import { WEB_URL } from '../ingress';
@@ -498,6 +500,62 @@ export async function startedAs(
   const prisma = ticketPrisma();
   try {
     await prisma.ticket.update({ where: { id: ticketId }, data: { source } });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * One indexed, organization-wide document, searchable by its words: written
+ * straight to ingestion's database, as the pipeline would leave it, because
+ * indexing a file needs a model. Each passage gets a `vector_point_id`, which
+ * is what makes the keyword arm consider it; there's no vector behind it, so
+ * search finds it by its words. Its file was never stored: "Download
+ * original" answers 404.
+ */
+export async function knowledgeDocument(
+  owner: Person,
+  organizationId: string,
+  document: { title: string; passages: { page: number; text: string }[] },
+): Promise<{ id: string; passageIds: string[] }> {
+  const prisma = new IngestionPrisma({
+    adapter: new PrismaPg({
+      connectionString: databaseUrl('ingestion-service'),
+    }),
+  });
+  try {
+    const created = await prisma.document.create({
+      data: {
+        organizationId,
+        createdById: owner.id,
+        title: document.title,
+        fileUrl: `organizations/${organizationId}/documents/${randomUUID()}/${randomUUID()}.pdf`,
+        fileType: 'pdf',
+        fileSizeBytes: BigInt(1024),
+        fileHash: randomUUID().replaceAll('-', '').padEnd(64, '0'),
+        isOrganizationWide: true,
+        status: 'INDEXED',
+      },
+    });
+    const passageIds: string[] = [];
+    for (const [index, passage] of document.passages.entries()) {
+      const chunk = await prisma.documentChunk.create({
+        data: {
+          documentId: created.id,
+          chunkIndex: index,
+          contentText: passage.text,
+          pageNumber: passage.page,
+          tokenCount: Math.max(1, Math.ceil(passage.text.length / 4)),
+          organizationId,
+          isOrganizationWide: true,
+          departmentIds: [],
+          isDeleted: false,
+          vectorPointId: randomUUID(),
+        },
+      });
+      passageIds.push(chunk.id);
+    }
+    return { id: created.id, passageIds };
   } finally {
     await prisma.$disconnect();
   }
