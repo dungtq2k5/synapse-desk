@@ -1,7 +1,7 @@
 import type { Config } from 'jest';
 // Explicit `.ts` extension: jest loads this config through native ESM
 // resolution, which does not do extensionless lookups.
-import baseConfig from '../../jest.config.base.ts';
+import baseConfig, { e2eCoverage } from '../../jest.config.base.ts';
 
 /**
  * The e2e layer at auth-service's own boundary: real Prisma against a real
@@ -23,6 +23,7 @@ import baseConfig from '../../jest.config.base.ts';
  */
 const config: Config = {
   ...baseConfig,
+  ...e2eCoverage('auth-service'),
   displayName: 'auth-service:e2e',
   testRegex: String.raw`\.e2e-spec\.ts$`,
 

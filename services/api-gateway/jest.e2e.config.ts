@@ -1,7 +1,7 @@
 import type { Config } from 'jest';
 // Explicit `.ts` extension: jest loads this config through native ESM
 // resolution, which does not do extensionless lookups.
-import baseConfig from '../../jest.config.base.ts';
+import baseConfig, { e2eCoverage } from '../../jest.config.base.ts';
 
 /**
  * The e2e layer: the real Nest HTTP stack (guards, pipes, filters,
@@ -14,6 +14,7 @@ import baseConfig from '../../jest.config.base.ts';
  */
 const config: Config = {
   ...baseConfig,
+  ...e2eCoverage('api-gateway'),
   // ts-jest, PLUS the swagger plugin. REDECLARED rather than spread-and-patched:
   // `transform` is a nested object, so `...baseConfig` copies the reference and
   // mutating it would add the transformer to every other workspace's runs too.

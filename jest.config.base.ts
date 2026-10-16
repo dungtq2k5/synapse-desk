@@ -112,4 +112,27 @@ const baseConfig: Config = {
   // same in both single-config and multi-project invocations.
 };
 
+/**
+ * Coverage for one service's e2e run, when `E2E_COVERAGE_DIR` asks for it:
+ * an lcov at `<dir>/<service>/lcov.info`, its paths relative to the
+ * repository (the e2e scripts run from there), so Sonar reads it beside the
+ * unit suites' lcov. Nothing otherwise: a developer's e2e run stays as fast as
+ * it was.
+ *
+ * The e2e suites drive each service in-process through its real wiring, so
+ * this is the coverage of code no unit test reaches (sign-in, sessions,
+ * message writes).
+ *
+ * @example const config: Config = { ...baseConfig, ...e2eCoverage('ticket-service') };
+ */
+export function e2eCoverage(service: string): Config {
+  const directory = process.env.E2E_COVERAGE_DIR;
+  if (!directory) return {};
+  return {
+    collectCoverage: true,
+    coverageDirectory: `${directory}/${service}`,
+    coverageReporters: [['lcovonly', { projectRoot: process.cwd() }]],
+  };
+}
+
 export default baseConfig;
