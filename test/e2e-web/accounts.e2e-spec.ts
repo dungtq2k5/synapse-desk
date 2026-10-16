@@ -242,7 +242,7 @@ test('a Google-only account sets a password through the link, then signs in with
   await expect(page).toHaveURL(/\/login\?reset/);
 
   await signIn(page, email, 'Harbor-Lights-26');
-  await expect(page).toHaveURL(/\/ask$/);
+  await expect(page).toHaveURL(/\/tickets$/);
 });
 
 test('a profile photo uploads through the real flow, and shows', async ({

@@ -32,10 +32,14 @@ test('Google, through the emulator: a new person gets an account and lands in th
     user: { email },
   });
 
-  await page.goto('/tickets');
+  // The founder is the organization's admin: home is the queue, with the
+  // setup checklist above it.
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/tickets$/);
   await expect(
-    page.getByRole('heading', { name: 'My requests' }),
+    page.getByRole('heading', { name: 'Tickets', level: 1 }),
   ).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Set up / })).toBeVisible();
 });
 
 test('Google, through the emulator: an existing person signs in to their account', async ({
@@ -62,9 +66,9 @@ test('the Google button opens the popup, and the popup’s account signs in', as
   // The emulator's own sign-in page, standing in for Google's.
   await signInInPopup(await opened, email, 'Jo Park');
 
-  // A founder is no agent: home is Ask.
-  await expect(page).toHaveURL(/\/ask$/);
+  // A new domain: Jo founds it, so home is the queue.
+  await expect(page).toHaveURL(/\/tickets$/);
   await expect(
-    page.getByRole('heading', { name: 'Ask a question', level: 1 }),
+    page.getByRole('heading', { name: 'Tickets', level: 1 }),
   ).toBeVisible();
 });

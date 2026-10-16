@@ -85,6 +85,28 @@ test('an end user asks; the answer comes, they hand over, and an agent replies i
   ).toBeVisible();
 });
 
+test('a member opens a ticket from New request', async ({ page }) => {
+  const { priya } = await tenant('j-open-ticket');
+  await signInAs(page, priya);
+  await page.goto('/requests');
+  await page.getByRole('button', { name: 'New request' }).click();
+  await page.getByRole('menuitem', { name: 'Open a ticket' }).click();
+  await expect(page).toHaveURL(/\/tickets\/new$/);
+
+  await page.getByLabel('Title').fill('Badge doesn’t open the side door');
+  await page.getByLabel('Description').fill('It beeps red since Monday.');
+  await page.getByRole('button', { name: 'Create ticket' }).click();
+  await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
+  await expect(
+    page.getByRole('heading', { name: 'Badge doesn’t open the side door' }),
+  ).toBeVisible();
+
+  await page.getByRole('link', { name: 'My requests' }).first().click();
+  await expect(
+    page.getByRole('link', { name: /Badge doesn’t open the side door/ }),
+  ).toBeVisible();
+});
+
 test('an agent asks from Ask, and finds it under their latest questions', async ({
   page,
 }) => {
