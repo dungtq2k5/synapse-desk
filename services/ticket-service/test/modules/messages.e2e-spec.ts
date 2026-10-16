@@ -8,6 +8,7 @@ import {
   TICKET_PATTERNS,
   ticketMessageGroupKey,
   TicketStatus,
+  AnswerStatus,
 } from '@synapsedesk/contracts';
 import {
   E2eFixture,
@@ -25,7 +26,11 @@ import {
   createTicket,
   TenantFixture,
 } from '../factories';
-import { MessagesService } from '../../src/modules/messages/messages.service';
+import {
+  MessagesService,
+  OPENING_HAND_OVER,
+  OPENING_HAND_OVER_REASON,
+} from '../../src/modules/messages/messages.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
@@ -1512,6 +1517,59 @@ describe('Ticket messages & attachments (e2e)', () => {
         await fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
       ).toBe(0);
     });
+
+    /** The ticket once its background answer has escalated it. */
+    const escalatedOf = async (ticketId: string) => {
+      let row = await fx.prisma.ticket.findUniqueOrThrow({
+        where: { id: ticketId },
+      });
+      for (let tries = 0; tries < 50 && row.status !== 'ESCALATED'; tries++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        row = await fx.prisma.ticket.findUniqueOrThrow({
+          where: { id: ticketId },
+        });
+      }
+      return row;
+    };
+
+    it('**keeps what kind of answer it is, so a miss says so in the thread**', async () => {
+      isAvailable.mockReturnValue(true);
+      generateReplyDraft.mockResolvedValue({
+        ...DRAFT,
+        status: AnswerStatus.DOC_MISSING,
+      });
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await messages.answerOpening({ ticketId: ticket.id }, author());
+
+      expect((await answerOf(ticket.id))?.answerStatus).toBe('DOC_MISSING');
+    });
+
+    it.each([
+      ['the provider fails', true],
+      ['rag-service is not configured', false],
+    ])(
+      '**when %s, the thread says a person will reply, and one will**',
+      async (_, available) => {
+        isAvailable.mockReturnValue(available);
+        generateReplyDraft.mockRejectedValue({
+          code: status.UNAVAILABLE,
+          details: 'rag-service is unavailable',
+        });
+        const ticket = await createTicket(fx.prisma, tenant);
+
+        await messages.answerOpening({ ticketId: ticket.id }, author());
+
+        expect((await answerOf(ticket.id))?.content).toBe(OPENING_HAND_OVER);
+        expect((await escalatedOf(ticket.id)).status).toBe('ESCALATED');
+        expect(
+          await fx.prisma.ticketStatusChange.findFirst({
+            where: { ticketId: ticket.id, toStatus: 'ESCALATED' },
+            select: { reason: true },
+          }),
+        ).toEqual({ reason: OPENING_HAND_OVER_REASON });
+      },
+    );
 
     it('**only the author may ask**', async () => {
       const ticket = await createTicket(fx.prisma, tenant);

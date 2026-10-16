@@ -451,6 +451,7 @@ describe('the manifest contract', () => {
     const EXCLUDED = new Set([
       'FIREBASE_STORAGE_EMULATOR_HOST',
       'FIREBASE_AUTH_EMULATOR_HOST',
+      'RAG_OFFLINE_MODEL',
     ]);
 
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */
@@ -544,6 +545,7 @@ describe('the manifest contract', () => {
             ({ doc }) => doc.metadata?.name === 'rag-service-secret',
           )?.doc.stringData ?? {},
         ),
+        ...EXCLUDED,
       ]);
 
       // Narrowed to the ones `.env.example` also documents, so a plain string

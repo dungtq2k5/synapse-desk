@@ -171,6 +171,35 @@ class TestDegradedAtCap:
         assert response.degraded == rag_pb2.SEARCH_DEGRADATION_LEXICAL_ONLY
 
 
+class TestDegradedOnProviderFailure:
+    """A failing provider degrades the search exactly as the cap does."""
+
+    async def test_an_embedding_failure_serves_the_lexical_arm_marked_lexical_only(
+        self, search, seed, tenant_a, embeddings
+    ):
+        await seed(tenant_a.organization_id, text=SHARED_TEXT)
+        embeddings.fail_next = RuntimeError("provider unavailable")
+
+        response = await search(SHARED_TEXT, tenant_a.outsider())
+
+        assert response.degraded == rag_pb2.SEARCH_DEGRADATION_LEXICAL_ONLY
+        assert len(response.chunks) == 1
+        assert embeddings.calls, "the semantic arm was tried first"
+
+    async def test_the_provider_failure_path_STILL_enforces_the_boundary(
+        self, search, seed, tenant_a, tenant_b, embeddings
+    ):
+        mine = await seed(tenant_a.organization_id, text=SHARED_TEXT)
+        theirs = await seed(tenant_b.organization_id, text=SHARED_TEXT)
+        embeddings.fail_next = RuntimeError("provider unavailable")
+
+        response = await search(SHARED_TEXT, tenant_a.outsider())
+        ids = {chunk.chunk_id for chunk in response.chunks}
+
+        assert mine.chunk_id in ids
+        assert theirs.chunk_id not in ids
+
+
 class TestMetering:
     """The normal path spends, and spending is recorded."""
 

@@ -32,7 +32,7 @@ READ_PATTERNS = (
 )
 
 #: The measured census the floor pins. Grows with the config; never shrinks.
-FLOOR = 10
+FLOOR = 12
 
 
 def declared_variables() -> set[str]:

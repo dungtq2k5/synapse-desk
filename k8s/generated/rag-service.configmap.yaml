@@ -7,6 +7,9 @@
 #     node scripts/generate-k8s-config.mjs
 #
 # ConfigMap: the non-secret half of the env contract.
+#
+# Documented and deliberately absent:
+#   RAG_OFFLINE_MODEL — production answers with the real model; rag-service refuses to boot with the offline one under APP_ENV=production
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,6 +17,7 @@ metadata:
   labels:
     app.kubernetes.io/name: rag-service
 data:
+  APP_ENV: 'production'
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '50255'
   INGESTION_SERVICE_URL: 'ingestion-service:5004'

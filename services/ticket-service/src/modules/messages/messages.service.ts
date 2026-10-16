@@ -91,6 +91,13 @@ const READ_URL_GRACE_MS = 14 * 60 * 1000;
  */
 const AI_REPLY_TRANSCRIPT_TURNS = 40;
 
+/** What the thread says when the opening question couldn't be answered. */
+export const OPENING_HAND_OVER =
+  'The assistant couldn’t answer this just now. A person from the support team will reply here.';
+/** The escalation's recorded reason, beside it. */
+export const OPENING_HAND_OVER_REASON =
+  'Escalated automatically: the assistant could not answer the opening question';
+
 /** A message plus the tenant of the ticket it hangs off. */
 type LoadedMessage = TicketMessage & { organizationId: string };
 
@@ -185,8 +192,12 @@ export class MessagesService {
     }
 
     // Not awaited: the caller has a conversation to open. The handler
-    // catches everything it can throw.
-    void this.tryAppendAiReply(ticket, context, { escalateAtCap: true });
+    // catches everything it can throw, and leaves an outcome in the thread
+    // whatever happens: the answer, the cap's escalation, or a hand-over.
+    void this.tryAppendAiReply(ticket, context, {
+      escalateAtCap: true,
+      handOverOnFailure: true,
+    });
     return {};
   }
 
@@ -1047,7 +1058,18 @@ export class MessagesService {
   private async tryAppendAiReply(
     ticket: NotifiableTicket,
     context: CallerContext,
-    { escalateAtCap = false }: { escalateAtCap?: boolean } = {},
+    {
+      escalateAtCap = false,
+      handOverOnFailure = false,
+    }: {
+      escalateAtCap?: boolean;
+      /**
+       * The opening question: nothing else will ever answer it, and the person
+       * is watching for an answer. A failure leaves a message saying a person
+       * will reply, and escalates so one does.
+       */
+      handOverOnFailure?: boolean;
+    } = {},
   ): Promise<void> {
     const { id: ticketId } = ticket;
 
@@ -1055,6 +1077,7 @@ export class MessagesService {
       this.logger.debug(
         `AI reply skipped for ticket ${ticketId}: rag-service is not configured`,
       );
+      if (handOverOnFailure) await this.handOver(ticket, context);
       return;
     }
 
@@ -1123,6 +1146,9 @@ export class MessagesService {
           senderId: null,
           content: draft.content,
           isAiGenerated: true,
+          // What kind of answer: a thread says "not in the documents" under a
+          // DOC_MISSING one, and offers a person.
+          answerStatus: draft.status ?? null,
           modelName: draft.modelName,
           promptTokens: draft.promptTokens,
           completionTokens: draft.completionTokens,
@@ -1157,7 +1183,40 @@ export class MessagesService {
       // answer at the cap does: nothing else would ever answer it.
       if (escalateAtCap && isAtCap(error)) {
         await this.escalateAtCap(ticketId, context);
+      } else if (handOverOnFailure) {
+        await this.handOver(ticket, context);
       }
+    }
+  }
+
+  /**
+   * The opening question couldn't be answered: says so in the thread, and
+   * escalates so the person who'll reply is real. Swallowed like the rest of
+   * the handler: the conversation already exists.
+   */
+  private async handOver(
+    ticket: NotifiableTicket,
+    context: CallerContext,
+  ): Promise<void> {
+    try {
+      const notice = await this.prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          senderId: null,
+          content: OPENING_HAND_OVER,
+          isAiGenerated: true,
+          modelName: '',
+        },
+      });
+      this.publishCreated(ticket, notice);
+      await this.tickets.escalateTicket(
+        { ticketId: ticket.id, reason: OPENING_HAND_OVER_REASON },
+        context,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not hand over ticket ${ticket.id} after a failed opening answer: ${formatErrorMsg(error)}`,
+      );
     }
   }
 

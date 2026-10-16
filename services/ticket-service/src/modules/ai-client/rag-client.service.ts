@@ -7,6 +7,7 @@ import {
   AttachmentPart,
   CallerContext,
   ConversationTurn,
+  fromProtoRagAnswerStatus,
   fromProtoSearchDegradation,
   packRequestContext,
   RAG_GRPC_CLIENT,
@@ -14,6 +15,7 @@ import {
   RagServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
+  AnswerStatus,
   RetrievalDegradation,
   TICKET_PRIORITIES,
   TicketPriority,
@@ -37,6 +39,12 @@ export type AiReplyDraft = {
   completionTokens: number;
   /** The ledger row id — handed back as `generatedFromId` when posting. */
   generationId: string;
+  /**
+   * What kind of answer it is (`DOC_ANSWER`, `DOC_MISSING`, …), or `null` when
+   * rag-service sent none. Stored on an auto-reply, so the thread can say "not
+   * in the documents" under it.
+   */
+  status?: AnswerStatus | null;
   citations: Array<{
     chunkId: string;
     documentId: string;
@@ -199,6 +207,7 @@ export class RagClientService implements OnModuleInit {
       promptTokens: 0,
       completionTokens: 0,
       generationId: response.generationId,
+      status: fromProtoRagAnswerStatus(response.status),
       citations: response.citations.map((citation) => ({
         chunkId: citation.chunkId,
         documentId: citation.documentId,
