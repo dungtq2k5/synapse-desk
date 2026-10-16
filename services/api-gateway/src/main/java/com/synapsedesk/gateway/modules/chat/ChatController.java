@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -52,6 +54,7 @@ import synapsedesk.ticket.Common.TicketPriority;
 import synapsedesk.ticket.Common.TicketResponse;
 import synapsedesk.ticket.Common.TicketSource;
 import synapsedesk.ticket.Common.TicketStatus;
+import synapsedesk.ticket.Message.AnswerOpeningRequest;
 import synapsedesk.ticket.Message.AttachmentResponse;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
@@ -85,6 +88,10 @@ import synapsedesk.ticket.TicketServiceGrpc;
 @RequestMapping(ApiPaths.V1)
 @Validated
 public class ChatController {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+    ChatController.class
+  );
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -151,6 +158,20 @@ public class ChatController {
     }
 
     TicketResponse response = ticketsWith(context).createTicket(wire.build());
+    // The question is the description, so ticket-service answers it: the
+    // answer arrives as the thread's first message. The conversation exists
+    // either way, so a refusal to answer doesn't undo it.
+    try {
+      messagesWith(context).answerOpening(
+        AnswerOpeningRequest.newBuilder().setTicketId(response.getId()).build()
+      );
+    } catch (RuntimeException failure) {
+      LOG.warn(
+        "No answer asked for conversation {}: {}",
+        response.getId(),
+        failure.getMessage()
+      );
+    }
 
     return new ResponseEntity<>(
       ApiResponse.of(

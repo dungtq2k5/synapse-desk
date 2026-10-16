@@ -34,6 +34,7 @@ import synapsedesk.ticket.Message.MessageAnswerStatus;
 import synapsedesk.ticket.Message.MessageCitations;
 import synapsedesk.ticket.Message.MessageResponse;
 import synapsedesk.ticket.MessageServiceGrpc;
+import synapsedesk.ticket.Ticket.GetTicketRequest;
 import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc;
 
@@ -377,6 +378,20 @@ public class AiStreamService {
 
     List<MessageResponse> newestFirst = page.getItemsList();
     List<Rag.ConversationTurn> turns = new java.util.ArrayList<>();
+    // The opening question is the description, which isn't a message: it
+    // leads the transcript, unless the thread has outgrown the window.
+    if (newestFirst.size() < TRANSCRIPT_TURNS) {
+      turns.add(
+        Rag.ConversationTurn.newBuilder()
+          .setRole("user")
+          .setContent(
+            ticketsWith(principal, client)
+              .getTicket(GetTicketRequest.newBuilder().setId(ticketId).build())
+              .getDescription()
+          )
+          .build()
+      );
+    }
     for (int i = newestFirst.size() - 1; i >= 0; i--) {
       MessageResponse item = newestFirst.get(i);
       if (item.getExcludedFromAiContext()) {

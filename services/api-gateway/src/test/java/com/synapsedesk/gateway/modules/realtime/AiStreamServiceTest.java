@@ -76,6 +76,12 @@ class AiStreamServiceTest {
     when(messages.getAiAttachments(any())).thenReturn(
       Message.GetAiAttachmentsResponse.newBuilder().build()
     );
+    when(tickets.getTicket(any())).thenReturn(
+      Common.TicketResponse.newBuilder()
+        .setId("t1")
+        .setDescription("The app says my session expired.")
+        .build()
+    );
   }
 
   private static SocketIOClient client() {
@@ -107,6 +113,47 @@ class AiStreamServiceTest {
         Rag.ChatCompletion.newBuilder().setStatus(status).setContent(content)
       )
       .build();
+  }
+
+  @Test
+  void theTranscriptLeadsWithTheOpeningQuestionTheDescription() {
+    SocketIOClient client = client();
+    when(messages.listMessages(any())).thenReturn(
+      Message.ListMessagesResponse.newBuilder()
+        .addItems(
+          Message.MessageResponse.newBuilder()
+            .setId("m1")
+            .setSenderId("u1")
+            .setContent("and on weekends?")
+        )
+        .build()
+    );
+    when(rag.chat(any())).thenReturn(
+      List.of(
+        completion(Rag.AnswerStatus.ANSWER_STATUS_DOC_ANSWER, "Yes")
+      ).iterator()
+    );
+    when(messages.appendAiMessage(any())).thenReturn(
+      Message.MessageResponse.newBuilder().setId("m-persisted").build()
+    );
+
+    service.start(client, "t1", "hi", principal, "m1");
+
+    ArgumentCaptor<Rag.ChatRequest> captor = ArgumentCaptor.forClass(
+      Rag.ChatRequest.class
+    );
+    verify(rag, timeout(2000)).chat(captor.capture());
+    assertThat(
+      captor
+        .getValue()
+        .getHistoryList()
+        .stream()
+        .map(turn -> turn.getRole() + ": " + turn.getContent())
+        .toList()
+    ).containsExactly(
+      "user: The app says my session expired.",
+      "user: and on weekends?"
+    );
   }
 
   @Test
