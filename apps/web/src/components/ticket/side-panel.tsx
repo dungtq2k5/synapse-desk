@@ -1,5 +1,3 @@
-'use client';
-
 import {
   useTicketsControllerListAssignmentsV1,
   useTicketsControllerListStatusChangesV1,

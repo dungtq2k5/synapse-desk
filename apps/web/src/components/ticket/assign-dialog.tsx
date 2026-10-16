@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ticketsControllerAssignV1,
   ticketsControllerReassignV1,
@@ -8,7 +6,7 @@ import {
   type TicketResponseDto,
   type UpdateTicketDtoPriority,
 } from '@synapsedesk/api-client';
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { Button } from '@/components/ui/button';
@@ -123,7 +121,7 @@ function AssignForm({
     }
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!departmentId || !assigneeId) return;
     setBusy(true);

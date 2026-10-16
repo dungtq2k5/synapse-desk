@@ -12,7 +12,7 @@ import {
   FileDownIcon,
   LoaderCircleIcon,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { useDepartments } from '@/components/ticket/use-directory';
@@ -270,7 +270,7 @@ function ExportForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!from || !to || from > to) {
       return setError('Choose a start date on or before the end date.');

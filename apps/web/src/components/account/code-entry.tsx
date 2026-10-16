@@ -5,7 +5,7 @@ import {
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useEffect, useRef, type FormEvent } from 'react';
+import { useEffect, useRef, type SubmitEvent } from 'react';
 import { CodeSlots } from '@/components/auth/two-step-code';
 import { RetryAlert } from '@/components/auth/retry-alert';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -78,7 +78,7 @@ export function CodeEntry({
     if (spent) requestRef.current?.focus();
   }, [problem, spent]);
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (challenge && state.code.length === challenge.codeLength) {
       void state.check(state.code);

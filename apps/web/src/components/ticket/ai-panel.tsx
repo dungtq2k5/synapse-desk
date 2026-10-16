@@ -1,5 +1,3 @@
-'use client';
-
 import {
   aiControllerClassifyV1,
   aiControllerGenerateSummaryV1,

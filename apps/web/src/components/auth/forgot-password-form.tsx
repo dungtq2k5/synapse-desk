@@ -6,7 +6,7 @@ import {
 } from '@synapsedesk/api-client';
 import { CircleAlertIcon, MailCheckIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ export function ForgotPasswordForm() {
   >(null);
   const emailRef = useRef<HTMLInputElement>(null);
 
-  const send = async (event?: FormEvent) => {
+  const send = async (event?: SubmitEvent<HTMLFormElement>) => {
     event?.preventDefault();
     if (!EMAIL.test(email.trim())) {
       setError('Enter an email address like name@company.com.');

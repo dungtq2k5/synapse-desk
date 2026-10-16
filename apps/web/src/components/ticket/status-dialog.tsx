@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ticketsControllerChangeStatusV1,
   ticketsControllerCloseV1,
@@ -10,7 +8,7 @@ import {
   type TicketResponseDto,
 } from '@synapsedesk/api-client';
 import { CircleAlertIcon } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -78,7 +76,7 @@ export function StatusDialog({
     onOpenChange(open);
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!move || reason.length > REASON_MAX) return;
     setBusy(true);

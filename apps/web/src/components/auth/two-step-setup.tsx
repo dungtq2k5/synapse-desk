@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ApiError,
   twoFactorAuthControllerActivateV1,
@@ -14,7 +12,7 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -180,7 +178,7 @@ export function ScanAndConfirm({
   const codeRef = useRef<HTMLInputElement>(null);
   const key = secret ? manualKey(secret.otpauthUri) : '';
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (code.length !== 6 || busy) return;
     setBusy(true);

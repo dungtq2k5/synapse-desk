@@ -7,7 +7,7 @@ import {
 } from '@synapsedesk/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { CircleCheckIcon, InfoIcon, KeyRoundIcon } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
 import { PasswordChecklist } from '@/components/auth/password-checklist';
 import { PasswordInput } from '@/components/auth/password-input';
@@ -70,7 +70,7 @@ function ChangePassword() {
   const nextRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const found = {
       current: current ? undefined : 'Enter your current password.',

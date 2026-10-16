@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ticketsControllerUpdateV1,
   type ApiResponseTicketResponseDto,
@@ -7,7 +5,7 @@ import {
   type UpdateTicketDtoPriority,
 } from '@synapsedesk/api-client';
 import { CircleAlertIcon } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -55,7 +53,7 @@ export function EditDialog({
       <DialogContent
         showCloseButton={false}
         aria-describedby={undefined}
-        className="sm:max-w-[520px]"
+        className="sm:max-w-130"
       >
         {open && (
           <EditForm
@@ -90,7 +88,7 @@ function EditForm({
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const next = {
       title:

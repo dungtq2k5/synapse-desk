@@ -1,5 +1,3 @@
-'use client';
-
 import {
   useDepartmentsControllerListV1,
   useTicketsControllerGetByNumberV1,

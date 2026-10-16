@@ -5,7 +5,7 @@ import {
   otpControllerVerifyPhoneV1,
 } from '@synapsedesk/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { Button } from '@/components/ui/button';
@@ -73,7 +73,7 @@ function NumberStep({
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const number = value.replaceAll(/[\s()-]/g, '');
     if (!PHONE.test(number)) {

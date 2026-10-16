@@ -349,7 +349,12 @@ async function ai(ticketId: string, attachTo: string): Promise<void> {
       // No AT_CAP: an answer at the limit is never stored (the page shows a
       // notice from the stream's `done` frame instead).
     ];
-    for (const [answerStatus, content, citations] of answers) {
+    // A second apart, so the thread's order never rests on a tie.
+    const start = Date.now();
+    for (const [
+      index,
+      [answerStatus, content, citations],
+    ] of answers.entries()) {
       await prisma.ticketMessage.create({
         data: {
           ticketId,
@@ -357,6 +362,7 @@ async function ai(ticketId: string, attachTo: string): Promise<void> {
           isAiGenerated: true,
           answerStatus,
           citations: citations ?? undefined,
+          createdAt: new Date(start + (index + 1) * 1000),
         },
       });
     }

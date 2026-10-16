@@ -8,7 +8,7 @@ import {
 import { CircleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PASSWORD_RULES } from '@/lib/password-rules';
@@ -90,7 +90,7 @@ function NewPasswordForm({
     return () => globalThis.clearTimeout(timer);
   }, [password, met]);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (met < PASSWORD_RULES.length) return passwordRef.current?.focus();
     if (password !== confirm) {

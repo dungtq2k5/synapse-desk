@@ -1,9 +1,7 @@
-'use client';
-
 import { ApiError, authControllerRegisterV1 } from '@synapsedesk/api-client';
 import { CircleAlertIcon, CircleCheckIcon, UserPlusIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +55,7 @@ export function SignUpForm({
     if (done) doneRef.current?.focus();
   }, [done]);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const found: Errors = {
       fullName:

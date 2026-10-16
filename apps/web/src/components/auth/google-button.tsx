@@ -17,7 +17,7 @@ export function GoogleButton({
     <button
       type="button"
       className={cn(
-        'inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-[4px] border border-google-button-border bg-google-button-bg px-3 font-google text-sm/5 font-medium text-google-button-fg transition-all outline-none',
+        'inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-sm border border-google-button-border bg-google-button-bg px-3 font-google text-sm/5 font-medium text-google-button-fg transition-all outline-none',
         'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
         className,
       )}
@@ -32,7 +32,7 @@ export function GoogleButton({
 /** Google's "G", from its sign-in button assets. */
 function GoogleLogo() {
   return (
-    <svg aria-hidden viewBox="0 0 48 48" className="size-[18px] shrink-0">
+    <svg aria-hidden viewBox="0 0 48 48" className="size-4.5 shrink-0">
       <path
         fill="var(--color-google-red)"
         d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"

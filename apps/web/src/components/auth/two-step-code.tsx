@@ -1,11 +1,9 @@
-'use client';
-
 import {
   ApiError,
   twoFactorAuthControllerAuthenticateV1,
 } from '@synapsedesk/api-client';
 import { CircleCheckIcon } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -166,7 +164,7 @@ export function TwoStepCode({
     }
   };
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mode === 'code' && code.length === 6) void verify({ code });
     if (mode === 'backup' && backupCode.trim()) {

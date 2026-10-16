@@ -15,7 +15,7 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -89,7 +89,7 @@ export function ProfileForm({ user }: { user: UserResponseDto }) {
     setStatus('idle');
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!dirty) return;
     const dob = draft.dob.trim() ? isoDate(draft.dob) : null;

@@ -239,9 +239,10 @@ test.describe('a new ticket', () => {
       .fill('pri');
     // The search has applied: the whole list has Priya in it too.
     await expect(page.getByRole('option')).toHaveCount(1);
-    await expect(
-      page.getByRole('option', { name: /Priya Shah/ }),
-    ).toBeVisible();
+    const priya = page.getByRole('option', { name: /Priya Shah/ });
+    // The highlighted option, as the arrow keys or the pointer leave it.
+    await priya.hover();
+    await expect(priya).toHaveAttribute('aria-selected', 'true');
     await look(page, 'new-ticket-requester-search', {
       disabled: ['aria-hidden-focus'],
     });

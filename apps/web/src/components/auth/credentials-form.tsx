@@ -1,9 +1,7 @@
-'use client';
-
 import { ApiError, authControllerLoginV1 } from '@synapsedesk/api-client';
 import { CircleAlertIcon, InfoIcon, CircleCheckIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +48,7 @@ export function CredentialsForm({
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const found = {
       email: EMAIL.test(email.trim())

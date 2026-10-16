@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ApiError,
   type AiDraftResponseDto,
@@ -24,7 +22,7 @@ import {
   useRef,
   useState,
   type DragEvent,
-  type FormEvent,
+  type SubmitEvent,
 } from 'react';
 import { Field } from '@/components/auth/field';
 import { Markdown } from '@/components/markdown';
@@ -224,7 +222,7 @@ export function Composer({
     textareaRef.current?.focus();
   };
 
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = content.trim();
     if (!text || files.uploading || writing) return;
@@ -380,7 +378,7 @@ export function Composer({
       {preview ? (
         <div
           aria-label={`${formName}, preview`}
-          className="min-h-[5.5rem] rounded-md border bg-muted p-3 text-sm"
+          className="min-h-22 rounded-md border bg-muted p-3 text-sm"
         >
           <Markdown>{content}</Markdown>
         </div>

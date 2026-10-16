@@ -10,7 +10,7 @@ import { ChevronsUpDownIcon, CircleAlertIcon, SearchIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Popover } from 'radix-ui';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -48,7 +48,7 @@ export function NewTicketForm() {
   const [busy, setBusy] = useState(false);
   const chooses = isAgent && can('user.read');
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const next = {
       title:
@@ -102,7 +102,7 @@ export function NewTicketForm() {
         noValidate
         onSubmit={(event) => void submit(event)}
         aria-busy={busy || undefined}
-        className="flex w-full max-w-[640px] flex-col gap-4 rounded-lg border bg-card p-4 md:p-6"
+        className="flex w-full max-w-160 flex-col gap-4 rounded-lg border bg-card p-4 md:p-6"
       >
         {failure && (
           <Alert variant="destructive">

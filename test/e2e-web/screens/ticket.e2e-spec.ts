@@ -331,7 +331,7 @@ test.describe('ask a person', () => {
     );
     await page.getByRole('button', { name: 'Ask a person' }).click();
     await expect(
-      page.getByText('Couldn’t reach the support team'),
+      page.getByText('Couldn’t reach the support team', { exact: true }),
     ).toBeVisible();
     await look(page, 'ticket-ask-failed', { viewportOnly: true });
   });

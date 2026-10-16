@@ -70,7 +70,7 @@ export function Markdown({
   className?: string;
 }) {
   return (
-    <div className={cn('flex flex-col gap-2 break-words', className)}>
+    <div className={cn('flex flex-col gap-2 wrap-break-word', className)}>
       <ReactMarkdown components={COMPONENTS}>{children}</ReactMarkdown>
     </div>
   );

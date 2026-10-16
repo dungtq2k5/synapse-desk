@@ -1,5 +1,3 @@
-'use client';
-
 import {
   authControllerLoginWithTenantV1,
   type TenantOptionResponseDto,

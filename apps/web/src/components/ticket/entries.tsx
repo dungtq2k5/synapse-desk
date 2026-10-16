@@ -1,5 +1,3 @@
-'use client';
-
 import type {
   AttachmentResponseDto,
   CitationResponseDto,
@@ -187,7 +185,7 @@ export function PersonEntry({
         ) : markdown ? (
           <Markdown>{children}</Markdown>
         ) : (
-          <div className="whitespace-pre-wrap break-words">{children}</div>
+          <div className="whitespace-pre-wrap wrap-break-word">{children}</div>
         )}
         {!removed && attachments && attachments.length > 0 && (
           <ul className="flex flex-wrap gap-2">
@@ -479,7 +477,9 @@ export function PendingEntry({
           failed && 'border-destructive-border',
         )}
       >
-        <div className="whitespace-pre-wrap break-words">{pending.content}</div>
+        <div className="whitespace-pre-wrap wrap-break-word">
+          {pending.content}
+        </div>
         <p className="flex items-center justify-end gap-2 text-xs">
           {failed ? (
             <>

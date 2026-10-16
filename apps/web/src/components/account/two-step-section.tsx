@@ -15,7 +15,7 @@ import {
   ShieldCheckIcon,
   ShieldOffIcon,
 } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { PasswordInput } from '@/components/auth/password-input';
@@ -248,7 +248,7 @@ function RegenerateDialog({
     onOpenChange(next);
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!password) {
       setError('Enter your password.');
@@ -452,7 +452,7 @@ function TurnOffDialog({
     onOpenChange(next);
   };
 
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const found = {
       password: password ? undefined : 'Enter your password.',
