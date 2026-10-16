@@ -12,6 +12,10 @@ embedding and therefore costs nothing, so a capped tenant gets results plus a
 the moment someone is trying to work out what happened (RDM §1.14). The
 degraded path still goes through `tenant_scope()`: the failure to avoid is a
 fallback that skips the boundary because it is "just keyword search".
+
+**A failing provider takes the same path.** An outage, a bad key or a timeout
+in the semantic arm leaves the lexical arm's results, marked `LEXICAL_ONLY`,
+rather than failing the search.
 """
 
 from __future__ import annotations
@@ -120,12 +124,18 @@ class RetrievalService:
 
         arm_results: dict[str, list[RetrievedChunk]] = {}
 
+        semantic_failed = False
         if budget.allows_embedding:
             semantic, arm_results[LEXICAL] = await asyncio.gather(
-                self._semantic(query, scope, ctx, settings, settings.top_n, budget),
+                self._semantic_or_none(
+                    query, scope, ctx, settings, settings.top_n, budget
+                ),
                 lexical,
             )
-            arm_results[SEMANTIC] = semantic
+            if semantic is None:
+                semantic_failed = True
+            else:
+                arm_results[SEMANTIC] = semantic
         else:
             # The DEGRADED path, and it still goes through `tenant_scope()`.
             # The failure to avoid is a fallback that skips the boundary
@@ -162,12 +172,34 @@ class RetrievalService:
 
         return RetrievalResult(
             chunks=chunks,
-            lexical_only=not budget.allows_embedding,
+            lexical_only=not budget.allows_embedding or semantic_failed,
             # Recorded from the FUSED pool rather than the final selection: what
             # the retriever saw is a different question from what survived
             # rerank, and `UNCITED` needs both to mean anything.
             retrieved_chunk_ids=[entry.chunk.chunk_id for entry in fused],
         )
+
+    async def _semantic_or_none(
+        self,
+        query: str,
+        scope: TenantScope,
+        ctx: CallerContext,
+        settings: AiSettings,
+        top_n: int,
+        budget: BudgetState,
+    ) -> list[RetrievedChunk] | None:
+        """The semantic arm, or `None` when the provider failed.
+
+        A failure here degrades the search to keyword-only rather than failing
+        it: the lexical arm needs no provider, so the person still gets results.
+        """
+        try:
+            return await self._semantic(query, scope, ctx, settings, top_n, budget)
+        except Exception:  # any provider failure degrades
+            logger.warning(
+                "Semantic arm failed; serving the lexical arm alone", exc_info=True
+            )
+            return None
 
     async def _semantic(
         self,
