@@ -274,6 +274,7 @@ function FindByNumber({
   const ticket = number !== null ? found.data?.data : undefined;
   const missing = number !== null && found.isError;
   const showing = open && number !== null && (Boolean(ticket) || missing);
+  const label = useViewer().isAgent ? 'Search tickets' : 'Search requests';
 
   return (
     <div className="relative w-full md:w-72">
@@ -284,12 +285,12 @@ function FindByNumber({
       <Input
         type="search"
         role="combobox"
-        aria-label="Search tickets"
+        aria-label={label}
         aria-expanded={showing && Boolean(ticket)}
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={showing && ticket ? optionId : undefined}
-        placeholder="Search tickets"
+        placeholder={label}
         className="pl-9"
         value={search}
         onChange={(event) => {

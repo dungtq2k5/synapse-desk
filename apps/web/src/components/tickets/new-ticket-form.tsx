@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { Popover } from 'radix-ui';
 import { useEffect, useId, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
+import { AppHeader, useTicketsCrumb } from '@/components/shell/app-header';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -27,6 +28,11 @@ const DESCRIPTION_MAX = 20_000;
 
 type Person = { id: string; fullName: string; email: string };
 type Failure = { kind: 'failed' } | { kind: 'busy'; minutes: number };
+
+/** The bar above the form, hanging from the queue or the person's requests. */
+export function NewTicketHeader() {
+  return <AppHeader crumbs={[useTicketsCrumb(), { label: 'New ticket' }]} />;
+}
 
 /**
  * A new ticket: title and description, and for an agent who can list people,
@@ -170,7 +176,7 @@ export function NewTicketForm() {
         </Field>
         <div className="flex justify-end gap-2">
           <Link
-            href="/tickets"
+            href={isAgent ? '/tickets' : '/requests'}
             className={buttonVariants({ variant: 'outline' })}
           >
             Cancel

@@ -21,7 +21,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppHeader } from '@/components/shell/app-header';
+import { AppHeader, useTicketsCrumb } from '@/components/shell/app-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useViewer } from '@/hooks/use-viewer';
@@ -38,6 +38,7 @@ import { ActionBar, DeletedNotice } from './action-bar';
 import { AssignDialog, type Suggestion } from './assign-dialog';
 import { Composer } from './composer';
 import {
+  AnsweringEntry,
   LiveAnswerEntry,
   NoticeEntry,
   PendingEntry,
@@ -54,6 +55,7 @@ export function TicketView({ ticketId }: { ticketId: string }) {
   const ticket = useTicketsControllerGetV1(ticketId);
   const data = ticket.data?.data;
   const { can } = useViewer();
+  const tickets = useTicketsCrumb();
   const refresh = useTicketCache(ticketId);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   // The AI's "Assign to {department}", where the agent may assign.
@@ -74,10 +76,7 @@ export function TicketView({ ticketId }: { ticketId: string }) {
   return (
     <>
       <AppHeader
-        crumbs={[
-          { label: 'Tickets', href: '/tickets' },
-          { label: data ? `#${data.ticketNumber}` : '…' },
-        ]}
+        crumbs={[tickets, { label: data ? `#${data.ticketNumber}` : '…' }]}
         actions={
           data && (
             <div className="lg:hidden">
@@ -197,6 +196,14 @@ function Loaded({
   }, []);
 
   const streaming = live.answers.some((answer) => answer.state === 'streaming');
+  const answering = useOpeningAnswer(
+    requester &&
+      open &&
+      ticket.source === 'CHAT' &&
+      messages.data?.data?.items.length === 0 &&
+      live.answers.length === 0,
+    ticket.createdAt,
+  );
   const offerFor =
     requester && open && !streaming ? lastNonAnswerId(entries) : null;
   const askButton = (
@@ -255,6 +262,7 @@ function Loaded({
         <Thread
           entries={entries}
           loading={messages.isPending}
+          after={answering && <AnsweringEntry at={ticket.createdAt} />}
           render={(entry) => {
             switch (entry.kind) {
               case 'description':
@@ -275,6 +283,7 @@ function Loaded({
                   <ThreadAiMessage
                     ticket={ticket}
                     message={message}
+                    skipped={live.skipped[message.id]}
                     perspective={perspective}
                     askAPerson={offerFor === entry.id ? askButton : undefined}
                   />
@@ -282,6 +291,7 @@ function Loaded({
                   <ThreadMessage
                     ticket={ticket}
                     message={message}
+                    skipped={live.skipped[message.id]}
                     mine={entry.mine}
                   />
                 );
@@ -290,6 +300,11 @@ function Loaded({
                 return (
                   <PendingEntry
                     pending={entry.pending}
+                    skipped={
+                      entry.pending.messageId
+                        ? live.skipped[entry.pending.messageId]
+                        : undefined
+                    }
                     onRetry={() => live.retry(entry.pending.clientMessageId)}
                   />
                 );
@@ -297,6 +312,7 @@ function Loaded({
                 return (
                   <LiveAnswerEntry
                     answer={entry.answer}
+                    skipped={live.skipped[entry.answer.streamId]}
                     perspective={perspective}
                     onStop={() => live.stop(entry.answer.streamId)}
                     askAPerson={offerFor === entry.id ? askButton : undefined}
@@ -376,10 +392,13 @@ function Loaded({
 function Thread({
   entries,
   loading,
+  after,
   render,
 }: {
   entries: Entry[];
   loading: boolean;
+  /** At the end of the log: the opening answer on its way. */
+  after?: React.ReactNode;
   render: (entry: Entry) => React.ReactNode;
 }) {
   const end = useRef<HTMLDivElement>(null);
@@ -418,6 +437,7 @@ function Thread({
         {entries.map((entry) => (
           <div key={entry.id}>{render(entry)}</div>
         ))}
+        {after}
         {loading && (
           <>
             <span className="sr-only">Loading conversation</span>
@@ -441,6 +461,28 @@ function Thread({
       )}
     </div>
   );
+}
+
+/** How long a new conversation waits for its first answer before giving up. */
+const OPENING_ANSWER_MS = 90_000;
+
+/**
+ * Whether a new conversation's first answer is still being written: the
+ * requester's own chat, still before a person took over, with nothing in the
+ * thread yet. It ends when the answer arrives, when the ticket escalates
+ * (the allowance used up), or after a wait that no answer should outlast.
+ */
+function useOpeningAnswer(waiting: boolean, createdAt: string): boolean {
+  const [expired, setExpired] = useState<string | null>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = globalThis.setTimeout(
+      () => setExpired(createdAt),
+      Math.max(0, Date.parse(createdAt) + OPENING_ANSWER_MS - Date.now()),
+    );
+    return () => globalThis.clearTimeout(timer);
+  }, [waiting, createdAt]);
+  return waiting && expired !== createdAt;
 }
 
 /** Status, priority and assignee changes, said once each, politely. */
@@ -483,12 +525,7 @@ function Loading() {
 export function TicketNotFound() {
   return (
     <>
-      <AppHeader
-        crumbs={[
-          { label: 'Tickets', href: '/tickets' },
-          { label: 'Not found' },
-        ]}
-      />
+      <AppHeader crumbs={[useTicketsCrumb(), { label: 'Not found' }]} />
       <main id="main" tabIndex={-1} className="p-4 outline-none md:p-6">
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
           <h1 className="text-lg font-semibold">We can’t find that ticket</h1>

@@ -88,6 +88,28 @@ describe('buildThread', () => {
     ]);
   });
 
+  it('an escalation at the AI budget cap says first that the assistant wasn’t there', () => {
+    const entries = buildThread({
+      ...base,
+      viewerId: 'priya',
+      messages: [],
+      history: [
+        {
+          id: 'h1',
+          toStatus: 'ESCALATED',
+          reason:
+            'Escalated automatically: the workspace is at its AI budget cap',
+          changedAt: '2026-10-10T09:12:05Z',
+        },
+      ] as TicketStatusChangeResponseDto[],
+    });
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'description:t1',
+      'notice:cap:h1',
+      'notice:h1',
+    ]);
+  });
+
   it('a pending reply and a finished answer give way to their stored message', () => {
     const pending = [
       {

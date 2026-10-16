@@ -18,6 +18,7 @@ const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 // The header needs the sidebar's provider; its crumbs are all this page sets.
 jest.mock('@/components/shell/app-header', () => ({
+  useTicketsCrumb: () => ({ label: 'Tickets', href: '/tickets' }),
   AppHeader: ({ crumbs }: { crumbs: { label: string }[] }) => (
     <nav aria-label="Breadcrumb">
       {crumbs.map((crumb) => crumb.label).join(' / ')}
@@ -288,6 +289,49 @@ describe('the ticket page', () => {
   });
 
   describe('the thread', () => {
+    it('a new conversation: the first answer is being written, until it lands', async () => {
+      const { state, socket } = setup({
+        ticket: ticketOf({
+          source: 'CHAT',
+          createdAt: new Date().toISOString(),
+        }),
+      });
+      await loaded();
+      const log = await screen.findByRole('log');
+      expect(
+        await within(log).findByText('Writing an answer…'),
+      ).toBeInTheDocument();
+
+      state.messages = [
+        messageOf({
+          isAiGenerated: true,
+          senderId: null,
+          sender: null,
+          content: 'It resets in January.',
+          answerStatus: 'DOC_ANSWER',
+        }),
+      ];
+      act(() =>
+        socket.receive(REALTIME_EVENTS.messageNew, {
+          ticketId: 't1',
+          pattern: 'ticket.message_created',
+        }),
+      );
+      expect(
+        await within(log).findByText('It resets in January.'),
+      ).toBeInTheDocument();
+      expect(within(log).queryByText('Writing an answer…')).toBeNull();
+    });
+
+    it('an old conversation with no answer is not still answering', async () => {
+      setup({ ticket: ticketOf({ source: 'CHAT' }) });
+      await loaded();
+      const log = await screen.findByRole('log');
+      await waitFor(() =>
+        expect(within(log).queryByText('Writing an answer…')).toBeNull(),
+      );
+    });
+
     it('shows replies, notes, removed messages and attachments', async () => {
       setup({
         viewer: ANA,
@@ -360,8 +404,18 @@ describe('the ticket page', () => {
             content: 'Refunds take 5 days.',
             answerStatus: 'DOC_ANSWER',
             citations: [
-              { chunkId: 'c1', documentTitle: 'Refund policy', pageNumber: 2 },
-              { chunkId: 'c2', documentTitle: 'FAQ', pageNumber: null },
+              {
+                chunkId: 'c1',
+                documentId: 'd1',
+                documentTitle: 'Refund policy',
+                pageNumber: 2,
+              },
+              {
+                chunkId: 'c2',
+                documentId: 'd2',
+                documentTitle: 'FAQ',
+                pageNumber: null,
+              },
             ] as MessageResponseDto['citations'],
           }),
           messageOf({
@@ -384,10 +438,15 @@ describe('the ticket page', () => {
       const log = await screen.findByRole('log');
       await within(log).findByText('Refunds take 5 days.');
 
+      // Each source opens the reader at its passage.
       expect(
-        within(log).getByText('[1] Refund policy · p. 2'),
-      ).toBeInTheDocument();
-      expect(within(log).getByText('[2] FAQ')).toBeInTheDocument();
+        within(log).getByRole('link', {
+          name: 'Refund policy, page 2, source 1',
+        }),
+      ).toHaveAttribute('href', '/knowledge/articles/d1?passage=c1');
+      expect(
+        within(log).getByRole('link', { name: 'FAQ, source 2' }),
+      ).toHaveAttribute('href', '/knowledge/articles/d2?passage=c2');
       expect(within(log).getByText(/from 2 sources/)).toBeInTheDocument();
       expect(
         within(log).getByText(

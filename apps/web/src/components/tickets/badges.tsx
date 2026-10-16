@@ -57,14 +57,25 @@ const SOURCE_ICON = {
   API: CodeIcon,
 } as const;
 
-/** Where a ticket came from: an icon and its name. */
-export function SourceLabel({ source }: { source: TicketResponseDtoSource }) {
+/**
+ * Where a ticket came from: an icon and its name. An end user's requests say
+ * how they started, so Web reads "Web form" there.
+ */
+export function SourceLabel({
+  source,
+  started,
+  className,
+}: {
+  source: TicketResponseDtoSource;
+  started?: boolean;
+  className?: string;
+}) {
   if (!source) return <span className="text-muted-foreground">—</span>;
   const Icon = SOURCE_ICON[source];
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className={cn('inline-flex items-center gap-1.5', className)}>
       <Icon aria-hidden className="size-4 text-muted-foreground" />
-      {SOURCE_LABEL[source]}
+      {started && source === 'WEB' ? 'Web form' : SOURCE_LABEL[source]}
     </span>
   );
 }

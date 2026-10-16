@@ -363,7 +363,13 @@ function Suggestions({ ticketId }: { ticketId: string }) {
                       aria-hidden
                       className="size-4 shrink-0 text-muted-foreground"
                     />
-                    <span className="flex-1">{article.documentTitle}</span>
+                    {/* No passage on a suggestion: it opens at the article's start. */}
+                    <Link
+                      href={`/knowledge/articles/${article.documentId}`}
+                      className="flex-1 text-primary underline-offset-4 hover:underline"
+                    >
+                      {article.documentTitle}
+                    </Link>
                     {article.pageNumber !== null && (
                       <span className="text-xs text-muted-foreground">
                         p. {article.pageNumber}

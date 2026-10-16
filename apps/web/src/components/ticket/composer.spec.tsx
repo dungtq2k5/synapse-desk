@@ -147,8 +147,10 @@ describe('the composer', () => {
       );
       expect(screen.getByText('AI draft')).toBeInTheDocument();
       expect(
-        screen.getByText('[1] Remote Work Policy.pdf · p. 4'),
-      ).toBeInTheDocument();
+        screen.getByRole('link', {
+          name: 'Remote Work Policy.pdf, page 4, source 1',
+        }),
+      ).toHaveAttribute('href', '/knowledge/articles/d1?passage=c1');
       expect(onSend).not.toHaveBeenCalled();
 
       await user.click(screen.getByRole('button', { name: 'Send reply' }));

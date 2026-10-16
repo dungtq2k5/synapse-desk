@@ -4,8 +4,8 @@
  * and its `ApiError` in the test.
  *
  * Routes are `"METHOD /path"` (no query string). A reply is a body and an
- * optional status and headers, or a function of the request body that returns
- * one. An unstubbed call fails the test with its name.
+ * optional status and headers, or a function of the request body (and its
+ * URL, query and all) that returns one. An unstubbed call fails the test with its name.
  *
  * @example
  * const calls = stubApi({ 'POST /api/v1/auth/login': ok({ requiresTwoFactor: true }) });
@@ -15,7 +15,7 @@ export type Reply = {
   body?: unknown;
   headers?: Record<string, string>;
 };
-type Route = Reply | ((body: unknown) => Reply);
+type Route = Reply | ((body: unknown, url: string) => Reply);
 export type Call = { method: string; url: string; body: unknown };
 
 export function stubApi(routes: Record<string, Route>): Call[] {
@@ -30,7 +30,7 @@ export function stubApi(routes: Record<string, Route>): Call[] {
     if (!route)
       return Promise.reject(new Error(`No stub for ${method} ${url}`));
     return Promise.resolve(
-      response(typeof route === 'function' ? route(body) : route),
+      response(typeof route === 'function' ? route(body, url) : route),
     );
   }) as typeof fetch;
   return calls;

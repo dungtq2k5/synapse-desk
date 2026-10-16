@@ -447,22 +447,28 @@ describe('the ticket list for an agent', () => {
   });
 });
 
-describe('the ticket list for an end user', () => {
-  it('shows their own tickets with three columns', async () => {
+describe('My requests: the list for an end user', () => {
+  it('shows their requests with how each started', async () => {
     show({
-      'GET /api/v1/users/me': me([]),
-      'GET /api/v1/tickets': page([ticket(7, { status: 'RESOLVED' })]),
+      'GET /api/v1/users/me': me(['ticket.create']),
+      'GET /api/v1/tickets': page([
+        ticket(7, { status: 'RESOLVED', source: 'WEB' }),
+      ]),
     });
 
-    expect(await screen.findByText('1 ticket')).toBeInTheDocument();
+    expect(await screen.findByText('1 request')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'My tickets' }),
+      screen.getByRole('heading', { name: 'My requests' }),
     ).toBeInTheDocument();
     expect(
       within(table())
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
-    ).toEqual(['Ticket', 'Status', 'Last update']);
+    ).toEqual(['Request', 'Started as', 'Status', 'Last update']);
+    expect(within(table()).getByText('Web form')).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: 'Search requests' }),
+    ).toBeInTheDocument();
     expect(within(table()).getByText('Resolved')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Assigned to me' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'Priority' })).toBeNull();
@@ -471,17 +477,39 @@ describe('the ticket list for an end user', () => {
     ).toBeInTheDocument();
   });
 
-  it('has raised none yet', async () => {
+  it('New request: ask a question, or open a ticket', async () => {
+    const { user } = show({
+      'GET /api/v1/users/me': me(['ticket.create']),
+      'GET /api/v1/tickets': page([ticket(7)]),
+    });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'New request' }),
+    );
+    expect(
+      screen.getByRole('menuitem', { name: 'Ask a question' }),
+    ).toHaveAttribute('href', '/ask');
+    expect(
+      screen.getByRole('menuitem', { name: 'Open a ticket' }),
+    ).toHaveAttribute('href', '/tickets/new');
+  });
+
+  it('has none yet, and offers both ways in', async () => {
     show({
-      'GET /api/v1/users/me': me([]),
+      'GET /api/v1/users/me': me(['ticket.create']),
       'GET /api/v1/tickets': page([]),
     });
 
     expect(
-      await screen.findByRole('heading', {
-        name: 'You haven’t raised any tickets',
-      }),
+      await screen.findByRole('heading', { name: 'No requests yet' }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Ask a question' }),
+    ).toHaveAttribute('href', '/ask');
+    expect(screen.getByRole('link', { name: 'Open a ticket' })).toHaveAttribute(
+      'href',
+      '/tickets/new',
+    );
   });
 
   it('shows the skeleton while the first page loads', () => {
@@ -504,12 +532,14 @@ describe('the ticket list for an end user', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: 'Couldn’t load tickets' }),
+      await screen.findByRole('heading', {
+        name: 'Couldn’t load your requests',
+      }),
     ).toBeInTheDocument();
 
     failing = false;
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(await screen.findByText('1 ticket')).toBeInTheDocument();
+    expect(await screen.findByText('1 request')).toBeInTheDocument();
   });
 });
 

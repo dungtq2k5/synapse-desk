@@ -31,6 +31,19 @@ export const THREAD_PAGE: MessagesControllerListV1Params = {
   sortOrder: 'DESC',
 };
 
+/**
+ * Whether these permissions make someone an agent: ticket-service's own rule
+ * (`TicketAccessService.isAgent`), holding `ticket.read.all` or
+ * `ticket.message.moderate`. An agent sees internal notes and the full queue;
+ * anyone else is a requester.
+ */
+export function isAgent(permissionCodes: readonly string[]): boolean {
+  return (
+    permissionCodes.includes('ticket.read.all') ||
+    permissionCodes.includes('ticket.message.moderate')
+  );
+}
+
 /** The label for each status, priority and source. */
 export const STATUS_LABEL: Record<
   NonNullable<TicketResponseDtoStatus>,
@@ -183,3 +196,32 @@ export const ASSIGNMENT_REASON_LABEL: Record<
   SELF_ASSIGNED: 'Self-assigned',
   MANUAL: 'Manual',
 };
+
+const TITLE_MIN = 3;
+const TITLE_MAX = 255;
+
+/**
+ * The title a question is saved under: its first sentence, cut at the last
+ * word boundary within 255 characters. A first sentence under 3 characters
+ * gives way to the whole question, cut the same way; `null` when even that is
+ * too short to be a title.
+ *
+ * @example titleFrom('When does the allowance reset? I started in March.') // 'When does the allowance reset?'
+ * @example titleFrom('Hi') // null
+ */
+export function titleFrom(question: string): string | null {
+  const whole = question.replace(/\s+/g, ' ').trim();
+  const sentence = /^.*?[.!?](?=\s|$)/.exec(whole)?.[0] ?? whole;
+  for (const text of [sentence, whole]) {
+    const title = cutAtWord(text, TITLE_MAX);
+    if (title.length >= TITLE_MIN) return title;
+  }
+  return null;
+}
+
+function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max + 1);
+  const space = cut.lastIndexOf(' ');
+  return (space > 0 ? cut.slice(0, space) : text.slice(0, max)).trim();
+}

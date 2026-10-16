@@ -4,6 +4,13 @@ import type {
   TicketStatusChangeResponseDto,
 } from '@synapsedesk/api-client';
 
+/**
+ * The reason ticket-service and the gateways record when the AI budget cap
+ * escalates a ticket in place of an answer. Their text, matched as written.
+ */
+const AT_CAP_REASON =
+  'Escalated automatically: the workspace is at its AI budget cap';
+
 /** A reply of mine, sent from this tab and not yet in the stored thread. */
 export type PendingSend = {
   clientMessageId: string;
@@ -101,13 +108,31 @@ export function buildThread({
     })),
     ...history
       .filter((change) => change.toStatus === 'ESCALATED')
-      .map((change): Entry => ({
-        kind: 'notice',
-        id: `notice:${change.id}`,
-        at: change.changedAt,
-        mine: false,
-        notice: { kind: 'escalated', at: change.changedAt, id: change.id },
-      })),
+      .flatMap((change): Entry[] => [
+        // An escalation at the cap says first that the assistant wasn't there.
+        ...(change.reason === AT_CAP_REASON
+          ? [
+              {
+                kind: 'notice' as const,
+                id: `notice:cap:${change.id}`,
+                at: change.changedAt,
+                mine: false as const,
+                notice: {
+                  kind: 'ai-unavailable' as const,
+                  at: change.changedAt,
+                  id: `cap:${change.id}`,
+                },
+              },
+            ]
+          : []),
+        {
+          kind: 'notice',
+          id: `notice:${change.id}`,
+          at: change.changedAt,
+          mine: false,
+          notice: { kind: 'escalated', at: change.changedAt, id: change.id },
+        },
+      ]),
     ...notices.map((notice): Entry => ({
       kind: 'notice',
       id: `notice:${notice.id}`,

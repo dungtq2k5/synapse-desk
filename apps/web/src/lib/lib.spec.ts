@@ -14,7 +14,7 @@ import {
 } from './format';
 import { PASSWORD_RULES } from './password-rules';
 import { historyTimeline } from './history';
-import { statusMoves } from './tickets';
+import { statusMoves, titleFrom } from './tickets';
 import { ok, stubApi } from '@/test/api';
 import {
   afterSignIn,
@@ -28,12 +28,12 @@ describe('safeNext', () => {
   it.each([
     ['/tickets/42?tab=1', '/tickets/42?tab=1'],
     ['/', '/'],
-    [null, '/tickets'],
-    ['', '/tickets'],
-    ['//evil.example/x', '/tickets'],
-    ['/\\evil.example', '/tickets'],
-    ['https://evil.example', '/tickets'],
-    ['tickets', '/tickets'],
+    [null, '/'],
+    ['', '/'],
+    ['//evil.example/x', '/'],
+    ['/\\evil.example', '/'],
+    ['https://evil.example', '/'],
+    ['tickets', '/'],
   ])('%s → %s', (next, expected) => {
     expect(safeNext(next)).toBe(expected);
   });
@@ -194,6 +194,29 @@ describe('format', () => {
     expect(initials('Priya Anand Shah')).toBe('PS');
     expect(initials('Cher')).toBe('C');
     expect(firstName('Priya Shah')).toBe('Priya');
+  });
+});
+
+describe('titleFrom', () => {
+  it.each([
+    [
+      'When does the allowance reset? I started in March.',
+      'When does the allowance reset?',
+    ],
+    ['  Does   it\nreset in January  ', 'Does it reset in January'],
+    ['A? Where is the form?', 'A? Where is the form?'],
+    ['v1.2 is broken. Help', 'v1.2 is broken.'],
+    ['Hi', null],
+    ['   ', null],
+  ])('%j → %j', (question, title) => {
+    expect(titleFrom(question)).toBe(title);
+  });
+
+  it('cuts a long first sentence at the last word within 255', () => {
+    const title = titleFrom(`${'word '.repeat(60)}end.`)!;
+    expect(title.length).toBeLessThanOrEqual(255);
+    expect(title.endsWith('word')).toBe(true);
+    expect(titleFrom('x'.repeat(300))).toHaveLength(255);
   });
 });
 

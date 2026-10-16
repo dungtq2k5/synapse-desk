@@ -315,6 +315,69 @@ describe('a live ticket', () => {
     expect(result.current.notices).toEqual([]);
   });
 
+  it('keeps the files a message went without: failed to attach, and not read', async () => {
+    const { socket, result } = setup({ invokeAi: true });
+    socket.acks[CLIENT_EVENTS.messageSend] = () =>
+      frame({
+        messageId: 'm1',
+        streamId: 's1',
+        skippedAttachments: ['receipt.pdf'],
+      });
+
+    act(() => result.current.send('Is this covered?', false));
+    await waitFor(() =>
+      expect(result.current.skipped.m1).toEqual({
+        by: 'send',
+        names: ['receipt.pdf'],
+      }),
+    );
+
+    // Attached, but the assistant won't read it: said on the live answer,
+    // and kept on the message it becomes.
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.aiStreamAttachmentsSkipped,
+        frame({ ticketId: 't1', fileNames: ['invoice.heic'] }),
+      ),
+    );
+    expect(result.current.skipped.s1).toEqual({
+      by: 'assistant',
+      names: ['invoice.heic'],
+    });
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.aiStreamDone,
+        frame({
+          streamId: 's1',
+          ticketId: 't1',
+          messageId: 'm9',
+          status: 'DOC_ANSWER',
+        }),
+      ),
+    );
+    expect(result.current.skipped.m9).toEqual(result.current.skipped.s1);
+  });
+
+  it('holds skipped files named before the stream is known', () => {
+    const { socket, result } = setup({ invokeAi: true });
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.aiStreamAttachmentsSkipped,
+        frame({ ticketId: 't1', fileNames: ['a.heic', 'b.heic'] }),
+      ),
+    );
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.aiStreamChunk,
+        frame({ streamId: 's2', ticketId: 't1', token: 'Hi' }),
+      ),
+    );
+    expect(result.current.skipped.s2).toEqual({
+      by: 'assistant',
+      names: ['a.heic', 'b.heic'],
+    });
+  });
+
   it('says the assistant is unavailable when the AI limit is reached', () => {
     const { socket, result } = setup({ invokeAi: true });
 

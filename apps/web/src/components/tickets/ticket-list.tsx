@@ -19,10 +19,13 @@ import {
   ArrowDownIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleAlertIcon,
+  FileTextIcon,
   InboxIcon,
+  MessageCircleIcon,
   PlusIcon,
   SearchXIcon,
   Trash2Icon,
@@ -35,6 +38,12 @@ import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -70,7 +79,7 @@ const FRESH_MS = 2000;
 
 /**
  * The ticket list, for both perspectives: an agent's queue (every column and
- * filter) or an end user's own tickets (Ticket, Status, Last update).
+ * filter) or an end user's requests (Request, Started as, Status, Last update).
  * The first page arrives server-rendered; everything after is fetched here.
  */
 export function TicketList() {
@@ -172,8 +181,10 @@ export function TicketList() {
     ),
   );
 
-  const title = isAgent || viewer.isPending ? 'Tickets' : 'My tickets';
+  const requests = !isAgent && !viewer.isPending;
+  const title = requests ? 'My requests' : 'Tickets';
   const total = page?.meta.totalItems ?? 0;
+  const noun = requests ? 'request' : 'ticket';
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -182,14 +193,15 @@ export function TicketList() {
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p aria-live="polite" className="text-sm text-muted-foreground">
             {page &&
-              `${total} ${total === 1 ? 'ticket' : 'tickets'}${filtered ? ' match' : ''}${
+              `${total} ${total === 1 ? noun : `${noun}s`}${filtered ? ' match' : ''}${
                 deleted !== null ? ` · ${deleted} deleted` : ''
               }`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {isAgent && can('ticket.export') && <ExportButton />}
-          {can('ticket.create') && (
+          {requests && <NewRequest openTicket={can('ticket.create')} />}
+          {!requests && can('ticket.create') && (
             <Link
               href="/tickets/new"
               className={buttonVariants({ size: 'sm' })}
@@ -207,7 +219,11 @@ export function TicketList() {
         <Alert variant="destructive">
           <CircleAlertIcon />
           <AlertTitle>
-            <h2>Couldn’t load tickets</h2>
+            <h2>
+              {requests
+                ? 'Couldn’t load your requests'
+                : 'Couldn’t load tickets'}
+            </h2>
           </AlertTitle>
           <AlertDescription>
             Something went wrong on our side. Try again in a moment.
@@ -221,12 +237,12 @@ export function TicketList() {
           </AlertDescription>
         </Alert>
       ) : !page ? (
-        <Loading agent={isAgent} />
+        <Loading agent={isAgent} noun={`${noun}s`} />
       ) : page.items.length === 0 ? (
         filtered ? (
           <Empty
             icon={<SearchXIcon />}
-            title="No tickets match"
+            title={requests ? 'No requests match' : 'No tickets match'}
             description="Try another search, or clear the filters."
             action={
               <Button
@@ -247,8 +263,28 @@ export function TicketList() {
         ) : (
           <Empty
             icon={<InboxIcon />}
-            title="You haven’t raised any tickets"
-            description="When you contact support, your tickets appear here so you can follow them."
+            title="No requests yet"
+            description="Ask a question and the answer appears here, with any replies from the support team."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/ask" className={buttonVariants({ size: 'sm' })}>
+                  <MessageCircleIcon aria-hidden />
+                  Ask a question
+                </Link>
+                {can('ticket.create') && (
+                  <Link
+                    href="/tickets/new"
+                    className={buttonVariants({
+                      variant: 'outline',
+                      size: 'sm',
+                    })}
+                  >
+                    <FileTextIcon aria-hidden />
+                    Open a ticket
+                  </Link>
+                )}
+              </div>
+            }
           />
         )
       ) : (
@@ -261,11 +297,12 @@ export function TicketList() {
               <TableHeader>
                 <TableRow>
                   <SortHead
-                    label="Ticket"
+                    label={requests ? 'Request' : 'Ticket'}
                     column="ticketNumber"
                     paging={paging}
                     onSort={sortBy}
                   />
+                  {requests && <TableHead>Started as</TableHead>}
                   <SortHead
                     label="Status"
                     column="status"
@@ -305,6 +342,11 @@ export function TicketList() {
                     <TableCell className="max-w-0 w-full">
                       <TicketLink ticket={ticket} />
                     </TableCell>
+                    {requests && (
+                      <TableCell>
+                        <SourceLabel source={ticket.source} started />
+                      </TableCell>
+                    )}
                     <TableCell>
                       <StatusBadge status={ticket.status} />
                     </TableCell>
@@ -354,6 +396,13 @@ export function TicketList() {
                 )}
               >
                 <TicketLink ticket={ticket} />
+                {requests && (
+                  <SourceLabel
+                    source={ticket.source}
+                    started
+                    className="text-sm text-muted-foreground"
+                  />
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={ticket.status} />
                   {isAgent && <PriorityBadge priority={ticket.priority} />}
@@ -625,11 +674,11 @@ function Pagination({
   );
 }
 
-function Loading({ agent }: { agent: boolean }) {
+function Loading({ agent, noun }: { agent: boolean; noun: string }) {
   return (
     <div aria-busy className="flex flex-col gap-2">
       <span className="sr-only" role="status">
-        Loading tickets
+        Loading {noun}
       </span>
       {Array.from({ length: 6 }, (_, row) => (
         <div
@@ -646,6 +695,40 @@ function Loading({ agent }: { agent: boolean }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * An end user's ways in: a question for the AI, or (with `ticket.create`) a
+ * ticket.
+ */
+function NewRequest({ openTicket }: { openTicket: boolean }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm">
+          <PlusIcon aria-hidden />
+          New request
+          <ChevronDownIcon aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="shadow-md">
+        <DropdownMenuItem asChild>
+          <Link href="/ask">
+            <MessageCircleIcon aria-hidden />
+            Ask a question
+          </Link>
+        </DropdownMenuItem>
+        {openTicket && (
+          <DropdownMenuItem asChild>
+            <Link href="/tickets/new">
+              <FileTextIcon aria-hidden />
+              Open a ticket
+            </Link>
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

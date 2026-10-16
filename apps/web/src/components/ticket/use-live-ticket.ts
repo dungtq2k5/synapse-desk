@@ -18,6 +18,7 @@ import {
   useRealtimeEvent,
 } from '@/components/realtime/realtime-provider';
 import type { LiveAnswer, Notice, PendingSend } from '@/lib/thread';
+import { skippedText, type Skipped } from './entries';
 import { announce } from '@/lib/toast';
 
 /** The gateway's own frames (typing, the answer stream, acks) come wrapped. */
@@ -36,6 +37,7 @@ type DoneData = {
   status: string;
 };
 type StreamIdData = { streamId: string; ticketId: string };
+type SkippedData = { ticketId: string; fileNames: string[] };
 type SendAck = {
   messageId: string;
   streamId: string | null;
@@ -62,6 +64,11 @@ export function useLiveTicket(
   const [notices, setNotices] = useState<Notice[]>([]);
   const [typing, setTyping] = useState<Record<string, number>>({});
   const [viewers, setViewers] = useState<TicketViewer[]>([]);
+  // Files a message went without, by the message's id (or a live answer's
+  // stream id until it's stored). Only this tab knows: nothing stores them.
+  const [skipped, setSkipped] = useState<Record<string, Skipped>>({});
+  const streamingNow = useRef<string | null>(null);
+  const skippedEarly = useRef<string[] | null>(null);
   // Whether the person is typing now, whether or not the signal could be sent.
   const typingNow = useRef(false);
 
@@ -197,8 +204,20 @@ export function useLiveTicket(
     return () => globalThis.clearTimeout(timer);
   }, [typing]);
 
+  const noteSkipped = useCallback((id: string, value: Skipped) => {
+    if (value.names.length === 0) return;
+    setSkipped((current) => ({ ...current, [id]: value }));
+    announce(skippedText(value));
+  }, []);
+
   const upsertAnswer = useCallback(
-    (streamId: string, change: (answer: LiveAnswer) => LiveAnswer) =>
+    (streamId: string, change: (answer: LiveAnswer) => LiveAnswer) => {
+      streamingNow.current = streamId;
+      // Skipped files named before this tab knew the stream's id.
+      if (skippedEarly.current) {
+        noteSkipped(streamId, { by: 'assistant', names: skippedEarly.current });
+        skippedEarly.current = null;
+      }
       setAnswers((current) => {
         const found = current.find((answer) => answer.streamId === streamId);
         const base: LiveAnswer = found ?? {
@@ -213,8 +232,29 @@ export function useLiveTicket(
               answer.streamId === streamId ? next : answer,
             )
           : [...current, next];
-      }),
-    [],
+      });
+    },
+    [noteSkipped],
+  );
+
+  // Attached files the assistant won't read: said before the answer streams.
+  useRealtimeEvent(
+    REALTIME_EVENTS.aiStreamAttachmentsSkipped,
+    useCallback(
+      (frame: Frame<SkippedData>) => {
+        const data = frame.data;
+        if (!data || data.ticketId !== ticketId) return;
+        if (streamingNow.current) {
+          noteSkipped(streamingNow.current, {
+            by: 'assistant',
+            names: data.fileNames,
+          });
+        } else {
+          skippedEarly.current = data.fileNames;
+        }
+      },
+      [ticketId, noteSkipped],
+    ),
   );
 
   useRealtimeEvent(
@@ -243,6 +283,15 @@ export function useLiveTicket(
           state: 'done',
           messageId: data.messageId ?? undefined,
         }));
+        streamingNow.current = null;
+        const messageId = data.messageId;
+        if (messageId) {
+          setSkipped((current) =>
+            current[data.streamId]
+              ? { ...current, [messageId]: current[data.streamId] }
+              : current,
+          );
+        }
         if (data.status === 'AT_CAP') {
           // Nothing is stored; the ticket escalated itself, and the history
           // brings that notice.
@@ -272,6 +321,7 @@ export function useLiveTicket(
           ...answer,
           state: 'failed',
         }));
+        streamingNow.current = null;
       },
       [ticketId, upsertAnswer],
     ),
@@ -306,6 +356,10 @@ export function useLiveTicket(
             })) as Frame<SendAck>;
           if (!ack.success || !ack.data) throw new Error(ack.message);
           settle({ state: 'sending', messageId: ack.data.messageId });
+          noteSkipped(ack.data.messageId, {
+            by: 'send',
+            names: ack.data.skippedAttachments,
+          });
           if (ack.data.streamId)
             upsertAnswer(ack.data.streamId, (answer) => answer);
         } else {
@@ -317,6 +371,12 @@ export function useLiveTicket(
             generatedFromId: send.generatedFromId ?? undefined,
           });
           settle({ state: 'sending', messageId: answer.data?.message.id });
+          if (answer.data) {
+            noteSkipped(answer.data.message.id, {
+              by: 'send',
+              names: answer.data.skippedAttachments,
+            });
+          }
         }
         refetch({ messages: true });
       } catch {
@@ -324,7 +384,7 @@ export function useLiveTicket(
         announce('Your reply wasn’t sent.', 'assertive');
       }
     },
-    [socket, ready, ticketId, invokeAi, upsertAnswer, refetch],
+    [socket, ready, ticketId, invokeAi, upsertAnswer, refetch, noteSkipped],
   );
 
   const send = useCallback(
@@ -404,6 +464,7 @@ export function useLiveTicket(
     pending,
     answers,
     notices,
+    skipped,
     typingUserIds: Object.keys(typing),
     viewers,
     send,

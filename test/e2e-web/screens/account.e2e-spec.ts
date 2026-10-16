@@ -23,7 +23,7 @@ test('the shell asks an unverified person to verify their email', async ({
   const { priya } = await tenant('banner');
   await setEmailVerified([priya], false);
   await signInAs(page, priya);
-  await page.goto('/tickets');
+  await page.goto('/requests');
   await expect(
     page.getByRole('region', { name: 'Email verification' }),
   ).toBeVisible();

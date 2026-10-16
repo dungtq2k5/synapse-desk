@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { useViewer } from '@/hooks/use-viewer';
 import { VerifyEmailBanner } from './verify-email-banner';
 
 /**
@@ -62,4 +63,11 @@ export function AppHeader({
       {isMobile && <VerifyEmailBanner />}
     </>
   );
+}
+
+/** The crumb a ticket's pages hang from: the queue, or an end user's requests. */
+export function useTicketsCrumb(): { label: string; href: string } {
+  return useViewer().isAgent
+    ? { label: 'Tickets', href: '/tickets' }
+    : { label: 'My requests', href: '/requests' };
 }

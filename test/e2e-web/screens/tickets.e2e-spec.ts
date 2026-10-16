@@ -110,8 +110,10 @@ test.describe('the ticket list, as an agent', () => {
 test('the ticket list, as the person who raised them', async ({ page }) => {
   const { priya } = await tenant('list');
   await signInAs(page, priya);
-  await page.goto('/tickets');
-  await expect(page.getByRole('heading', { name: 'My tickets' })).toBeVisible();
+  await page.goto('/requests');
+  await expect(
+    page.getByRole('heading', { name: 'My requests' }),
+  ).toBeVisible();
   await expect(
     page.getByRole('link', { name: /Allowance for a standing desk/ }),
   ).toBeVisible();
@@ -169,6 +171,8 @@ test.describe('the app shell', () => {
     await tabsThrough(page, [
       /^Skip to content$/,
       /^Tickets$/,
+      /^Knowledge$/,
+      /^Ask$/,
       /^Account$/,
       /^Toggle sidebar$/,
     ]);

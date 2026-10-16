@@ -487,6 +487,22 @@ export async function givePhoto(person: Person): Promise<void> {
 }
 
 /** A service's database, as its own `.env` names it. */
+/**
+ * Marks a ticket as started from a chat (or by email), as `POST /chat/conversations`
+ * would have: without asking the AI for an answer, which needs a model.
+ */
+export async function startedAs(
+  ticketId: string,
+  source: 'CHAT' | 'EMAIL',
+): Promise<void> {
+  const prisma = ticketPrisma();
+  try {
+    await prisma.ticket.update({ where: { id: ticketId }, data: { source } });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 export function databaseUrl(service: string): string {
   const env = readFileSync(join(REPO_ROOT, `services/${service}/.env`), 'utf8');
   const url = /^DATABASE_URL\s*=\s*(.*)$/m.exec(env)?.[1]?.trim();

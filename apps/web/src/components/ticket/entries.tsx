@@ -1,6 +1,5 @@
 import type {
   AttachmentResponseDto,
-  CitationResponseDto,
   MessageResponseDto,
 } from '@synapsedesk/api-client';
 import { attachmentsControllerDownloadV1 } from '@synapsedesk/api-client';
@@ -19,6 +18,7 @@ import {
   ZapOffIcon,
 } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
+import { Citations } from '@/components/knowledge/citations';
 import { Markdown } from '@/components/markdown';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { absoluteTime, clockTime, fileSize } from '@/lib/format';
+import { absoluteTime, andList, clockTime, fileSize } from '@/lib/format';
 import type { LiveAnswer, Notice, PendingSend } from '@/lib/thread';
 import { toastError } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -86,6 +86,7 @@ export function PersonEntry({
   actions,
   editor,
   onDeleteAttachment,
+  skipped,
   children,
 }: {
   mine: boolean;
@@ -106,6 +107,8 @@ export function PersonEntry({
   editor?: ReactNode;
   /** Offered to the uploader and to moderators. */
   onDeleteAttachment?: (attachment: AttachmentResponseDto) => void;
+  /** Files that failed to attach when it was sent. */
+  skipped?: Skipped;
   children: string;
 }) {
   const headerId = useId();
@@ -206,6 +209,7 @@ export function PersonEntry({
             ))}
           </ul>
         )}
+        {!removed && <SkippedNotice skipped={skipped} />}
       </article>
     </Side>
   );
@@ -247,23 +251,32 @@ function AttachmentChip({ attachment }: { attachment: AttachmentResponseDto }) {
   );
 }
 
-function Citations({ citations }: { citations: CitationResponseDto[] }) {
+/** Files a message went without, and who did. */
+export type Skipped = { by: 'send' | 'assistant'; names: string[] };
+
+/**
+ * A notice inside an entry about files it went without: files that failed to
+ * attach when it was sent, or files attached that the assistant didn't read.
+ */
+export function SkippedNotice({ skipped }: { skipped?: Skipped }) {
+  if (!skipped || skipped.names.length === 0) return null;
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium">Sources</span>
-      <ul className="flex flex-wrap gap-2">
-        {citations.map((citation, index) => (
-          <li
-            key={citation.chunkId}
-            className="rounded-sm border border-author-ai-border px-1.5 py-0.5 font-mono text-xs"
-          >
-            [{index + 1}] {citation.documentTitle}
-            {citation.pageNumber !== null && ` · p. ${citation.pageNumber}`}
-          </li>
-        ))}
-      </ul>
-    </div>
+    <p className="flex items-start gap-2 text-xs">
+      <CircleAlertIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+      <span>{skippedText(skipped)}</span>
+    </p>
   );
+}
+
+/**
+ * @example skippedText({ by: 'assistant', names: ['invoice.heic'] }) // 'The assistant couldn’t read invoice.heic; the support team can still see it.'
+ */
+export function skippedText({ by, names }: Skipped): string {
+  const files = andList(names);
+  const one = names.length === 1;
+  return by === 'send'
+    ? `We couldn’t attach ${files}, so the answer doesn’t use ${one ? 'it' : 'them'}. You can attach ${one ? 'it' : 'them'} again below.`
+    : `The assistant couldn’t read ${files}; the support team can still see ${one ? 'it' : 'them'}.`;
 }
 
 /** The AI's frame: left, the AI surface and its teal rule, the AI label. */
@@ -365,10 +378,13 @@ export function AiMessage({
   askAPerson,
   actions,
   feedback,
+  skipped,
 }: {
   message: MessageResponseDto;
   perspective: Perspective;
   askAPerson?: ReactNode;
+  /** Attached files the assistant didn't read. */
+  skipped?: Skipped;
   /** A moderator's menu. */
   actions?: ReactNode;
   /** Helpful? and its form. */
@@ -394,6 +410,7 @@ export function AiMessage({
       {status === 'DOC_ANSWER' && citations.length > 0 && (
         <Citations citations={citations} />
       )}
+      {!message.redactedAt && <SkippedNotice skipped={skipped} />}
       {!message.redactedAt && feedback}
       {status === 'DOC_MISSING' && (
         <Footer icon={<SearchXIcon aria-hidden />}>
@@ -416,16 +433,19 @@ export function LiveAnswerEntry({
   perspective,
   onStop,
   askAPerson,
+  skipped,
 }: {
   answer: LiveAnswer;
   perspective: Perspective;
   onStop: () => void;
   askAPerson?: ReactNode;
+  skipped?: Skipped;
 }) {
   const streaming = answer.state === 'streaming';
   return (
     <AiFrame label="AI" at={answer.startedAt} busy={streaming}>
       {answer.text && <Markdown>{answer.text}</Markdown>}
+      <SkippedNotice skipped={skipped} />
       {streaming && (
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="inline-flex items-center gap-2">
@@ -456,13 +476,33 @@ export function LiveAnswerEntry({
   );
 }
 
+/**
+ * The first answer to a new conversation, being written: it lands as a stored
+ * message, unstreamed, so all there is to show until then is that it's coming.
+ */
+export function AnsweringEntry({ at }: { at: string }) {
+  return (
+    <AiFrame label="AI" at={at} busy>
+      <span className="inline-flex items-center gap-2 text-xs">
+        <LoaderCircleIcon
+          aria-hidden
+          className="size-3.5 motion-safe:animate-spin"
+        />
+        Writing an answer…
+      </span>
+    </AiFrame>
+  );
+}
+
 /** A reply of mine on its way, or one that didn't go. */
 export function PendingEntry({
   pending,
   onRetry,
+  skipped,
 }: {
   pending: PendingSend;
   onRetry: () => void;
+  skipped?: Skipped;
 }) {
   const failed = pending.state === 'failed';
   return (
@@ -480,6 +520,7 @@ export function PendingEntry({
         <div className="whitespace-pre-wrap wrap-break-word">
           {pending.content}
         </div>
+        <SkippedNotice skipped={skipped} />
         <p className="flex items-center justify-end gap-2 text-xs">
           {failed ? (
             <>

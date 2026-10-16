@@ -1,7 +1,13 @@
 'use client';
 
 import { useOrganizationsControllerGetV1 } from '@synapsedesk/api-client';
-import { TicketIcon } from 'lucide-react';
+import {
+  BookOpenIcon,
+  InboxIcon,
+  MessageCircleIcon,
+  TicketIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -20,15 +26,64 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
+import { useViewer } from '@/hooks/use-viewer';
 import { TwoStepWarning } from './two-step-warning';
 import { UserMenu } from './user-menu';
 
+type Item = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  /** The paths it's the current item for. */
+  active: (pathname: string) => boolean;
+};
+
+const ASK: Item = {
+  label: 'Ask',
+  href: '/ask',
+  icon: MessageCircleIcon,
+  active: (path) => path.startsWith('/ask'),
+};
+const KNOWLEDGE: Item = {
+  label: 'Knowledge',
+  href: '/knowledge',
+  icon: BookOpenIcon,
+  active: (path) => path.startsWith('/knowledge'),
+};
+
+/** The sidebar's items by role. An end user's tickets are their requests. */
+const ITEMS = {
+  agent: [
+    {
+      label: 'Tickets',
+      href: '/tickets',
+      icon: TicketIcon,
+      active: (path) => path.startsWith('/tickets'),
+    },
+    KNOWLEDGE,
+    ASK,
+  ],
+  requester: [
+    ASK,
+    {
+      label: 'My requests',
+      href: '/requests',
+      icon: InboxIcon,
+      active: (path) =>
+        path.startsWith('/requests') || path.startsWith('/tickets'),
+    },
+    KNOWLEDGE,
+  ],
+} satisfies Record<string, Item[]>;
+
 /**
  * The signed-in frame: the sidebar (a Sheet on phones), and the page beside
- * it. Only Tickets is live; later areas join the Support group or their own.
+ * it. The items depend on who is looking: an agent's queue comes first, an
+ * end user's Ask.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { isAgent } = useViewer();
   const organization = useOrganizationsControllerGetV1({
     query: { retry: false },
   });
@@ -79,17 +134,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                   Support
                 </SidebarGroupLabel>
                 <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname.startsWith('/tickets')}
-                    >
-                      <Link href="/tickets">
-                        <TicketIcon />
-                        Tickets
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {ITEMS[isAgent ? 'agent' : 'requester'].map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={item.active(pathname)}
+                      >
+                        <Link href={item.href}>
+                          <item.icon />
+                          {item.label}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
                 </SidebarMenu>
               </SidebarGroup>
             </nav>

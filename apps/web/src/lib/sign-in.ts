@@ -7,8 +7,11 @@ import {
   type TwoFactorRequiredResponseDto,
 } from '@synapsedesk/api-client';
 
-/** Where a signed-in user lands when no `next` says otherwise. */
-export const HOME = '/tickets';
+/**
+ * Where a signed-in user lands when no `next` says otherwise: the root, which
+ * sends an agent to Tickets and anyone else to Ask.
+ */
+export const HOME = '/';
 
 /**
  * The `next` a sign-in returns to, if it's a path on this origin. Anything
@@ -16,7 +19,7 @@ export const HOME = '/tickets';
  * the sign-in page can't be used to send someone elsewhere.
  *
  * @example safeNext('/tickets/42?tab=notes') // '/tickets/42?tab=notes'
- * @example safeNext('//evil.example') // '/tickets'
+ * @example safeNext('//evil.example') // '/'
  */
 export function safeNext(next: string | null | undefined): string {
   if (!next?.startsWith('/') || /^\/[/\\]/.test(next)) return HOME;

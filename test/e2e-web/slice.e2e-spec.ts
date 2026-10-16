@@ -23,7 +23,8 @@ async function personAt(
   const context = await browser.newContext();
   const page = await context.newPage();
   await signIn(page, email, DEMO_PASSWORD);
-  await expect(page).toHaveURL(/\/tickets$/);
+  // Home by role: an agent's queue, or anyone else's Ask.
+  await expect(page).toHaveURL(/\/(tickets|ask)$/);
   return { context, page };
 }
 
@@ -168,6 +169,9 @@ test('an expired access cookie: the page renders, refreshes once, shows the data
   const { colleague } = await seededActors();
   const { context, page } = await personAt(browser, colleague.email);
   const ticketId = await ownTicket(page, colleague.id);
+  // The landing page's own calls settle first: one still in flight when the
+  // cookie goes would refresh on its own.
+  await page.waitForLoadState('networkidle');
 
   await context.clearCookies({ name: 'access_token' });
   const refreshes: string[] = [];

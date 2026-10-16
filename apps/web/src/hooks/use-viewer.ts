@@ -4,13 +4,11 @@ import {
   useUsersControllerGetCurrentUserV1,
   type CurrentUserResponseDtoPermissionCodesItem as PermissionCode,
 } from '@synapsedesk/api-client';
+import { isAgent } from '@/lib/tickets';
 
 /**
  * Who is looking: the signed-in user and what they may do.
- *
- * `isAgent` is ticket-service's own rule (`TicketAccessService.isAgent`):
- * holding `ticket.read.all` or `ticket.message.moderate`. An agent sees
- * internal notes and the full queue; anyone else is a requester.
+ * `isAgent` is ticket-service's own rule (see `isAgent` in `lib/tickets`).
  */
 export function useViewer() {
   const query = useUsersControllerGetCurrentUserV1();
@@ -23,8 +21,6 @@ export function useViewer() {
     /** The departments they belong to, by id. */
     departmentIds: query.data?.data?.departmentIds ?? [],
     can: (code: PermissionCode) => codes.includes(code),
-    isAgent:
-      codes.includes('ticket.read.all') ||
-      codes.includes('ticket.message.moderate'),
+    isAgent: isAgent(codes),
   };
 }

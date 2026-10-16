@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
@@ -54,11 +54,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const ME = ok({
-  user: { id: 'u-1', fullName: 'Priya Shah', email: 'priya@acme.test' },
-  permissionCodes: [],
-  departmentIds: [],
-});
+const USER = { id: 'u-1', fullName: 'Priya Shah', email: 'priya@acme.test' };
 
 function wrap(ui: ReactNode) {
   const client = new QueryClient({
@@ -73,10 +69,17 @@ function wrap(ui: ReactNode) {
   );
 }
 
-function shell(logout: Reply | (() => Reply) = ok(null)) {
+function shell(
+  logout: Reply | (() => Reply) = ok(null),
+  permissionCodes: string[] = [],
+) {
   const calls = stubApi({
     'GET /api/v1/organizations/current': ok({ id: 'o-1', name: 'Acme Inc' }),
-    'GET /api/v1/users/me': ME,
+    'GET /api/v1/users/me': ok({
+      user: USER,
+      permissionCodes,
+      departmentIds: [],
+    }),
     'POST /api/v1/auth/logout': logout,
   });
   wrap(
@@ -88,7 +91,7 @@ function shell(logout: Reply | (() => Reply) = ok(null)) {
 }
 
 describe('the app shell', () => {
-  it('names the organization and marks Tickets as the current area', async () => {
+  it('names the organization and, for an end user, marks My requests on a thread', async () => {
     shell();
 
     expect(await screen.findByText('Acme Inc')).toBeInTheDocument();
@@ -98,18 +101,30 @@ describe('the app shell', () => {
     ).toHaveAttribute('href', '#main');
     const nav = screen.getByRole('navigation', { name: 'Main' });
     expect(nav).toHaveTextContent('Support');
-    expect(screen.getByRole('link', { name: 'Tickets' })).toHaveAttribute(
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Ask', 'My requests', 'Knowledge']);
+    expect(screen.getByRole('link', { name: 'My requests' })).toHaveAttribute(
       'data-active',
       'true',
     );
     expect(screen.getByRole('main')).toHaveTextContent('The page');
   });
 
-  it('leaves Tickets unmarked elsewhere', async () => {
+  it('gives an agent Tickets, Knowledge and Ask, and marks none elsewhere', async () => {
     pathname = '/settings';
-    shell();
+    shell(ok(null), ['ticket.read.all']);
 
-    expect(await screen.findByText('Acme Inc')).toBeInTheDocument();
+    const nav = await screen.findByRole('navigation', { name: 'Main' });
+    await waitFor(() =>
+      expect(
+        within(nav)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(['Tickets', 'Knowledge', 'Ask']),
+    );
     expect(screen.getByRole('link', { name: 'Tickets' })).toHaveAttribute(
       'data-active',
       'false',

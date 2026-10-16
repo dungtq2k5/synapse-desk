@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Citations } from '@/components/knowledge/citations';
 import { firstName } from '@/lib/format';
 import { announce } from '@/lib/toast';
 import { cn } from '@/lib/utils';
@@ -404,18 +405,7 @@ export function Composer({
       )}
 
       {draft.generationId && draft.citations.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-medium">Sources</span>
-          {draft.citations.map((citation, index) => (
-            <span
-              key={citation.chunkId}
-              className="rounded-sm border border-author-ai-border px-1.5 py-0.5 font-mono"
-            >
-              [{index + 1}] {citation.documentTitle}
-              {citation.pageNumber !== null && ` · p. ${citation.pageNumber}`}
-            </span>
-          ))}
-        </div>
+        <Citations citations={draft.citations} surface="neutral" />
       )}
 
       <AttachmentList

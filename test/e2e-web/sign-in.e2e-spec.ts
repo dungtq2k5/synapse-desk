@@ -105,7 +105,7 @@ test('one email in two organizations: choose one', async ({ page }) => {
     .click();
 
   await verifyLater(page);
-  await expect(page).toHaveURL(/\/tickets$/);
+  await expect(page).toHaveURL(/\/ask$/);
 });
 
 test('an organization that requires two-step: setting it up signs you in', async ({

@@ -124,7 +124,7 @@ test('accepting an invitation signs in, into the inviting organization', async (
   await page.getByLabel('Password', { exact: true }).fill('Harbor-Lights-26');
   await page.getByRole('button', { name: 'Join Harbor Labs' }).click();
 
-  await expect(page).toHaveURL(/\/tickets$/);
+  await expect(page).toHaveURL(/\/ask$/);
   await expect(page.getByText('Harbor Labs').first()).toBeVisible();
 });
 
@@ -242,7 +242,7 @@ test('a Google-only account sets a password through the link, then signs in with
   await expect(page).toHaveURL(/\/login\?reset/);
 
   await signIn(page, email, 'Harbor-Lights-26');
-  await expect(page).toHaveURL(/\/tickets$/);
+  await expect(page).toHaveURL(/\/ask$/);
 });
 
 test('a profile photo uploads through the real flow, and shows', async ({

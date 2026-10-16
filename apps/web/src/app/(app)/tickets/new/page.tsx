@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
-import { AppHeader } from '@/components/shell/app-header';
-import { NewTicketForm } from '@/components/tickets/new-ticket-form';
+import {
+  NewTicketForm,
+  NewTicketHeader,
+} from '@/components/tickets/new-ticket-form';
 
 export const metadata: Metadata = { title: 'New ticket · SynapseDesk' };
 
@@ -8,12 +10,7 @@ export const metadata: Metadata = { title: 'New ticket · SynapseDesk' };
 export default function NewTicketPage() {
   return (
     <>
-      <AppHeader
-        crumbs={[
-          { label: 'Tickets', href: '/tickets' },
-          { label: 'New ticket' },
-        ]}
-      />
+      <NewTicketHeader />
       <main id="main" tabIndex={-1} className="outline-none">
         <NewTicketForm />
       </main>

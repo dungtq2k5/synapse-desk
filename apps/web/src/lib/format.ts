@@ -59,6 +59,20 @@ export function absoluteTime(at: string | Date, timeZone?: string): string {
 }
 
 /**
+ * A day, as the knowledge pages date an article.
+ *
+ * @example dayDate('2026-10-02T09:12:00Z', 'UTC') // '2 Oct 2026'
+ */
+export function dayDate(at: string | Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone,
+  }).format(new Date(at));
+}
+
+/**
  * A moment's time of day, as a message header shows it.
  *
  * @example clockTime('2026-10-10T09:12:00Z', 'UTC') // '09:12'

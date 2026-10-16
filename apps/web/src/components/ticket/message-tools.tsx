@@ -44,7 +44,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useViewer } from '@/hooks/use-viewer';
 import { announce, toastError } from '@/lib/toast';
-import { AiMessage, PersonEntry, type Perspective } from './entries';
+import {
+  AiMessage,
+  PersonEntry,
+  type Perspective,
+  type Skipped,
+} from './entries';
 import { serverMessage } from './use-directory';
 
 /** Past this, a timer can't wait (setTimeout's limit is about 24.8 days). */
@@ -83,10 +88,13 @@ export function ThreadMessage({
   ticket,
   message,
   mine,
+  skipped,
 }: {
   ticket: TicketResponseDto;
   message: MessageResponseDto;
   mine: boolean;
+  /** Files that failed to attach when it was sent from this tab. */
+  skipped?: Skipped;
 }) {
   const { can } = useViewer();
   const refresh = useRefreshThread(ticket.id);
@@ -144,6 +152,7 @@ export function ThreadMessage({
         note={message.isInternalNote}
         removed={redacted}
         attachments={message.attachments}
+        skipped={skipped}
         markdown={!fromRequester}
         actions={actions.length > 0 ? actions : undefined}
         editor={
@@ -195,11 +204,13 @@ export function ThreadAiMessage({
   message,
   perspective,
   askAPerson,
+  skipped,
 }: {
   ticket: TicketResponseDto;
   message: MessageResponseDto;
   perspective: Perspective;
   askAPerson?: ReactNode;
+  skipped?: Skipped;
 }) {
   const { can } = useViewer();
   const refresh = useRefreshThread(ticket.id);
@@ -211,6 +222,7 @@ export function ThreadAiMessage({
         message={message}
         perspective={perspective}
         askAPerson={askAPerson}
+        skipped={skipped}
         actions={
           moderator && (
             <ModeratorMenu
