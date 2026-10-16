@@ -323,13 +323,20 @@ describe('the ticket page', () => {
       expect(within(log).queryByText('Writing an answer…')).toBeNull();
     });
 
-    it('an old conversation with no answer is not still answering', async () => {
+    it('once the wait is over with no answer, it says the answer stopped and offers a person', async () => {
+      // Created long ago: the 90-second wait is already over.
       setup({ ticket: ticketOf({ source: 'CHAT' }) });
       await loaded();
       const log = await screen.findByRole('log');
-      await waitFor(() =>
-        expect(within(log).queryByText('Writing an answer…')).toBeNull(),
-      );
+      expect(
+        await within(log).findByText(
+          'The answer stopped before it finished. Ask again, or ask a person to take over.',
+        ),
+      ).toBeInTheDocument();
+      expect(within(log).queryByText('Writing an answer…')).toBeNull();
+      expect(
+        within(log).getByRole('button', { name: 'Ask a person' }),
+      ).toBeInTheDocument();
     });
 
     it('shows replies, notes, removed messages and attachments', async () => {

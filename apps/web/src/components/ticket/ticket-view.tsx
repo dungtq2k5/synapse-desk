@@ -269,7 +269,25 @@ function Loaded({
         <Thread
           entries={entries}
           loading={messages.isPending}
-          after={answering && <AnsweringEntry at={ticket.createdAt} />}
+          after={
+            answering === 'waiting' ? (
+              <AnsweringEntry at={ticket.createdAt} />
+            ) : answering === 'timed-out' ? (
+              // No answer and no word of one: design 02's failed answer, with
+              // the person on offer.
+              <LiveAnswerEntry
+                answer={{
+                  streamId: 'opening',
+                  text: '',
+                  startedAt: ticket.createdAt,
+                  state: 'failed',
+                }}
+                perspective={perspective}
+                onStop={() => undefined}
+                askAPerson={askButton}
+              />
+            ) : null
+          }
           render={(entry) => {
             switch (entry.kind) {
               case 'description':
@@ -474,12 +492,16 @@ function Thread({
 const OPENING_ANSWER_MS = 90_000;
 
 /**
- * Whether a new conversation's first answer is still being written: the
- * requester's own chat, still before a person took over, with nothing in the
- * thread yet. It ends when the answer arrives, when the ticket escalates
- * (the allowance used up), or after a wait that no answer should outlast.
+ * Where a new conversation's first answer stands, while the requester's own
+ * chat is still before a person and the thread is still empty: `waiting`, or
+ * `timed-out` once the wait is over with no answer and no word of one. `null`
+ * otherwise: the answer (or the server's hand-over) arrived, or the ticket
+ * escalated (the allowance used up).
  */
-function useOpeningAnswer(waiting: boolean, createdAt: string): boolean {
+function useOpeningAnswer(
+  waiting: boolean,
+  createdAt: string,
+): 'waiting' | 'timed-out' | null {
   const [expired, setExpired] = useState<string | null>(null);
   useEffect(() => {
     if (!waiting) return;
@@ -489,7 +511,8 @@ function useOpeningAnswer(waiting: boolean, createdAt: string): boolean {
     );
     return () => globalThis.clearTimeout(timer);
   }, [waiting, createdAt]);
-  return waiting && expired !== createdAt;
+  if (!waiting) return null;
+  return expired === createdAt ? 'timed-out' : 'waiting';
 }
 
 /** Status, priority and assignee changes, said once each, politely. */
