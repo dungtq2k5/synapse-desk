@@ -169,9 +169,6 @@ test('an expired access cookie: the page renders, refreshes once, shows the data
   const { colleague } = await seededActors();
   const { context, page } = await personAt(browser, colleague.email);
   const ticketId = await ownTicket(page, colleague.id);
-  // The landing page's own calls settle first: one still in flight when the
-  // cookie goes would refresh on its own.
-  await page.waitForLoadState('networkidle');
 
   await context.clearCookies({ name: 'access_token' });
   const refreshes: string[] = [];

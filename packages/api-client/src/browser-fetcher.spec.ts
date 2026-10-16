@@ -59,6 +59,68 @@ describe('browserFetch', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it('a 401 arriving AFTER the refresh finished retries without a second refresh', async () => {
+    // The first call's 401 starts the refresh; the second call was sent
+    // before it finished, and its 401 lands after.
+    let releaseLate!: () => void;
+    let refreshed = false;
+    fetchMock.mockImplementation((url) => {
+      if (url === '/api/v1/auth/refresh') {
+        refreshed = true;
+        return Promise.resolve(json(200, { success: true }));
+      }
+      if (url === '/api/v1/users/me' && !refreshed) {
+        // Sent with the old cookie; answered late.
+        return new Promise((resolve) => {
+          releaseLate = () => resolve(json(401, { statusCode: 401 }));
+        });
+      }
+      const retried =
+        fetchMock.mock.calls.filter(([seen]) => seen === url).length > 1;
+      return Promise.resolve(
+        retried || refreshed
+          ? json(200, { url })
+          : json(401, { statusCode: 401 }),
+      );
+    });
+
+    const late = browserFetch('/api/v1/users/me', { method: 'GET' });
+    await expect(
+      browserFetch('/api/v1/tickets', { method: 'GET' }),
+    ).resolves.toEqual({ url: '/api/v1/tickets' });
+    releaseLate();
+
+    await expect(late).resolves.toEqual({ url: '/api/v1/users/me' });
+    expect(refreshCalls()).toHaveLength(1);
+  });
+
+  it('a 401 arriving DURING the refresh joins it', async () => {
+    let releaseRefresh!: () => void;
+    fetchMock.mockImplementation((url) => {
+      if (url === '/api/v1/auth/refresh') {
+        return new Promise((resolve) => {
+          releaseRefresh = () => resolve(json(200, { success: true }));
+        });
+      }
+      const retried =
+        fetchMock.mock.calls.filter(([seen]) => seen === url).length > 1;
+      return Promise.resolve(
+        retried ? json(200, { url }) : json(401, { statusCode: 401 }),
+      );
+    });
+
+    const first = browserFetch('/api/v1/tickets', { method: 'GET' });
+    await new Promise((resolve) => setImmediate(resolve));
+    // Sent while the refresh is in flight.
+    const during = browserFetch('/api/v1/users/me', { method: 'GET' });
+    await new Promise((resolve) => setImmediate(resolve));
+    releaseRefresh();
+
+    await expect(first).resolves.toEqual({ url: '/api/v1/tickets' });
+    await expect(during).resolves.toEqual({ url: '/api/v1/users/me' });
+    expect(refreshCalls()).toHaveLength(1);
+  });
+
   it('a failed refresh sends the browser to sign-in, keeping where it was', async () => {
     fetchMock.mockImplementation((url) =>
       Promise.resolve(

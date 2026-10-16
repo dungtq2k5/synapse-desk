@@ -8,11 +8,20 @@ const REFRESH_URL = '/api/v1/auth/refresh';
 let refreshing: Promise<boolean> | null = null;
 
 /**
+ * How many refreshes have succeeded. A call notes it when sent: a 401 on a
+ * call sent before the latest refresh finished carried the old cookie, so it
+ * retries with the new one rather than refreshing again. Two refreshes for one
+ * expiry would spend a refresh token twice, and reuse signs the session out.
+ */
+let generation = 0;
+
+/**
  * The browser's fetcher: same-origin, cookies only.
  *
  * On a 401 from a call the access cookie authorises, it refreshes **once** for
- * every call waiting at that moment, then retries the call once. A refresh
- * that fails sends the browser to `/login?next=…`. A 401 from any other call
+ * every call waiting at that moment, then retries the call once. A call sent
+ * before a refresh that has since finished just retries (`generation`). A
+ * refresh that fails sends the browser to `/login?next=…`. A 401 from any other call
  * (a sign-in leg) is returned as it is: refreshing can't fix a wrong password.
  *
  * @example
@@ -22,9 +31,16 @@ export async function browserFetch<T>(
   url: string,
   init: RequestInit,
 ): Promise<T> {
-  const response = await send(url, init);
+  const sentAt = generation;
+  let response = await send(url, init);
   if (response.status !== 401 || !needsSession(init.method ?? 'GET', url)) {
     return readResponse<T>(response);
+  }
+
+  if (generation !== sentAt) {
+    // A refresh finished after this was sent: the cookie it carried is old.
+    response = await send(url, init);
+    if (response.status !== 401) return readResponse<T>(response);
   }
 
   if (await refreshOnce()) {
@@ -51,7 +67,10 @@ export function needsSession(method: string, url: string): boolean {
 /** One `POST /auth/refresh` for every caller waiting now; `true` if it worked. */
 export function refreshOnce(): Promise<boolean> {
   refreshing ??= send(REFRESH_URL, { method: 'POST' })
-    .then((response) => response.ok)
+    .then((response) => {
+      if (response.ok) generation += 1;
+      return response.ok;
+    })
     .catch(() => false)
     .finally(() => {
       refreshing = null;
