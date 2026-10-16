@@ -34,6 +34,12 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
+/** Google sign-in's origins when it isn't configured: none. */
+const NO_FIREBASE: { connect: string[]; frame: string[] } = {
+  connect: [],
+  frame: [],
+};
+
 /**
  * The policy for one nonce. Development adds what the dev server needs: eval
  * for React's refresh, and its own WebSocket for hot reload. `firebase` is
@@ -45,10 +51,7 @@ export function proxy(request: NextRequest) {
 export function contentSecurityPolicy(
   nonce: string,
   development: boolean,
-  firebase: { connect: string[]; frame: string[] } = {
-    connect: [],
-    frame: [],
-  },
+  firebase: { connect: string[]; frame: string[] } = NO_FIREBASE,
   storage?: string,
 ): string {
   const media = storage ? [storage] : [];
