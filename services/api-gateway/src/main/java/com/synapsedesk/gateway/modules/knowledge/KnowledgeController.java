@@ -25,6 +25,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -184,7 +185,11 @@ public class KnowledgeController {
       value = "limit",
       required = false,
       defaultValue = "10"
-    ) BigDecimal limit
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "passage",
+      required = false
+    ) @Nullable UUID passage
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -198,14 +203,15 @@ public class KnowledgeController {
       .setSortBy("")
       .build();
 
+    GetKnowledgeArticleRequest.Builder request =
+      GetKnowledgeArticleRequest.newBuilder().setId(id).setPage(blockRange);
+    // A cited passage: the service answers the page that holds it.
+    if (passage != null) {
+      request.setPassage(passage.toString());
+    }
     KnowledgeArticleDetailResponse response = withDocumentMetadata(
       context
-    ).getKnowledgeArticle(
-      GetKnowledgeArticleRequest.newBuilder()
-        .setId(id)
-        .setPage(blockRange)
-        .build()
-    );
+    ).getKnowledgeArticle(request.build());
 
     return ResponseEntity.ok(
       ApiResponse.of(
@@ -215,7 +221,8 @@ public class KnowledgeController {
           response.getArticle(),
           response.getBlocksList(),
           response.getMeta(),
-          response.getHasUnindexedPages()
+          response.getHasUnindexedPages(),
+          response.hasPassageIndex() ? response.getPassageIndex() : null
         )
       )
     );

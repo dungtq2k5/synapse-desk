@@ -23,6 +23,8 @@ public class KnowledgeArticleDetailResponseDto {
 
   private Boolean hasUnindexedPages;
 
+  private @Nullable Integer passageIndex = null;
+
   public KnowledgeArticleDetailResponseDto() {
     super();
   }
@@ -143,6 +145,27 @@ public class KnowledgeArticleDetailResponseDto {
     this.hasUnindexedPages = hasUnindexedPages;
   }
 
+  public KnowledgeArticleDetailResponseDto passageIndex(
+    @Nullable Integer passageIndex
+  ) {
+    this.passageIndex = passageIndex;
+    return this;
+  }
+
+  /**
+   * When the request named a `passage`: its index within `blocks`, for the reader to highlight and scroll to. `null` otherwise.
+   * @return passageIndex
+   */
+  @JsonProperty("passageIndex")
+  public @Nullable Integer getPassageIndex() {
+    return passageIndex;
+  }
+
+  @JsonProperty("passageIndex")
+  public void setPassageIndex(@Nullable Integer passageIndex) {
+    this.passageIndex = passageIndex;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -160,13 +183,17 @@ public class KnowledgeArticleDetailResponseDto {
       Objects.equals(
         this.hasUnindexedPages,
         knowledgeArticleDetailResponseDto.hasUnindexedPages
+      ) &&
+      Objects.equals(
+        this.passageIndex,
+        knowledgeArticleDetailResponseDto.passageIndex
       )
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(article, blocks, meta, hasUnindexedPages);
+    return Objects.hash(article, blocks, meta, hasUnindexedPages, passageIndex);
   }
 
   @Override
@@ -178,6 +205,9 @@ public class KnowledgeArticleDetailResponseDto {
     sb.append("    meta: ").append(toIndentedString(meta)).append("\n");
     sb.append("    hasUnindexedPages: ")
       .append(toIndentedString(hasUnindexedPages))
+      .append("\n");
+    sb.append("    passageIndex: ")
+      .append(toIndentedString(passageIndex))
       .append("\n");
     sb.append("}");
     return sb.toString();

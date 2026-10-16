@@ -14,6 +14,7 @@ import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeAskDto;
 import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeSearchDto;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,7 +91,8 @@ class KnowledgeControllerTest {
     controller.knowledgeControllerGetArticleV1(
       "article-1",
       BigDecimal.ONE,
-      BigDecimal.TEN
+      BigDecimal.TEN,
+      null
     );
 
     ArgumentCaptor<GetKnowledgeArticleRequest> captor = ArgumentCaptor.forClass(
@@ -98,6 +100,26 @@ class KnowledgeControllerTest {
     );
     verify(documentStub).getKnowledgeArticle(captor.capture());
     assertThat(captor.getValue().getPage().getSortBy()).isEmpty();
+    assertThat(captor.getValue().hasPassage()).isFalse();
+  }
+
+  @Test
+  void getArticleForwardsAPassage() {
+    when(documentStub.getKnowledgeArticle(any())).thenReturn(wireDetail());
+    UUID passage = UUID.fromString("aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa");
+
+    controller.knowledgeControllerGetArticleV1(
+      "article-1",
+      BigDecimal.ONE,
+      BigDecimal.TEN,
+      passage
+    );
+
+    ArgumentCaptor<GetKnowledgeArticleRequest> captor = ArgumentCaptor.forClass(
+      GetKnowledgeArticleRequest.class
+    );
+    verify(documentStub).getKnowledgeArticle(captor.capture());
+    assertThat(captor.getValue().getPassage()).isEqualTo(passage.toString());
   }
 
   @Test

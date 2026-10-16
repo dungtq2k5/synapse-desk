@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.ingestion.Document.KnowledgeArticleBlockResponse;
 import synapsedesk.ingestion.Document.KnowledgeArticleResponse;
@@ -51,13 +52,15 @@ final class KnowledgeMapper {
     KnowledgeArticleResponse article,
     List<KnowledgeArticleBlockResponse> blocks,
     PageMeta meta,
-    boolean hasUnindexedPages
+    boolean hasUnindexedPages,
+    @Nullable Integer passageIndex
   ) {
     return new KnowledgeArticleDetailResponseDto()
       .article(toArticleDto(article))
       .blocks(blocks.stream().map(KnowledgeMapper::toBlockDto).toList())
       .meta(toPaginationMetaDto(meta))
-      .hasUnindexedPages(hasUnindexedPages);
+      .hasUnindexedPages(hasUnindexedPages)
+      .passageIndex(passageIndex);
   }
 
   static KnowledgeAskResponseDto toAskDto(

@@ -734,6 +734,7 @@
     "GET /api/v1/feedback query:sortBy": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
     "GET /api/v1/ingestion-jobs query:sortBy": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
     "GET /api/v1/knowledge/articles query:sortBy": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
+    "GET /api/v1/knowledge/articles/{id} query:passage": "A passage to open at: a citation's `chunkId`. The answer is then the page\nof blocks that holds it, whatever `page` says, and `passageIndex` marks it.\nA passage not in this article is a 404, as the article itself would be.",
     "GET /api/v1/platform/audit-logs query:sortBy": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
     "GET /api/v1/roles query:includeSystem": "Adds the four global system roles to the result.\n\nDefaults to FALSE so a caller that wants the assignable set has to ask —\nsilently widening a list is the riskier default, and the role editor knows\nwhich view it wants.",
     "GET /api/v1/tickets query:includeDeleted": "Requires `ticket.delete` — the module's manage permission — which the\ncontroller enforces. Without that gate any member could enumerate deleted\ntickets, which is exactly the history someone would delete a ticket to\nremove.",
@@ -1055,6 +1056,9 @@
     },
     "KnowledgeArticleDetailResponseDto.meta": {
       "description": "Describes the BLOCK range, not a page of articles.\n\nA whole document is unbounded — a 200-page handbook is hundreds of blocks —\nso the detail view pages through the text rather than returning it whole."
+    },
+    "KnowledgeArticleDetailResponseDto.passageIndex": {
+      "description": "When the request named a `passage`: its index within `blocks`, for the\nreader to highlight and scroll to. `null` otherwise."
     },
     "KnowledgeArticleResponseDto.chunkCount": {
       "description": "The only reading-length signal on this response, `fileSizeBytes` being absent."
