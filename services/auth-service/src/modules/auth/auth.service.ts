@@ -388,6 +388,43 @@ export class AuthService {
   }
 
   /**
+   * What a sign-up makes of the person, by whether it found their organization
+   * or created it. Both sign-up paths (password and Google) call this, so the
+   * rule lives once.
+   *
+   * - **Created it: Org Admin.** Without this a new workspace has no
+   *   administrator at all: nobody can invite, create a department or complete
+   *   onboarding, and there is no other path to the first admin because
+   *   inviting one already requires `user.invite`.
+   * - **Joined by domain match: End User.** Org Admin there would hand full
+   *   tenant control to anyone with a matching address.
+   * - **The seat alarm** is evaluated for a joiner only; a founder is the
+   *   first member of a free-tier tenant (see `fireSeatAlarm`).
+   *
+   * @example await this.signUpTerms(null, tx) // { roleId: <Org Admin>, seatAlarm: null }
+   */
+  private async signUpTerms(
+    existingOrg: { id: string; maxAgentSeats: number } | null,
+    tx: Prisma.TransactionClient,
+  ): Promise<{
+    roleId: string;
+    seatAlarm: { organizationId: string; maxAgentSeats: number } | null;
+  }> {
+    return {
+      roleId: await this.rolesService.getSystemRoleId(
+        existingOrg ? SystemRoleName.END_USER : SystemRoleName.ORG_ADMIN,
+        tx,
+      ),
+      seatAlarm: existingOrg
+        ? {
+            organizationId: existingOrg.id,
+            maxAgentSeats: existingOrg.maxAgentSeats,
+          }
+        : null,
+    };
+  }
+
+  /**
    * Resolves the tenant, then creates the user inside the SAME transaction.
    *
    * The order matters: the conflict check is only answerable once the tenant is
@@ -449,17 +486,6 @@ export class AuthService {
             select: { id: true, name: true },
           }));
 
-        // Whoever CREATES a tenant becomes its Org Admin; everyone who joins an
-        // existing one by domain match gets End User.
-        //
-        // Without this a self-registered workspace has no administrator at all:
-        // nobody can invite, create a department, or complete onboarding, and
-        // there is no other path to the first admin because inviting one
-        // already requires `user.invite`. Domain-matched joiners must NOT get
-        // it — that would hand full tenant control to anyone with a matching
-        // address.
-        const isFounder = existingOrg === null;
-
         // Now that the tenant is known, the conflict question is answerable.
         const existing = await tx.user.findFirst({
           where: { email, organizationId: org.id, deletedAt: null },
@@ -467,10 +493,7 @@ export class AuthService {
         });
         if (existing) return { taken: existing };
 
-        const roleId = await this.rolesService.getSystemRoleId(
-          isFounder ? SystemRoleName.ORG_ADMIN : SystemRoleName.END_USER,
-          tx,
-        );
+        const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
 
         // `select`, not `include: USER_WITH_ACCESS`. The caller reads four
         // scalars off this row and never touches the relations, so including
@@ -498,20 +521,7 @@ export class AuthService {
           },
         });
 
-        return {
-          created,
-          organizationName: org.name,
-          // **The rule, expressed where the branch is decided.** Null on the
-          // founder branch rather than re-derived at the call site, so the
-          // "only for an existing organization" condition lives next to the
-          // thing that knows which branch ran.
-          seatAlarm: existingOrg
-            ? {
-                organizationId: existingOrg.id,
-                maxAgentSeats: existingOrg.maxAgentSeats,
-              }
-            : null,
-        };
+        return { created, organizationName: org.name, seatAlarm };
       });
 
       if ('taken' in result) return result;
@@ -1577,9 +1587,9 @@ export class AuthService {
 
   /**
    * First Google sign-in: creates the account under the same tenant-resolution
-   * and default-role rules as `register()`, so a Google user is not a
-   * second-class citizen with no organization and no role (which would leave
-   * them with an empty `permissionCodes` and a 403 on everything).
+   * and founder rules as `register()` (`signUpTerms`): whoever creates the
+   * organization is its Org Admin, and whoever joins one by domain is an End
+   * User.
    */
   private async createUserFromGoogle(
     identity: GoogleIdentity,
@@ -1587,11 +1597,10 @@ export class AuthService {
     emailDomain: string,
   ): Promise<UserWithAccess> {
     const created = await this.prisma.$transaction(async (tx) => {
-      // **Bound to a name rather than left inline.** The seat alarm below fires
-      // only for a registration that joined an EXISTING tenant, and an inline
-      // `findFirst() || create()` discards which branch ran at the point it is
-      // produced. The password path already keeps this distinction as
-      // `isFounder`; this is the same fact under a different name.
+      // **Bound to a name rather than left inline.** Whether this sign-up
+      // found the tenant or created it decides the role and the seat alarm
+      // (`signUpTerms`), and an inline `findFirst() || create()` would discard
+      // which branch ran.
       const existingOrg = await tx.organization.findFirst({
         where: { allowedEmailDomains: { has: emailDomain }, deletedAt: null },
         // `maxAgentSeats` for the alarm. Found branch only — see
@@ -1614,7 +1623,7 @@ export class AuthService {
           select: { id: true, name: true },
         }));
 
-      const endUserRoleId = await this.rolesService.getEndUserRoleId(tx);
+      const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
 
       const user = await tx.user.create({
         data: {
@@ -1631,23 +1640,12 @@ export class AuthService {
           // storage object path, and this column holds only the latter.
           passwordHash: null,
           isEmailVerified: identity.emailVerified,
-          roles: { connect: { id: endUserRoleId } },
+          roles: { connect: { id: roleId } },
         },
         select: { id: true },
       });
 
-      return {
-        userId: user.id,
-        organizationName: org.name,
-        // Same rule as the password path, decided at the same place: null when
-        // this registration created the workspace.
-        seatAlarm: existingOrg
-          ? {
-              organizationId: existingOrg.id,
-              maxAgentSeats: existingOrg.maxAgentSeats,
-            }
-          : null,
-      };
+      return { userId: user.id, organizationName: org.name, seatAlarm };
     });
 
     this.fireSeatAlarm(created.seatAlarm);

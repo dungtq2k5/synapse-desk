@@ -22,3 +22,11 @@ describe('system roles that assign tickets', () => {
     );
   });
 });
+
+describe('the End User role', () => {
+  it('may open a ticket from the form, and nothing else', () => {
+    expect(SYSTEM_ROLE_PERMISSIONS[SystemRoleName.END_USER]).toEqual([
+      'ticket.create',
+    ]);
+  });
+});
