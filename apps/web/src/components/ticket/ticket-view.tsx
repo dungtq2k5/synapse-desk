@@ -51,7 +51,14 @@ import { useLiveTicket } from './use-live-ticket';
 import { ThreadAiMessage, ThreadMessage } from './message-tools';
 
 /** One ticket: its header, the live thread with the composer, and its details. */
-export function TicketView({ ticketId }: { ticketId: string }) {
+export function TicketView({
+  ticketId,
+  fromNotification = false,
+}: {
+  ticketId: string;
+  /** Opened from a notification: not found offers the way back to them. */
+  fromNotification?: boolean;
+}) {
   const ticket = useTicketsControllerGetV1(ticketId);
   const data = ticket.data?.data;
   const { can } = useViewer();
@@ -70,7 +77,7 @@ export function TicketView({ ticketId }: { ticketId: string }) {
     const gone =
       ticket.error instanceof ApiError &&
       [400, 403, 404].includes(ticket.error.status);
-    if (gone) return <TicketNotFound />;
+    if (gone) return <TicketNotFound fromNotification={fromNotification} />;
   }
 
   return (
@@ -521,8 +528,15 @@ function Loading() {
   );
 }
 
-/** A ticket that doesn't exist, or isn't the viewer's to see: one answer for both. */
-export function TicketNotFound() {
+/**
+ * A ticket that doesn't exist, or isn't the viewer's to see: one answer for
+ * both. Reached from a notification, it leads back to the notifications first.
+ */
+export function TicketNotFound({
+  fromNotification = false,
+}: {
+  fromNotification?: boolean;
+}) {
   return (
     <>
       <AppHeader crumbs={[useTicketsCrumb(), { label: 'Not found' }]} />
@@ -532,12 +546,22 @@ export function TicketNotFound() {
           <p className="max-w-sm text-sm text-muted-foreground">
             It may have been deleted, or you may not have access to it.
           </p>
-          <Link
-            href="/tickets"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            Back to tickets
-          </Link>
+          <div className="flex flex-wrap justify-center gap-2">
+            {fromNotification && (
+              <Link
+                href="/notifications"
+                className={buttonVariants({ size: 'sm' })}
+              >
+                Back to notifications
+              </Link>
+            )}
+            <Link
+              href="/tickets"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              Back to tickets
+            </Link>
+          </div>
         </div>
       </main>
     </>

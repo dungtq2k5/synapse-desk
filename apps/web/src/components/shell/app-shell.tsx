@@ -25,6 +25,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '@/components/ui/sidebar';
+import { NotificationsLive } from '@/components/notifications/store';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
 import { useViewer } from '@/hooks/use-viewer';
 import { TwoStepWarning } from './two-step-warning';
@@ -90,6 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <RealtimeProvider>
+      <NotificationsLive />
       <SidebarProvider>
         <a
           href="#main"

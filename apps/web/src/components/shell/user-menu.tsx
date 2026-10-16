@@ -3,6 +3,7 @@
 import { authControllerLogoutV1 } from '@synapsedesk/api-client';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  BellIcon,
   ChevronsUpDownIcon,
   LogOutIcon,
   ShieldCheckIcon,
@@ -80,6 +81,12 @@ export function UserMenu() {
           <Link href="/security">
             <ShieldCheckIcon />
             Security
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/notifications/settings">
+            <BellIcon />
+            Notification settings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

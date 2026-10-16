@@ -248,9 +248,16 @@ test.describe('the knowledge base', () => {
         },
       }),
     );
+    // The new query's own card, not the last one's: wait for its question.
+    const asked = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/api/v1/knowledge/ask') &&
+        (request.postData() ?? '').includes('parking permit for visitors'),
+    );
     await page
       .getByRole('searchbox', { name: 'Search the knowledge base' })
       .fill('parking permit for visitors');
+    await asked;
     await page.getByRole('button', { name: 'Ask as a conversation' }).click();
     await expect(page).toHaveURL(/\/ask$/);
     await expect(

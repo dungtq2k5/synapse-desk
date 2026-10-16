@@ -17,6 +17,7 @@ import {
   useRealtime,
   useRealtimeEvent,
 } from '@/components/realtime/realtime-provider';
+import { useNotificationActions } from '@/components/notifications/store';
 import type { LiveAnswer, Notice, PendingSend } from '@/lib/thread';
 import { skippedText, type Skipped } from './entries';
 import { announce } from '@/lib/toast';
@@ -94,13 +95,16 @@ export function useLiveTicket(
     [queryClient, ticketId],
   );
 
+  const { markTicketRead } = useNotificationActions();
+  // The ticket read, and everything the bell says about it: it's on screen.
   const markRead = useCallback(() => {
+    markTicketRead(ticketId);
     void ticketsControllerMarkReadV1(ticketId, {})
       .then(() =>
         queryClient.invalidateQueries({ queryKey: ['/api/v1/tickets'] }),
       )
       .catch(() => undefined);
-  }, [queryClient, ticketId]);
+  }, [queryClient, ticketId, markTicketRead]);
 
   // Read when opened, and again when the tab comes back into view.
   useEffect(() => {

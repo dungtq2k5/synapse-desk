@@ -26,6 +26,7 @@ function setup({
 } = {}) {
   const calls = stubApi({
     'POST /api/v1/tickets/t1/read': ok(null),
+    'POST /api/v1/notifications/read': ok({ updated: 0, unreadCount: 0 }),
     'POST /api/v1/tickets/t1/messages': ok(stored('m1'), 201),
     ...routes,
   });
@@ -51,7 +52,7 @@ function setup({
 }
 
 describe('a live ticket', () => {
-  it('marks the ticket read and refreshes the lists when it opens', async () => {
+  it('marks the ticket read, and everything the bell says about it, when it opens', async () => {
     const { calls, invalidate } = setup();
 
     await waitFor(() =>
@@ -59,10 +60,19 @@ describe('a live ticket', () => {
         queryKey: ['/api/v1/tickets'],
       }),
     );
-    expect(calls[0]).toMatchObject({
-      method: 'POST',
-      url: '/api/v1/tickets/t1/read',
-    });
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          method: 'POST',
+          url: '/api/v1/tickets/t1/read',
+        }),
+        expect.objectContaining({
+          method: 'POST',
+          url: '/api/v1/notifications/read',
+          body: { resourceType: 'TICKET', resourceId: 't1' },
+        }),
+      ]),
+    );
   });
 
   it('joins the ticket room once ready, and leaves it on unmount', () => {
@@ -93,9 +103,11 @@ describe('a live ticket', () => {
     expect(keys()).toEqual(['/api/v1/tickets/t1/messages']);
   });
 
-  it('marks a new message read as it arrives', async () => {
+  it('marks a new message read as it arrives, and its notifications', async () => {
     const { socket, calls } = setup();
-    await waitFor(() => expect(calls).toHaveLength(1));
+    const reads = (url: string) =>
+      calls.filter((call) => call.url === url).length;
+    await waitFor(() => expect(reads('/api/v1/tickets/t1/read')).toBe(1));
 
     act(() =>
       socket.receive(REALTIME_EVENTS.messageNew, {
@@ -103,8 +115,8 @@ describe('a live ticket', () => {
         pattern: 'ticket.message_created',
       }),
     );
-    await waitFor(() => expect(calls).toHaveLength(2));
-    expect(calls[1].url).toBe('/api/v1/tickets/t1/read');
+    await waitFor(() => expect(reads('/api/v1/tickets/t1/read')).toBe(2));
+    expect(reads('/api/v1/notifications/read')).toBe(2);
   });
 
   it('refetches the ticket, its history and its assignments when the ticket changes', () => {

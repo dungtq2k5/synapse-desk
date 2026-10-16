@@ -13,6 +13,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { useViewer } from '@/hooks/use-viewer';
+import { NotificationBell } from '@/components/notifications/bell';
 import { VerifyEmailBanner } from './verify-email-banner';
 
 /**
@@ -58,7 +59,10 @@ export function AppHeader({
             ))}
           </BreadcrumbList>
         </Breadcrumb>
-        {actions && <div className="ml-auto flex items-center">{actions}</div>}
+        <div className="ml-auto flex items-center gap-1">
+          {actions}
+          <NotificationBell />
+        </div>
       </header>
       {isMobile && <VerifyEmailBanner />}
     </>

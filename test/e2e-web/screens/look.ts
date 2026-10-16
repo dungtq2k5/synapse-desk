@@ -19,6 +19,9 @@ function variable(page: Page): Locator[] {
     page.locator('time'),
     page.getByText(/^#\d+$/),
     page.getByText(/@[\w.-]+\.example\.test$/),
+    // The bell's count: the tenant's own notifications land as the services
+    // get to them. The bell's rows assert it by the bell's name.
+    page.locator('[data-notification-count]'),
   ];
 }
 

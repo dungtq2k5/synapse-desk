@@ -21,6 +21,7 @@ jest.mock('next/navigation', () => ({
 // No socket in these tests: the provider only passes its children through.
 jest.mock('@/components/realtime/realtime-provider', () => ({
   RealtimeProvider: ({ children }: { children: ReactNode }) => children,
+  useRealtimeEvent: () => undefined,
 }));
 
 /** A viewport that is phone-sized or not, and can change while mounted. */

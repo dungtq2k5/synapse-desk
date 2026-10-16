@@ -14,6 +14,7 @@ import {
 } from './format';
 import { PASSWORD_RULES } from './password-rules';
 import { historyTimeline } from './history';
+import { dayHeading, notificationHref } from './notifications';
 import { statusMoves, titleFrom } from './tickets';
 import { ok, stubApi } from '@/test/api';
 import {
@@ -309,5 +310,32 @@ describe('historyTimeline', () => {
     ]);
     expect(events[1]).toMatchObject({ reason: 'department change' });
     expect(events[3]).toMatchObject({ from: 'New', to: 'Open' });
+  });
+});
+
+describe('notificationHref', () => {
+  it.each([
+    ['/tickets/1042', '/tickets/1042?from=notification'],
+    ['/settings/billing', '/settings/billing'],
+    [null, null],
+    ['', null],
+    ['tickets/1042', null],
+    ['//evil.example/tickets', null],
+    ['/\\evil.example', null],
+    ['https://evil.example/tickets/1', null],
+    ['javascript:alert(1)', null],
+  ])('%j → %j', (actionUrl, href) => {
+    expect(notificationHref(actionUrl)).toBe(href);
+  });
+});
+
+describe('dayHeading', () => {
+  const now = new Date('2026-10-16T12:00:00Z');
+  it.each([
+    ['2026-10-16T01:00:00Z', 'Today'],
+    ['2026-10-15T23:00:00Z', 'Yesterday'],
+    ['2026-10-14T09:00:00Z', '14 Oct'],
+  ])('%s → %s', (at, heading) => {
+    expect(dayHeading(at, now, 'UTC')).toBe(heading);
   });
 });
