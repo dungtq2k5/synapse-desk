@@ -112,7 +112,15 @@ export class KnowledgeArticlesService {
     // instead of a scrambled document. It also supplies `chunkIndex` for the
     // empty `sortBy` the gateway does send, which is why the gateway names no
     // column of its own.
-    const { skip, take } = toPrismaPage(page, DOCUMENT_CHUNK_SORTABLE_FIELDS);
+    const { skip: asked, take } = toPrismaPage(
+      page,
+      DOCUMENT_CHUNK_SORTABLE_FIELDS,
+    );
+    // A cited passage decides the page instead: the one that holds it.
+    const passage = request.passage
+      ? await this.locatePassage(request.id, request.passage, take, context)
+      : null;
+    const skip = passage ? passage.skip : asked;
 
     // **Read THROUGH the article, never `documentChunk.findMany({ documentId })`.**
     // Chunk rows carry their own `isDeleted`, `isOrganizationWide` and
@@ -157,9 +165,53 @@ export class KnowledgeArticlesService {
       article: toKnowledgeArticleResponse(article),
       blocks: article.chunks.map(toKnowledgeArticleBlockResponse),
       // Over the BLOCK count, so a reader can page through the document.
-      meta: toPageMeta(page, article._count.chunks, article.chunks.length),
+      meta: toPageMeta(
+        passage ? { ...page, page: passage.page } : page,
+        article._count.chunks,
+        article.chunks.length,
+      ),
       hasUnindexedPages: unindexed !== null,
+      passageIndex: passage ? passage.position - skip : undefined,
     };
+  }
+
+  /**
+   * Where a passage sits in its article: its position in reading order, and
+   * the page of `take` blocks that holds it.
+   *
+   * Through the article's own scope, so a passage of an article this caller
+   * can't see is as missing as the article.
+   *
+   * @throws RpcException NOT_FOUND when the passage isn't a block of this
+   *   article, or the article isn't one this caller may read.
+   */
+  private async locatePassage(
+    articleId: string,
+    passageId: string,
+    take: number,
+    context: CallerContext,
+  ): Promise<{ position: number; page: number; skip: number }> {
+    const block = await this.prisma.documentChunk.findFirst({
+      where: {
+        id: passageId,
+        documentId: articleId,
+        document: { id: articleId, ...this.scope(context) },
+      },
+      select: { chunkIndex: true },
+    });
+    if (!block) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No such passage in that article',
+      });
+    }
+    // Counted, not read off `chunkIndex`: the position among the blocks the
+    // reader pages through, whatever the numbering.
+    const position = await this.prisma.documentChunk.count({
+      where: { documentId: articleId, chunkIndex: { lt: block.chunkIndex } },
+    });
+    const page = Math.floor(position / take) + 1;
+    return { position, page, skip: (page - 1) * take };
   }
 
   /** The three predicates that define an article, in one place. */

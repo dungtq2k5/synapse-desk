@@ -393,7 +393,16 @@ export interface KnowledgeArticleBlockResponse {
  */
 export interface GetKnowledgeArticleRequest {
   id: string;
-  page: PageRequest | undefined;
+  page:
+    | PageRequest
+    | undefined;
+  /**
+   * A passage (a chunk id, as a citation names it). When set, the answer is
+   * the page of blocks that holds it, whatever `page.page` says, and
+   * `passage_index` is its place on that page. A passage not in this article
+   * is NOT_FOUND, as the article itself would be.
+   */
+  passage?: string | undefined;
 }
 
 export interface KnowledgeArticleDetailResponse {
@@ -414,6 +423,8 @@ export interface KnowledgeArticleDetailResponse {
    * never clears teaches readers to ignore the true one.
    */
   hasUnindexedPages: boolean;
+  /** Set when the request named a `passage`: its index within `blocks`. */
+  passageIndex?: number | undefined;
 }
 
 /**

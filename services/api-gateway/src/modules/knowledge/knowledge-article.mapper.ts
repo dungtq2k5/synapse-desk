@@ -49,6 +49,7 @@ export function toGetKnowledgeArticleRequest(
       sortBy: '',
       sortOrder: DEFAULT_SEARCH.SORT_ORDER,
     }),
+    passage: query.passage,
   };
 }
 
@@ -95,5 +96,6 @@ export function toKnowledgeArticleDetailResponseDto(
     })),
     meta: toPaginationMetaDataResponseDto(response.meta),
     hasUnindexedPages: response.hasUnindexedPages,
+    passageIndex: response.passageIndex ?? null,
   };
 }

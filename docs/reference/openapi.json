@@ -58344,6 +58344,16 @@
               "default": 10,
               "type": "number"
             }
+          },
+          {
+            "name": "passage",
+            "required": false,
+            "in": "query",
+            "description": "A passage to open at: a citation's `chunkId`. The answer is then the page\nof blocks that holds it, whatever `page` says, and `passageIndex` marks it.\nA passage not in this article is a 404, as the article itself would be.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -67321,9 +67331,20 @@
           "hasUnindexedPages": {
             "type": "boolean",
             "description": "True when some of the source could not be read.\n\nThe blocks are then less than the document, and nothing in them shows it —\n`chunkIndex` is contiguous over what survived, so there is no gap to\nnotice. Render it as a notice rather than hiding the article: 197 readable\npages beat none, which is the trade indexing already made."
+          },
+          "passageIndex": {
+            "type": "number",
+            "nullable": true,
+            "description": "When the request named a `passage`: its index within `blocks`, for the\nreader to highlight and scroll to. `null` otherwise."
           }
         },
-        "required": ["article", "blocks", "meta", "hasUnindexedPages"]
+        "required": [
+          "article",
+          "blocks",
+          "meta",
+          "hasUnindexedPages",
+          "passageIndex"
+        ]
       },
       "KnowledgeAskResponseDto": {
         "type": "object",

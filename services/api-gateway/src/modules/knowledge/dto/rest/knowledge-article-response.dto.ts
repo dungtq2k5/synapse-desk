@@ -44,4 +44,9 @@ export class KnowledgeArticleDetailResponseDto {
    * pages beat none, which is the trade indexing already made.
    */
   hasUnindexedPages!: boolean;
+  /**
+   * When the request named a `passage`: its index within `blocks`, for the
+   * reader to highlight and scroll to. `null` otherwise.
+   */
+  passageIndex!: number | null;
 }

@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -114,4 +115,14 @@ export class KnowledgeArticleBlocksQueryDto {
   @Type(() => Number)
   @ApiPropertyOptional()
   readonly limit: number = DEFAULT_SEARCH.LIMIT;
+
+  /**
+   * A passage to open at: a citation's `chunkId`. The answer is then the page
+   * of blocks that holds it, whatever `page` says, and `passageIndex` marks it.
+   * A passage not in this article is a 404, as the article itself would be.
+   */
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({ format: 'uuid' })
+  readonly passage?: string;
 }
