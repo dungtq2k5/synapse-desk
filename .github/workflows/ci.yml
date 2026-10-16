@@ -538,11 +538,24 @@ jobs:
       # here to enable. The log is what `capture-e2e-state.mjs` reads for
       # known gap #13's ask: which suites were in the run and how far it got,
       # neither of which the process table can answer for a sequential chain.
+      # **Coverage for Sonar** (`E2E_COVERAGE_DIR`, see `jest.config.base.ts`):
+      # the suites drive each service in-process, so this is the coverage of
+      # code no unit test reaches. One lcov per service.
       - name: e2e suites
         shell: bash
+        env:
+          E2E_COVERAGE_DIR: ${{ github.workspace }}/coverage-e2e
         run: |
           set -o pipefail
           npm run test:e2e 2>&1 | tee e2e.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-e2e
+          path: coverage-e2e/*/lcov.info
+          # A run that wrote no lcov would read as uncovered code in Sonar;
+          # failing here names the cause.
+          if-no-files-found: error
 
       # **Run-scoped, not spec-scoped** — known gap #13's correction to #7,
       # whose capture instruction is scoped to one spec and so loses the thing
@@ -661,7 +674,7 @@ jobs:
     # is `main-java`. An analysis of any other ref, a pull request included,
     # is one the plan refuses, so it is not run.
     if: github.ref_name == 'main-java'
-    needs: [unit, python, gateway-java-verify, contract]
+    needs: [unit, e2e, python, gateway-java-verify, contract]
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
@@ -675,6 +688,11 @@ jobs:
         with:
           name: coverage-unit
           path: coverage
+      - uses: actions/download-artifact@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          name: coverage-e2e
+          path: coverage-e2e
       - uses: actions/download-artifact@v4
         if: env.SONAR_TOKEN != ''
         with:
