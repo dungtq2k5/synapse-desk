@@ -39,6 +39,14 @@ async function panel(
   await look(page, name, { widths: ['phone'], viewportOnly: true });
 }
 
+/** Runs the metered sections, which wait to be asked; already run, they show. */
+async function ask(scope: Locator) {
+  for (const name of ['Get suggestions', 'Suggest routing']) {
+    const button = scope.getByRole('button', { name });
+    if (await button.isVisible()) await button.click();
+  }
+}
+
 const envelope = (data: unknown, status = 200) => ({
   status,
   json: {
@@ -150,6 +158,7 @@ test.describe('the AI tab', () => {
     });
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai', 'AI', async (scope) => {
+      await ask(scope);
       await expect(scope.getByText('€450 standing desk')).toBeVisible();
       await expect(
         scope.getByRole('button', { name: 'Assign to Facilities' }),
@@ -161,11 +170,39 @@ test.describe('the AI tab', () => {
     });
   });
 
+  test('on open: suggestions and routing wait to be asked', async ({
+    page,
+  }) => {
+    const { maya, tickets } = await tenant('panel');
+    const metered: string[] = [];
+    page.on('request', (request) => {
+      if (/\/ai\/(suggestions|classify)$/.test(request.url())) {
+        metered.push(request.url());
+      }
+    });
+    await answer(page, {
+      summary: () => envelope(SUMMARY),
+      similar: () => envelope(SIMILAR),
+    });
+    await open(page, maya, tickets.desk);
+    await panel(page, 'panel-ai-not-run', 'AI', async (scope) => {
+      await expect(
+        scope.getByRole('button', { name: 'Get suggestions' }),
+      ).toBeVisible();
+      await expect(
+        scope.getByRole('button', { name: 'Suggest routing' }),
+      ).toBeVisible();
+      await expect(scope.getByText('€450 standing desk')).toBeVisible();
+    });
+    expect(metered).toEqual([]);
+  });
+
   test('loading', async ({ page }) => {
     const { maya, tickets } = await tenant('panel');
     await answer(page, {});
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai-loading', 'AI', async (scope) => {
+      await ask(scope);
       await expect(scope.getByText('Finding suggestions…')).toBeVisible();
       await expect(scope.getByText('Classifying…')).toBeVisible();
     });
@@ -187,6 +224,7 @@ test.describe('the AI tab', () => {
     });
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai-empty', 'AI', async (scope) => {
+      await ask(scope);
       await expect(
         scope.getByText(
           'No summary yet. Generate one to catch up on this ticket.',
@@ -224,6 +262,7 @@ test.describe('the AI tab', () => {
     });
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai-limited', 'AI', async (scope) => {
+      await ask(scope);
       await expect(
         scope.getByText('Search was limited, so these may be less relevant.'),
       ).toBeVisible();
@@ -240,8 +279,9 @@ test.describe('the AI tab', () => {
     });
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai-errors', 'AI', async (scope) => {
+      await ask(scope);
       for (const title of [
-        'Couldn’t generate a summary',
+        'Couldn’t load the summary',
         'Couldn’t load suggestions',
         'Couldn’t classify this ticket',
         'Couldn’t load similar tickets',
@@ -269,6 +309,7 @@ test.describe('the AI tab', () => {
     });
     await open(page, maya, tickets.desk);
     await panel(page, 'panel-ai-402', 'AI', async (scope) => {
+      await ask(scope);
       await scope.getByRole('button', { name: 'Generate' }).click();
       await expect(
         scope.getByText('The summary can’t be generated.', { exact: false }),
@@ -298,6 +339,7 @@ test.describe('the AI tab', () => {
       .locator('aside')
       .getByRole('tab', { name: 'AI', exact: true })
       .click();
+    await ask(page.locator('aside'));
     await page.getByRole('button', { name: 'Assign to Facilities' }).click();
     const dialog = page.getByRole('dialog', { name: /^Assign ticket #\d+$/ });
     await expect(dialog).toContainText(

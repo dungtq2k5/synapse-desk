@@ -15,6 +15,7 @@ import {
   BookOpenIcon,
   CircleAlertIcon,
   RefreshCwIcon,
+  SparklesIcon,
   UserPlusIcon,
   ZapOffIcon,
 } from 'lucide-react';
@@ -42,7 +43,8 @@ const missing = (error: unknown) =>
  * What the AI knows about a ticket: its summary, suggested next steps and
  * articles, a suggested department and priority, and similar resolved
  * tickets. Each section loads, fails and answers 402 on its own; nothing is
- * applied by itself. Without `ticket.ai.use`, the summary is read-only and
+ * applied by itself. Suggestions and routing are metered, so they run only
+ * when the agent asks. Without `ticket.ai.use`, the summary is read-only and
  * suggestions and routing are gone; similar tickets stay.
  */
 export function AiPanel({
@@ -142,6 +144,55 @@ function Confidence({ score }: { score: number }) {
   );
 }
 
+/**
+ * A metered AI call that runs only when the agent asks, then keeps its answer
+ * for the page's life: asked once, the answer shows again when the panel
+ * mounts anew (the sheet, another tab).
+ */
+function useOnRequest<T>(
+  queryKey: readonly unknown[],
+  queryFn: () => Promise<T>,
+) {
+  const [requested, setRequested] = useState(false);
+  const query = useQuery({
+    queryKey,
+    queryFn,
+    enabled: requested,
+    staleTime: Infinity,
+    retry: false,
+  });
+  return {
+    query,
+    asked:
+      requested ||
+      query.isFetching ||
+      query.data !== undefined ||
+      query.isError,
+    ask: () => setRequested(true),
+  };
+}
+
+/** A metered section before it's run: what it does, and the button that runs it. */
+function NotRunYet({
+  what,
+  action,
+  onRun,
+}: {
+  what: string;
+  action: string;
+  onRun: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <p className="text-muted-foreground">{what}</p>
+      <Button variant="outline" size="sm" onClick={onRun}>
+        <SparklesIcon aria-hidden />
+        {action}
+      </Button>
+    </div>
+  );
+}
+
 function Summary({ ticketId, ai }: { ticketId: string; ai: boolean }) {
   const queryClient = useQueryClient();
   const stored = useAiControllerGetSummaryV1(ticketId, {
@@ -189,10 +240,15 @@ function Summary({ ticketId, ai }: { ticketId: string; ai: boolean }) {
         <Waiting>Writing a summary…</Waiting>
       ) : unpaid(failure) ? (
         <Unpaid>The summary can’t be generated.</Unpaid>
-      ) : failure || loadFailed ? (
+      ) : failure ? (
         <Failed
           title="Couldn’t generate a summary"
-          onRetry={() => (failure ? void generate() : void stored.refetch())}
+          onRetry={() => void generate()}
+        />
+      ) : loadFailed ? (
+        <Failed
+          title="Couldn’t load the summary"
+          onRetry={() => void stored.refetch()}
         />
       ) : stored.isPending ? null : summary ? (
         <>
@@ -228,12 +284,9 @@ function Summary({ ticketId, ai }: { ticketId: string; ai: boolean }) {
 }
 
 function Suggestions({ ticketId }: { ticketId: string }) {
-  const query = useQuery({
-    queryKey: ['ai-suggestions', ticketId],
-    queryFn: () => aiControllerGetSuggestionsV1(ticketId),
-    staleTime: Infinity,
-    retry: false,
-  });
+  const { query, asked, ask } = useOnRequest(['ai-suggestions', ticketId], () =>
+    aiControllerGetSuggestionsV1(ticketId),
+  );
   const answer = query.data?.data;
   const refresh = async () => {
     await query.refetch();
@@ -254,7 +307,13 @@ function Suggestions({ ticketId }: { ticketId: string }) {
         )
       }
     >
-      {query.isFetching ? (
+      {!asked ? (
+        <NotRunYet
+          what="Finds next steps and related articles for this ticket. Uses the AI allowance."
+          action="Get suggestions"
+          onRun={ask}
+        />
+      ) : query.isFetching ? (
         <Waiting>Finding suggestions…</Waiting>
       ) : query.isError ? (
         <Failed
@@ -331,12 +390,9 @@ function Routing({
   onAssignTo?: (suggestion: Suggestion) => void;
 }) {
   const departments = useDepartments();
-  const query = useQuery({
-    queryKey: ['ai-classify', ticketId],
-    queryFn: () => aiControllerClassifyV1(ticketId),
-    staleTime: Infinity,
-    retry: false,
-  });
+  const { query, asked, ask } = useOnRequest(['ai-classify', ticketId], () =>
+    aiControllerClassifyV1(ticketId),
+  );
   const answer = query.data?.data;
   const department = answer?.suggestedDepartmentId
     ? (departments.names.get(answer.suggestedDepartmentId) ??
@@ -344,8 +400,30 @@ function Routing({
     : null;
 
   return (
-    <Section title="Suggested routing" busy={query.isFetching}>
-      {query.isFetching ? (
+    <Section
+      title="Suggested routing"
+      busy={query.isFetching}
+      action={
+        answer &&
+        !query.isFetching && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void query.refetch()}
+          >
+            <RefreshCwIcon aria-hidden />
+            Refresh
+          </Button>
+        )
+      }
+    >
+      {!asked ? (
+        <NotRunYet
+          what="Suggests a department and a priority. Uses the AI allowance."
+          action="Suggest routing"
+          onRun={ask}
+        />
+      ) : query.isFetching ? (
         <Waiting>Classifying…</Waiting>
       ) : unpaid(query.error) ? (
         <Unpaid>Routing can’t be suggested.</Unpaid>
