@@ -105,7 +105,7 @@ A global interceptor checks `organizations.status` (RDM §1.8) before dispatch:
 
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| POST | `/auth/google` | Verify a Firebase-issued Google ID token, upsert the user with `password_hash = NULL`, resolve the tenant, issue tokens. Returns the **same three-way outcome** as `POST /auth/login` — Google proves only the first factor, so the account may still owe 2FA, and the address may still resolve to several tenants. | PUBLIC |
+| POST | `/auth/google` | Verify a Firebase-issued Google ID token, upsert the user with `password_hash = NULL`, resolve the tenant, issue tokens. Returns the **same three-way outcome** as `POST /auth/login` — Google proves only the first factor, so the account may still owe 2FA, and the address may still resolve to several tenants. **A Google sign-up on a domain no organization admits founds a new organization, and its founder is its Org Admin**, the same founder rule as `POST /auth/register`. | PUBLIC |
 
 **OAuth 2.0 / OIDC redirect flow** (tech-stack §7) — **DEFERRED.** `POST /auth/google` covers Google end-to-end; the redirect flow earns its keep only when adding a second provider (GitHub) or enterprise SSO. Specified here so the shape is settled when that day comes:
 
@@ -700,7 +700,7 @@ analytics.read         audit.read             audit.export
 | **Org Admin** | everything except `platform.*` |
 | **Knowledge Manager** | `document.*`, `analytics.read`, `ticket.read.all` |
 | **Support Agent (Tier 2)** | `ticket.*` (minus `delete`/`export`), `document.read`, `user.read`, `department.read` (to assign within a department) |
-| **End User** | own tickets + `/chat/*` + `/knowledge/search` only (no explicit permission rows) |
+| **End User** | `ticket.create` (to open a ticket from the form), and otherwise own tickets + `/chat/*` + `/knowledge/search`, authorized by ownership and tenancy rather than permission rows |
 
 ---
 
