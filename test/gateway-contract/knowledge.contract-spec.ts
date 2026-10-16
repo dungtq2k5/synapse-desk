@@ -113,6 +113,54 @@ describe('knowledge', () => {
   );
 
   rowFor('Knowledge')(
+    '**`getArticle` forwards a `passage` and answers its `passageIndex`; without one, `null`**',
+    async () => {
+      const PASSAGE = 'aaaaaaaa-9999-4999-8999-aaaaaaaaaaaa';
+      const detail = {
+        article: wireArticle(),
+        blocks: [],
+        meta: { totalItems: 0 },
+        hasUnindexedPages: false,
+      };
+      peers.ingestion
+        .on('DocumentService/GetKnowledgeArticle')
+        .reply({ ...detail, passageIndex: 1 });
+      peers.ingestion.on('DocumentService/GetKnowledgeArticle').reply(detail);
+
+      const cited = await new Session(gateway.baseUrl).get<{
+        data: { passageIndex: number | null };
+      }>(`${API}/knowledge/articles/${ARTICLE}?passage=${PASSAGE}`, headers());
+      const plain = await new Session(gateway.baseUrl).get<{
+        data: { passageIndex: number | null };
+      }>(`${API}/knowledge/articles/${ARTICLE}`, headers());
+
+      expect(cited.status).toBe(200);
+      expect(cited.body.data.passageIndex).toBe(1);
+      expect(plain.body.data.passageIndex).toBeNull();
+      const [first, second] = peers.ingestion.calls(
+        'DocumentService/GetKnowledgeArticle',
+      );
+      expect(first.request.passage).toBe(PASSAGE);
+      expect(second.request.passage).toBeUndefined();
+    },
+  );
+
+  rowFor('Knowledge')(
+    "**`getArticle` refuses a `passage` that isn't a uuid, before the peer**",
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/knowledge/articles/${ARTICLE}?passage=not-a-uuid`,
+        headers(),
+      );
+
+      expect(response.status).toBe(400);
+      expect(
+        peers.ingestion.calls('DocumentService/GetKnowledgeArticle'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Knowledge')(
     '**`ask` refuses an all-whitespace message after trimming — the dropped `@Transform`**',
     async () => {
       const response = await new Session(gateway.baseUrl).post(

@@ -307,5 +307,83 @@ describe('Knowledge articles (e2e)', () => {
         status.NOT_FOUND,
       );
     });
+    describe('opening at a cited passage', () => {
+      /** The chunk id a citation would name, by its place in the article. */
+      const passageAt = async (documentId: string, chunkIndex: number) =>
+        (
+          await fx.prisma.documentChunk.findFirstOrThrow({
+            where: { documentId, chunkIndex },
+          })
+        ).id;
+
+      it('**13. answers the page of blocks that holds the passage, and its place on it**', async () => {
+        const document = await article({}, 7);
+        const passage = await passageAt(document.id, 5);
+
+        const detail = await articles.getKnowledgeArticle(
+          {
+            id: document.id,
+            page: pageRequest({ page: 1, limit: 2 }),
+            passage,
+          },
+          endUser(),
+        );
+
+        // Block 5 of 0..6 is on the third page of two: blocks 4 and 5.
+        expect(detail.meta?.currentPage).toBe(3);
+        expect(detail.blocks.map((block) => block.chunkIndex)).toEqual([4, 5]);
+        expect(detail.passageIndex).toBe(1);
+      });
+
+      it('14. without a passage, no passageIndex', async () => {
+        const document = await article({}, 3);
+
+        const detail = await articles.getKnowledgeArticle(
+          { id: document.id, page: pageRequest() },
+          endUser(),
+        );
+
+        expect(detail.passageIndex).toBeUndefined();
+      });
+
+      it('**15. a passage of ANOTHER article is NOT_FOUND**', async () => {
+        const document = await article({}, 2);
+        const other = await article({}, 2);
+
+        await expectRpc(
+          articles.getKnowledgeArticle(
+            {
+              id: document.id,
+              page: pageRequest(),
+              passage: await passageAt(other.id, 1),
+            },
+            endUser(),
+          ),
+          status.NOT_FOUND,
+        );
+      });
+
+      it('**16. a passage of an article the caller can’t see is NOT_FOUND**', async () => {
+        const document = await createScopedDocument(
+          fx.prisma,
+          tenant,
+          [tenant.departmentId],
+          { status: DocumentStatus.INDEXED },
+        );
+        await createChunks(fx.prisma, document, 2);
+
+        await expectRpc(
+          articles.getKnowledgeArticle(
+            {
+              id: document.id,
+              page: pageRequest(),
+              passage: await passageAt(document.id, 1),
+            },
+            endUser(),
+          ),
+          status.NOT_FOUND,
+        );
+      });
+    });
   });
 });

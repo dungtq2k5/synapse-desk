@@ -380,24 +380,28 @@ class KnowledgeArticleBlockResponse(_message.Message):
     def __init__(self, chunk_index: _Optional[int] = ..., page_number: _Optional[int] = ..., content_text: _Optional[str] = ...) -> None: ...
 
 class GetKnowledgeArticleRequest(_message.Message):
-    __slots__ = ("id", "page")
+    __slots__ = ("id", "page", "passage")
     ID_FIELD_NUMBER: _ClassVar[int]
     PAGE_FIELD_NUMBER: _ClassVar[int]
+    PASSAGE_FIELD_NUMBER: _ClassVar[int]
     id: str
     page: _common_pb2.PageRequest
-    def __init__(self, id: _Optional[str] = ..., page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ...) -> None: ...
+    passage: str
+    def __init__(self, id: _Optional[str] = ..., page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ..., passage: _Optional[str] = ...) -> None: ...
 
 class KnowledgeArticleDetailResponse(_message.Message):
-    __slots__ = ("article", "blocks", "meta", "has_unindexed_pages")
+    __slots__ = ("article", "blocks", "meta", "has_unindexed_pages", "passage_index")
     ARTICLE_FIELD_NUMBER: _ClassVar[int]
     BLOCKS_FIELD_NUMBER: _ClassVar[int]
     META_FIELD_NUMBER: _ClassVar[int]
     HAS_UNINDEXED_PAGES_FIELD_NUMBER: _ClassVar[int]
+    PASSAGE_INDEX_FIELD_NUMBER: _ClassVar[int]
     article: KnowledgeArticleResponse
     blocks: _containers.RepeatedCompositeFieldContainer[KnowledgeArticleBlockResponse]
     meta: _common_pb2.PageMeta
     has_unindexed_pages: bool
-    def __init__(self, article: _Optional[_Union[KnowledgeArticleResponse, _Mapping]] = ..., blocks: _Optional[_Iterable[_Union[KnowledgeArticleBlockResponse, _Mapping]]] = ..., meta: _Optional[_Union[_common_pb2.PageMeta, _Mapping]] = ..., has_unindexed_pages: _Optional[bool] = ...) -> None: ...
+    passage_index: int
+    def __init__(self, article: _Optional[_Union[KnowledgeArticleResponse, _Mapping]] = ..., blocks: _Optional[_Iterable[_Union[KnowledgeArticleBlockResponse, _Mapping]]] = ..., meta: _Optional[_Union[_common_pb2.PageMeta, _Mapping]] = ..., has_unindexed_pages: _Optional[bool] = ..., passage_index: _Optional[int] = ...) -> None: ...
 
 class ResolveDocumentFlagRequest(_message.Message):
     __slots__ = ("id", "resolution", "comment")
