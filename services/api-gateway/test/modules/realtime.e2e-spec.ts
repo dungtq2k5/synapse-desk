@@ -937,8 +937,38 @@ describe('the real-time relay (e2e)', () => {
       const history = (request as { history: Array<{ content: string }> })
         .history;
 
-      expect(history.map((turn) => turn.content)).toEqual([
+      // After the opening question (the ticket's description).
+      expect(history.slice(1).map((turn) => turn.content)).toEqual([
         'how much carry-over do I get?',
+      ]);
+    });
+
+    it("**the transcript leads with the opening question: the ticket's description**", async () => {
+      // The description isn't a message, so without this the model never
+      // sees the question a conversation was started with.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+      fx.stubs.message.listMessages.mockReturnValue(
+        of(
+          wirePage([
+            wireMessage({ content: 'and on weekends?', senderId: authorId }),
+          ]),
+        ),
+      );
+
+      const done = waitForEvent(author, REALTIME_EVENTS.aiStreamDone);
+      await askFrom(author);
+      subject.next(completion());
+      subject.complete();
+      await done;
+
+      const [[request]] = fx.stubs.rag.chat.mock.calls;
+      const history = (
+        request as { history: Array<{ role: string; content: string }> }
+      ).history;
+      expect(history).toEqual([
+        { role: 'user', content: 'It really is' },
+        { role: 'user', content: 'and on weekends?' },
       ]);
     });
 
@@ -976,7 +1006,7 @@ describe('the real-time relay (e2e)', () => {
       const [[chatRequest]] = fx.stubs.rag.chat.mock.calls;
       const history = (chatRequest as { history: Array<{ content: string }> })
         .history;
-      expect(history.map((turn) => turn.content)).toEqual([
+      expect(history.slice(1).map((turn) => turn.content)).toEqual([
         'turn-01',
         'turn-02',
         'turn-03',

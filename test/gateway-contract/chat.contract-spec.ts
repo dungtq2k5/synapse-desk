@@ -119,6 +119,43 @@ describe('chat', () => {
   );
 
   rowFor('Chat')(
+    '**starting a conversation asks ticket-service to answer its opening question**',
+    async () => {
+      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket.on('MessageService/AnswerOpening').reply({});
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/chat/conversations`,
+        { title: 'Printer is on fire', message: 'It is genuinely on fire' },
+        cookie(),
+      );
+
+      expect(response.status).toBe(201);
+      const [call] = peers.ticket.calls('MessageService/AnswerOpening');
+      expect(call.request).toEqual({ ticketId: TICKET });
+    },
+  );
+
+  rowFor('Chat')(
+    '**a refusal to answer the opening question doesn’t undo the conversation**',
+    async () => {
+      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket
+        .on('MessageService/AnswerOpening')
+        .fail(9, 'This conversation is already under way');
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/chat/conversations`,
+        { title: 'Printer is on fire', message: 'It is genuinely on fire' },
+        cookie(),
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ data: { id: TICKET } });
+    },
+  );
+
+  rowFor('Chat')(
     '**list is pinned to the caller’s OWN conversations** — `authorId` cannot be overridden',
     async () => {
       peers.ticket.on('TicketService/ListTickets').reply({

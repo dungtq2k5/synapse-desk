@@ -80,6 +80,14 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
    * The row stays visible in the thread; what changes is that no transcript
    * builder hands it to a model again.
    */
+  answerOpening(ticketId: string, context: RequestContext): Promise<unknown> {
+    return this.call(
+      (metadata) =>
+        this.messageGrpcService.answerOpening({ ticketId }, metadata),
+      context,
+    );
+  }
+
   excludeFromAiContext(
     ticketId: string,
     messageId: string,

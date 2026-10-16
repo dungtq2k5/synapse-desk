@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Param,
   ParseUUIDPipe,
   Post,
@@ -16,6 +17,7 @@ import {
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
 import { RequestContext, TicketSource } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -62,6 +64,8 @@ import {
 @Controller('chat')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(
     private readonly tickets: TicketsService,
     private readonly messages: MessagesService,
@@ -83,11 +87,11 @@ export class ChatController {
   @ApiFilterErrors(['400', '401'])
   @Post('conversations')
   @ResponseMessage('Conversation started')
-  start(
+  async start(
     @CurrentUser() context: RequestContext,
     @Body() dto: StartConversationDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.create(
+    const ticket = await this.tickets.create(
       {
         title: dto.title,
         description: dto.message,
@@ -100,6 +104,17 @@ export class ChatController {
       },
       context,
     );
+    // The question is the description, so ticket-service answers it: the
+    // answer arrives as the thread's first message. The conversation exists
+    // either way, so a refusal to answer doesn't undo it.
+    try {
+      await this.messages.answerOpening(ticket.id, context);
+    } catch (error) {
+      this.logger.warn(
+        `No answer asked for conversation ${ticket.id}: ${formatErrorMsg(error)}`,
+      );
+    }
+    return ticket;
   }
 
   /**

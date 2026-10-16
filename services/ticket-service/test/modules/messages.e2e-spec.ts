@@ -1444,4 +1444,94 @@ describe('Ticket messages & attachments (e2e)', () => {
       ).resolves.not.toBeNull();
     });
   });
+  describe('answerOpening', () => {
+    const DRAFT = {
+      content: 'Sign out and in again on the app.',
+      modelName: 'test-model-v1',
+      promptTokens: 10,
+      completionTokens: 20,
+      generationId: 'gen-opening',
+      citations: [],
+    };
+
+    /** The AI's message on a ticket, once the background answer lands. */
+    const answerOf = async (ticketId: string) => {
+      for (let tries = 0; tries < 50; tries++) {
+        const row = await fx.prisma.ticketMessage.findFirst({
+          where: { ticketId, isAiGenerated: true },
+        });
+        if (row) return row;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      return null;
+    };
+
+    it('**answers the opening question, which is the description, as the first user turn**', async () => {
+      isAvailable.mockReturnValue(true);
+      generateReplyDraft.mockResolvedValue(DRAFT);
+      const ticket = await createTicket(fx.prisma, tenant, {
+        description: 'The app says my session expired.',
+      });
+
+      await expect(
+        messages.answerOpening({ ticketId: ticket.id }, author()),
+      ).resolves.toEqual({});
+
+      expect((await answerOf(ticket.id))?.content).toBe(DRAFT.content);
+      const [, history] = generateReplyDraft.mock.calls[0] as [
+        string,
+        { role: string; content: string }[],
+      ];
+      expect(history[0]).toEqual({
+        role: 'user',
+        content: 'The app says my session expired.',
+      });
+    });
+
+    it('**at the AI budget cap, the ticket escalates instead**', async () => {
+      isAvailable.mockReturnValue(true);
+      generateReplyDraft.mockRejectedValue({
+        code: status.PERMISSION_DENIED,
+        details: '[http:402] This workspace has used its AI allowance',
+      });
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await messages.answerOpening({ ticketId: ticket.id }, author());
+
+      let row = await fx.prisma.ticket.findUniqueOrThrow({
+        where: { id: ticket.id },
+      });
+      for (let tries = 0; tries < 50 && row.status !== 'ESCALATED'; tries++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        row = await fx.prisma.ticket.findUniqueOrThrow({
+          where: { id: ticket.id },
+        });
+      }
+      expect(row.status).toBe('ESCALATED');
+      expect(
+        await fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
+      ).toBe(0);
+    });
+
+    it('**only the author may ask**', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await expectRpc(
+        messages.answerOpening({ ticketId: ticket.id }, agent()),
+        status.PERMISSION_DENIED,
+      );
+      expect(generateReplyDraft).not.toHaveBeenCalled();
+    });
+
+    it('**once the thread has a message, it is not answered again**', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      await createMessage(fx.prisma, ticket.id);
+
+      await expectRpc(
+        messages.answerOpening({ ticketId: ticket.id }, author()),
+        status.FAILED_PRECONDITION,
+      );
+      expect(generateReplyDraft).not.toHaveBeenCalled();
+    });
+  });
 });

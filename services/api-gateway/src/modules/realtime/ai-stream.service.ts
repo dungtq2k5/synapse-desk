@@ -517,10 +517,22 @@ export class AiStreamService implements OnModuleInit {
     };
 
     const page = await this.messages.list(ticketId, query, context);
+    // The opening question is the description, which isn't a message: it
+    // leads the transcript, unless the thread has outgrown the window.
+    const opening =
+      page.items.length < TRANSCRIPT_TURNS
+        ? [
+            {
+              role: 'user',
+              content: (await this.tickets.get(ticketId, context)).description,
+            },
+          ]
+        : [];
 
-    return (
+    return [
+      ...opening,
       // Back to reading order. Copied first: `reverse()` mutates in place.
-      [...page.items]
+      ...[...page.items]
         .reverse()
         // **Filtered HERE, after the fetch — deliberately, and NOT the same
         // rule as `isInternalNote`**.
@@ -542,8 +554,8 @@ export class AiStreamService implements OnModuleInit {
         .map((item) => ({
           role: item.isAiGenerated || !item.senderId ? 'assistant' : 'user',
           content: item.content,
-        }))
-    );
+        })),
+    ];
   }
 
   /**

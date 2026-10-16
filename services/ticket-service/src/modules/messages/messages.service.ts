@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  AnswerOpeningRequest,
+  AnswerOpeningResponse,
   AppendAiMessageRequest,
   AttachmentResponse,
   CallerContext,
@@ -48,7 +50,7 @@ import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
 import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
-import { isDraftRefusal } from '../ai-client/refusal';
+import { isAtCap, isDraftRefusal } from '../ai-client/refusal';
 import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
@@ -147,6 +149,45 @@ export class MessagesService {
     this.editWindowMinutes = this.configService.getOrThrow<number>(
       'MESSAGE_EDIT_WINDOW_MINUTES',
     );
+  }
+
+  /**
+   * Answers a conversation's opening question: its description, which no
+   * message carries.
+   *
+   * **Acknowledged at once**, and answered after: the answer lands as an AI
+   * message, announced like any message, or at the AI budget cap the ticket
+   * escalates. A failure is logged, as on every AI reply path.
+   *
+   * @throws RpcException PERMISSION_DENIED when the caller isn't the author.
+   * @throws RpcException FAILED_PRECONDITION once the thread has a message:
+   *   the opening is answered once, not on demand.
+   */
+  async answerOpening(
+    request: AnswerOpeningRequest,
+    context: CallerContext,
+  ): Promise<AnswerOpeningResponse> {
+    const ticket = await this.tickets.load(request.ticketId, context);
+    if (ticket.authorId !== requireActor(context)) {
+      throw new RpcException({
+        code: status.PERMISSION_DENIED,
+        message: 'Only the person who asked can have the question answered',
+      });
+    }
+    const messages = await this.prisma.ticketMessage.count({
+      where: { ticketId: ticket.id },
+    });
+    if (messages > 0) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: 'This conversation is already under way',
+      });
+    }
+
+    // Not awaited: the caller has a conversation to open. The handler
+    // catches everything it can throw.
+    void this.tryAppendAiReply(ticket, context, { escalateAtCap: true });
+    return {};
   }
 
   // ------------------------------------------------------------------------- Read
@@ -1006,6 +1047,7 @@ export class MessagesService {
   private async tryAppendAiReply(
     ticket: NotifiableTicket,
     context: CallerContext,
+    { escalateAtCap = false }: { escalateAtCap?: boolean } = {},
   ): Promise<void> {
     const { id: ticketId } = ticket;
 
@@ -1032,6 +1074,21 @@ export class MessagesService {
         take: AI_REPLY_TRANSCRIPT_TURNS,
       });
       history.reverse();
+      // The opening question is the description, which isn't a message: it
+      // leads the transcript, unless the thread has outgrown the window.
+      if (history.length < AI_REPLY_TRANSCRIPT_TURNS) {
+        const opening = await this.prisma.ticket.findUnique({
+          where: { id: ticketId },
+          select: { description: true, authorId: true },
+        });
+        if (opening?.description) {
+          history.unshift({
+            content: opening.description,
+            senderId: opening.authorId,
+            isAiGenerated: false,
+          });
+        }
+      }
 
       // Same two decisions as the co-pilot path, made by the same service —
       // This one replies to a customer directly, so a screenshot it
@@ -1095,6 +1152,32 @@ export class MessagesService {
       // message is already committed and is what the RPC promises to return; a
       // failed bookkeeping write must not turn that into an error.
       await this.excludeRefused(ticketId, error);
+
+      // At the budget cap an opening question goes to a person, as a streamed
+      // answer at the cap does: nothing else would ever answer it.
+      if (escalateAtCap && isAtCap(error)) {
+        await this.escalateAtCap(ticketId, context);
+      }
+    }
+  }
+
+  private async escalateAtCap(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<void> {
+    try {
+      await this.tickets.escalateTicket(
+        {
+          ticketId,
+          reason:
+            'Escalated automatically: the workspace is at its AI budget cap',
+        },
+        context,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not escalate ticket ${ticketId} at the AI cap: ${formatErrorMsg(error)}`,
+      );
     }
   }
 

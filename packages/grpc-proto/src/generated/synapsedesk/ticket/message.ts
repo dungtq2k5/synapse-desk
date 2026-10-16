@@ -419,6 +419,13 @@ export interface DownloadAttachmentResponse {
   expiresAt: Timestamp | undefined;
 }
 
+export interface AnswerOpeningRequest {
+  ticketId: string;
+}
+
+export interface AnswerOpeningResponse {
+}
+
 export interface MessageServiceClient {
   createMessage(request: CreateMessageRequest, metadata?: Metadata): Observable<CreateMessageResponse>;
 
@@ -437,6 +444,15 @@ export interface MessageServiceClient {
    */
 
   excludeFromAiContext(request: ExcludeFromAiContextRequest, metadata?: Metadata): Observable<MessageResponse>;
+
+  /**
+   * Answers a conversation's opening question, which is its description.
+   * Acknowledged at once; the answer lands as an AI message (or, at the AI
+   * budget cap, the ticket escalates), announced as any message is. Only the
+   * author may ask, and only while the ticket has no messages yet.
+   */
+
+  answerOpening(request: AnswerOpeningRequest, metadata?: Metadata): Observable<AnswerOpeningResponse>;
 
   /**
    * UploadAttachment is now the PRESIGN step — it returns a URL rather than a
@@ -505,6 +521,18 @@ export interface MessageServiceController {
   ): Promise<MessageResponse> | Observable<MessageResponse> | MessageResponse;
 
   /**
+   * Answers a conversation's opening question, which is its description.
+   * Acknowledged at once; the answer lands as an AI message (or, at the AI
+   * budget cap, the ticket escalates), announced as any message is. Only the
+   * author may ask, and only while the ticket has no messages yet.
+   */
+
+  answerOpening(
+    request: AnswerOpeningRequest,
+    metadata?: Metadata,
+  ): Promise<AnswerOpeningResponse> | Observable<AnswerOpeningResponse> | AnswerOpeningResponse;
+
+  /**
    * UploadAttachment is now the PRESIGN step — it returns a URL rather than a
    * stored row, because no row exists until the bytes have actually landed.
    */
@@ -563,6 +591,7 @@ export function MessageServiceControllerMethods() {
       "updateMessage",
       "redactMessage",
       "excludeFromAiContext",
+      "answerOpening",
       "uploadAttachment",
       "ingestAttachment",
       "confirmAttachment",

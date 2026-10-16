@@ -1,4 +1,5 @@
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { TicketSource, TicketStatus } from '@synapsedesk/contracts';
 import {
@@ -57,6 +58,40 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.data.source).toBe(TicketSource.CHAT);
+    });
+
+    it('**1b. asks ticket-service to answer the opening question**', async () => {
+      const ticket = wireTicket({
+        source: ProtoTicketSource.TICKET_SOURCE_CHAT,
+      });
+      fx.stubs.ticket.createTicket.mockReturnValue(of(ticket));
+      fx.stubs.message.answerOpening.mockReturnValue(of({}));
+
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/chat/conversations`)
+        .send(start);
+
+      expect(res.status).toBe(201);
+      expect(fx.stubs.message.answerOpening).toHaveBeenCalledWith(
+        { ticketId: ticket.id },
+        expect.anything(),
+      );
+    });
+
+    it("**1c. a refusal to answer doesn't undo the conversation**", async () => {
+      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.message.answerOpening.mockReturnValue(
+        throwError(() => ({
+          code: status.FAILED_PRECONDITION,
+          details: 'This conversation is already under way',
+        })),
+      );
+
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/chat/conversations`)
+        .send(start);
+
+      expect(res.status).toBe(201);
     });
 
     it('2. needs NO ticket.create permission', async () => {

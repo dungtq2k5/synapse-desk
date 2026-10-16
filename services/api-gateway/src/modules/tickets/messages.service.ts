@@ -108,6 +108,17 @@ export class MessagesService {
     );
   }
 
+  /**
+   * Has ticket-service answer a conversation's opening question (its
+   * description). Acknowledged at once; the answer arrives as a message.
+   */
+  async answerOpening(
+    ticketId: string,
+    context: RequestContext,
+  ): Promise<void> {
+    await this.messagesGrpcClient.answerOpening(ticketId, context);
+  }
+
   async excludeFromAiContext(
     ticketId: string,
     messageId: string,

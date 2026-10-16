@@ -339,6 +339,12 @@ message DownloadAttachmentResponse {
   google.protobuf.Timestamp expires_at = 2;
 }
 
+message AnswerOpeningRequest {
+  string ticket_id = 1;
+}
+
+message AnswerOpeningResponse {}
+
 service MessageService {
   rpc CreateMessage(CreateMessageRequest) returns (CreateMessageResponse);
   rpc AppendAiMessage(AppendAiMessageRequest) returns (MessageResponse);
@@ -349,6 +355,11 @@ service MessageService {
   // id of the message that was just refused: the gateway for `Chat`,
   // ticket-service internally for the two `Draft` paths.
   rpc ExcludeFromAiContext(ExcludeFromAiContextRequest) returns (MessageResponse);
+  // Answers a conversation's opening question, which is its description.
+  // Acknowledged at once; the answer lands as an AI message (or, at the AI
+  // budget cap, the ticket escalates), announced as any message is. Only the
+  // author may ask, and only while the ticket has no messages yet.
+  rpc AnswerOpening(AnswerOpeningRequest) returns (AnswerOpeningResponse);
 
   // UploadAttachment is now the PRESIGN step — it returns a URL rather than a
   // stored row, because no row exists until the bytes have actually landed.

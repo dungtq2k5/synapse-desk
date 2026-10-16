@@ -11,6 +11,9 @@ import { readHttpStatusHint } from '@synapsedesk/core';
  */
 const REFUSAL_HTTP_STATUS = 422;
 
+/** The HTTP status rag-service marks a refusal at the AI budget cap with. */
+const AT_CAP_HTTP_STATUS = 402;
+
 /**
  * Whether a failed draft was REFUSED, as opposed to merely failing.
  *
@@ -31,6 +34,20 @@ export function isDraftRefusal(error: unknown): boolean {
   return (
     readHttpStatusHint(details ?? message ?? '').httpStatus ===
     REFUSAL_HTTP_STATUS
+  );
+}
+
+/**
+ * Whether a failed draft was refused because the workspace is at its AI budget
+ * cap: rag-service's `PERMISSION_DENIED` with the 402 marker.
+ */
+export function isAtCap(error: unknown): boolean {
+  const { code, details, message } = asGrpcError(error);
+  if (code !== status.PERMISSION_DENIED) return false;
+
+  return (
+    readHttpStatusHint(details ?? message ?? '').httpStatus ===
+    AT_CAP_HTTP_STATUS
   );
 }
 

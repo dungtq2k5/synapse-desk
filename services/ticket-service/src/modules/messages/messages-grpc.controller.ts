@@ -1,6 +1,8 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  AnswerOpeningRequest,
+  AnswerOpeningResponse,
   AppendAiMessageRequest,
   AttachmentResponse,
   ConfirmAttachmentRequest,
@@ -45,6 +47,13 @@ export class MessagesGrpcController implements MessageServiceController {
     metadata?: Metadata,
   ): Promise<CreateMessageResponse> {
     return this.messages.createMessage(request, unpackCallerContext(metadata));
+  }
+
+  answerOpening(
+    request: AnswerOpeningRequest,
+    metadata?: Metadata,
+  ): Promise<AnswerOpeningResponse> {
+    return this.messages.answerOpening(request, unpackCallerContext(metadata));
   }
 
   appendAiMessage(
