@@ -1090,6 +1090,41 @@ describe('Auth core (e2e)', () => {
       expect(created.isEmailVerified).toBe(true);
     });
 
+    it('**26a. whoever founds an organization through Google is its Org Admin; a joiner is an End User**', async () => {
+      // The same founder rule as the password path. Before it, a Google
+      // founder got End User, and their new organization had no admin.
+      await createOrganization(fx.prisma, {
+        allowedEmailDomains: ['google-joined.test'],
+      });
+      const firebase = fx.moduleRef.get<{
+        verifyGoogleIdToken: (t: string) => Promise<unknown>;
+      }>(
+        (await import('../../src/modules/firebase/firebase.service'))
+          .FirebaseService,
+      );
+      const signUp = async (email: string) => {
+        jest.spyOn(firebase, 'verifyGoogleIdToken').mockResolvedValue({
+          email,
+          fullName: 'Google Person',
+          avatarUrl: null,
+          emailVerified: true,
+        });
+        await auth.googleSignIn({ idToken: 'stub' }, requestOrigin());
+        const user = await fx.prisma.user.findFirstOrThrow({
+          where: { email },
+          include: { roles: true },
+        });
+        return user.roles.map((role) => role.name);
+      };
+
+      expect(await signUp('founder@google-founded.test')).toEqual([
+        SystemRoleName.ORG_ADMIN,
+      ]);
+      expect(await signUp('joiner@google-joined.test')).toEqual([
+        SystemRoleName.END_USER,
+      ]);
+    });
+
     it('**26b. a domain match fires the seat alarm on this path too**', async () => {
       // Two sign-up paths that reported seat usage differently would be a
       // difference nobody chose — the same argument the free-tier grants
