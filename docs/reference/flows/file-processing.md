@@ -75,6 +75,10 @@ QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED
 
 The status is written at each stage boundary, so a stuck job says where it stuck. A job sitting in `PARSING` for minutes is almost always OCR (§4).
 
+**A failed job also says why, and where.** `errorCode` comes from the error the processor caught: `DocumentTooComplex` → `TOO_LONG`, `NoExtractableText` → `NO_READABLE_TEXT`, `OcrUnavailable` → `OCR_UNAVAILABLE`, a thrown embedding call (`ProviderFailure`, still retried) → `PROVIDER_FAILURE`, anything else → `OTHER`. `failedStage` is the stage the job was in, except that no readable text and OCR unavailable record `PARSING`: they're counted after chunking starts, but the parse decided them. A success clears both.
+
+**A job put back at the AI cap says so:** `waitingReason = AI_ALLOWANCE` on its `QUEUED` row. Every other status move clears it, and so does a cancel.
+
 ---
 
 ## 4. Parsing, and the branch most files skip
