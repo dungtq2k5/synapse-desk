@@ -8,6 +8,9 @@
  * than the current data.
  */
 
+import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { faker } from '@faker-js/faker';
 import { DocumentStatus } from '@synapsedesk/contracts';
 import {
@@ -18,6 +21,7 @@ import {
 import type { PrismaService } from '../../../services/ingestion-service/src/modules/prisma/prisma.service';
 import type { ManifestTenant } from '../manifest';
 import type { Profile } from '../profiles';
+import { REPO_ROOT } from '../paths';
 import { tenantsOf, type SeedStep } from '../registry';
 
 const TRANSACTION_TIMEOUT_MS = 30_000;
@@ -25,6 +29,88 @@ const TRANSACTION_MAX_WAIT_MS = 15_000;
 
 /** Chunks per document. Fixed: a chunk count is a property of a file's length. */
 const CHUNKS_PER_DOCUMENT = 4;
+
+/**
+ * The files behind the demo documents: one each of PDF, Word and Markdown,
+ * committed beside this step, so download, reindex and replace all have a
+ * real object to read.
+ */
+export const DOCUMENT_FIXTURES = [
+  {
+    file: 'remote-work-policy.pdf',
+    title: 'Remote Work Policy',
+    fileType: 'pdf',
+    contentType: 'application/pdf',
+  },
+  {
+    file: 'new-starter-guide.docx',
+    title: 'New Starter Guide',
+    fileType: 'docx',
+    contentType:
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  },
+  {
+    file: 'expenses-faq.md',
+    title: 'Expenses FAQ',
+    fileType: 'md',
+    contentType: 'text/markdown',
+  },
+] as const;
+
+/**
+ * The fixture behind the `index`th document, and its title: the three in
+ * turn, numbered from their second round.
+ *
+ * @example fixtureFor(4).title // 'New Starter Guide 2.docx'
+ */
+export function fixtureFor(index: number) {
+  const fixture = DOCUMENT_FIXTURES[index % DOCUMENT_FIXTURES.length];
+  const round = Math.floor(index / DOCUMENT_FIXTURES.length);
+  return {
+    ...fixture,
+    title: `${fixture.title}${round ? ` ${round + 1}` : ''}.${fixture.fileType}`,
+  };
+}
+
+/** The Storage emulator, from storage-service's own `.env`, or `null`. */
+function storageEmulator(): { host: string; bucket: string } | null {
+  let text: string;
+  try {
+    text = readFileSync(
+      join(REPO_ROOT, 'services/storage-service/.env'),
+      'utf8',
+    );
+  } catch {
+    return null;
+  }
+  const read = (key: string) =>
+    new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm').exec(text)?.[1]?.trim();
+  const host = read('FIREBASE_STORAGE_EMULATOR_HOST');
+  const bucket = read('FIREBASE_STORAGE_BUCKET');
+  return host && bucket ? { host, bucket } : null;
+}
+
+/** Writes one object to the emulator, unsigned, as presign tells a browser to. */
+async function upload(
+  emulator: { host: string; bucket: string },
+  objectPath: string,
+  file: string,
+  contentType: string,
+): Promise<void> {
+  const response = await fetch(
+    `http://${emulator.host}/upload/storage/v1/b/${encodeURIComponent(emulator.bucket)}/o?uploadType=media&name=${encodeURIComponent(objectPath)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: readFileSync(join(__dirname, '../fixtures', file)),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `The Storage emulator answered ${response.status} for ${objectPath}`,
+    );
+  }
+}
 
 /**
  * What to write, taken from what the auth step already decided.
@@ -69,6 +155,12 @@ export async function seedDocuments(
   apply: boolean,
 ): Promise<string[]> {
   const lines: string[] = [];
+  const emulator = apply ? storageEmulator() : null;
+  if (apply && !emulator) {
+    lines.push(
+      'No Storage emulator in services/storage-service/.env: documents get no files, so download, reindex and replace will fail.',
+    );
+  }
 
   for (const tenant of tenants) {
     const plan = documentPlanFor(tenant);
@@ -79,10 +171,16 @@ export async function seedDocuments(
 
     if (!apply) continue;
 
-    await prisma.$transaction(
+    const files = await prisma.$transaction(
       async (tx) => writeDocuments(tx as PrismaService, tenant, plan),
       { timeout: TRANSACTION_TIMEOUT_MS, maxWait: TRANSACTION_MAX_WAIT_MS },
     );
+    // After the rows commit: a network write has no place in a transaction.
+    if (emulator) {
+      for (const { objectPath, file, contentType } of files) {
+        await upload(emulator, objectPath, file, contentType);
+      }
+    }
   }
 
   return lines;
@@ -92,15 +190,23 @@ async function writeDocuments(
   tx: PrismaService,
   tenant: ManifestTenant,
   plan: { documents: number; bytesEach: bigint },
-): Promise<void> {
+): Promise<{ objectPath: string; file: string; contentType: string }[]> {
   const fixture = buildTenant({
     organizationId: tenant.organizationId,
     userId: tenant.adminUserId,
     departmentId: tenant.departmentIds[0],
   });
 
+  const files: { objectPath: string; file: string; contentType: string }[] = [];
   for (let index = 0; index < plan.documents; index++) {
+    const file = fixtureFor(index);
+    // The path presign would choose: under the tenant, a nonce, a fresh name.
+    const objectPath = `organizations/${tenant.organizationId}/documents/${randomUUID()}/${randomUUID()}.${file.fileType}`;
+    files.push({ objectPath, file: file.file, contentType: file.contentType });
     const document = await createDocument(tx, fixture, {
+      title: file.title,
+      fileUrl: objectPath,
+      fileType: file.fileType,
       // INDEXED, because a demo corpus that is all PENDING shows a pipeline
       // mid-flight rather than a knowledge base. The chunks below carry no
       // `vectorPointId`, so "indexed" here means the rows a search would join
@@ -116,4 +222,5 @@ async function writeDocuments(
     // an honest empty result rather than nonsense rankings from fake vectors.
     await createChunks(tx, document, CHUNKS_PER_DOCUMENT, tenant.departmentIds);
   }
+  return files;
 }
