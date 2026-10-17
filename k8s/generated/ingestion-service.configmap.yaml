@@ -7,6 +7,9 @@
 #     node scripts/generate-k8s-config.mjs
 #
 # ConfigMap: the non-secret half of the env contract.
+#
+# Documented and deliberately absent:
+#   INGESTION_OFFLINE_MODEL — production embeds with the real model; ingestion-service refuses to boot with the offline client under NODE_ENV=production
 apiVersion: v1
 kind: ConfigMap
 metadata:
