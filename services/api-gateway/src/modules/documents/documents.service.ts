@@ -23,6 +23,7 @@ import {
 import {
   ConfirmDocumentDto,
   ListDocumentFlagsQueryDto,
+  ListDocumentChunksQueryDto,
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
@@ -177,7 +178,7 @@ export class DocumentsService {
 
   async listChunks(
     documentId: string,
-    query: ListDocumentsQueryDto,
+    query: ListDocumentChunksQueryDto,
     context: RequestContext,
   ): Promise<PaginationResponseDto<DocumentChunkResponseDto>> {
     return toDocumentChunkPageDto(

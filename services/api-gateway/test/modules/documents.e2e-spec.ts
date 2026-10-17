@@ -25,7 +25,10 @@ import {
   flushTestRedis,
 } from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
-import { IngestionJobStatus as ProtoIngestionJobStatus } from '@synapsedesk/grpc-proto';
+import {
+  IngestionJobStatus as ProtoIngestionJobStatus,
+  SortOrder,
+} from '@synapsedesk/grpc-proto';
 
 /**
  * Domain C's document surface at the HTTP boundary.
@@ -772,6 +775,59 @@ describe('Documents at the HTTP boundary (e2e)', () => {
 
       expect(res.body.data).toHaveProperty('vectorPointId', null);
       expect(res.body.data).toHaveProperty('pageNumber', null);
+    });
+
+    describe('the chunk list', () => {
+      const chunk = (chunkIndex: number) => ({
+        id: faker.string.uuid(),
+        documentId,
+        chunkIndex,
+        contentText: `passage ${chunkIndex}`,
+        pageNumber: 1,
+        tokenCount: 10,
+        vectorPointId: faker.string.uuid(),
+        createdAt: timestamp(),
+      });
+      const list = () =>
+        authenticatedAgent(fx.app, { permissionCodes: ['document.read'] });
+
+      it('**with no query, answers in reading order**', async () => {
+        fx.stubs.document.listDocumentChunks.mockReturnValue(
+          of(wirePage([chunk(0), chunk(1)])),
+        );
+
+        const res = await list().get(`${API}/documents/${documentId}/chunks`);
+
+        expect(res.status).toBe(200);
+        const [[request]] = fx.stubs.document.listDocumentChunks.mock.calls;
+        expect(request.page).toMatchObject({
+          sortBy: 'chunkIndex',
+          sortOrder: SortOrder.SORT_ORDER_ASC,
+        });
+        expect(
+          res.body.data.items.map(
+            (item: { chunkIndex: number }) => item.chunkIndex,
+          ),
+        ).toEqual([0, 1]);
+      });
+
+      it('refuses a sort a chunk does not have', async () => {
+        const res = await list()
+          .get(`${API}/documents/${documentId}/chunks`)
+          .query({ sortBy: 'createdAt' });
+
+        expect(res.status).toBe(400);
+        expect(fx.stubs.document.listDocumentChunks).not.toHaveBeenCalled();
+      });
+
+      it('refuses the document list’s filters, like any unknown field', async () => {
+        const res = await list()
+          .get(`${API}/documents/${documentId}/chunks`)
+          .query({ status: 'INDEXED' });
+
+        expect(res.status).toBe(400);
+        expect(fx.stubs.document.listDocumentChunks).not.toHaveBeenCalled();
+      });
     });
 
     it('3. the citation deep-link needs no permission', async () => {

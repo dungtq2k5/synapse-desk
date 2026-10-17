@@ -16,6 +16,8 @@ import {
 } from 'class-validator';
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
+  DOCUMENT_CHUNK_SORTABLE_FIELDS,
+  type SortOrder,
   OCR_LANGUAGES,
   DOCUMENT_FLAG_SEVERITIES,
   MAX_FLAG_RESOLUTION_COMMENT_LENGTH,
@@ -318,4 +320,25 @@ export class ListDocumentFlagsQueryDto extends PaginationDto {
   @IsUUID('4')
   @ApiPropertyOptional()
   readonly documentId?: string;
+}
+
+/**
+ * A document's chunks, a page at a time, in reading order by default.
+ *
+ * Its own query, not the document list's: a chunk sorts by `chunkIndex` only,
+ * and the list's filters (status, department, type, deleted, search) mean
+ * nothing here, so sending one is refused like any unknown field.
+ */
+export class ListDocumentChunksQueryDto extends PaginationDto {
+  /** `chunkIndex`, the only column a chunk sorts by. */
+  @IsIn(DOCUMENT_CHUNK_SORTABLE_FIELDS)
+  @ApiPropertyOptional({
+    enum: DOCUMENT_CHUNK_SORTABLE_FIELDS,
+    default: 'chunkIndex',
+  })
+  override readonly sortBy: string = 'chunkIndex';
+
+  /** Ascending by default: the passages in the order they read. */
+  @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'ASC' })
+  override readonly sortOrder: SortOrder = 'ASC';
 }

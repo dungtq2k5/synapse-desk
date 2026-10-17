@@ -546,6 +546,47 @@ describe('documents', () => {
   );
 
   rowFor('Documents')(
+    '**a document’s chunks list with no query**, in reading order',
+    async () => {
+      peers.ingestion.on('DocumentService/ListDocumentChunks').reply({
+        items: [0, 1].map((chunkIndex) => ({
+          id: `77777777-7777-4777-8777-77777777777${chunkIndex}`,
+          documentId: DOCUMENT,
+          chunkIndex,
+          contentText: `Passage ${chunkIndex}.`,
+          tokenCount: 12,
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        })),
+        meta: {
+          totalItems: 2,
+          itemCount: 2,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/chunks`,
+        cookie(['document.read']),
+      );
+
+      expect(response.status).toBe(200);
+      const body = response.body as {
+        data: { items: { chunkIndex: number }[] };
+      };
+      expect(body.data.items.map((item) => item.chunkIndex)).toEqual([0, 1]);
+      const [call] = peers.ingestion.calls(
+        'DocumentService/ListDocumentChunks',
+      );
+      expect(call.request.page).toMatchObject({
+        sortBy: 'chunkIndex',
+        sortOrder: 1, // SORT_ORDER_ASC
+      });
+    },
+  );
+
+  rowFor('Documents')(
     'a wire OCR code this build does not recognise is dropped, not surfaced as a crash',
     async () => {
       peers.ingestion

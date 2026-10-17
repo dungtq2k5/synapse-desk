@@ -36,6 +36,7 @@ import {
   ConfirmDocumentDto,
   ListDocumentFlagsQueryDto,
   ResolveDocumentFlagDto,
+  ListDocumentChunksQueryDto,
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
@@ -473,7 +474,7 @@ export class DocumentsController {
   listChunks(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: ListDocumentsQueryDto,
+    @Query() query: ListDocumentChunksQueryDto,
   ): Promise<PaginationResponseDto<DocumentChunkResponseDto>> {
     return this.documents.listChunks(id, query, context);
   }
