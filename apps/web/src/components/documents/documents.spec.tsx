@@ -365,6 +365,22 @@ describe('one document', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('without user.read, Details says "Uploaded" over the date alone', async () => {
+    show(
+      <DocumentView documentId="d1" />,
+      MANAGER.filter((code) => code !== 'user.read'),
+      {
+        'GET /api/v1/documents/d1': ok(doc()),
+        'GET /api/v1/documents/d1/ingestion-jobs': page([job()]),
+      },
+    );
+
+    const details = await screen.findByRole('region', { name: 'Details' });
+    expect(within(details).getByText('Uploaded')).toBeInTheDocument();
+    expect(within(details).queryByText('Uploaded by')).not.toBeInTheDocument();
+    expect(within(details).getByText('12 Sept 2026')).toBeInTheDocument();
+  });
+
   it('a reader without document.read gets "Document not found"', async () => {
     show(<DocumentView documentId="d1" />, ['ticket.create']);
 
@@ -421,6 +437,27 @@ describe('a flag', () => {
         },
       ),
     );
+  });
+
+  it('a resolver missing from the people says "someone", mid-sentence', async () => {
+    show(
+      <FlagCard
+        flag={{
+          ...flag,
+          resolvedAt: '2026-10-15T09:00:00Z',
+          resolvedById: 'gone',
+          resolution: 'DISMISSED',
+          resolutionComment: 'Still current.',
+        }}
+      />,
+      MANAGER,
+    );
+
+    expect(
+      await screen.findByText(
+        'Dismissed by someone on 15 Oct 2026: “Still current.”',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('reads its type, detail and confidence, and how it was resolved', () => {

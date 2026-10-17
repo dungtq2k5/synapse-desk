@@ -237,7 +237,7 @@ export function FlagCard({
 function Resolved({ flag }: { flag: DocumentFlagResponseDto }) {
   const { names } = usePeople();
   const who = flag.resolvedById
-    ? (names.get(flag.resolvedById) ?? 'Someone')
+    ? (names.get(flag.resolvedById) ?? 'someone')
     : null;
   const when = flag.resolvedAt ? dayDate(flag.resolvedAt) : '';
   const comment = flag.resolutionComment ? `: “${flag.resolutionComment}”` : '';

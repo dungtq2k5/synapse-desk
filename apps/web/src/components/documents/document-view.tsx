@@ -1049,7 +1049,7 @@ function Details({
     ['OCR languages', languages || '—'],
     ['Passages', document.status === 'INDEXED' ? document.chunkCount : '—'],
     [
-      'Uploaded by',
+      uploader ? 'Uploaded by' : 'Uploaded',
       uploader
         ? `${uploader}, ${dayDate(document.createdAt)}`
         : dayDate(document.createdAt),
