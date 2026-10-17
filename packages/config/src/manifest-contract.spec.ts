@@ -451,6 +451,7 @@ describe('the manifest contract', () => {
     const EXCLUDED = new Set([
       'FIREBASE_STORAGE_EMULATOR_HOST',
       'FIREBASE_AUTH_EMULATOR_HOST',
+      'INGESTION_OFFLINE_MODEL',
       'RAG_OFFLINE_MODEL',
     ]);
 

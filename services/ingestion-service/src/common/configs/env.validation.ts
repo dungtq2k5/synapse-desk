@@ -69,10 +69,18 @@ export const envValidationSchema = Joi.object({
   // Required in every environment EXCEPT test, where the pipeline runs against
   // a substitute embedding client — deliberately, so the ingestion tests
   // need no API key, no network and no per-run spend.
+  //
+  // Not needed either with INGESTION_OFFLINE_MODEL, which calls no provider.
   GEMINI_API_KEY: Joi.string().when('NODE_ENV', {
     is: 'test',
     then: Joi.optional(),
-    otherwise: Joi.required(),
+    otherwise: Joi.when('INGESTION_OFFLINE_MODEL', {
+      // The raw value too, as a sibling may be read before it's converted;
+      // `required()` so an absent switch doesn't match.
+      is: Joi.valid(true, 'true').required(),
+      then: Joi.optional(),
+      otherwise: Joi.required(),
+    }),
   }),
 
   // -------------------------------------------------------------- 8 POLICY
@@ -92,4 +100,13 @@ export const envValidationSchema = Joi.object({
   // told was still good, which reads like a permissions bug rather than a
   // clock-skew one. The default leaves a 60-second margin.
   DOWNLOAD_URL_TTL_SECONDS: Joi.number().default(840),
+
+  // --------------------------------------------------------- 9 DEVELOPMENT
+
+  // The model-free embedding client, for the end-to-end stack only: rag-service's
+  // offline vectors, so its offline answers find what was uploaded. Refused
+  // under NODE_ENV=production, where a document must be embedded for real.
+  INGESTION_OFFLINE_MODEL: Joi.boolean()
+    .default(false)
+    .when('NODE_ENV', { is: 'production', then: Joi.invalid(true) }),
 });
