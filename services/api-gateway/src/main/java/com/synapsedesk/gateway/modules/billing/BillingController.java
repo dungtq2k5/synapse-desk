@@ -9,6 +9,7 @@ import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.security.RequirePermission;
+import com.synapsedesk.gateway.common.web.AcceptsUndeclaredQuery;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.modules.billing.dto.rest.ChangePlanDto;
@@ -194,6 +195,8 @@ public class BillingController {
   }
 
   @GetMapping(value = "/billing/invoices", produces = { "application/json" })
+  // The contract binds `limit` alone, not a query object, so any other name is ignored.
+  @AcceptsUndeclaredQuery
   @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<

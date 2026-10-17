@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.common.lifecycle.OrganizationLifecycleInterceptor
 import com.synapsedesk.gateway.common.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.common.throttle.ThrottlerInterceptor;
 import com.synapsedesk.gateway.common.web.PathIdInterceptor;
+import com.synapsedesk.gateway.common.web.UndeclaredQueryInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
 import org.springframework.context.annotation.Configuration;
@@ -33,6 +34,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
   private final HttpMetricsInterceptor httpMetricsInterceptor;
   private final OrganizationLifecycleInterceptor organizationLifecycleInterceptor;
   private final PathIdInterceptor pathIdInterceptor;
+  private final UndeclaredQueryInterceptor undeclaredQueryInterceptor;
 
   public WebMvcConfig(
     SessionInterceptor sessionInterceptor,
@@ -40,7 +42,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
     ThrottlerInterceptor throttlerInterceptor,
     HttpMetricsInterceptor httpMetricsInterceptor,
     OrganizationLifecycleInterceptor organizationLifecycleInterceptor,
-    PathIdInterceptor pathIdInterceptor
+    PathIdInterceptor pathIdInterceptor,
+    UndeclaredQueryInterceptor undeclaredQueryInterceptor
   ) {
     this.sessionInterceptor = sessionInterceptor;
     this.permissionInterceptor = permissionInterceptor;
@@ -48,6 +51,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     this.httpMetricsInterceptor = httpMetricsInterceptor;
     this.organizationLifecycleInterceptor = organizationLifecycleInterceptor;
     this.pathIdInterceptor = pathIdInterceptor;
+    this.undeclaredQueryInterceptor = undeclaredQueryInterceptor;
   }
 
   @Override
@@ -65,7 +69,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // After the permission check: a request that lacks a permission is refused
     // for THAT without the lifecycle gate asking about the tenant.
     registry.addInterceptor(organizationLifecycleInterceptor);
-    // Last: a malformed id is refused for THAT, after the guards.
+    // A malformed id is refused for THAT, after the guards.
     registry.addInterceptor(pathIdInterceptor);
+    // Last: a query name the route does not declare.
+    registry.addInterceptor(undeclaredQueryInterceptor);
   }
 }
