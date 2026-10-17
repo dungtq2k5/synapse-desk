@@ -587,6 +587,48 @@ describe('documents', () => {
   );
 
   rowFor('Documents')(
+    'a document’s chunks refuse a sort a chunk does not have',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/chunks?sortBy=createdAt`,
+        cookie(['document.read']),
+      );
+
+      expect(response.status).toBe(400);
+      expect(
+        peers.ingestion.calls('DocumentService/ListDocumentChunks'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Documents')(
+    'a document list filter on the chunks is ignored, like any unknown query field on this gateway',
+    async () => {
+      peers.ingestion.on('DocumentService/ListDocumentChunks').reply({
+        items: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 10,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/chunks?status=INDEXED`,
+        cookie(['document.read']),
+      );
+
+      expect(response.status).toBe(200);
+      const [call] = peers.ingestion.calls(
+        'DocumentService/ListDocumentChunks',
+      );
+      expect(Object.keys(call.request).sort()).toEqual(['documentId', 'page']);
+    },
+  );
+
+  rowFor('Documents')(
     'a wire OCR code this build does not recognise is dropped, not surfaced as a crash',
     async () => {
       peers.ingestion

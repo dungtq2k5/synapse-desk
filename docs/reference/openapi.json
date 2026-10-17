@@ -47163,16 +47163,18 @@
           {
             "name": "sortBy",
             "in": "query",
-            "description": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
+            "description": "`chunkIndex`, the only column a chunk sorts by.",
             "required": false,
             "schema": {
               "type": "string",
-              "default": "createdAt"
+              "default": "chunkIndex",
+              "enum": ["chunkIndex"]
             }
           },
           {
             "name": "sortOrder",
             "in": "query",
+            "description": "Ascending by default: the passages in the order they read.",
             "required": false,
             "schema": {
               "type": "string",

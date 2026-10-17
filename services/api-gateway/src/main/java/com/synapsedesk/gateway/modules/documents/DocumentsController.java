@@ -18,6 +18,7 @@ import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.modules.documents.dto.rest.ConfirmDocumentDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentChunkResponseDto;
+import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentChunkSortField;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentDepartmentsResponseDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentFileTypeFilter;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentFlagResponseDto;
@@ -902,8 +903,8 @@ public class DocumentsController {
     @Valid @RequestParam(
       value = "sortBy",
       required = false,
-      defaultValue = "createdAt"
-    ) String sortBy,
+      defaultValue = "chunkIndex"
+    ) DocumentChunkSortField sortBy,
     @Valid @RequestParam(
       value = "sortOrder",
       required = false,
@@ -915,7 +916,7 @@ public class DocumentsController {
     PageRequest pageRequest = PageRequest.newBuilder()
       .setPage(page.intValue())
       .setLimit(limit.intValue())
-      .setSortBy(sortBy)
+      .setSortBy(sortBy.name())
       .setSortOrder(
         sortOrder == SortDirection.DESC
           ? SortOrder.SORT_ORDER_DESC
