@@ -282,9 +282,13 @@ const bell = (page: Page) =>
   page.getByRole('button', { name: /^Notifications/ });
 const panel = (page: Page) =>
   page.getByRole('dialog', { name: 'Notifications' });
-/** Day headings older than yesterday read a date, which moves every day. */
+/**
+ * Day headings older than yesterday read a date, which moves every day. By tag
+ * rather than role: an open menu hides the rest of the page from the
+ * accessibility tree, and the date with it.
+ */
 const datedHeadings = (page: Page) =>
-  page.getByRole('heading', { level: 2, name: /^\d{1,2} [A-Z][a-z]{2}$/ });
+  page.locator('h2').filter({ hasText: /^\d{1,2} [A-Z][a-z]{2}$/ });
 /** The page's own alert: Next.js's route announcer is an `alert` too. */
 const alert = (page: Page) => page.getByRole('main').getByRole('alert');
 /** Radix's modal menus hide the page and trap focus; axe sees only the hiding. */
@@ -811,7 +815,11 @@ test.describe('notification settings', () => {
   });
 
   test('the account menu', async ({ page }) => {
-    const { maya } = await tenant('bell');
+    const { maya, tickets } = await tenant('bell');
+    // The list behind the menu draws the desk ticket read, whichever rows ran.
+    const mayas = await sessionAs(maya);
+    await api(mayas, 'POST', `/tickets/${tickets.desk}/read`);
+    await mayas.dispose();
     await signInAs(page, maya);
     await notifications(page, { count: 4, items: [] });
     await page.goto('/tickets');
