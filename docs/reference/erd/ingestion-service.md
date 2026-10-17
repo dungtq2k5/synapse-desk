@@ -55,6 +55,9 @@ erDiagram
     String bullmq_job_id 
     String status 
     String error_log "❓"
+    String error_code "❓"
+    String failed_stage "❓"
+    String waiting_reason "❓"
     String superseded_by_id "❓"
     DateTime processed_at "❓"
     DateTime created_at 

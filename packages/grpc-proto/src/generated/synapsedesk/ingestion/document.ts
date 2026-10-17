@@ -56,6 +56,39 @@ export enum IngestionJobStatus {
 }
 
 /**
+ * Why a FAILED job failed. Mirrors `IngestionErrorCode` in `document.config.ts`.
+ * UNSPECIFIED on a job that hasn't failed.
+ */
+export enum IngestionErrorCode {
+  INGESTION_ERROR_CODE_UNSPECIFIED = 0,
+  INGESTION_ERROR_CODE_TOO_LONG = 1,
+  INGESTION_ERROR_CODE_NO_READABLE_TEXT = 2,
+  INGESTION_ERROR_CODE_OCR_UNAVAILABLE = 3,
+  INGESTION_ERROR_CODE_PROVIDER_FAILURE = 4,
+  INGESTION_ERROR_CODE_OTHER = 5,
+  UNRECOGNIZED = -1,
+}
+
+/** The stage a FAILED job was in. Mirrors `IngestionStage`. */
+export enum IngestionStage {
+  INGESTION_STAGE_UNSPECIFIED = 0,
+  INGESTION_STAGE_PARSING = 1,
+  INGESTION_STAGE_CHUNKING = 2,
+  INGESTION_STAGE_EMBEDDING = 3,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Why a QUEUED job waits. Mirrors `IngestionWaitingReason`; UNSPECIFIED is an
+ * ordinary queue.
+ */
+export enum IngestionWaitingReason {
+  INGESTION_WAITING_REASON_UNSPECIFIED = 0,
+  INGESTION_WAITING_REASON_AI_ALLOWANCE = 1,
+  UNRECOGNIZED = -1,
+}
+
+/**
  * The EXTENSION a document is filed under, not its MIME type — the distinction
  * the `DocumentFileType` doc comment exists to make. The column holds `pdf`; a
  * filter naming `application/pdf` matches no row and reports no error.
@@ -524,7 +557,14 @@ export interface IngestionJobResponse {
    * running, which is why this one is `optional` and `created_at` is not.
    */
   processedAt?: Timestamp | undefined;
-  createdAt: Timestamp | undefined;
+  createdAt:
+    | Timestamp
+    | undefined;
+  /** Set on a FAILED job; UNSPECIFIED otherwise. `error_log` stays the detail. */
+  errorCode: IngestionErrorCode;
+  failedStage: IngestionStage;
+  /** Set on a QUEUED job put back for a reason; UNSPECIFIED otherwise. */
+  waitingReason: IngestionWaitingReason;
 }
 
 export interface ListIngestionJobsRequest {

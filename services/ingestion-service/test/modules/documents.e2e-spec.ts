@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { readHttpStatusHint } from '@synapsedesk/core';
 import { randomUUID } from 'node:crypto';
 import {
   BATCH_CHUNK_LIMIT,
@@ -39,12 +40,34 @@ import {
   createScopedDocument,
   TenantFixture,
 } from '../factories';
-import { DocumentsService } from '../../src/modules/documents/documents.service';
+import {
+  DOCUMENT_LIMIT_MESSAGE,
+  DocumentsService,
+  STORAGE_FULL_MESSAGE,
+} from '../../src/modules/documents/documents.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
 import { faultInjector } from '@synapsedesk/testing/fault';
+
+/**
+ * A plan-limit refusal: `RESOURCE_EXHAUSTED` carrying the `[http:402]` marker
+ * and the sentence the gateways forward.
+ */
+async function expectPlanLimit(
+  promise: Promise<unknown>,
+  message: string,
+): Promise<void> {
+  await expectRpc(promise, status.RESOURCE_EXHAUSTED);
+  await promise.catch((error: unknown) =>
+    expect(
+      readHttpStatusHint(
+        ((error as RpcException).getError() as { message: string }).message,
+      ),
+    ).toEqual({ httpStatus: 402, message }),
+  );
+}
 
 describe('Documents (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
@@ -285,9 +308,10 @@ describe('Documents (e2e)', () => {
       getStorageLimitBytes.mockResolvedValue(1024);
       await createDocument(fx.prisma, tenant, { fileSizeBytes: BigInt(1024) });
 
-      await expectRpc(
+      // A plan limit: 402 with its sentence, not the rate limit's 429.
+      await expectPlanLimit(
         documents.presignDocument(presignRequest(), manager()),
-        status.RESOURCE_EXHAUSTED,
+        STORAGE_FULL_MESSAGE,
       );
 
       expect(presignDocument).not.toHaveBeenCalled();
@@ -303,9 +327,9 @@ describe('Documents (e2e)', () => {
       await createDocument(fx.prisma, tenant);
       await createDocument(fx.prisma, tenant);
 
-      await expectRpc(
+      await expectPlanLimit(
         documents.presignDocument(presignRequest(), manager()),
-        status.RESOURCE_EXHAUSTED,
+        DOCUMENT_LIMIT_MESSAGE,
       );
 
       // Nothing was taken away to make room.

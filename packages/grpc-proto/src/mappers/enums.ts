@@ -12,7 +12,10 @@ import {
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
+  IngestionErrorCode,
   IngestionJobStatus,
+  IngestionStage,
+  IngestionWaitingReason,
   Gender,
   InvitationStatus,
   NOTIFICATION_TYPES,
@@ -55,7 +58,10 @@ import {
   DocumentFlagSeverity as ProtoDocumentFlagSeverity,
   DocumentFlagType as ProtoDocumentFlagType,
   DocumentStatus as ProtoDocumentStatus,
+  IngestionErrorCode as ProtoIngestionErrorCode,
   IngestionJobStatus as ProtoIngestionJobStatus,
+  IngestionStage as ProtoIngestionStage,
+  IngestionWaitingReason as ProtoIngestionWaitingReason,
 } from '../generated/synapsedesk/ingestion/document';
 import { AiGenerationOutcome as ProtoAiGenerationOutcome } from '../generated/synapsedesk/ingestion/ledger';
 import {
@@ -475,6 +481,57 @@ const ingestionJobStatus = enumBridge<
 
 export const toProtoIngestionJobStatus = ingestionJobStatus.toProto;
 export const fromProtoIngestionJobStatus = ingestionJobStatus.fromProto;
+
+/** `ingestion_jobs.error_code`: UNSPECIFIED on a job that hasn't failed. */
+const ingestionErrorCode = enumBridge<
+  IngestionErrorCode,
+  ProtoIngestionErrorCode
+>(
+  {
+    [IngestionErrorCode.TOO_LONG]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_TOO_LONG,
+    [IngestionErrorCode.NO_READABLE_TEXT]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_NO_READABLE_TEXT,
+    [IngestionErrorCode.OCR_UNAVAILABLE]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_OCR_UNAVAILABLE,
+    [IngestionErrorCode.PROVIDER_FAILURE]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_PROVIDER_FAILURE,
+    [IngestionErrorCode.OTHER]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_OTHER,
+  },
+  ProtoIngestionErrorCode.INGESTION_ERROR_CODE_UNSPECIFIED,
+);
+
+export const toProtoIngestionErrorCode = ingestionErrorCode.toProto;
+export const fromProtoIngestionErrorCode = ingestionErrorCode.fromProto;
+
+/** `ingestion_jobs.failed_stage`: UNSPECIFIED on a job that hasn't failed. */
+const ingestionStage = enumBridge<IngestionStage, ProtoIngestionStage>(
+  {
+    [IngestionStage.PARSING]: ProtoIngestionStage.INGESTION_STAGE_PARSING,
+    [IngestionStage.CHUNKING]: ProtoIngestionStage.INGESTION_STAGE_CHUNKING,
+    [IngestionStage.EMBEDDING]: ProtoIngestionStage.INGESTION_STAGE_EMBEDDING,
+  },
+  ProtoIngestionStage.INGESTION_STAGE_UNSPECIFIED,
+);
+
+export const toProtoIngestionStage = ingestionStage.toProto;
+export const fromProtoIngestionStage = ingestionStage.fromProto;
+
+/** `ingestion_jobs.waiting_reason`: UNSPECIFIED is an ordinary queue. */
+const ingestionWaitingReason = enumBridge<
+  IngestionWaitingReason,
+  ProtoIngestionWaitingReason
+>(
+  {
+    [IngestionWaitingReason.AI_ALLOWANCE]:
+      ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_AI_ALLOWANCE,
+  },
+  ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_UNSPECIFIED,
+);
+
+export const toProtoIngestionWaitingReason = ingestionWaitingReason.toProto;
+export const fromProtoIngestionWaitingReason = ingestionWaitingReason.fromProto;
 
 const documentFileType = enumBridge<DocumentFileType, ProtoDocumentFileType>(
   {

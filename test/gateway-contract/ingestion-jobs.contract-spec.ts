@@ -144,6 +144,43 @@ describe('ingestion-jobs', () => {
   );
 
   rowFor('Ingestion Jobs')(
+    '**`list` names why a job failed, where, and why one waits; unset is `null`**',
+    async () => {
+      peers.ingestion.on('DocumentService/ListIngestionJobs').reply({
+        items: [
+          // NO_READABLE_TEXT, at PARSING.
+          wireJob({ errorCode: 2, failedStage: 1 }),
+          // QUEUED, waiting for the AI allowance.
+          wireJob({
+            id: '33333333-3333-4333-8333-333333333333',
+            status: 1,
+            waitingReason: 1,
+          }),
+        ],
+        meta: { totalItems: 2 },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/ingestion-jobs`,
+        headersWithCodes(['document.read']),
+      );
+
+      expect(response.status).toBe(200);
+      const body = response.body as { data: { items: unknown[] } };
+      expect(body.data.items[0]).toMatchObject({
+        errorCode: 'NO_READABLE_TEXT',
+        failedStage: 'PARSING',
+        waitingReason: null,
+      });
+      expect(body.data.items[1]).toMatchObject({
+        errorCode: null,
+        failedStage: null,
+        waitingReason: 'AI_ALLOWANCE',
+      });
+    },
+  );
+
+  rowFor('Ingestion Jobs')(
     '**`get` refuses a caller without `document.read`**',
     async () => {
       const response = await new Session(gateway.baseUrl).get(

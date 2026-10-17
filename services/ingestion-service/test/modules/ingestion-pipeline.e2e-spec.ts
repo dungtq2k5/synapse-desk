@@ -6,7 +6,10 @@ import {
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_MODEL,
+  IngestionErrorCode,
   IngestionJobStatus,
+  IngestionStage,
+  IngestionWaitingReason,
   MAX_CHUNKS_PER_DOCUMENT,
   UNKNOWN_EXTENSION,
   QDRANT_PAYLOAD_FIELDS,
@@ -329,6 +332,9 @@ describe('The ingestion pipeline (e2e)', () => {
       // for: a stuck document is diagnosable by someone looking at the
       // document, not by someone who knows to grep a container's stdout.
       expect(job.errorLog).toMatch(/no extractable text/i);
+      // The code and stage a reader acts on: the parse found nothing.
+      expect(job.errorCode).toBe(IngestionErrorCode.NO_READABLE_TEXT);
+      expect(job.failedStage).toBe(IngestionStage.PARSING);
 
       const document = await fx.prisma.document.findUniqueOrThrow({
         where: { id: data.documentId },
@@ -724,6 +730,8 @@ describe('The ingestion pipeline (e2e)', () => {
       expect(job.status).toBe(IngestionJobStatus.FAILED);
       expect(job.errorLog).toMatch(/not available on this deployment/i);
       expect(job.errorLog).toMatch(/server configuration/i);
+      expect(job.errorCode).toBe(IngestionErrorCode.OCR_UNAVAILABLE);
+      expect(job.failedStage).toBe(IngestionStage.PARSING);
     });
 
     it('2. **…and that message never mentions LANGUAGE**', async () => {
@@ -1100,6 +1108,8 @@ describe('The ingestion pipeline (e2e)', () => {
 
       expect(job.status).toBe(IngestionJobStatus.QUEUED);
       expect(job.errorLog).toBeNull();
+      // Why it waits, so the page can say so.
+      expect(job.waitingReason).toBe(IngestionWaitingReason.AI_ALLOWANCE);
       expect(document.status).toBe(DocumentStatus.PENDING);
       expect(fx.embeddings.calls).toHaveLength(0);
     });
@@ -1145,6 +1155,11 @@ describe('The ingestion pipeline (e2e)', () => {
         where: { documentId: data.documentId },
       });
       expect(chunks.every((chunk) => chunk.vectorPointId !== null)).toBe(true);
+      // Started again, so it no longer waits for anything.
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.waitingReason).toBeNull();
     });
   });
 
@@ -1166,7 +1181,31 @@ describe('The ingestion pipeline (e2e)', () => {
 
       expect(job.status).toBe(IngestionJobStatus.FAILED);
       expect(job.errorLog).toContain('embedding provider is down');
+      expect(job.errorCode).toBe(IngestionErrorCode.PROVIDER_FAILURE);
+      expect(job.failedStage).toBe(IngestionStage.EMBEDDING);
       expect(document.status).toBe(DocumentStatus.FAILED);
+    });
+
+    it('13c. Any other failure is OTHER, at the stage it was in; a later success clears both', async () => {
+      downloadObject.mockRejectedValueOnce(new Error('storage is unreachable'));
+      const data = await queueDocument();
+
+      await expect(processor.process(data)).rejects.toThrow(
+        'storage is unreachable',
+      );
+      let job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.errorCode).toBe(IngestionErrorCode.OTHER);
+      expect(job.failedStage).toBe(IngestionStage.PARSING);
+
+      // BullMQ's next attempt runs the same row.
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+      job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.errorCode).toBeNull();
+      expect(job.failedStage).toBeNull();
     });
 
     it('**13a. A document over the chunk ceiling is REFUSED, not retried**', async () => {
@@ -1197,6 +1236,8 @@ describe('The ingestion pipeline (e2e)', () => {
       // The reason names the ceiling, so a Knowledge Manager reading the row
       // knows to split the document rather than to re-upload it.
       expect(job.errorLog).toContain('ceiling');
+      expect(job.errorCode).toBe(IngestionErrorCode.TOO_LONG);
+      expect(job.failedStage).toBe(IngestionStage.CHUNKING);
     });
 
     it('**13b. …and it costs no embedding call at all**', async () => {

@@ -9,7 +9,10 @@ import {
   DocumentFlagType,
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
+  IngestionErrorCode,
   IngestionJobStatus,
+  IngestionStage,
+  IngestionWaitingReason,
   MAX_CHUNKS_PER_DOCUMENT,
   QDRANT_UPSERT_BATCH,
   TERMINAL_INGESTION_STATUSES,
@@ -150,6 +153,35 @@ class OcrUnavailable extends Error {
 }
 
 /**
+ * Raised when the embedding provider refused or didn't answer.
+ *
+ * Retried like any generic failure (a provider outage passes); its own type so
+ * the job records `PROVIDER_FAILURE` rather than `OTHER`.
+ */
+class ProviderFailure extends Error {
+  constructor(cause: unknown) {
+    super(`The embedding provider failed: ${formatErrorMsg(cause)}`, {
+      cause,
+    });
+  }
+}
+
+/** The code a reader acts on, for an error the processor caught. */
+function errorCodeOf(error: unknown): IngestionErrorCode {
+  if (error instanceof DocumentTooComplex) return IngestionErrorCode.TOO_LONG;
+  if (error instanceof NoExtractableText) {
+    return IngestionErrorCode.NO_READABLE_TEXT;
+  }
+  if (error instanceof OcrUnavailable) {
+    return IngestionErrorCode.OCR_UNAVAILABLE;
+  }
+  if (error instanceof ProviderFailure) {
+    return IngestionErrorCode.PROVIDER_FAILURE;
+  }
+  return IngestionErrorCode.OTHER;
+}
+
+/**
  * `QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED | FAILED`.
  *
  * Three orderings here are load-bearing and each has a failure behind it:
@@ -192,6 +224,8 @@ export class IngestionProcessor {
    */
   async process(data: IngestionJobData): Promise<IngestionOutcome> {
     const { documentId, ingestionJobId, organizationId } = data;
+    // The stage the job is in, for `failed_stage` if it fails.
+    let stage = IngestionStage.PARSING;
 
     try {
       await this.setPhase(
@@ -227,6 +261,7 @@ export class IngestionProcessor {
         parseOcrLanguages(data.ocrLanguages ?? []),
       );
 
+      stage = IngestionStage.CHUNKING;
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
       const chunks = await this.chunker.chunk(parsed.pages);
 
@@ -238,6 +273,11 @@ export class IngestionProcessor {
       }
 
       if (chunks.length === 0) {
+        // Found by counting chunks, but decided by the parse: the file has no
+        // text a reader could fix by anything but a new file, so it failed at
+        // parsing.
+        stage = IngestionStage.PARSING;
+
         // **FAILED, with a reason a human can act on.**
         //
         // This used to report INDEXED, reasoning that FAILED "would send
@@ -298,6 +338,7 @@ export class IngestionProcessor {
 
       const scope = await this.writeChunkRows(documentId, chunks);
 
+      stage = IngestionStage.EMBEDDING;
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
       await this.embedAndUpsert(data, scope);
 
@@ -340,7 +381,7 @@ export class IngestionProcessor {
         // of the process, so attempts two and three re-read the same cached
         // `false` — and installing tesseract is a deploy, which replaces the
         // process anyway. A retry cannot observe the fix even after it lands.
-        await this.fail(data, error);
+        await this.fail(data, error, stage);
         this.logger.warn(`Refused ${documentId}: ${formatErrorMsg(error)}`);
 
         return INGESTION_OUTCOMES.REFUSED;
@@ -359,6 +400,7 @@ export class IngestionProcessor {
             IngestionJobStatus.QUEUED,
             documentId,
             DocumentStatus.PENDING,
+            IngestionWaitingReason.AI_ALLOWANCE,
           );
         } catch (deferralError) {
           if (deferralError instanceof JobNoLongerRunnableError) {
@@ -378,7 +420,7 @@ export class IngestionProcessor {
         return INGESTION_OUTCOMES.DEFERRED;
       }
 
-      await this.fail(data, error);
+      await this.fail(data, error, stage);
       throw error;
     }
   }
@@ -585,10 +627,14 @@ export class IngestionProcessor {
       if (!decision.allowed) throw new BudgetExhausted();
 
       const startedAt = Date.now();
-      const result = await this.embeddings.embedBatch(
-        batch.map((chunk) => chunk.contentText),
-        settings.embeddingModel,
-      );
+      const result = await this.embeddings
+        .embedBatch(
+          batch.map((chunk) => chunk.contentText),
+          settings.embeddingModel,
+        )
+        .catch((cause: unknown) => {
+          throw new ProviderFailure(cause);
+        });
 
       // CHARGE first, awaited. One INCRBY, and the only thing standing between
       // a burst of concurrent jobs and all of them passing a stale gate.
@@ -659,6 +705,8 @@ export class IngestionProcessor {
           status: IngestionJobStatus.COMPLETED,
           processedAt: new Date(),
           errorLog: null,
+          errorCode: null,
+          failedStage: null,
         },
       }),
       this.prisma.document.update({
@@ -695,7 +743,11 @@ export class IngestionProcessor {
    * of RDM Table 20 is that a stuck document is locatable by someone looking at
    * the document, not by someone who knows to grep a container's stdout.
    */
-  private async fail(data: IngestionJobData, error: unknown): Promise<void> {
+  private async fail(
+    data: IngestionJobData,
+    error: unknown,
+    stage: IngestionStage,
+  ): Promise<void> {
     const message = formatErrorMsg(error);
     // Read BEFORE the status writes, and separately from them: the failure
     // event must go out even if the writes below throw, and reading it there
@@ -712,6 +764,8 @@ export class IngestionProcessor {
           data: {
             status: IngestionJobStatus.FAILED,
             errorLog: message,
+            errorCode: errorCodeOf(error),
+            failedStage: stage,
             processedAt: new Date(),
           },
         }),
@@ -767,15 +821,19 @@ export class IngestionProcessor {
    * A refusal from {@link setJobStatus} rolls the document write back with it,
    * so a job that is no longer runnable cannot leave a document claiming to be
    * processing.
+   *
+   * @param waitingReason why a job put back to `QUEUED` waits; every other
+   *   move clears it.
    */
   private async setPhase(
     ingestionJobId: string,
     jobStatus: IngestionJobStatus,
     documentId: string,
     documentStatus: DocumentStatus,
+    waitingReason: IngestionWaitingReason | null = null,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await this.setJobStatus(ingestionJobId, jobStatus, tx);
+      await this.setJobStatus(ingestionJobId, jobStatus, tx, waitingReason);
       await tx.document.update({
         where: { id: documentId },
         data: { status: documentStatus },
@@ -787,11 +845,14 @@ export class IngestionProcessor {
    * @param client The transaction to run in. Defaults to the unwrapped client
    *   for the phases that move the job alone — CHUNKING and EMBEDDING leave the
    *   document at PROCESSING throughout.
+   * @param waitingReason written with the status, so a job that moves again
+   *   (or is put back for another reason) never keeps a stale one.
    */
   private async setJobStatus(
     ingestionJobId: string,
     status: IngestionJobStatus,
     client: Prisma.TransactionClient | PrismaService = this.prisma,
+    waitingReason: IngestionWaitingReason | null = null,
   ): Promise<void> {
     const { count } = await client.ingestionJob.updateMany({
       // `notIn`, not `in RESUMABLE_*`: a FAILED row is what BullMQ retries, and
@@ -801,7 +862,7 @@ export class IngestionProcessor {
         id: ingestionJobId,
         status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
       },
-      data: { status },
+      data: { status, waitingReason },
     });
 
     if (count === 0) throw new JobNoLongerRunnableError(ingestionJobId);

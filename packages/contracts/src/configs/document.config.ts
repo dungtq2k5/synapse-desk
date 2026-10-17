@@ -49,6 +49,48 @@ export enum IngestionJobStatus {
 export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
 
 /**
+ * `ingestion_jobs.error_code` — why a `FAILED` job failed, as a reader can act
+ * on it. `error_log` keeps the detail.
+ *
+ * - `TOO_LONG`: more passages than one document may produce; split it.
+ * - `NO_READABLE_TEXT`: the file parsed to no text, even with OCR.
+ * - `OCR_UNAVAILABLE`: scanned pages and no OCR on this deployment.
+ * - `PROVIDER_FAILURE`: the embedding provider refused or didn't answer.
+ * - `OTHER`: anything else.
+ */
+export enum IngestionErrorCode {
+  TOO_LONG = 'TOO_LONG',
+  NO_READABLE_TEXT = 'NO_READABLE_TEXT',
+  OCR_UNAVAILABLE = 'OCR_UNAVAILABLE',
+  PROVIDER_FAILURE = 'PROVIDER_FAILURE',
+  OTHER = 'OTHER',
+}
+
+export const INGESTION_ERROR_CODES = Object.values(IngestionErrorCode);
+
+/** `ingestion_jobs.failed_stage` — the stage a `FAILED` job was in. */
+export enum IngestionStage {
+  PARSING = 'PARSING',
+  CHUNKING = 'CHUNKING',
+  EMBEDDING = 'EMBEDDING',
+}
+
+export const INGESTION_STAGES = Object.values(IngestionStage);
+
+/**
+ * `ingestion_jobs.waiting_reason` — why a `QUEUED` job is waiting. `null` is
+ * an ordinary queue.
+ *
+ * - `AI_ALLOWANCE`: put back mid-job because the organization's AI allowance
+ *   ran out; it starts again once the allowance resets or the plan changes.
+ */
+export enum IngestionWaitingReason {
+  AI_ALLOWANCE = 'AI_ALLOWANCE',
+}
+
+export const INGESTION_WAITING_REASONS = Object.values(IngestionWaitingReason);
+
+/**
  * The statuses a job can still be CANCELLED from — its one consumer's question.
  *
  * Not what the worker checks: that is {@link TERMINAL_INGESTION_STATUSES} with

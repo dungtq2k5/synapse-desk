@@ -47,7 +47,8 @@ describe('IngestionProcessor cancellation (unit)', () => {
         id: 'job-1',
         status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
       },
-      data: { status: IngestionJobStatus.PARSING },
+      // A job that moves no longer waits for anything.
+      data: { status: IngestionJobStatus.PARSING, waitingReason: null },
     });
   });
 
