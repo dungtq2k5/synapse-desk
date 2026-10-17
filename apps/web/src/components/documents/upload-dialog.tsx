@@ -198,9 +198,10 @@ function UploadForm({ onClose }: { onClose: () => void }) {
   const sendable = rows.filter((row) =>
     ['ready', 'failed', 'held'].includes(row.phase),
   );
-  const started = rows.some((row) =>
-    ['waiting', 'uploading', 'uploaded'].includes(row.phase),
-  );
+  // Once Upload has been pressed, the batch is what it is: no more files, no
+  // more titles, and Done once nothing is left to send.
+  const [tried, setTried] = useState(false);
+  const started = tried;
   const finished = started && !busy && sendable.length === 0;
 
   /** Sends one file: presign, the bytes, then confirm. */
@@ -273,6 +274,7 @@ function UploadForm({ onClose }: { onClose: () => void }) {
       return;
 
     setBusy(true);
+    setTried(true);
     setNotice(null);
     for (const row of batch)
       update(row.key, { phase: 'waiting', reason: null });
@@ -672,7 +674,13 @@ function RowState({ row, onRetry }: { row: Row; onRetry?: () => void }) {
             {row.reason}
           </span>
           {onRetry && (
-            <Button variant="outline" size="xs" onClick={onRetry}>
+            <Button
+              variant="outline"
+              size="xs"
+              // Its own color: the line it sits on is the failure's red.
+              className="text-foreground"
+              onClick={onRetry}
+            >
               <RotateCcwIcon aria-hidden />
               Retry
             </Button>

@@ -719,7 +719,6 @@ function RowActions({ document }: { document: DocumentResponseDto }) {
     null,
   );
   const href = `/knowledge/documents/${document.id}`;
-  const working = isWorking(document.status);
   const editable = can('document.update');
 
   return (
@@ -763,7 +762,7 @@ function RowActions({ document }: { document: DocumentResponseDto }) {
               )}
               {can('document.reindex') && (
                 <DropdownMenuItem
-                  disabled={working}
+                  disabled={document.status !== 'INDEXED'}
                   onSelect={() => void reindex(document)}
                 >
                   Reindex

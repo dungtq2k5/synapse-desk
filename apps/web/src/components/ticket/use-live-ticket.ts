@@ -169,16 +169,21 @@ export function useLiveTicket(
       [ticketId],
     ),
   );
-  // A signal sent before the room was joined went nowhere: once it is, say
-  // "typing" again if the person still is, rather than at their next keystroke.
+  // Whatever was said before the room was joined reached nobody here: once
+  // it is, read the thread and the ticket again (an opening answer can be
+  // stored before the page joins), and say "typing" again if the person
+  // still is, rather than at their next keystroke.
   useRealtimeEvent(
     REALTIME_EVENTS.ticketJoined,
     useCallback(
       (frame: Frame<{ ticketId: string }>) => {
-        if (frame.data?.ticketId !== ticketId || !typingNow.current) return;
-        socket?.emit(CLIENT_EVENTS.typingStart, { ticketId });
+        if (frame.data?.ticketId !== ticketId) return;
+        refetch({ messages: true, ticket: true });
+        if (typingNow.current) {
+          socket?.emit(CLIENT_EVENTS.typingStart, { ticketId });
+        }
       },
-      [socket, ticketId],
+      [socket, ticketId, refetch],
     ),
   );
   // Agents only: the gateway sends the list to the ticket's internal room.

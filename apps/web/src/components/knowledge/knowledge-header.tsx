@@ -55,14 +55,16 @@ export function KnowledgeHeader({
       </div>
       {can('document.read') && (
         <nav aria-label="Knowledge">
-          <ul className="inline-flex h-9 w-full items-center rounded-lg bg-muted p-0.75 sm:w-120">
+          <ul className="inline-flex h-9 w-full max-w-120 items-center rounded-lg bg-muted p-0.75">
             {TABS.map((item) => (
-              <li key={item.tab} className="h-full flex-1">
+              // As wide as its words on a phone, a third each from `sm`; and
+              // never wider than the row allows, while a resize settles.
+              <li key={item.tab} className="h-full min-w-0 flex-auto sm:flex-1">
                 <Link
                   href={item.href}
                   aria-current={item.tab === tab ? 'page' : undefined}
                   className={cn(
-                    'inline-flex h-full w-full items-center justify-center rounded-md border border-transparent px-2 text-sm font-medium whitespace-nowrap text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    'inline-flex h-full w-full items-center justify-center rounded-md border border-transparent px-1.5 text-sm sm:px-2 font-medium whitespace-nowrap overflow-hidden text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     item.tab === tab &&
                       'bg-background text-foreground shadow-sm dark:border-input dark:bg-input/30',
                   )}

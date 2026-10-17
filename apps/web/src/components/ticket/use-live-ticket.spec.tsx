@@ -190,6 +190,29 @@ describe('a live ticket', () => {
     ]);
   });
 
+  it('reads the thread and the ticket again once the room is joined', () => {
+    // An opening answer can be stored before the page joins its room, and
+    // the event announcing it then reached nobody here.
+    const { socket, keys } = setup();
+
+    act(() =>
+      socket.receive(
+        REALTIME_EVENTS.ticketJoined,
+        frame({ ticketId: 'other' }),
+      ),
+    );
+    expect(keys()).toEqual([]);
+    act(() =>
+      socket.receive(REALTIME_EVENTS.ticketJoined, frame({ ticketId: 't1' })),
+    );
+    expect(keys()).toEqual(
+      expect.arrayContaining([
+        '/api/v1/tickets/t1/messages',
+        '/api/v1/tickets/t1',
+      ]),
+    );
+  });
+
   it('says nothing on joining when the person has stopped typing', () => {
     const { socket, result } = setup({ ready: false });
 

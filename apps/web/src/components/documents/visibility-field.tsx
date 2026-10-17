@@ -80,15 +80,17 @@ export function VisibilityField({
         }
         disabled={disabled || Boolean(locked)}
         aria-describedby={locked ? lockId : undefined}
-        className={cn('gap-3', locked && 'opacity-50')}
+        className="gap-3"
       >
         <Choice
+          dimmed={Boolean(locked)}
           id={`${id}-everyone`}
           value="everyone"
           label={`Everyone in ${organization}`}
           hint={`Organization-wide. Everyone can find ${noun} and get answers from ${noun}.`}
         />
         <Choice
+          dimmed={Boolean(locked)}
           id={`${id}-departments`}
           value="departments"
           label="Only some departments"
@@ -147,7 +149,10 @@ function Choice({
   value,
   label,
   hint,
+  dimmed,
 }: {
+  /** Locked: the control and its label at half strength; the hint stays legible. */
+  dimmed: boolean;
   id: string;
   value: string;
   label: string;
@@ -159,10 +164,13 @@ function Choice({
         id={id}
         value={value}
         aria-describedby={`${id}-hint`}
-        className="mt-0.5"
+        className={cn('mt-0.5', dimmed && 'opacity-50')}
       />
       <div className="flex flex-col gap-0.5">
-        <Label htmlFor={id} className="font-normal">
+        <Label
+          htmlFor={id}
+          className={cn('font-normal', dimmed && 'opacity-50')}
+        >
           {label}
         </Label>
         <p id={`${id}-hint`} className="text-sm text-muted-foreground">

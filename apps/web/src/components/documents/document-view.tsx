@@ -110,6 +110,7 @@ import { useDocumentLive } from './use-document-live';
 import { VisibilityField, andList } from './visibility-field';
 
 const PASSAGES_PAGE = 4;
+const UNFINISHED = new Set(['QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING']);
 /** How often a document being processed looks again. */
 const WORKING_POLL_MS = 4000;
 
@@ -237,7 +238,15 @@ function Loaded({
   const departments = useDepartmentNames();
   const working = isWorking(document.status);
   const jobs = useDocumentsControllerListIngestionJobsV1(document.id, {
-    query: { refetchInterval: working ? WORKING_POLL_MS : false },
+    query: {
+      // While the document works, and until its latest attempt has finished:
+      // the document can settle between two looks, leaving the job unread.
+      refetchInterval: (query) =>
+        working ||
+        UNFINISHED.has(query.state.data?.data?.items.at(-1)?.status ?? '')
+          ? WORKING_POLL_MS
+          : false,
+    },
   });
   const flags = useDocumentsControllerListFlagsV1({
     documentId: document.id,
@@ -310,7 +319,6 @@ function Loaded({
         {!deleted && (
           <HeaderActions
             document={document}
-            working={working}
             onDialog={setDialog}
             onReindex={() => void reindex(document)}
           />
@@ -384,12 +392,10 @@ function Loaded({
 
 function HeaderActions({
   document,
-  working,
   onDialog,
   onReindex,
 }: {
   document: DocumentResponseDto;
-  working: boolean;
   onDialog: (dialog: 'edit' | 'replace' | 'delete') => void;
   onReindex: () => void;
 }) {
@@ -416,7 +422,8 @@ function HeaderActions({
         <Button
           variant="outline"
           className="max-sm:hidden"
-          disabled={working}
+          // An indexed document only; a failed one is retried through its job.
+          disabled={document.status !== 'INDEXED'}
           onClick={onReindex}
         >
           <RotateCcwIcon aria-hidden />
@@ -442,7 +449,7 @@ function HeaderActions({
             {can('document.reindex') && (
               <DropdownMenuItem
                 className="sm:hidden"
-                disabled={working}
+                disabled={document.status !== 'INDEXED'}
                 onSelect={onReindex}
               >
                 Reindex
@@ -682,9 +689,8 @@ function Processing({
           !deleted &&
           can('document.reindex') && (
             <Button
-              variant="outline"
+              variant="destructive-outline"
               size="sm"
-              className="border-destructive-border text-destructive hover:bg-destructive-subtle hover:text-destructive"
               onClick={() => setStopping(true)}
             >
               <SquareIcon aria-hidden />
