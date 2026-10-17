@@ -590,3 +590,52 @@ async function me(session: APIRequestContext): Promise<Person> {
   const { user } = await api<{ user: Person }>(session, 'GET', '/users/me');
   return { id: user.id, email: user.email, fullName: user.fullName };
 }
+
+/**
+ * An open quality flag on a document, as the detectors would leave one:
+ * written to ingestion's database, because the detectors run on a schedule.
+ */
+export async function documentFlag(
+  organizationId: string,
+  documentId: string,
+  flag: {
+    flagType: string;
+    severity: 'INFO' | 'WARNING' | 'CRITICAL';
+    detail: string;
+    confidenceScore?: number;
+    detectedAt?: Date;
+    relatedDocumentId?: string;
+  },
+): Promise<string> {
+  const prisma = new IngestionPrisma({
+    adapter: new PrismaPg({
+      connectionString: databaseUrl('ingestion-service'),
+    }),
+  });
+  try {
+    const created = await prisma.documentFlag.create({
+      data: { organizationId, documentId, ...flag },
+    });
+    return created.id;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/** The organization's storage grant, in bytes: what presign checks against. */
+export async function setStorageLimit(
+  organizationId: string,
+  bytes: number,
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    await prisma.organization.update({
+      where: { id: organizationId },
+      data: { maxStorageBytes: BigInt(bytes) },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
