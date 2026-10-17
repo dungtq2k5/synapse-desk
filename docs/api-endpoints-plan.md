@@ -445,7 +445,7 @@ No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internall
 | POST | `/documents/:id/reindex` | Re-run ingestion without a new file (model or chunking-strategy change). `INDEXED` only — a document whose ingestion FAILED goes through `POST /ingestion-jobs/:id/retry`, so the two preconditions are complements. Creates a new job row and returns it; 202. Open flags are LEFT OPEN, because the file has not changed. | perm:`document.reindex` |
 | GET | `/documents/:id/departments` | Departments scoped to this document. | perm:`document.read` |
 | PUT | `/documents/:id/departments` ✎ | Replace `department_documents` links. Ignored while `is_organization_wide = true` (**409** to make the conflict explicit). | perm:`document.share` |
-| GET | `/documents/:id/chunks` | Paginated `document_chunks`: `chunk_index`, `content_text`, `page_number`, `token_count`. Powers citation preview. | perm:`document.read` |
+| GET | `/documents/:id/chunks` | Paginated `document_chunks`: `chunk_index`, `content_text`, `page_number`, `token_count`. Powers citation preview. **Its own query:** `page`, `limit`, `sortBy` (`chunkIndex` only, the default) and `sortOrder` (ascending by default), so no query reads in reading order. None of the document list's filters. | perm:`document.read` |
 | GET | `/documents/:id/chunks/:chunkId` | Single chunk (citation deep-link target). | USER |
 | GET | `/documents/storage` | Storage usage breakdown vs `max_storage_bytes`. | perm:`document.read` |
 
