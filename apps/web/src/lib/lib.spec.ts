@@ -189,6 +189,8 @@ describe('format', () => {
     );
     expect(clockTime('2026-10-10T09:12:00Z', 'UTC')).toBe('09:12');
     expect(fileSize(217_088)).toBe('212 KB');
+    expect(fileSize(5 * 1024 ** 3)).toBe('5 GB');
+    expect(fileSize(4.2 * 1024 ** 3)).toBe('4.2 GB');
     expect(fileSize(1_258_291)).toBe('1.2 MB');
     expect(fileSize(900)).toBe('900 B');
     expect(initials('Maya Chen')).toBe('MC');

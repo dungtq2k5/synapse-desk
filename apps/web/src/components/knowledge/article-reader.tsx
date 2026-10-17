@@ -279,9 +279,23 @@ function Block({
 }
 
 /**
- * Opens the original through a short-lived link. The tab opens on the click,
- * so no popup blocker stops it, and is pointed at the link once known.
+ * Opens a document's original through a short-lived link. The tab opens on
+ * the click, so no popup blocker stops it, and is pointed at the link once
+ * known.
  */
+export async function openOriginal(documentId: string): Promise<void> {
+  const tab = window.open('', '_blank');
+  if (tab) tab.opener = null;
+  try {
+    const answer = await documentsControllerDownloadV1(documentId);
+    if (!answer.data) throw new Error('No download link');
+    if (tab) tab.location.href = answer.data.downloadUrl;
+  } catch {
+    tab?.close();
+    toastError('Couldn’t download the original', 'Try again in a moment.');
+  }
+}
+
 function DownloadButton({
   documentId,
   link,
@@ -289,18 +303,7 @@ function DownloadButton({
   documentId: string;
   link?: boolean;
 }) {
-  const download = async () => {
-    const tab = window.open('', '_blank');
-    if (tab) tab.opener = null;
-    try {
-      const answer = await documentsControllerDownloadV1(documentId);
-      if (!answer.data) throw new Error('No download link');
-      if (tab) tab.location.href = answer.data.downloadUrl;
-    } catch {
-      tab?.close();
-      toastError('Couldn’t download the original', 'Try again in a moment.');
-    }
-  };
+  const download = () => openOriginal(documentId);
   return link ? (
     <Button
       variant="link"

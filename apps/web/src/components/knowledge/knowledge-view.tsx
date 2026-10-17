@@ -35,9 +35,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useViewer } from '@/hooks/use-viewer';
+import { cn } from '@/lib/utils';
 import { ArticleRow } from './article-row';
 import { Citations, passageHref } from './citations';
 import { highlight } from './highlight';
+import { KnowledgeHeader } from './knowledge-header';
 
 const ARTICLES_PAGE = 8;
 
@@ -56,6 +59,7 @@ export function KnowledgeView() {
   // Cleared at once, rather than once the pause has passed.
   const query = typed.trim() ? settled : '';
   const input = useRef<HTMLInputElement>(null);
+  const manager = useViewer().can('document.read');
 
   const clear = () => {
     setTyped('');
@@ -63,13 +67,17 @@ export function KnowledgeView() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-188 flex-col gap-5 px-4 py-8 md:py-12">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Knowledge</h1>
-        <p className="text-sm text-muted-foreground">
-          {`Search ${organization}’s documents. An AI answer appears on top, with the passages it came from below.`}
-        </p>
-      </div>
+    <div
+      className={cn(
+        'flex w-full max-w-188 flex-col gap-5 px-4 py-8 md:py-12',
+        // With the tabs, Search lines up with Documents and Quality flags.
+        manager ? 'md:px-6 md:py-6' : 'mx-auto',
+      )}
+    >
+      <KnowledgeHeader
+        tab="search"
+        description={`Search ${organization}’s documents. An AI answer appears on top, with the passages it came from below.`}
+      />
 
       <div className="relative">
         <SearchIcon

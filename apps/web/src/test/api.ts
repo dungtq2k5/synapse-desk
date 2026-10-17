@@ -41,7 +41,7 @@ export function ok(data: unknown, status = 200): Reply {
   return { status, body: { success: true, message: 'OK', data } };
 }
 
-/** The gateway's error envelope. */
+/** The gateway's error envelope, its words in `error` as both gateways send them. */
 export function fail(
   status: number,
   message: string,
@@ -49,7 +49,13 @@ export function fail(
 ): Reply {
   return {
     status,
-    body: { success: false, statusCode: status, message },
+    body: {
+      success: false,
+      statusCode: status,
+      path: '/api/v1',
+      timestamp: '2026-10-17T00:00:00.000Z',
+      error: message,
+    },
     headers,
   };
 }

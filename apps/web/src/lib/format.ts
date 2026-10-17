@@ -91,11 +91,13 @@ export function clockTime(at: string | Date, timeZone?: string): string {
  *
  * @example fileSize(217_088) // '212 KB'
  * @example fileSize(1_258_291) // '1.2 MB'
+ * @example fileSize(5 * 1024 ** 3) // '5 GB'
  */
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 ** 3) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Number((bytes / 1024 ** 3).toFixed(1))} GB`;
 }
 
 /**
