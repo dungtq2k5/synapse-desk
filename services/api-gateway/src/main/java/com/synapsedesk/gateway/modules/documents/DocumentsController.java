@@ -536,7 +536,17 @@ public class DocumentsController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "402", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "A plan limit: the organization's document storage is full, or it " +
+        "holds its plan's document count. `error` is the sentence to show " +
+        "(\"Your document storage is full. …\" or \"You have reached the " +
+        "document limit on your plan. …\"). A file over the organization's " +
+        "size limit is a 400; the rate limit stays a 429."
+    )
+  )
   @RequirePermission(PermissionCodesEnum.DOCUMENT_CREATE)
   public ResponseEntity<
     ApiResponse<PresignDocumentResponseDto>

@@ -1021,11 +1021,20 @@
     "IngestionJobResponseDto.bullmqJobId": {
       "description": "Empty until the worker has queued it."
     },
+    "IngestionJobResponseDto.errorCode": {
+      "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, no\nreadable text, OCR unavailable, the AI provider failed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed."
+    },
+    "IngestionJobResponseDto.failedStage": {
+      "description": "The stage a `FAILED` attempt was in. `null` on one that hasn't failed."
+    },
     "IngestionJobResponseDto.processedAt": {
       "description": "`null` while the attempt is still running."
     },
     "IngestionJobResponseDto.status": {
       "description": "`null` only if the peer sent a member this build does not know."
+    },
+    "IngestionJobResponseDto.waitingReason": {
+      "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `null` is an ordinary queue."
     },
     "InvitationPreviewRowResponseDto.unknownRoleIds": {
       "description": "Reported even on an OK row: these are skipped at redemption, not fatal."

@@ -9,6 +9,9 @@ public record IngestionJobGqlDto(
   String bullmqJobId,
   IngestionJobStatusGql status,
   String errorLog,
+  IngestionErrorCodeGql errorCode,
+  IngestionStageGql failedStage,
+  IngestionWaitingReasonGql waitingReason,
   OffsetDateTime processedAt,
   OffsetDateTime createdAt
 ) {}

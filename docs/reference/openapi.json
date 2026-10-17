@@ -20966,6 +20966,44 @@
               }
             }
           },
+          "402": {
+            "description": "A plan limit: the organization's document storage is full, or it holds its plan's document count. `error` is the sentence to show (\"Your document storage is full. …\" or \"You have reached the document limit on your plan. …\"). A file over the organization's size limit is a 400; the rate limit stays a 429.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
           "403": {
             "description": "Authenticated, but lacking the permission this route requires.",
             "content": {
@@ -58965,6 +59003,28 @@
           "errorLog": {
             "type": ["string", "null"]
           },
+          "errorCode": {
+            "type": ["string", "null"],
+            "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, no\nreadable text, OCR unavailable, the AI provider failed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed.",
+            "enum": [
+              "NO_READABLE_TEXT",
+              "OCR_UNAVAILABLE",
+              "OTHER",
+              "PROVIDER_FAILURE",
+              "TOO_LONG",
+              null
+            ]
+          },
+          "failedStage": {
+            "type": ["string", "null"],
+            "description": "The stage a `FAILED` attempt was in. `null` on one that hasn't failed.",
+            "enum": ["CHUNKING", "EMBEDDING", "PARSING", null]
+          },
+          "waitingReason": {
+            "type": ["string", "null"],
+            "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `null` is an ordinary queue.",
+            "enum": ["AI_ALLOWANCE", null]
+          },
           "processedAt": {
             "type": ["string", "null"],
             "format": "date-time",
@@ -58979,10 +59039,13 @@
           "bullmqJobId",
           "createdAt",
           "documentId",
+          "errorCode",
           "errorLog",
+          "failedStage",
           "id",
           "processedAt",
-          "status"
+          "status",
+          "waitingReason"
         ]
       },
       "ReplaceDocumentDto": {

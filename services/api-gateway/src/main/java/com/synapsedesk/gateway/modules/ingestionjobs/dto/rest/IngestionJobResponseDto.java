@@ -71,6 +71,123 @@ public class IngestionJobResponseDto {
 
   private String errorLog = null;
 
+  /**
+   * Why a `FAILED` attempt failed, as a reader can act on it: too long, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
+   */
+  public enum ErrorCodeEnum {
+    NO_READABLE_TEXT("NO_READABLE_TEXT"),
+
+    OCR_UNAVAILABLE("OCR_UNAVAILABLE"),
+
+    OTHER("OTHER"),
+
+    PROVIDER_FAILURE("PROVIDER_FAILURE"),
+
+    TOO_LONG("TOO_LONG");
+
+    private final String value;
+
+    ErrorCodeEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static ErrorCodeEnum fromValue(String value) {
+      for (ErrorCodeEnum b : ErrorCodeEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private ErrorCodeEnum errorCode = null;
+
+  /**
+   * The stage a `FAILED` attempt was in. `null` on one that hasn't failed.
+   */
+  public enum FailedStageEnum {
+    CHUNKING("CHUNKING"),
+
+    EMBEDDING("EMBEDDING"),
+
+    PARSING("PARSING");
+
+    private final String value;
+
+    FailedStageEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static FailedStageEnum fromValue(String value) {
+      for (FailedStageEnum b : FailedStageEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private FailedStageEnum failedStage = null;
+
+  /**
+   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `null` is an ordinary queue.
+   */
+  public enum WaitingReasonEnum {
+    AI_ALLOWANCE("AI_ALLOWANCE");
+
+    private final String value;
+
+    WaitingReasonEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static WaitingReasonEnum fromValue(String value) {
+      for (WaitingReasonEnum b : WaitingReasonEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private WaitingReasonEnum waitingReason = null;
+
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime processedAt = null;
 
@@ -90,6 +207,9 @@ public class IngestionJobResponseDto {
     String bullmqJobId,
     StatusEnum status,
     String errorLog,
+    ErrorCodeEnum errorCode,
+    FailedStageEnum failedStage,
+    WaitingReasonEnum waitingReason,
     OffsetDateTime processedAt,
     OffsetDateTime createdAt
   ) {
@@ -98,6 +218,9 @@ public class IngestionJobResponseDto {
     this.bullmqJobId = bullmqJobId;
     this.status = status;
     this.errorLog = errorLog;
+    this.errorCode = errorCode;
+    this.failedStage = failedStage;
+    this.waitingReason = waitingReason;
     this.processedAt = processedAt;
     this.createdAt = createdAt;
   }
@@ -202,6 +325,68 @@ public class IngestionJobResponseDto {
     this.errorLog = errorLog;
   }
 
+  public IngestionJobResponseDto errorCode(ErrorCodeEnum errorCode) {
+    this.errorCode = errorCode;
+    return this;
+  }
+
+  /**
+   * Why a `FAILED` attempt failed, as a reader can act on it: too long, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
+   * @return errorCode
+   */
+
+  @JsonProperty("errorCode")
+  public ErrorCodeEnum getErrorCode() {
+    return errorCode;
+  }
+
+  @JsonProperty("errorCode")
+  public void setErrorCode(ErrorCodeEnum errorCode) {
+    this.errorCode = errorCode;
+  }
+
+  public IngestionJobResponseDto failedStage(FailedStageEnum failedStage) {
+    this.failedStage = failedStage;
+    return this;
+  }
+
+  /**
+   * The stage a `FAILED` attempt was in. `null` on one that hasn't failed.
+   * @return failedStage
+   */
+
+  @JsonProperty("failedStage")
+  public FailedStageEnum getFailedStage() {
+    return failedStage;
+  }
+
+  @JsonProperty("failedStage")
+  public void setFailedStage(FailedStageEnum failedStage) {
+    this.failedStage = failedStage;
+  }
+
+  public IngestionJobResponseDto waitingReason(
+    WaitingReasonEnum waitingReason
+  ) {
+    this.waitingReason = waitingReason;
+    return this;
+  }
+
+  /**
+   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `null` is an ordinary queue.
+   * @return waitingReason
+   */
+
+  @JsonProperty("waitingReason")
+  public WaitingReasonEnum getWaitingReason() {
+    return waitingReason;
+  }
+
+  @JsonProperty("waitingReason")
+  public void setWaitingReason(WaitingReasonEnum waitingReason) {
+    this.waitingReason = waitingReason;
+  }
+
   public IngestionJobResponseDto processedAt(OffsetDateTime processedAt) {
     this.processedAt = processedAt;
     return this;
@@ -259,6 +444,12 @@ public class IngestionJobResponseDto {
       Objects.equals(this.bullmqJobId, ingestionJobResponseDto.bullmqJobId) &&
       Objects.equals(this.status, ingestionJobResponseDto.status) &&
       Objects.equals(this.errorLog, ingestionJobResponseDto.errorLog) &&
+      Objects.equals(this.errorCode, ingestionJobResponseDto.errorCode) &&
+      Objects.equals(this.failedStage, ingestionJobResponseDto.failedStage) &&
+      Objects.equals(
+        this.waitingReason,
+        ingestionJobResponseDto.waitingReason
+      ) &&
       Objects.equals(this.processedAt, ingestionJobResponseDto.processedAt) &&
       Objects.equals(this.createdAt, ingestionJobResponseDto.createdAt)
     );
@@ -272,6 +463,9 @@ public class IngestionJobResponseDto {
       bullmqJobId,
       status,
       errorLog,
+      errorCode,
+      failedStage,
+      waitingReason,
       processedAt,
       createdAt
     );
@@ -290,6 +484,15 @@ public class IngestionJobResponseDto {
       .append("\n");
     sb.append("    status: ").append(toIndentedString(status)).append("\n");
     sb.append("    errorLog: ").append(toIndentedString(errorLog)).append("\n");
+    sb.append("    errorCode: ")
+      .append(toIndentedString(errorCode))
+      .append("\n");
+    sb.append("    failedStage: ")
+      .append(toIndentedString(failedStage))
+      .append("\n");
+    sb.append("    waitingReason: ")
+      .append(toIndentedString(waitingReason))
+      .append("\n");
     sb.append("    processedAt: ")
       .append(toIndentedString(processedAt))
       .append("\n");
