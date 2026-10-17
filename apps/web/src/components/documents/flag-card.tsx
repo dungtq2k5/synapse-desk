@@ -96,8 +96,7 @@ export function FlagCard({
   const detail = [
     flag.detail,
     flag.confidenceScore !== null
-      ? // ponytail: nothing writes the score yet; a fraction up to 1, a percent above.
-        `Confidence in this finding: ${Math.round(flag.confidenceScore <= 1 ? flag.confidenceScore * 100 : flag.confidenceScore)}%`
+      ? `Confidence in this finding: ${Math.round(flag.confidenceScore * 100)}%`
       : null,
   ]
     .filter(Boolean)
