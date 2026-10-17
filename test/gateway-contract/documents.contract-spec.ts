@@ -587,6 +587,40 @@ describe('documents', () => {
   );
 
   rowFor('Documents')(
+    'a document’s chunks refuse a document list filter, like any undeclared query field',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/chunks?status=INDEXED`,
+        cookie(['document.read']),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        error: 'property status should not exist!',
+      });
+      expect(
+        peers.ingestion.calls('DocumentService/ListDocumentChunks'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Documents')(
+    'two undeclared query fields are named in the order they were sent',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/chunks?status=INDEXED&page=1&fileType=pdf`,
+        cookie(['document.read']),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        error:
+          'property status should not exist, property fileType should not exist!',
+      });
+    },
+  );
+
+  rowFor('Documents')(
     'a wire OCR code this build does not recognise is dropped, not surfaced as a crash',
     async () => {
       peers.ingestion

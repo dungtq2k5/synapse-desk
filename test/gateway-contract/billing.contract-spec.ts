@@ -174,6 +174,21 @@ describe('billing', () => {
   });
 
   rowFor('Billing')(
+    '`listInvoices` binds `limit` alone, so another query name is ignored',
+    async () => {
+      peers.auth.on('BillingService/ListInvoices').reply({ items: [] });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/invoices?limit=5&starting_after=in_1`,
+        headers(['organization.update']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(peers.auth.calls('BillingService/ListInvoices')).toHaveLength(1);
+    },
+  );
+
+  rowFor('Billing')(
     '**`listPlans` returns the tenant-visible catalogue with prices**',
     async () => {
       peers.auth.on('BillingService/ListTenantPlans').reply({
