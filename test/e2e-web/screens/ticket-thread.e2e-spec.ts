@@ -230,8 +230,14 @@ test.describe('the composer', () => {
       data.items.add(new File(['x'], 'quote.pdf', { type: 'application/pdf' }));
       return data;
     });
-    await composer.dispatchEvent('dragover', { dataTransfer });
-    await expect(page.getByText('Drop files to attach')).toBeVisible();
+    // A drag before hydration reaches no handler and is gone: drag again
+    // until the composer answers.
+    await expect(async () => {
+      await composer.dispatchEvent('dragover', { dataTransfer });
+      await expect(page.getByText('Drop files to attach')).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
     await look(page, 'composer-drop');
   });
 });
