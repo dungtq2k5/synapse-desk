@@ -23670,6 +23670,44 @@
               }
             }
           },
+          "402": {
+            "description": "A plan limit: the organization's document storage is full, or it holds its plan's document count. `error` is the sentence to show (\"Your document storage is full. …\" or \"You have reached the document limit on your plan. …\"). A file over the organization's size limit is a 400; the rate limit stays a 429.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "403": {
             "description": "Authenticated, but lacking the permission this route requires.",
             "content": {
@@ -63551,6 +63589,30 @@
             "type": "string",
             "nullable": true
           },
+          "errorCode": {
+            "nullable": true,
+            "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, no\nreadable text, OCR unavailable, the AI provider failed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed.",
+            "enum": [
+              "NO_READABLE_TEXT",
+              "OCR_UNAVAILABLE",
+              "OTHER",
+              "PROVIDER_FAILURE",
+              "TOO_LONG"
+            ],
+            "type": "string"
+          },
+          "failedStage": {
+            "nullable": true,
+            "description": "The stage a `FAILED` attempt was in. `null` on one that hasn't failed.",
+            "enum": ["CHUNKING", "EMBEDDING", "PARSING"],
+            "type": "string"
+          },
+          "waitingReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `null` is an ordinary queue.",
+            "enum": ["AI_ALLOWANCE"]
+          },
           "processedAt": {
             "format": "date-time",
             "type": "string",
@@ -63568,6 +63630,9 @@
           "bullmqJobId",
           "status",
           "errorLog",
+          "errorCode",
+          "failedStage",
+          "waitingReason",
           "processedAt",
           "createdAt"
         ]

@@ -130,6 +130,17 @@ enum Gender {
   UNSPECIFIED
 }
 
+"""
+Why a FAILED ingestion attempt failed, as a reader can act on it. `errorLog` stays the detail.
+"""
+enum IngestionErrorCode {
+  NO_READABLE_TEXT
+  OCR_UNAVAILABLE
+  OTHER
+  PROVIDER_FAILURE
+  TOO_LONG
+}
+
 type IngestionJob {
   bullmqJobId: String!
   createdAt: DateTime!
@@ -139,10 +150,13 @@ type IngestionJob {
   """
   document: Document
   documentId: ID!
+  errorCode: IngestionErrorCode
   errorLog: String
+  failedStage: IngestionStage
   id: ID!
   processedAt: DateTime
   status: IngestionJobStatus
+  waitingReason: IngestionWaitingReason
 }
 
 type IngestionJobPage {
@@ -161,6 +175,18 @@ enum IngestionJobStatus {
   FAILED
   PARSING
   QUEUED
+}
+
+"""The pipeline stage a FAILED ingestion attempt was in."""
+enum IngestionStage {
+  CHUNKING
+  EMBEDDING
+  PARSING
+}
+
+"""Why a QUEUED ingestion attempt waits. Null is an ordinary queue."""
+enum IngestionWaitingReason {
+  AI_ALLOWANCE
 }
 
 type KnowledgeGapFlag {

@@ -18,7 +18,10 @@ import { registerEnumType } from '@nestjs/graphql';
 import {
   DocumentStatus,
   Gender,
+  IngestionErrorCode,
   IngestionJobStatus,
+  IngestionStage,
+  IngestionWaitingReason,
   TicketPriority,
   TicketSource,
   TicketStatus,
@@ -46,6 +49,24 @@ registerEnumType(TicketSource, {
 registerEnumType(DocumentStatus, {
   name: 'DocumentStatus',
   description: 'Where a document sits in the ingestion pipeline.',
+});
+
+registerEnumType(IngestionErrorCode, {
+  name: 'IngestionErrorCode',
+  description:
+    'Why a FAILED ingestion attempt failed, as a reader can act on it. ' +
+    '`errorLog` stays the detail.',
+});
+
+registerEnumType(IngestionStage, {
+  name: 'IngestionStage',
+  description: 'The pipeline stage a FAILED ingestion attempt was in.',
+});
+
+registerEnumType(IngestionWaitingReason, {
+  name: 'IngestionWaitingReason',
+  description:
+    'Why a QUEUED ingestion attempt waits. Null is an ordinary queue.',
 });
 
 registerEnumType(IngestionJobStatus, {

@@ -12,6 +12,7 @@
  * the peer received three different resolutions.
  */
 
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -165,6 +166,38 @@ describe('documents', () => {
       expect(response.body).toMatchObject({
         data: { objectPath: 'pending/documents/abc123' },
       });
+    },
+  );
+
+  /**
+   * The plan limits (storage full, the document count) are 402, carrying
+   * ingestion-service's sentence; the marker never reaches the client.
+   */
+  rowFor('Documents')(
+    "**presign at a plan limit answers 402 with the server's sentence**",
+    async () => {
+      const sentence =
+        'Your document storage is full. New uploads will be refused until space is freed or your plan is changed.';
+      peers.ingestion
+        .on('DocumentService/PresignDocument')
+        .fail(GrpcStatus.RESOURCE_EXHAUSTED, `[http:402] ${sentence}`);
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/presign`,
+        {
+          contentType: 'application/pdf',
+          sizeBytes: 1024,
+          fileName: 'refund.pdf',
+        },
+        cookie(['document.create']),
+      );
+
+      expect(response.status).toBe(402);
+      // Every error ends in one `!` (`formatErrorMsg`); the words are the
+      // server's.
+      expect((response.body as { error: string }).error).toBe(
+        `${sentence.slice(0, -1)}!`,
+      );
     },
   );
 

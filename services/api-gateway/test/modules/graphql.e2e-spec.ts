@@ -1211,6 +1211,9 @@ describe('The GraphQL surface (e2e)', () => {
       // `''`, not `undefined`: `error_log` is a plain proto3 string, so the
       // zero value is the empty one and the field is never absent on the wire.
       errorLog: '',
+      errorCode: 0,
+      failedStage: 0,
+      waitingReason: 0,
       processedAt: timestamp(),
       createdAt: timestamp(),
     });

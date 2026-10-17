@@ -30,6 +30,27 @@ class IngestionJobStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     INGESTION_JOB_STATUS_FAILED: _ClassVar[IngestionJobStatus]
     INGESTION_JOB_STATUS_CANCELLED: _ClassVar[IngestionJobStatus]
 
+class IngestionErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    INGESTION_ERROR_CODE_UNSPECIFIED: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_TOO_LONG: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_NO_READABLE_TEXT: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_OCR_UNAVAILABLE: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_PROVIDER_FAILURE: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_OTHER: _ClassVar[IngestionErrorCode]
+
+class IngestionStage(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    INGESTION_STAGE_UNSPECIFIED: _ClassVar[IngestionStage]
+    INGESTION_STAGE_PARSING: _ClassVar[IngestionStage]
+    INGESTION_STAGE_CHUNKING: _ClassVar[IngestionStage]
+    INGESTION_STAGE_EMBEDDING: _ClassVar[IngestionStage]
+
+class IngestionWaitingReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    INGESTION_WAITING_REASON_UNSPECIFIED: _ClassVar[IngestionWaitingReason]
+    INGESTION_WAITING_REASON_AI_ALLOWANCE: _ClassVar[IngestionWaitingReason]
+
 class DocumentFileType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     DOCUMENT_FILE_TYPE_UNSPECIFIED: _ClassVar[DocumentFileType]
@@ -76,6 +97,18 @@ INGESTION_JOB_STATUS_EMBEDDING: IngestionJobStatus
 INGESTION_JOB_STATUS_COMPLETED: IngestionJobStatus
 INGESTION_JOB_STATUS_FAILED: IngestionJobStatus
 INGESTION_JOB_STATUS_CANCELLED: IngestionJobStatus
+INGESTION_ERROR_CODE_UNSPECIFIED: IngestionErrorCode
+INGESTION_ERROR_CODE_TOO_LONG: IngestionErrorCode
+INGESTION_ERROR_CODE_NO_READABLE_TEXT: IngestionErrorCode
+INGESTION_ERROR_CODE_OCR_UNAVAILABLE: IngestionErrorCode
+INGESTION_ERROR_CODE_PROVIDER_FAILURE: IngestionErrorCode
+INGESTION_ERROR_CODE_OTHER: IngestionErrorCode
+INGESTION_STAGE_UNSPECIFIED: IngestionStage
+INGESTION_STAGE_PARSING: IngestionStage
+INGESTION_STAGE_CHUNKING: IngestionStage
+INGESTION_STAGE_EMBEDDING: IngestionStage
+INGESTION_WAITING_REASON_UNSPECIFIED: IngestionWaitingReason
+INGESTION_WAITING_REASON_AI_ALLOWANCE: IngestionWaitingReason
 DOCUMENT_FILE_TYPE_UNSPECIFIED: DocumentFileType
 DOCUMENT_FILE_TYPE_PDF: DocumentFileType
 DOCUMENT_FILE_TYPE_TXT: DocumentFileType
@@ -478,7 +511,7 @@ class ListDocumentChunksByIdsResponse(_message.Message):
     def __init__(self, items: _Optional[_Iterable[_Union[DocumentChunkSummary, _Mapping]]] = ...) -> None: ...
 
 class IngestionJobResponse(_message.Message):
-    __slots__ = ("id", "document_id", "bullmq_job_id", "status", "error_log", "processed_at", "created_at")
+    __slots__ = ("id", "document_id", "bullmq_job_id", "status", "error_log", "processed_at", "created_at", "error_code", "failed_stage", "waiting_reason")
     ID_FIELD_NUMBER: _ClassVar[int]
     DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
     BULLMQ_JOB_ID_FIELD_NUMBER: _ClassVar[int]
@@ -486,6 +519,9 @@ class IngestionJobResponse(_message.Message):
     ERROR_LOG_FIELD_NUMBER: _ClassVar[int]
     PROCESSED_AT_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    FAILED_STAGE_FIELD_NUMBER: _ClassVar[int]
+    WAITING_REASON_FIELD_NUMBER: _ClassVar[int]
     id: str
     document_id: str
     bullmq_job_id: str
@@ -493,7 +529,10 @@ class IngestionJobResponse(_message.Message):
     error_log: str
     processed_at: _timestamp_pb2.Timestamp
     created_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., document_id: _Optional[str] = ..., bullmq_job_id: _Optional[str] = ..., status: _Optional[_Union[IngestionJobStatus, str]] = ..., error_log: _Optional[str] = ..., processed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    error_code: IngestionErrorCode
+    failed_stage: IngestionStage
+    waiting_reason: IngestionWaitingReason
+    def __init__(self, id: _Optional[str] = ..., document_id: _Optional[str] = ..., bullmq_job_id: _Optional[str] = ..., status: _Optional[_Union[IngestionJobStatus, str]] = ..., error_log: _Optional[str] = ..., processed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., error_code: _Optional[_Union[IngestionErrorCode, str]] = ..., failed_stage: _Optional[_Union[IngestionStage, str]] = ..., waiting_reason: _Optional[_Union[IngestionWaitingReason, str]] = ...) -> None: ...
 
 class ListIngestionJobsRequest(_message.Message):
     __slots__ = ("page", "status", "document_id")

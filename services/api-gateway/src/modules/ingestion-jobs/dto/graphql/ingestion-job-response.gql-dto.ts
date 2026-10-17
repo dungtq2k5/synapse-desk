@@ -1,5 +1,10 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
-import { IngestionJobStatus } from '@synapsedesk/contracts';
+import {
+  IngestionErrorCode,
+  IngestionJobStatus,
+  IngestionStage,
+  IngestionWaitingReason,
+} from '@synapsedesk/contracts';
 import { PageMetaResponseGqlDto } from '../../../../common/dto/graphql/page-meta-response.gql-dto';
 import '../../../../common/graphql/enums';
 
@@ -46,6 +51,18 @@ export class IngestionJobResponseGqlDto {
 
   @Field(() => String, { nullable: true })
   errorLog!: string | null;
+
+  /** Why a FAILED attempt failed; null on one that hasn't failed. */
+  @Field(() => IngestionErrorCode, { nullable: true })
+  errorCode!: IngestionErrorCode | null;
+
+  /** The stage a FAILED attempt was in; null on one that hasn't failed. */
+  @Field(() => IngestionStage, { nullable: true })
+  failedStage!: IngestionStage | null;
+
+  /** Why a QUEUED attempt waits; null is an ordinary queue. */
+  @Field(() => IngestionWaitingReason, { nullable: true })
+  waitingReason!: IngestionWaitingReason | null;
 
   /** Null while the attempt is still running. */
   @Field(() => Date, { nullable: true })

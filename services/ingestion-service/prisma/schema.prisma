@@ -187,6 +187,17 @@ model IngestionJob {
 
   errorLog String? @map("error_log") @db.Text
 
+  /// IngestionErrorCode, on a FAILED job: why, as a reader can act on it.
+  /// `error_log` stays the detail.
+  errorCode String? @map("error_code") @db.VarChar(30)
+
+  /// IngestionStage, on a FAILED job: the stage it was in.
+  failedStage String? @map("failed_stage") @db.VarChar(20)
+
+  /// IngestionWaitingReason, on a QUEUED job put back for a reason (the AI
+  /// allowance ran out mid-job). Cleared when the job moves again.
+  waitingReason String? @map("waiting_reason") @db.VarChar(30)
+
   /// The retry that replaced this attempt, if one did.
   ///
   /// Claimed under `where: { supersededById: null }`, which is what makes two

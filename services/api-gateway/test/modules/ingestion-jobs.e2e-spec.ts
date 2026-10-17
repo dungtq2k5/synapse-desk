@@ -1,7 +1,12 @@
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { IngestionJobStatus as ProtoIngestionJobStatus } from '@synapsedesk/grpc-proto';
+import {
+  IngestionErrorCode as ProtoIngestionErrorCode,
+  IngestionJobStatus as ProtoIngestionJobStatus,
+  IngestionStage as ProtoIngestionStage,
+  IngestionWaitingReason as ProtoIngestionWaitingReason,
+} from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -22,6 +27,9 @@ describe('Ingestion jobs at the HTTP boundary (e2e)', () => {
     bullmqJobId: 'bull-1',
     status: ProtoIngestionJobStatus.INGESTION_JOB_STATUS_FAILED,
     errorLog: 'the parser gave up',
+    errorCode: 0,
+    failedStage: 0,
+    waitingReason: 0,
     processedAt: timestamp(),
     createdAt: timestamp(),
     ...overrides,
@@ -54,6 +62,43 @@ describe('Ingestion jobs at the HTTP boundary (e2e)', () => {
         errorLog: 'the parser gave up',
       });
       expect(res.body.data.meta).toBeDefined();
+    });
+
+    it('1b. serves why a job failed, where, and why one waits, by name', async () => {
+      fx.stubs.document.listIngestionJobs.mockReturnValue(
+        of(
+          wirePage([
+            wireJob({
+              errorCode:
+                ProtoIngestionErrorCode.INGESTION_ERROR_CODE_NO_READABLE_TEXT,
+              failedStage: ProtoIngestionStage.INGESTION_STAGE_PARSING,
+            }),
+            wireJob({
+              status: ProtoIngestionJobStatus.INGESTION_JOB_STATUS_QUEUED,
+              errorLog: '',
+              waitingReason:
+                ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_AI_ALLOWANCE,
+            }),
+          ]),
+        ),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/ingestion-jobs`);
+
+      expect(res.body.data.items).toEqual([
+        expect.objectContaining({
+          errorCode: 'NO_READABLE_TEXT',
+          failedStage: 'PARSING',
+          waitingReason: null,
+        }),
+        expect.objectContaining({
+          errorCode: null,
+          failedStage: null,
+          waitingReason: 'AI_ALLOWANCE',
+        }),
+      ]);
     });
 
     it('**2. a status filter is forwarded as the PROTO enum**', async () => {

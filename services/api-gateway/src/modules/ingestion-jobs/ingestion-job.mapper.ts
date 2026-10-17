@@ -2,7 +2,10 @@ import {
   IngestionJobResponse,
   ListIngestionJobsRequest,
   ListIngestionJobsResponse,
+  fromProtoIngestionErrorCode,
   fromProtoIngestionJobStatus,
+  fromProtoIngestionStage,
+  fromProtoIngestionWaitingReason,
   fromProtoTimestamp,
   requireProtoTimestamp,
   toPageRequest,
@@ -71,6 +74,10 @@ export function toIngestionJobResponseDto(
     // inventing a member here would report a status the peer never sent.
     status: fromProtoIngestionJobStatus(job.status),
     errorLog: toErrorLog(job.errorLog),
+    // UNSPECIFIED is "not set" on the wire; REST commits to null.
+    errorCode: fromProtoIngestionErrorCode(job.errorCode),
+    failedStage: fromProtoIngestionStage(job.failedStage),
+    waitingReason: fromProtoIngestionWaitingReason(job.waitingReason),
     processedAt: fromProtoTimestamp(job.processedAt) ?? null,
     createdAt: requireProtoTimestamp(job.createdAt, 'createdAt'),
   };

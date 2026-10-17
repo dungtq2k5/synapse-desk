@@ -285,6 +285,7 @@ export class IngestionJobsService {
         data: {
           status: IngestionJobStatus.CANCELLED,
           errorLog: 'Cancelled',
+          waitingReason: null,
           processedAt: new Date(),
         },
       });

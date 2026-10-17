@@ -55,7 +55,11 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
 } from '@synapsedesk/contracts';
-import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
+import {
+  exceedsLimit,
+  isUniqueConstraintViolation,
+  withHttpStatus,
+} from '@synapsedesk/core';
 import {
   formatErrorMsg,
   requireActor,
@@ -84,6 +88,14 @@ import {
 
 /** The partial unique index the seeder applies: one live hash per tenant. */
 const DOCUMENT_HASH_INDEX = 'documents_org_hash_key';
+
+/** Presign's 402 when the organization's document storage is full. */
+export const STORAGE_FULL_MESSAGE =
+  'Your document storage is full. New uploads will be refused until space is freed or your plan is changed.';
+
+/** Presign's 402 when the organization holds its plan's document count. */
+export const DOCUMENT_LIMIT_MESSAGE =
+  'You have reached the document limit on your plan. New uploads will be refused until documents are removed or your plan is changed.';
 
 /**
  * The knowledge base's document surface.
@@ -171,12 +183,13 @@ export class DocumentsService {
     }
 
     if (exceedsLimit(usedBytes + request.sizeBytes, limitBytes)) {
-      // RESOURCE_EXHAUSTED -> 429 at the gateway. Not PERMISSION_DENIED: the
-      // caller is allowed to upload documents, they have simply run out of
-      // room, and 403 would send an admin looking at role grants.
+      // A plan limit, so 402 like the AI allowance: the marker carries the
+      // status across the gRPC hop, and the gateway forwards the sentence.
+      // Not 429, which is the rate limit's ("try again soon" is wrong here),
+      // and not 403, which would send an admin looking at role grants.
       throw new RpcException({
         code: status.RESOURCE_EXHAUSTED,
-        message: `This workspace has used ${usedBytes} of ${limitBytes} bytes of document storage`,
+        message: withHttpStatus(402, STORAGE_FULL_MESSAGE),
       });
     }
 
@@ -190,9 +203,10 @@ export class DocumentsService {
     // tenant is already at the limit — at exactly the limit the next one is the
     // one to refuse.
     if (exceedsLimit(documentCount + 1, countLimit)) {
+      // 402, for the storage refusal's reasons above.
       throw new RpcException({
         code: status.RESOURCE_EXHAUSTED,
-        message: `This workspace holds ${documentCount} of ${countLimit} documents`,
+        message: withHttpStatus(402, DOCUMENT_LIMIT_MESSAGE),
       });
     }
 

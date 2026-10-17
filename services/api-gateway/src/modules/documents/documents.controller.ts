@@ -250,7 +250,16 @@ export class DocumentsController {
       '{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }',
   })
   @ApiWrappedResponse(PresignDocumentResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
+  @ApiFilterErrors(['400', '401', '402', '403'], {
+    descriptions: {
+      '402':
+        "A plan limit: the organization's document storage is full, or it " +
+        "holds its plan's document count. `error` is the sentence to show " +
+        '("Your document storage is full. …" or "You have reached the ' +
+        'document limit on your plan. …"). A file over the organization\'s ' +
+        'size limit is a 400; the rate limit stays a 429.',
+    },
+  })
   @Post('presign')
   @RequirePermission('document.create')
   @HttpCode(HttpStatus.OK)
