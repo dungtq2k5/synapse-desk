@@ -220,7 +220,7 @@ The answer's shape is [`ai-output-contract.md`](../ai-output-contract.md).
 | **Layer A hit** | refusal, written back — see `sys-flows.md` §5 | The refusal is part of the record |
 | **Layer 2 fails** | degrades to `FACTUAL` | Run-open: never silently to `GREETING` or `REFUSED` |
 | **Semantic arm returns thin** | retried once with `HNSW_EF_RELAXED` | An index-tuning artefact, **not** "nothing relevant" |
-| **Qdrant or the embedder errors** | the whole call fails | There is no try/except here — the at-cap path is the only degraded path |
+| **Qdrant or the embedder errors** | the lexical arm serves alone (`_semantic_or_none`); `Search` reports `LEXICAL_ONLY` | The keyword arm needs no provider, so an outage still returns results. A logged warning is the only trace on `Chat`, `Ask` and `Draft` |
 | **Pool ≤ `final_context_k`** | rerank skipped silently | Reordering five to keep five changes nothing |
 | **Reranker cannot load** | warns **per request**, falls back to fused order | `_load` assigns only on success, so a failed load is retried and re-paid every request |
 | **Retrieval genuinely empty** | `DOC_MISSING_WITH_HANDOFF` or `..._NO_HANDOFF`, on `can_escalate` | Whether a human is offered is part of the answer |
