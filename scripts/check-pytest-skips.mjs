@@ -47,6 +47,21 @@ const EXPECTED = [
     legitimateWhen: () => false,
     absent: 'poppler-utils (the python job installs it — this is a regression)',
   },
+  {
+    // Before the busy entry: both refusals are 429s, and only this one lasts
+    // the day, so the acceptance test did not run and the run says so.
+    match: /daily quota is used up/i,
+    legitimateWhen: () => false,
+    problem:
+      "the Gemini key's daily quota is used up — the acceptance test did not run (retry after the quota resets)",
+  },
+  {
+    // A 503 or a per-minute limit that outlasted three tries: an outage at
+    // Google, not a broken feature.
+    match: /provider stayed busy/i,
+    legitimateWhen: () => true,
+    absent: 'a responsive model provider',
+  },
 ];
 
 const [reportPath] = process.argv.slice(2);
@@ -69,7 +84,7 @@ try {
 const cases = [...xml.matchAll(/<testcase\b[^>]*>/g)].length;
 const skipped = [
   ...xml.matchAll(
-    /<testcase\b[^>]*?name="([^"]*)"[^>]*>\s*<skipped[^>]*message="([^"]*)"/g,
+    /<testcase\b[^>]*?\sname="([^"]*)"[^>]*>\s*<skipped[^>]*message="([^"]*)"/g,
   ),
 ].map(([, name, message]) => ({ name, message }));
 
@@ -119,13 +134,13 @@ for (const { name, message } of skipped) {
   const expected = EXPECTED.find((entry) => entry.match.test(message));
 
   if (!expected) {
-    problems.push(`${name}: unrecognised skip — "${message}"`);
+    problems.push(`${name}: unrecognized skip — "${message}"`);
     continue;
   }
 
   if (!expected.legitimateWhen()) {
     problems.push(
-      `${name}: skipped although its precondition is available — ${expected.absent}`,
+      `${name}: ${expected.problem ?? `skipped although its precondition is available — ${expected.absent}`}`,
     );
     continue;
   }
