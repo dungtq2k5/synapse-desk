@@ -153,6 +153,25 @@ describe('browserFetch', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it("the gateway's own words, from its envelope's `error`", async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(402, {
+        success: false,
+        statusCode: 402,
+        path: '/api/v1/documents/presign',
+        timestamp: '2026-10-17T00:00:00.000Z',
+        error: 'Your document storage is full!',
+      }),
+    );
+
+    await expect(
+      browserFetch('/api/v1/documents/presign', { method: 'POST' }),
+    ).rejects.toMatchObject({
+      status: 402,
+      message: 'Your document storage is full!',
+    });
+  });
+
   it('any other error keeps the gateway envelope, unrewritten', async () => {
     const envelope = {
       success: false,

@@ -19,6 +19,16 @@ export class ApiError extends Error {
   }
 
   private static messageOf(status: number, body: unknown): string {
+    // Both gateways put the words in `error` (`{ success, statusCode, path,
+    // timestamp, error }`); `message` is what a non-gateway body may carry.
+    if (
+      body &&
+      typeof body === 'object' &&
+      'error' in body &&
+      typeof body.error === 'string'
+    ) {
+      return body.error;
+    }
     if (body && typeof body === 'object' && 'message' in body) {
       const message = body.message;
       if (typeof message === 'string') return message;
