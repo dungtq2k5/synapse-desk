@@ -7,7 +7,11 @@ import { SEED_EDGES, STEPS } from './registry';
 import { PROFILES, bytesFor, countFor, type Profile } from './profiles';
 import { planTenant } from './steps/auth.step';
 import { ticketCountFor } from './steps/ticket.step';
-import { documentPlanFor } from './steps/ingestion.step';
+import {
+  DOCUMENT_FIXTURES,
+  documentPlanFor,
+  fixtureFor,
+} from './steps/ingestion.step';
 import type { ManifestTenant } from './manifest';
 import { REPO_ROOT as REPO } from './paths';
 
@@ -339,4 +343,33 @@ describe('the demo seeder', () => {
     expect(tenants.some((t) => t.deleted)).toBe(true);
     expect(tenants.some((t) => t.entitlementsPinned)).toBe(true);
   });
+});
+
+describe('the files behind the demo documents', () => {
+  it('turn through the PDF, the Word file and the Markdown, numbered from their second round', () => {
+    expect(
+      [0, 1, 2, 3, 4].map((index) => [
+        fixtureFor(index).title,
+        fixtureFor(index).fileType,
+      ]),
+    ).toEqual([
+      ['Remote Work Policy.pdf', 'pdf'],
+      ['New Starter Guide.docx', 'docx'],
+      ['Expenses FAQ.md', 'md'],
+      ['Remote Work Policy 2.pdf', 'pdf'],
+      ['New Starter Guide 2.docx', 'docx'],
+    ]);
+  });
+
+  it.each(DOCUMENT_FIXTURES.map((fixture) => [fixture.file]))(
+    '%s is committed and is what its type says',
+    (file) => {
+      const bytes = readFileSync(join(__dirname, 'fixtures', file));
+      const head = bytes.subarray(0, 4).toString('latin1');
+
+      expect(bytes.length).toBeGreaterThan(100);
+      if (file.endsWith('.pdf')) expect(head).toBe('%PDF');
+      if (file.endsWith('.docx')) expect(head).toBe('PK\u0003\u0004');
+    },
+  );
 });
