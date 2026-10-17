@@ -257,7 +257,7 @@ npm run check            # lint, lint:py, format:check, typecheck, typecheck:py
 
 Tests print their results, not the services' logs. When a failure needs the logs, `TEST_LOGS=1 npm test` brings the Nest logs back, and `TEST_LOG_LEVEL=INFO` does the same for the gateway's Maven tests.
 
-CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit, Python, gateway and contract jobs write. Java's coverage counts both `mvnw verify` and the contract suite: each contract shard runs its gateways under the JaCoCo agent (`CONTRACT_JACOCO_AGENT` names the jar; without it the harness launches the gateway plainly), and `scripts/report-contract-coverage.sh` fails if any launch wrote no coverage, then writes the shard's report. It runs on pushes to `main-java` only, SonarCloud's main branch: the organization's plan analyses no other branch, so pull requests are skipped too; `sonar-project.properties` says what is analysed and what counts toward coverage.
+CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit, Python, Node e2e, gateway and contract jobs write. The `e2e` job sets `E2E_COVERAGE_DIR` and uploads each suite's lcov, failing if none was written. Java's coverage counts both `mvnw verify` and the contract suite: each contract shard runs its gateways under the JaCoCo agent (`CONTRACT_JACOCO_AGENT` names the jar; without it the harness launches the gateway plainly), and `scripts/report-contract-coverage.sh` fails if any launch wrote no coverage, then writes the shard's report. It runs on pushes to `main-java` only, SonarCloud's main branch: the organization's plan analyses no other branch, so pull requests are skipped too; `sonar-project.properties` says what is analysed and what counts toward coverage.
 
 End-to-end suites need the stack up and their own databases. `prisma db push` creates a missing database on connect, so this is the whole preparation:
 
@@ -265,6 +265,8 @@ End-to-end suites need the stack up and their own databases. `prisma db push` cr
 npm run db:test:push
 npm run test:e2e         # six suites, sequential
 ```
+
+With `E2E_COVERAGE_DIR` set, each Node e2e suite also writes `<dir>/<service>/lcov.info`, with paths relative to the repository.
 
 `npm run test:e2e:web` drives the web client in Chromium across the whole system (`test/e2e-web/`, Playwright): sign-in through every leg, the expired-session fallback, a live reply between two browsers, and sign-out. That's the `chromium` project. The `screens` project drives **every state of every screen** and checks each one three ways:
 
@@ -275,6 +277,8 @@ npm run test:e2e         # six suites, sequential
 The baselines are drawn by the browser inside the pinned Playwright image, so fonts render the same on every machine. They protect an approved look from accidental change; they aren't compared with Figma. When a change is meant to move a screen, `npm run test:e2e:web:update-screens` redraws the baselines that changed, and the new PNGs are reviewed in the diff like code. Before a screen's first baseline is approved, compare it with its Figma frame.
 
 The suite reuses `test:system`'s setup, so it is destructive in the same way. CI runs it in the `e2e-web` job, whose plans seed reads Stripe with the repository secret `STRIPE_RESTRICT_KEY`: a test-mode restricted key (`rk_test_…`) with Read on Products and Prices, and nothing else. The job refuses any other kind of key. Install the browser once with `npx playwright install chromium`.
+
+The suite starts rag-service in its model-free mode (`RAG_OFFLINE_MODEL=true`, refused under `APP_ENV=production`), on every machine and in CI, so it needs no `GEMINI_API_KEY` and the AI journeys assert fixed text: embeddings are a fixed function of the words, and an answer reads "This answer comes from the offline model, citing [1]." for each source it found. Document ingestion still embeds through ingestion-service's own Gemini client, which this mode doesn't cover. The real model stays covered by rag-service's live tests in the Python job.
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares.
 
