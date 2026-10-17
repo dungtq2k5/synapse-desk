@@ -128,6 +128,22 @@ describe('audit-logs', () => {
     },
   );
 
+  rowFor('Audit Logs')(
+    '**`list` refuses `searchTerm`**, a filter it does not take, rather than answering unfiltered',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/audit-logs?searchTerm=x`,
+        headers(['audit.read']),
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        error: 'property searchTerm should not exist!',
+      });
+      expect(peers.ticket.calls('AuditService/ListAuditLogs')).toHaveLength(0);
+    },
+  );
+
   rowFor('Audit Logs')('**`listActions` requires `audit.read`**', async () => {
     peers.ticket
       .on('AuditService/ListAuditActions')
