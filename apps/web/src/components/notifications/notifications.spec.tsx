@@ -184,6 +184,12 @@ describe('the bell', () => {
       await screen.findByRole('button', { name: /^Notifications/ }),
     );
 
+    // Opening lands on the panel's heading, before the list.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Notifications', level: 2 }),
+      ).toHaveFocus(),
+    );
     const item = await screen.findByRole('link', {
       name: /^Unread\., Jordan Lee assigned #1051 to you, .*High priority$/,
     });

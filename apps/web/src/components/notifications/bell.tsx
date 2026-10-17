@@ -22,6 +22,17 @@ import { useNotificationActions, useUnreadCount } from './store';
 const LATEST = 10;
 
 /**
+ * Radix's open focus, aimed at the panel's heading rather than the first
+ * control, so a reader starts above the tabs and the list.
+ */
+function focusHeading(event: Event) {
+  event.preventDefault();
+  (event.currentTarget as HTMLElement)
+    .querySelector<HTMLElement>('[data-panel-heading]')
+    ?.focus();
+}
+
+/**
  * The bell: the server's unread count on a badge ("99+" past 99, none at 0),
  * opening the latest notifications in a popover, or a full-height sheet on a
  * phone.
@@ -63,6 +74,7 @@ export function NotificationBell() {
           <SheetContent
             side="right"
             aria-describedby={undefined}
+            onOpenAutoFocus={focusHeading}
             className="w-full gap-0 p-0 sm:max-w-full"
           >
             <SheetTitle className="sr-only">Notifications</SheetTitle>
@@ -81,6 +93,7 @@ export function NotificationBell() {
           align="end"
           sideOffset={8}
           aria-label="Notifications"
+          onOpenAutoFocus={focusHeading}
           className="z-50 w-100 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md outline-none"
         >
           <Panel onClose={() => setOpen(false)} />
@@ -187,7 +200,11 @@ function Panel({
             sheet && 'pr-8',
           )}
         >
-          <h2 tabIndex={-1} autoFocus className="font-semibold outline-none">
+          <h2
+            tabIndex={-1}
+            data-panel-heading
+            className="font-semibold outline-none"
+          >
             Notifications
           </h2>
           {unreadIds.length > 0 && (
