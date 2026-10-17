@@ -15,6 +15,11 @@ Skipped rather than failed without an API key or without poppler, because a
 missing credential is not a broken feature; and, after three tries, when the
 provider refuses with a transient status (503, 429): the pipeline then keeps the
 raw message by design, and an outage at Google is not a broken feature either.
+
+**A used-up daily quota skips at once**, with its own reason: no retry within
+the run can outlast it. `scripts/check-pytest-skips.mjs` allows the busy skip
+and fails this one, because the acceptance test then did not run for a reason
+that holds all day.
 """
 
 from __future__ import annotations
@@ -55,6 +60,10 @@ pytestmark = [
 #: What the provider says when it is busy rather than when the call is wrong.
 TRANSIENT = ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")
 
+#: A per-day quota in the refusal's `QuotaFailure` (for example
+#: `GenerateRequestsPerDayPerProjectPerModel-FreeTier`): spent until tomorrow.
+DAILY_QUOTA = "PerDay"
+
 
 async def run_live(pipeline, caplog, **kwargs):
     """`pipeline.run`, tried again when the provider was transiently busy.
@@ -74,6 +83,8 @@ async def run_live(pipeline, caplog, **kwargs):
         ]
         if not refused:
             return result
+        if any(DAILY_QUOTA in message for message in refused):
+            pytest.skip(f"the Gemini key's daily quota is used up: {refused[0]}")
         await asyncio.sleep(5 * (attempt + 1))
     pytest.skip(f"the provider stayed busy for three tries: {refused[0]}")
 
