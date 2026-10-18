@@ -90,5 +90,6 @@ graphify-out/
 sonar-project.properties
 .mcp.json
 .sonar-config.json
+.playwright-mcp
 # Next.js build output: the image builds its own.
 **/.next
