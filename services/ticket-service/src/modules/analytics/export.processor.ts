@@ -295,9 +295,8 @@ export class ExportProcessor extends WorkerHost {
           csvCell(entry.ipAddress ?? ''),
           csvCell(entry.userAgent ?? ''),
           entry.createdAt.toISOString(),
-          // The nested column, flattened into one cell as JSON. This is the
-          // argument for offering `application/json` on THIS export and not on
-          // the ticket one.
+          // The nested column, as one cell holding its JSON: the export is CSV
+          // only, and a cell is how a nested value fits in a row.
           csvCell(
             entry.metadata === null ? '' : JSON.stringify(entry.metadata),
           ),

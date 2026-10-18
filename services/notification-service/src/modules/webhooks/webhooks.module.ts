@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WEBHOOK_QUEUE } from '@synapsedesk/nest-common';
+import { AuditPublisher, WEBHOOK_QUEUE } from '@synapsedesk/nest-common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { WebhookAdminService } from './webhook-admin.service';
 import { WebhookDeliveryProcessor } from './webhook-delivery.processor';
@@ -31,6 +31,8 @@ import { WebhookSenderService } from './webhook-sender.service';
     PrismaModule,
   ],
   providers: [
+    // The audit trail's publisher, as ingestion-service's flags use it.
+    AuditPublisher,
     WebhookSenderService,
     WebhookDispatchService,
     WebhookDeliveryProcessor,

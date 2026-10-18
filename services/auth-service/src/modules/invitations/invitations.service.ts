@@ -30,6 +30,8 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
+  AuditAction,
+  AuditResourceType,
   EmailTemplateName,
   INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
@@ -37,12 +39,25 @@ import {
   RequestOrigin,
   WEB_ROUTES,
 } from '@synapsedesk/contracts';
-import { isUniqueConstraintViolation, normalizeEmail } from '@synapsedesk/core';
-import { requireTenant, formatErrorMsg } from '@synapsedesk/nest-common';
+import {
+  isUniqueConstraintViolation,
+  normalizeEmail,
+  readHttpStatusHint,
+} from '@synapsedesk/core';
+import {
+  AuditPublisher,
+  formatErrorMsg,
+  requireTenant,
+} from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { RolesService } from '../roles/roles.service';
-import { OrganizationsService } from '../organizations/organizations.service';
+import {
+  NO_SEATS_MESSAGE,
+  NO_SEATS_TO_JOIN_MESSAGE,
+  noSeats,
+  OrganizationsService,
+} from '../organizations/organizations.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import {
   addDays,
@@ -87,6 +102,7 @@ export class InvitationsService {
     private readonly authService: AuthService,
     private readonly rolesService: RolesService,
     private readonly organizationsService: OrganizationsService,
+    private readonly audit: AuditPublisher,
   ) {
     this.INVITATION_TTL_DAYS = this.configService.getOrThrow<number>(
       'INVITATION_TTL_DAYS',
@@ -132,6 +148,16 @@ export class InvitationsService {
         code: status.NOT_FOUND,
         message: 'Organization not found',
       });
+    }
+
+    // Too few seats for the batch refuses it whole, nothing sent: the 402 the
+    // preview warned about. Counted as the preview counts (only the addresses
+    // that would be sent), so the two agree. A seat lost to a race during the
+    // send still fails that one address below.
+    if (
+      (await this.plan(organization.id, request.invitations)).seatOverrun > 0
+    ) {
+      throw noSeats(NO_SEATS_MESSAGE);
     }
 
     // One batch id for the whole paste, so the import can be reported on as a
@@ -216,8 +242,17 @@ export class InvitationsService {
     request: PreviewInvitationsRequest,
     context: CallerContext,
   ): Promise<PreviewInvitationsResponse> {
-    const organizationId = requireTenant(context);
+    return this.plan(requireTenant(context), request.invitations);
+  }
 
+  /**
+   * The preview's checks, shared with the send: a batch the preview reported
+   * as fitting the seats is one the send accepts.
+   */
+  private async plan(
+    organizationId: string,
+    invitations: PreviewInvitationsRequest['invitations'],
+  ): Promise<PreviewInvitationsResponse> {
     const organization = await this.prisma.organization.findFirst({
       where: { id: organizationId, deletedAt: null },
       select: { maxAgentSeats: true },
@@ -234,9 +269,7 @@ export class InvitationsService {
       organizationId,
     );
 
-    const emails = request.invitations.map((input) =>
-      normalizeEmail(input.email),
-    );
+    const emails = invitations.map((input) => normalizeEmail(input.email));
 
     // Three bulk reads rather than three per row: a 200-row paste would
     // otherwise be 600 queries.
@@ -282,7 +315,7 @@ export class InvitationsService {
     const seen = new Set<string>();
     let okCount = 0;
 
-    const rows = request.invitations.map((input, index) => {
+    const rows = invitations.map((input, index) => {
       const email = emails[index];
       const unknownRoleIds = input.roleIds.filter((id) => !liveRoleIds.has(id));
       const unknownDepartmentIds = input.departmentIds.filter(
@@ -383,6 +416,16 @@ export class InvitationsService {
       },
     });
 
+    this.audit.record(
+      auditActor(request.organizationId, request.actorId, origin),
+      {
+        action: AuditAction.INVITATION_RESENT,
+        resourceType: AuditResourceType.INVITATION,
+        resourceId: updated.id,
+        metadata: { email: updated.email },
+      },
+    );
+
     this.notifications.sendEmail({
       template: EmailTemplateName.INVITATION,
       to: updated.email,
@@ -401,6 +444,7 @@ export class InvitationsService {
 
   async revokeInvitation(
     request: InvitationIdRequest,
+    origin: RequestOrigin,
   ): Promise<RevokeInvitationResponse> {
     const invitation = await this.loadPending(
       request.invitationId,
@@ -415,6 +459,16 @@ export class InvitationsService {
         revokedAt: new Date(),
       },
     });
+
+    this.audit.record(
+      auditActor(request.organizationId, request.actorId, origin),
+      {
+        action: AuditAction.INVITATION_REVOKED,
+        resourceType: AuditResourceType.INVITATION,
+        resourceId: invitation.id,
+        metadata: { email: invitation.email },
+      },
+    );
 
     return {};
   }
@@ -510,10 +564,7 @@ export class InvitationsService {
             invitation.organizationId,
           )) >= invitation.organization.maxAgentSeats
         ) {
-          throw new RpcException({
-            code: status.RESOURCE_EXHAUSTED,
-            message: 'This workspace has no seats remaining',
-          });
+          throw noSeats(NO_SEATS_TO_JOIN_MESSAGE);
         }
 
         // They may have registered directly since the invite was sent.
@@ -695,10 +746,7 @@ export class InvitationsService {
           context.organizationId,
         )) >= context.maxAgentSeats
       ) {
-        throw new RpcException({
-          code: status.RESOURCE_EXHAUSTED,
-          message: 'No seats remaining on this plan',
-        });
+        throw noSeats(NO_SEATS_MESSAGE);
       }
 
       return tx.userInvitation.create({
@@ -737,6 +785,21 @@ export class InvitationsService {
           `Could not evaluate the seat alarm for ${context.organizationId}: ${formatErrorMsg(error)}`,
         ),
       );
+
+    this.audit.record(
+      auditActor(context.organizationId, context.invitedById, context.origin),
+      {
+        action: AuditAction.INVITATION_SENT,
+        resourceType: AuditResourceType.INVITATION,
+        resourceId: invitation.id,
+        // The address and what it grants. Never the token, raw or hashed.
+        metadata: {
+          email: invitation.email,
+          roleIds: invitation.roleIds,
+          departmentIds: invitation.departmentIds,
+        },
+      },
+    );
 
     const roleNames = await this.resolveRoleNames(invitation.roleIds);
 
@@ -826,7 +889,8 @@ export class InvitationsService {
     if (error instanceof RpcException) {
       const payload = error.getError();
       if (typeof payload === 'object' && payload && 'message' in payload) {
-        return String(payload.message);
+        // The batch reports a reason, not a status: drop a 402 marker.
+        return readHttpStatusHint(String(payload.message)).message;
       }
     }
     // Named so the batch report can say WHICH constraint rejected the address
@@ -843,4 +907,25 @@ export class InvitationsService {
     );
     return 'Could not create this invitation';
   }
+}
+
+/**
+ * The person acting, as the audit trail records them. These RPCs carry the
+ * tenant and the actor's id rather than a verified caller context, and the
+ * recorder reads only who, where and from what.
+ */
+function auditActor(
+  organizationId: string,
+  actorId: string,
+  origin: RequestOrigin,
+): CallerContext {
+  return {
+    ...origin,
+    sub: actorId,
+    organizationId,
+    isSuperAdmin: false,
+    departmentIds: [],
+    permissionCodes: [],
+    isEmailVerified: true,
+  };
 }

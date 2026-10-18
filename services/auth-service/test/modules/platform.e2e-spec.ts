@@ -1,5 +1,7 @@
 import { expectRpc } from '@synapsedesk/testing/rpc';
+import { DOMAIN_TAKEN_MESSAGE } from '../../src/modules/organizations/organizations.service';
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
 import {
   OrgStatus as ProtoOrgStatus,
   toProtoOrgStatus,
@@ -315,6 +317,27 @@ describe('Platform (e2e)', () => {
       );
 
       expect(result.organization!.maxAgentSeats).toBe(100);
+    });
+
+    it('a taken domain names the domain, as the tenant’s own update does', async () => {
+      const other = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.organization.update({
+        where: { id: other.org.id },
+        data: { domain: 'platform-taken.example.test' },
+      });
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const update = platform.updateOrganization(
+        { organizationId: t.org.id, domain: 'platform-taken.example.test' },
+        ctx,
+      );
+
+      await expectRpc(update, status.ALREADY_EXISTS);
+      await update.catch((error: unknown) =>
+        expect((error as RpcException).getError()).toMatchObject({
+          message: DOMAIN_TAKEN_MESSAGE,
+        }),
+      );
     });
 
     it('resetting the billing cycle moves the metering window forward', async () => {

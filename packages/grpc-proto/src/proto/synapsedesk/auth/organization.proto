@@ -124,6 +124,12 @@ message OrganizationSettingsResponse {
   optional int64 max_document_bytes_override = 4;
   optional int64 max_attachment_bytes_override = 5;
   optional int32 max_attachments_per_message_override = 6;
+
+  // The inbound-mail token, absent when inbound email is off. The gateway
+  // turns it into the support address (`support+{token}@{domain}`), which is
+  // published to customers rather than secret; the bare token never leaves
+  // the gateway.
+  optional string inbound_token = 7;
 }
 
 message GetOrganizationSettingsRequest {}

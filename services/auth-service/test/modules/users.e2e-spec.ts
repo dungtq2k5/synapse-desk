@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { BATCH_ID_LIMIT, SystemRoleName } from '@synapsedesk/contracts';
-import { compareAlphabetically } from '@synapsedesk/core';
+import { compareAlphabetically, withHttpStatus } from '@synapsedesk/core';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -24,6 +25,7 @@ import {
   TEST_PASSWORD,
 } from '../factories';
 import { UsersService } from '../../src/modules/users/users.service';
+import { NO_SEATS_MESSAGE } from '../../src/modules/organizations/organizations.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
 import { flattenPermissionCodes } from '../../src/common/utils';
@@ -299,6 +301,29 @@ describe('Users (e2e)', () => {
         users.restoreUser({ id: leaver.id }, superuser(t)),
         status.ALREADY_EXISTS,
       );
+    });
+
+    it('**17d. restoring at the seat limit is a 402 naming the plan, and they stay deleted**', async () => {
+      // The admin and one other hold both seats; the leaver would take a third.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 2 },
+      });
+      const leaver = await addMember(fx.prisma, t.org.id);
+      await users.deleteUser({ id: leaver.id }, superuser(t));
+      await addMember(fx.prisma, t.org.id);
+
+      const refused = users.restoreUser({ id: leaver.id }, superuser(t));
+
+      await expectRpc(refused, status.RESOURCE_EXHAUSTED);
+      expect(
+        (
+          (await refused.catch((error: unknown) => error)) as RpcException
+        ).getError(),
+      ).toMatchObject({ message: withHttpStatus(402, NO_SEATS_MESSAGE) });
+      expect(
+        (await fx.prisma.user.findUniqueOrThrow({ where: { id: leaver.id } }))
+          .deletedAt,
+      ).not.toBeNull();
     });
 
     it('17b. restoring when the address is free succeeds, with no sessions back', async () => {

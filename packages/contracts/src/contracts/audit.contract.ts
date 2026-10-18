@@ -115,6 +115,24 @@ export enum AuditAction {
    * changed nobody, and one row cannot say both.
    */
   PLATFORM_PLAN_APPLIED = 'PLATFORM_PLAN_APPLIED',
+
+  // Invitations: who was invited, re-sent or revoked. The address is recorded;
+  // the token never is.
+  INVITATION_SENT = 'INVITATION_SENT',
+  INVITATION_RESENT = 'INVITATION_RESENT',
+  INVITATION_REVOKED = 'INVITATION_REVOKED',
+
+  // Webhook endpoints. The URL and event types are recorded; the signing
+  // secret never is, not even on a rotation.
+  WEBHOOK_ENDPOINT_CREATED = 'WEBHOOK_ENDPOINT_CREATED',
+  WEBHOOK_ENDPOINT_UPDATED = 'WEBHOOK_ENDPOINT_UPDATED',
+  WEBHOOK_SECRET_ROTATED = 'WEBHOOK_SECRET_ROTATED',
+  WEBHOOK_ENDPOINT_DELETED = 'WEBHOOK_ENDPOINT_DELETED',
+
+  // The inbound support address: turned on, re-keyed, turned off.
+  INBOUND_ADDRESS_ENABLED = 'INBOUND_ADDRESS_ENABLED',
+  INBOUND_ADDRESS_ROTATED = 'INBOUND_ADDRESS_ROTATED',
+  INBOUND_ADDRESS_DISABLED = 'INBOUND_ADDRESS_DISABLED',
 }
 
 /**
@@ -141,6 +159,8 @@ export enum AuditResourceType {
   EXPORT = 'EXPORT',
   /** A row in the plan catalogue. Owned by no tenant, which is the point. */
   SUBSCRIPTION_PLAN = 'SUBSCRIPTION_PLAN',
+  INVITATION = 'INVITATION',
+  WEBHOOK_ENDPOINT = 'WEBHOOK_ENDPOINT',
 }
 
 /**

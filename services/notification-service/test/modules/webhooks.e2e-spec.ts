@@ -10,6 +10,8 @@ import { faultInjector } from '@synapsedesk/testing/fault';
 import { status } from '@grpc/grpc-js';
 import { toProtoNotificationType } from '@synapsedesk/grpc-proto';
 import {
+  AuditAction,
+  AuditResourceType,
   NOTIFICATION_TYPES,
   type NotificationType,
   NotificationPriority,
@@ -18,6 +20,7 @@ import {
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import {
+  AuditPublisher,
   WEBHOOK_DISABLE_AFTER_FAILURES,
   WEBHOOK_SIGNATURE_HEADER,
   WebhookDeliveryStatus,
@@ -679,6 +682,44 @@ describe('Outbound webhooks (e2e)', () => {
 
     expect(listed.items).toHaveLength(1);
     expect(JSON.stringify(listed.items)).not.toContain('whsec_');
+  });
+
+  it('**8c. create, update, rotate and delete each record one entry, and no secret reaches the metadata**', async () => {
+    const record = jest
+      .spyOn(fx.moduleRef.get(AuditPublisher), 'record')
+      .mockImplementation(() => undefined);
+    try {
+      const created = await endpointAt();
+      const { id } = created;
+      await admin.update(
+        { endpointId: id, description: 'Renamed', isActive: false },
+        context,
+      );
+      const rotated = await admin.rotateSecret(id, context);
+      await admin.delete(id, context);
+
+      expect(
+        record.mock.calls.map(([, event]) => [
+          event.action,
+          event.resourceType,
+          event.resourceId,
+        ]),
+      ).toEqual(
+        [
+          AuditAction.WEBHOOK_ENDPOINT_CREATED,
+          AuditAction.WEBHOOK_ENDPOINT_UPDATED,
+          AuditAction.WEBHOOK_SECRET_ROTATED,
+          AuditAction.WEBHOOK_ENDPOINT_DELETED,
+        ].map((action) => [action, AuditResourceType.WEBHOOK_ENDPOINT, id]),
+      );
+      const recorded = JSON.stringify(record.mock.calls);
+      expect(recorded).toContain(receiverUrl);
+      expect(recorded).not.toContain(created.secret);
+      expect(recorded).not.toContain(rotated.secret);
+      expect(recorded).not.toContain('whsec_');
+    } finally {
+      record.mockRestore();
+    }
   });
 
   it("8b. another tenant's endpoint id selects nothing", async () => {

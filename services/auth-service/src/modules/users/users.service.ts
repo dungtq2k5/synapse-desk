@@ -69,7 +69,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
-import { OrganizationsService } from '../organizations/organizations.service';
+import {
+  NO_SEATS_MESSAGE,
+  noSeats,
+  OrganizationsService,
+} from '../organizations/organizations.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   NOTIFICATION_RECIPIENT_SELECT,
@@ -450,10 +454,7 @@ export class UsersService {
           (await this.organizationsService.seatsInUse(tx, organizationId)) >=
           organization.maxAgentSeats
         ) {
-          throw new RpcException({
-            code: status.RESOURCE_EXHAUSTED,
-            message: 'No seats remaining on this plan',
-          });
+          throw noSeats(NO_SEATS_MESSAGE);
         }
 
         const user = await tx.user.create({
@@ -659,15 +660,27 @@ export class UsersService {
     }
 
     try {
-      // The write does NOT carry the include. Prisma has to make a write plus
-      // its relation reads atomic, so it opens an implicit transaction — and
-      // the include's relation loads then run concurrently on that
-      // transaction's single connection, which is the pg deprecation. Splitting
-      // the read out keeps the write a plain statement.
-      const user = await this.prisma.user.update({
-        where: { id: existing.id },
-        data: restoreData(),
-        select: { id: true, email: true },
+      // A restored person takes a seat back, so the same check as an
+      // invitation, in the same transaction as the write it guards. The write
+      // does NOT carry the include: its relation loads would run concurrently
+      // on the transaction's single connection, the pg deprecation. The read
+      // below is its own statement.
+      const user = await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.findUniqueOrThrow({
+          where: { id: organizationId },
+          select: { maxAgentSeats: true },
+        });
+        if (
+          (await this.organizationsService.seatsInUse(tx, organizationId)) >=
+          organization.maxAgentSeats
+        ) {
+          throw noSeats(NO_SEATS_MESSAGE);
+        }
+        return tx.user.update({
+          where: { id: existing.id },
+          data: restoreData(),
+          select: { id: true, email: true },
+        });
       });
 
       this.audit.record(context, {
