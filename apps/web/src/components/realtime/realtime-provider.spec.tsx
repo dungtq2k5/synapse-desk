@@ -1,4 +1,8 @@
-import { REALTIME_EVENTS, REALTIME_SOCKET } from '@synapsedesk/contracts';
+import {
+  CONNECTION_REFUSED_CODES,
+  REALTIME_EVENTS,
+  REALTIME_SOCKET,
+} from '@synapsedesk/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { toast } from 'sonner';
@@ -6,6 +10,7 @@ import { fail, ok, stubApi } from '@/test/api';
 import { lastSocket } from '@/test/socket';
 import {
   RealtimeProvider,
+  reconnectDelay,
   useRealtime,
   useRealtimeEvent,
 } from './realtime-provider';
@@ -46,7 +51,10 @@ describe('the realtime provider', () => {
     jest.spyOn(toast, 'info').mockImplementation(() => 'id');
     jest.spyOn(toast, 'dismiss').mockImplementation(() => 'id');
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
 
   it('opens one websocket on the gateway namespace, cookie-authenticated', () => {
     const { socket } = setup();
@@ -84,34 +92,100 @@ describe('the realtime provider', () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 
-  it('refreshes the session and reconnects when the server closes the socket', async () => {
-    const calls = stubApi({ 'GET /api/v1/users/me': ok({}) });
+  /** The server's refusal: the code, then the disconnect it precedes. */
+  const refuse = (socket: ReturnType<typeof lastSocket>, code?: string) => {
+    socket.receive(REALTIME_EVENTS.connectionRefused, {
+      success: false,
+      message: 'Refused',
+      data: code ? { code } : undefined,
+    });
+    socket.receive('disconnect', 'io server disconnect');
+  };
+
+  it('a run of RATE_LIMITED refusals reconnects at growing intervals, without asking for the session', () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const calls = stubApi({});
     const { socket } = setup();
 
-    act(() => socket.receive('disconnect', 'io server disconnect'));
-    await waitFor(() => expect(socket.connects).toBe(2));
-    expect(calls.map((call) => call.url)).toEqual(['/api/v1/users/me']);
+    for (const wait of [1_000, 2_000, 4_000, 8_000]) {
+      act(() => refuse(socket, CONNECTION_REFUSED_CODES.rateLimited));
+      const before = socket.connects;
+      act(() => jest.advanceTimersByTime(wait - 1));
+      expect(socket.connects).toBe(before);
+      act(() => jest.advanceTimersByTime(1));
+      expect(socket.connects).toBe(before + 1);
+    }
+    expect(calls).toHaveLength(0);
   });
 
-  it('refreshes once for a burst of refused handshakes', async () => {
+  it('the wait stops growing at 30 seconds', () => {
+    expect(reconnectDelay(4, () => 0)).toBe(16_000);
+    expect(reconnectDelay(5, () => 0)).toBe(30_000);
+    expect(reconnectDelay(9, () => 0)).toBe(30_000);
+    expect(reconnectDelay(0, () => 1)).toBe(500);
+  });
+
+  it('UNAUTHENTICATED refreshes the session once and reconnects once; a second refusal waits', async () => {
     const calls = stubApi({ 'GET /api/v1/users/me': ok({}) });
     const { socket } = setup();
 
-    act(() => {
-      socket.receive('connect_error');
-      socket.receive('connect_error');
-    });
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.unauthenticated));
     await waitFor(() => expect(socket.connects).toBe(2));
+    expect(calls.map((call) => call.url)).toEqual(['/api/v1/users/me']);
+
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.unauthenticated));
+    expect(socket.connects).toBe(2);
+    act(() => jest.advanceTimersByTime(1_000));
+    expect(socket.connects).toBe(3);
     expect(calls).toHaveLength(1);
   });
 
-  it('leaves reconnecting to socket.io when the refresh fails', async () => {
+  it('being ready again resets the wait', () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    stubApi({});
+    const { socket } = setup();
+
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.rateLimited));
+    act(() => jest.advanceTimersByTime(1_000));
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.rateLimited));
+    act(() => jest.advanceTimersByTime(2_000));
+    expect(socket.connects).toBe(3);
+
+    act(() => socket.receive(REALTIME_EVENTS.connectionReady));
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.rateLimited));
+    act(() => jest.advanceTimersByTime(1_000));
+    expect(socket.connects).toBe(4);
+  });
+
+  it('a refusal with no code, or a failed transport, waits too', () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const calls = stubApi({});
+    const { socket } = setup();
+
+    act(() => refuse(socket));
+    act(() => jest.advanceTimersByTime(999));
+    expect(socket.connects).toBe(1);
+    act(() => jest.advanceTimersByTime(1));
+    expect(socket.connects).toBe(2);
+
+    act(() => socket.receive('connect_error'));
+    act(() => jest.advanceTimersByTime(2_000));
+    expect(socket.connects).toBe(3);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('waits when the refresh fails', async () => {
     const calls = stubApi({ 'GET /api/v1/users/me': fail(500, 'Down') });
     const { socket } = setup();
 
-    act(() => socket.receive('connect_error'));
+    act(() => refuse(socket, CONNECTION_REFUSED_CODES.unauthenticated));
     await waitFor(() => expect(calls).toHaveLength(1));
-    // Let the failed refresh settle before checking nothing reconnected.
+    // Let the failed refresh settle before checking nothing reconnected yet.
     await act(() => Promise.resolve());
     expect(socket.connects).toBe(1);
   });
