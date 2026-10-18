@@ -214,8 +214,38 @@ describe('organizations', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         message: 'OK',
-        data: { enforceTwoFactor: true, allowedEmailDomains: ['acme.com'] },
+        data: {
+          enforceTwoFactor: true,
+          allowedEmailDomains: ['acme.com'],
+          inboundAddress: null,
+        },
       });
+    },
+  );
+
+  rowFor('Organizations')(
+    '**`getSettings` answers the inbound address built from the token, never the token**',
+    async () => {
+      const token = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+      peers.auth.on('OrganizationService/GetOrganizationSettings').reply({
+        enforceTwoFactor: false,
+        allowedEmailDomains: [],
+        publicDomainWarnings: [],
+        inboundToken: token,
+      });
+
+      const response = await new Session(gateway.baseUrl).get<{
+        data: Record<string, unknown>;
+      }>(
+        `${API}/organizations/current/settings`,
+        headers(['organization.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.inboundAddress).toBe(
+        `support+${token}@inbound.test`,
+      );
+      expect(response.body.data).not.toHaveProperty('inboundToken');
     },
   );
 
