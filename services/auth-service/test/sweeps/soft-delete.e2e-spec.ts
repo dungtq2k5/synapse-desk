@@ -158,15 +158,16 @@ describe('soft-delete sweep (e2e)', () => {
       expect(row!.deletedAt).toBeTruthy();
     });
 
-    it('a soft-deleted user is invisible to getUser too', async () => {
+    it('a soft-deleted user is still read by id, marked deleted: their page restores them', async () => {
+      // The directory hides them (above); their own page is where an admin
+      // restores them, so a read by id answers with `deletedAt` set.
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await addMember(fx.prisma, t.org.id);
 
       await users.deleteUser({ id: gone.id }, superuser(t));
 
-      await expect(
-        users.getUser({ id: gone.id }, superuser(t)),
-      ).rejects.toBeDefined();
+      const read = await users.getUser({ id: gone.id }, superuser(t));
+      expect(read.deletedAt).toBeTruthy();
     });
 
     it('a soft-deleted user cannot LOG IN — the filter reaches the auth path', async () => {
