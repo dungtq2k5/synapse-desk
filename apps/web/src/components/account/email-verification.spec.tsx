@@ -15,10 +15,17 @@ const ME = ok({
   departmentIds: [],
   hasPassword: true,
 });
+/**
+ * The clock every row reads, held still: a countdown asserted against a moving
+ * clock passes or fails by how long the machine took between the answer and
+ * the assertion.
+ */
+const NOW = Date.parse('2026-10-18T09:00:00Z');
+
 const PENDING = ok({
   pending: true,
   target: 'm***a@northwind.health',
-  expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+  expiresAt: new Date(NOW + 10 * 60_000).toISOString(),
   attemptsRemaining: 5,
   codeLength: 6,
 });
@@ -58,6 +65,9 @@ const lead = () =>
   );
 
 describe('verify your email', () => {
+  beforeEach(() => jest.spyOn(Date, 'now').mockReturnValue(NOW));
+  afterEach(() => jest.restoreAllMocks());
+
   it('uses the code already sent, without sending another', async () => {
     const { calls } = setup({ [STATUS]: PENDING });
 
@@ -74,7 +84,9 @@ describe('verify your email', () => {
     expect(
       calls.filter(({ url }) => url.includes('/verify/request')),
     ).toHaveLength(1);
-    expect(screen.getByText(/Resend code in (1:00|0:59)/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Didn’t get it? Resend code in 1:00'),
+    ).toBeInTheDocument();
   });
 
   it('a wrong code says how many attempts are left', async () => {
@@ -153,7 +165,9 @@ describe('verify your email', () => {
         'You can request another code in 8 minutes. The last code we sent still works.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Resend code in (8:00|7:59)/)).toBeInTheDocument();
+    expect(
+      screen.getByText('Didn’t get it? Resend code in 8:00'),
+    ).toBeInTheDocument();
     expect(code()).toBeEnabled();
   });
 
