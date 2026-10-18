@@ -47,7 +47,20 @@ The socket authenticates with the **same `HttpOnly` access-token cookie the REST
 
 **A half-authenticated session is refused.** A two-factor *challenge* token proves a password and nothing more; presenting one is rejected with `Two-factor challenge is not complete`.
 
-**Refusal is a hard disconnect.** An unauthenticated socket is not left open to retry — it is closed. Reconnect after re-authenticating over REST, not by re-emitting.
+**Refusal is a hard disconnect, and it says why first.** The server sends `connection:refused`, then disconnects (`io server disconnect`, which Socket.IO never retries on its own):
+
+```ts
+socket.on('connection:refused', ({ data }) => {
+  // data.code: 'UNAUTHENTICATED' | 'RATE_LIMITED' (CONNECTION_REFUSED_CODES)
+});
+```
+
+| Code | Why | What the client does |
+| :--- | :--- | :--- |
+| `UNAUTHENTICATED` | no session, or an expired or revoked one (also sent by the sweep that disconnects revoked sessions) | refresh over REST **once**, then reconnect once; when the refresh fails, the person is signed out |
+| `RATE_LIMITED` | the address's handshake budget is spent | wait, then reconnect: 1 s, doubling, up to 30 s, with jitter. A refresh can't help |
+
+**Never reconnect at once.** Every attempt spends the handshake budget everyone behind the same address shares, so a client that retries as fast as the server answers can shed every other client there.
 
 ---
 
@@ -211,8 +224,8 @@ Socket.IO reconnects on its own. Your responsibilities on each reconnect:
 3. **Refetch what you missed.** The socket is a *delivery optimisation, not a channel of record*: every event here has a REST equivalent, and rows are always written before the frame is emitted. After a gap, re-read the feed and the thread rather than assuming continuity.
 
    **Not everything has a REST equivalent.** `typing`, `presence:*` and the AI stream chunks are socket-only — there is no presence or typing controller in the gateway. Those are ephemeral by design: after a gap there is nothing to refetch and nothing was lost that matters. Everything durable — tickets, messages, notifications, documents — does have a REST read.
-4. **A revoked session is cut off.** Signing out, "sign out everywhere", a password change or a revoked session refuses the handshake, and a connected socket is disconnected within 5 seconds. Don't reconnect in a loop: refresh over REST first, and when that fails too, the person is signed out.
-5. **Re-authenticate first if the cookie expired.** A refused handshake is a hard disconnect; reconnect attempts against an expired cookie will keep failing until you refresh the session over REST.
+4. **A revoked session is cut off.** Signing out, "sign out everywhere", a password change or a revoked session refuses the handshake, and a connected socket is disconnected within 5 seconds, each with `UNAUTHENTICATED`.
+5. **A refusal is not retried for you** (§2): reconnect by its code, with a wait between attempts. A successful connection resets the wait.
 
 ---
 
