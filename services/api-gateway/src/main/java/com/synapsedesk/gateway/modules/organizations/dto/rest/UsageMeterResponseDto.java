@@ -1,6 +1,8 @@
 package com.synapsedesk.gateway.modules.organizations.dto.rest;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -19,7 +21,44 @@ public class UsageMeterResponseDto {
 
   private BigDecimal limit = null;
 
-  private String unavailableReason = null;
+  /**
+   * Why there's no number, when `available` is false: `READ_FAILED` (it
+   * couldn't be read just now; try again) or `NOT_AVAILABLE` (this
+   * organization has no such meter). Null when available.
+   */
+  public enum UnavailableReasonEnum {
+    NOT_AVAILABLE("NOT_AVAILABLE"),
+
+    READ_FAILED("READ_FAILED");
+
+    private final String value;
+
+    UnavailableReasonEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static UnavailableReasonEnum fromValue(String value) {
+      for (UnavailableReasonEnum b : UnavailableReasonEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private UnavailableReasonEnum unavailableReason = null;
 
   public UsageMeterResponseDto() {
     super();
@@ -32,7 +71,7 @@ public class UsageMeterResponseDto {
     Boolean available,
     BigDecimal used,
     BigDecimal limit,
-    String unavailableReason
+    UnavailableReasonEnum unavailableReason
   ) {
     this.available = available;
     this.used = used;
@@ -100,23 +139,25 @@ public class UsageMeterResponseDto {
     this.limit = limit;
   }
 
-  public UsageMeterResponseDto unavailableReason(String unavailableReason) {
+  public UsageMeterResponseDto unavailableReason(
+    UnavailableReasonEnum unavailableReason
+  ) {
     this.unavailableReason = unavailableReason;
     return this;
   }
 
   /**
-   * Get unavailableReason
+   * Why there's no number, when `available` is false. Null when available.
    * @return unavailableReason
    */
 
   @JsonProperty("unavailableReason")
-  public String getUnavailableReason() {
+  public UnavailableReasonEnum getUnavailableReason() {
     return unavailableReason;
   }
 
   @JsonProperty("unavailableReason")
-  public void setUnavailableReason(String unavailableReason) {
+  public void setUnavailableReason(UnavailableReasonEnum unavailableReason) {
     this.unavailableReason = unavailableReason;
   }
 

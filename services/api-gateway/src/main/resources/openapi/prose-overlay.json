@@ -1151,6 +1151,9 @@
     "OrganizationResponseDto.status": {
       "description": "`OrgStatus`, null when the bridge answers null for `UNSPECIFIED`"
     },
+    "OrganizationSettingsResponseDto.inboundAddress": {
+      "description": "The support address customers write to, `null` while inbound email is\noff. A published address, not a secret: rotating it is how an old one\nstops working."
+    },
     "OrganizationSettingsResponseDto.maxDocumentBytesOverride": {
       "description": "What this workspace has configured, or `null` where it has configured\nnothing.\n\n`null` rather than the platform number: a screen that renders the ceiling\nas if the tenant had chosen it cannot show the difference between an\ninherited limit and a deliberate one, and the tenant would have no way to\ntell whether clearing the field changes anything."
     },
@@ -1420,6 +1423,9 @@
     },
     "UploadAttachmentDto.mimeType": {
       "description": "An allowlist, never a denylist. A denylist is a promise to have thought of\nevery dangerous type, which is not a promise anyone can keep."
+    },
+    "UsageMeterResponseDto.unavailableReason": {
+      "description": "Why there's no number, when `available` is false: `READ_FAILED` (it\ncouldn't be read just now; try again) or `NOT_AVAILABLE` (this\norganization has no such meter). Null when available."
     },
     "UserResponseDto.dob": {
       "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, with no time and no\nzone. `null` when the user has not given one."

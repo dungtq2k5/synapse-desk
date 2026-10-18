@@ -259,7 +259,15 @@ public class UserAdminController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "402", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "A plan limit: no seat is free. `error` is the sentence to show (\"No " +
+        "seats left. Revoke a pending invitation or change the plan to add " +
+        "people.\")."
+    )
+  )
   @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.USER_CREATE)
   public ResponseEntity<
@@ -358,7 +366,15 @@ public class UserAdminController {
   }
 
   @PostMapping(value = "/users/{id}/restore", produces = { "application/json" })
-  @ApiErrors({ "400", "401", "403", "404" })
+  @ApiErrors(
+    value = { "400", "401", "402", "403", "404" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "A plan limit: restoring takes a seat back and none is free. `error` " +
+        "is the sentence to show (\"No seats left. Revoke a pending " +
+        "invitation or change the plan to add people.\")."
+    )
+  )
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
   public ResponseEntity<
     ApiResponse<UserSummaryResponseDto>

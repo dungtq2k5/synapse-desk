@@ -122,8 +122,6 @@ public class OrganizationsController {
   private static final String CACHE_SCOPE = "organizations";
   private static final long GET_CACHE_TTL_SECONDS = 60;
   private static final String INBOUND_LOCAL_PART = "support";
-  private static final String STORAGE_UNAVAILABLE_REASON =
-    "Storage usage could not be read just now — try again shortly";
 
   private final OrganizationServiceGrpc.OrganizationServiceBlockingStub stub;
   private final DocumentServiceGrpc.DocumentServiceBlockingStub documentStub;
@@ -209,12 +207,7 @@ public class OrganizationsController {
       context
     ).issueInboundToken(IssueInboundTokenRequest.getDefaultInstance());
 
-    String address =
-      INBOUND_LOCAL_PART +
-      "+" +
-      response.getInboundToken() +
-      "@" +
-      inboundEmail.domain();
+    String address = inboundAddress(response.getInboundToken());
 
     return ResponseEntity.status(201).body(
       ApiResponse.of(
@@ -249,7 +242,13 @@ public class OrganizationsController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "403", "409" },
+    descriptions = @ApiErrors.Description(
+      status = "409",
+      value = "The slug or the domain is taken by another organization. `error` names which: \"That address is already taken by another organization.\" (the slug) or \"That domain is already used by another organization.\""
+    )
+  )
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<
     ApiResponse<OrganizationResponseDto>
@@ -423,7 +422,9 @@ public class OrganizationsController {
         .available(false)
         .used(null)
         .limit(null)
-        .unavailableReason(STORAGE_UNAVAILABLE_REASON);
+        .unavailableReason(
+          UsageMeterResponseDto.UnavailableReasonEnum.READ_FAILED
+        );
     }
   }
 
@@ -540,7 +541,7 @@ public class OrganizationsController {
     return ApiResponse.of(status, message, toOrganizationResponseDto(response));
   }
 
-  private static ApiResponse<OrganizationSettingsResponseDto> toSettingsEnvelope(
+  private ApiResponse<OrganizationSettingsResponseDto> toSettingsEnvelope(
     String message,
     OrganizationSettingsResponse response,
     String warning
@@ -549,8 +550,18 @@ public class OrganizationsController {
       200,
       message,
       warning,
-      toOrganizationSettingsResponseDto(response)
+      toOrganizationSettingsResponseDto(response).inboundAddress(
+        // The bare token stays here: the response carries the address.
+        response.hasInboundToken()
+          ? inboundAddress(response.getInboundToken())
+          : null
+      )
     );
+  }
+
+  /** The support address for a token: {@code support+{token}@{domain}}. */
+  private String inboundAddress(String token) {
+    return INBOUND_LOCAL_PART + "+" + token + "@" + inboundEmail.domain();
   }
 
   private static OrganizationResponseDto toOrganizationResponseDto(
@@ -634,8 +645,20 @@ public class OrganizationsController {
           : null
       )
       .unavailableReason(
-        meter.hasUnavailableReason() ? meter.getUnavailableReason() : null
+        meter.getAvailable() ? null : toUnavailableReason(meter)
       );
+  }
+
+  /**
+   * A meter's reason off the wire, as one of the codes. Anything else (an older
+   * peer's sentence, or none) is {@code READ_FAILED}: the meter didn't answer.
+   */
+  private static UsageMeterResponseDto.UnavailableReasonEnum toUnavailableReason(
+    UsageMeter meter
+  ) {
+    return "NOT_AVAILABLE".equals(meter.getUnavailableReason())
+      ? UsageMeterResponseDto.UnavailableReasonEnum.NOT_AVAILABLE
+      : UsageMeterResponseDto.UnavailableReasonEnum.READ_FAILED;
   }
 
   private static OrganizationResponseDto.StatusEnum toStatusEnum(

@@ -21,6 +21,8 @@ public class OrganizationSettingsResponseDto {
 
   private List<String> publicDomainWarnings = new ArrayList<>();
 
+  private String inboundAddress = null;
+
   private BigDecimal maxDocumentBytesOverride = null;
 
   private BigDecimal maxAttachmentBytesOverride = null;
@@ -38,6 +40,7 @@ public class OrganizationSettingsResponseDto {
     Boolean enforceTwoFactor,
     List<String> allowedEmailDomains,
     List<String> publicDomainWarnings,
+    String inboundAddress,
     BigDecimal maxDocumentBytesOverride,
     BigDecimal maxAttachmentBytesOverride,
     BigDecimal maxAttachmentsPerMessageOverride
@@ -45,6 +48,7 @@ public class OrganizationSettingsResponseDto {
     this.enforceTwoFactor = enforceTwoFactor;
     this.allowedEmailDomains = allowedEmailDomains;
     this.publicDomainWarnings = publicDomainWarnings;
+    this.inboundAddress = inboundAddress;
     this.maxDocumentBytesOverride = maxDocumentBytesOverride;
     this.maxAttachmentBytesOverride = maxAttachmentBytesOverride;
     this.maxAttachmentsPerMessageOverride = maxAttachmentsPerMessageOverride;
@@ -134,6 +138,26 @@ public class OrganizationSettingsResponseDto {
   @JsonProperty("publicDomainWarnings")
   public void setPublicDomainWarnings(List<String> publicDomainWarnings) {
     this.publicDomainWarnings = publicDomainWarnings;
+  }
+
+  public OrganizationSettingsResponseDto inboundAddress(String inboundAddress) {
+    this.inboundAddress = inboundAddress;
+    return this;
+  }
+
+  /**
+   * The support address customers write to, `null` while inbound email is off. A published address, not a secret: rotating it is how an old one stops working.
+   * @return inboundAddress
+   */
+
+  @JsonProperty("inboundAddress")
+  public String getInboundAddress() {
+    return inboundAddress;
+  }
+
+  @JsonProperty("inboundAddress")
+  public void setInboundAddress(String inboundAddress) {
+    this.inboundAddress = inboundAddress;
   }
 
   public OrganizationSettingsResponseDto maxDocumentBytesOverride(
@@ -230,6 +254,10 @@ public class OrganizationSettingsResponseDto {
         organizationSettingsResponseDto.publicDomainWarnings
       ) &&
       Objects.equals(
+        this.inboundAddress,
+        organizationSettingsResponseDto.inboundAddress
+      ) &&
+      Objects.equals(
         this.maxDocumentBytesOverride,
         organizationSettingsResponseDto.maxDocumentBytesOverride
       ) &&
@@ -250,6 +278,7 @@ public class OrganizationSettingsResponseDto {
       enforceTwoFactor,
       allowedEmailDomains,
       publicDomainWarnings,
+      inboundAddress,
       maxDocumentBytesOverride,
       maxAttachmentBytesOverride,
       maxAttachmentsPerMessageOverride
@@ -268,6 +297,9 @@ public class OrganizationSettingsResponseDto {
       .append("\n");
     sb.append("    publicDomainWarnings: ")
       .append(toIndentedString(publicDomainWarnings))
+      .append("\n");
+    sb.append("    inboundAddress: ")
+      .append(toIndentedString(inboundAddress))
       .append("\n");
     sb.append("    maxDocumentBytesOverride: ")
       .append(toIndentedString(maxDocumentBytesOverride))

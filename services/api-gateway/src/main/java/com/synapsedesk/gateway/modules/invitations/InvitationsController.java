@@ -132,7 +132,16 @@ public class InvitationsController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "402", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "A plan limit: the batch needs more seats than are free, counted as " +
+        "the preview counts them, so nothing was sent. `error` is the " +
+        "sentence to show (\"No seats left. Revoke a pending invitation or " +
+        "change the plan to add people.\")."
+    )
+  )
   @ResponseStatus(HttpStatus.CREATED)
   @RequireVerifiedEmail
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
@@ -373,7 +382,16 @@ public class InvitationsController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "402" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "The organization has no free seat right now. `error` is the " +
+        "invitee's sentence (\"This organization has no free seats right now. " +
+        "Ask the person who invited you to free a seat, then try again. Your " +
+        "invitation still works.\")."
+    )
+  )
   public ResponseEntity<
     ApiResponse<LoginResponseDto>
   > invitationsControllerAcceptV1(
