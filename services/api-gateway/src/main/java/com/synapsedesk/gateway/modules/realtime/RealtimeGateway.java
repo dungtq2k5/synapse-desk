@@ -189,7 +189,11 @@ public class RealtimeGateway implements RuntimeParticipant {
     String handshakeIp = SocketHandshakes.ip(client);
     if (!wsThrottler.allowHandshake(handshakeIp)) {
       LOG.warn("Handshake budget exceeded for {}", handshakeIp);
-      client.disconnect();
+      refuse(
+        client,
+        RealtimeEvents.CONNECTION_REFUSED_CODES_RATE_LIMITED,
+        "Too many connections from this address"
+      );
 
       return;
     }
@@ -232,12 +236,27 @@ public class RealtimeGateway implements RuntimeParticipant {
         client.getSessionId(),
         refused.getMessage()
       );
-      // Admit-then-disconnect, never a handshake-layer refusal: the client
-      // sees `connect → disconnect(io server disconnect)` and does not
-      // retry. Refusing at the transport layer instead
-      // makes `socket.io-client` retry the handshake forever.
-      client.disconnect();
+      refuse(
+        client,
+        RealtimeEvents.CONNECTION_REFUSED_CODES_UNAUTHENTICATED,
+        "Sign in again"
+      );
     }
+  }
+
+  /**
+   * Admit-then-disconnect, never a handshake-layer refusal: the client sees
+   * `connection:refused` with the code, then `disconnect(io server
+   * disconnect)`, and decides when to retry from the code. Refusing at the
+   * transport layer instead makes `socket.io-client` retry the handshake
+   * forever.
+   */
+  static void refuse(SocketIOClient client, String code, String message) {
+    client.sendEvent(
+      RealtimeEvents.REALTIME_EVENTS_CONNECTION_REFUSED,
+      new WsResponse<>(false, message, new ConnectionRefusedPayload(code))
+    );
+    client.disconnect();
   }
 
   /**

@@ -174,6 +174,14 @@ export const REALTIME_EVENTS = {
   connectionReady: 'connection:ready',
 
   /**
+   * Sent just before the server disconnects a socket it won't keep, carrying
+   * why (`CONNECTION_REFUSED_CODES`). The disconnect that follows is
+   * `io server disconnect`, which socket.io never retries on its own, so the
+   * client decides when to try again from this code.
+   */
+  connectionRefused: 'connection:refused',
+
+  /**
    * A new in-app notification — the toast payload. Room: `user:{recipientId}`.
    *
    * Carries the whole row so the client renders and deep-links without a
@@ -209,6 +217,22 @@ export const REALTIME_EVENTS = {
    */
   notificationUnreadCount: 'notification:unread-count',
 } as const;
+
+/**
+ * Why a socket was refused (`connectionRefused`'s `data.code`).
+ *
+ * - `UNAUTHENTICATED`: no session, or an expired or revoked one. A refresh
+ *   may help.
+ * - `RATE_LIMITED`: the address's handshake budget is spent. Only waiting
+ *   helps.
+ */
+export const CONNECTION_REFUSED_CODES = {
+  unauthenticated: 'UNAUTHENTICATED',
+  rateLimited: 'RATE_LIMITED',
+} as const;
+
+export type ConnectionRefusedCode =
+  (typeof CONNECTION_REFUSED_CODES)[keyof typeof CONNECTION_REFUSED_CODES];
 
 /** One agent in a ticket; `fullName` is null when it couldn't be resolved. */
 export type TicketViewer = { id: string; fullName: string | null };

@@ -12,6 +12,7 @@ import Redis from 'ioredis';
 import { io, type Socket } from 'socket.io-client';
 import { sign } from 'jsonwebtoken';
 import {
+  CONNECTION_REFUSED_CODES,
   OrgStatus,
   REALTIME_EVENTS,
   REALTIME_SOCKET,
@@ -74,6 +75,19 @@ describe('revoked sessions', () => {
     return socket;
   };
 
+  /** The refusal's code, then the disconnect's reason, in the order they came. */
+  const refusal = (socket: Socket) =>
+    new Promise<[string | undefined, string]>((resolve) => {
+      let code: string | undefined;
+      socket.once(
+        REALTIME_EVENTS.connectionRefused,
+        (frame: { data: { code: string } }) => {
+          code = frame.data.code;
+        },
+      );
+      socket.once('disconnect', (reason) => resolve([code, reason]));
+    });
+
   beforeAll(async () => {
     const { redisUrl, natsUrl } = readRunState();
     redis = new Redis(redisUrl);
@@ -108,9 +122,7 @@ describe('revoked sessions', () => {
       const b = family();
       expect((await listSessions(a)).status).toBe(200);
       const socket = await connectAs(a);
-      const disconnected = new Promise<string>((resolve) =>
-        socket.once('disconnect', resolve),
-      );
+      const disconnected = refusal(socket);
 
       peers.auth
         .on('SessionService/RevokeSession')
@@ -127,7 +139,10 @@ describe('revoked sessions', () => {
       expect((await listSessions(a)).status).toBe(401);
       expect((await listSessions(b)).status).toBe(200);
       // The sweep runs every 5 seconds.
-      await expect(disconnected).resolves.toBe('io server disconnect');
+      await expect(disconnected).resolves.toEqual([
+        CONNECTION_REFUSED_CODES.unauthenticated,
+        'io server disconnect',
+      ]);
     },
     20_000,
   );
@@ -146,9 +161,28 @@ describe('revoked sessions', () => {
       });
       sockets.push(socket);
 
-      await expect(
-        new Promise<string>((resolve) => socket.once('disconnect', resolve)),
-      ).resolves.toBe('io server disconnect');
+      await expect(refusal(socket)).resolves.toEqual([
+        CONNECTION_REFUSED_CODES.unauthenticated,
+        'io server disconnect',
+      ]);
+    },
+  );
+
+  rowFor('Sessions')(
+    '**a socket with no session cookie is refused as unauthenticated**',
+    async () => {
+      const socket = io(`${gateway.wsUrl}${REALTIME_SOCKET.namespace}`, {
+        transports: ['websocket'],
+        reconnection: false,
+        forceNew: true,
+        extraHeaders: { cookie: 'other=1' },
+      });
+      sockets.push(socket);
+
+      await expect(refusal(socket)).resolves.toEqual([
+        CONNECTION_REFUSED_CODES.unauthenticated,
+        'io server disconnect',
+      ]);
     },
   );
 

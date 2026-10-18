@@ -20,12 +20,17 @@ public final class RealtimeEvents {
   public static final String CLIENT_EVENTS_TYPING_START = "typing:start";
   public static final String CLIENT_EVENTS_TYPING_STOP = "typing:stop";
 
+  /** {@code CONNECTION_REFUSED_CODES} in `packages/contracts`. */
+  public static final String CONNECTION_REFUSED_CODES_RATE_LIMITED = "RATE_LIMITED";
+  public static final String CONNECTION_REFUSED_CODES_UNAUTHENTICATED = "UNAUTHENTICATED";
+
   /** {@code REALTIME_EVENTS} in `packages/contracts`. */
   public static final String REALTIME_EVENTS_AI_STREAM_ATTACHMENTS_SKIPPED = "ai:stream:attachments-skipped";
   public static final String REALTIME_EVENTS_AI_STREAM_CHUNK = "ai:stream:chunk";
   public static final String REALTIME_EVENTS_AI_STREAM_DONE = "ai:stream:done";
   public static final String REALTIME_EVENTS_AI_STREAM_ERROR = "ai:stream:error";
   public static final String REALTIME_EVENTS_CONNECTION_READY = "connection:ready";
+  public static final String REALTIME_EVENTS_CONNECTION_REFUSED = "connection:refused";
   public static final String REALTIME_EVENTS_DOCUMENT_FAILED = "document:failed";
   public static final String REALTIME_EVENTS_DOCUMENT_INDEXED = "document:indexed";
   public static final String REALTIME_EVENTS_MESSAGE_DELETED = "message:deleted";

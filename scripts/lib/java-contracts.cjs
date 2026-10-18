@@ -44,7 +44,12 @@ const GROUPS = [
     className: 'RealtimeEvents',
     purpose:
       'Socket event names, both directions, and the namespace clients connect to. A renamed one is a client that stops receiving, silently.',
-    exports: ['REALTIME_EVENTS', 'CLIENT_EVENTS', 'REALTIME_SOCKET'],
+    exports: [
+      'REALTIME_EVENTS',
+      'CLIENT_EVENTS',
+      'REALTIME_SOCKET',
+      'CONNECTION_REFUSED_CODES',
+    ],
   },
   {
     className: 'GrpcMetadata',

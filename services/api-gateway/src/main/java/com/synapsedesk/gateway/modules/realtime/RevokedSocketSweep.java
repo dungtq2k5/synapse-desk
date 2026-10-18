@@ -4,6 +4,7 @@ import com.corundumstudio.socketio.SocketIOClient;
 import com.corundumstudio.socketio.SocketIONamespace;
 import com.synapsedesk.gateway.common.auth.JwtPrincipal;
 import com.synapsedesk.gateway.common.auth.RevokedSessions;
+import com.synapsedesk.gateway.common.contracts.RealtimeEvents;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -69,7 +70,11 @@ class RevokedSocketSweep {
           "Disconnecting socket {}: its session was revoked",
           clients.get(index).getSessionId()
         );
-        clients.get(index).disconnect();
+        RealtimeGateway.refuse(
+          clients.get(index),
+          RealtimeEvents.CONNECTION_REFUSED_CODES_UNAUTHENTICATED,
+          "Sign in again"
+        );
       }
     }
   }
