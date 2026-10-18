@@ -246,7 +246,7 @@ npm run test:e2e         # six suites, sequential
 
 With `E2E_COVERAGE_DIR` set, each Node e2e suite also writes `<dir>/<service>/lcov.info`, with paths relative to the repository.
 
-`npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares.
+`npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares. **Don't run another suite against the dev stack while it runs:** rag-service's pytest uses the same Qdrant (`QDRANT_URL` in its `.env.test`) and errors when the collection is dropped under it.
 
 The specs under `packages/config/src/` are contract guards rather than unit tests — they check the manifests against the application, the images against the Dockerfiles, the env schemas against the `.env.example` files, and the flow documents against the symbols they cite. A `.env.example` that gains a key without a schema entry fails there.
 
