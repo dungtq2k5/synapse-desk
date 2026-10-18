@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import httpx
 import pytest
 from qdrant_client.http import models as qm
 from qdrant_client.http.exceptions import UnexpectedResponse
@@ -17,7 +16,7 @@ def _refusal(status: int, reason: str) -> UnexpectedResponse:
         status_code=status,
         reason_phrase=reason,
         content=b'{"status":{"error":"Wrong input: Collection `document_chunks` already exists!"}}',
-        headers=httpx.Headers(),
+        headers={},  # type: ignore[arg-type]
     )
 
 
