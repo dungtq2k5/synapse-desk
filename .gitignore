@@ -34,6 +34,10 @@ ci-artifacts/
 # wherever they run). Machine-specific build cache, like `.turbo/`.
 .swc/
 
+# The Playwright MCP's output: page snapshots and screenshots, which hold
+# whatever the page showed. Never committed, never in an image.
+.playwright-mcp/
+
 # Turborepo per-package task logs and local cache. One appears in every
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/

@@ -86,3 +86,4 @@ graphify-out/
 sonar-project.properties
 .mcp.json
 .sonar-config.json
+.playwright-mcp
