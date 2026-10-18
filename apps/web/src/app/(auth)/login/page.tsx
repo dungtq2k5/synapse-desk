@@ -37,6 +37,8 @@ function noticeOf(one: (key: string) => string | undefined): SignInNotice {
   if (one('reset') !== undefined) {
     return one('others') === '1' ? 'reset-signed-out-elsewhere' : 'reset';
   }
+  const deleted = one('organization-deleted');
+  if (deleted) return { organizationDeleted: deleted };
   const everywhere = Number(one('signed-out-everywhere'));
   if (Number.isInteger(everywhere) && everywhere > 0) return { everywhere };
   if (one('signed-out') !== undefined) return 'signed-out';

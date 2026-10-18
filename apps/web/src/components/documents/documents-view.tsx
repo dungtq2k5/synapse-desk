@@ -37,13 +37,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -92,12 +85,18 @@ import {
   useDocumentActions,
 } from './document-actions';
 import { ReplaceDialog } from './replace-dialog';
-import { Empty, Pagination, PlanLink, useDepartmentNames } from './parts';
+import {
+  ALL,
+  Empty,
+  FilterSelect,
+  Pagination,
+  PlanLink,
+  useDepartmentNames,
+} from './parts';
 import { UploadButton } from './upload-dialog';
 import { useDocumentLive } from './use-document-live';
 
 const PAGE = 8;
-const ALL = 'all';
 /** How often a list with work in flight looks again. */
 const WORKING_POLL_MS = 5000;
 
@@ -513,41 +512,6 @@ function Toolbar({
         </div>
       )}
     </div>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onValue,
-}: {
-  label: string;
-  value: string | undefined;
-  options: Record<string, string>;
-  onValue: (value: string) => void;
-}) {
-  return (
-    <Select value={value ?? ALL} onValueChange={onValue}>
-      <SelectTrigger aria-label={label} className="w-auto min-w-37 gap-2">
-        {value ? (
-          <span className="flex gap-1">
-            <span className="text-muted-foreground">{label}:</span>
-            <SelectValue />
-          </span>
-        ) : (
-          <span className="text-muted-foreground">{label}</span>
-        )}
-      </SelectTrigger>
-      <SelectContent className="shadow-md">
-        <SelectItem value={ALL}>All</SelectItem>
-        {Object.entries(options).map(([key, text]) => (
-          <SelectItem key={key} value={key}>
-            {text}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 

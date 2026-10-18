@@ -87,6 +87,32 @@ export function clockTime(at: string | Date, timeZone?: string): string {
 }
 
 /**
+ * A moment as the audit log and delivery history write it: "Today, 09:12",
+ * "Yesterday, 18:02", then "15 Oct, 09:12".
+ *
+ * @example logTime('2026-10-12T09:12:00Z', new Date('2026-10-12T10:00:00Z'), 'UTC') // 'Today, 09:12'
+ */
+export function logTime(
+  at: string | Date,
+  now: Date = new Date(),
+  timeZone?: string,
+): string {
+  const then = new Date(at);
+  const days = calendarDays(then, now, timeZone);
+  const day =
+    days === 0
+      ? 'Today'
+      : days === 1
+        ? 'Yesterday'
+        : new Intl.DateTimeFormat('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            timeZone,
+          }).format(then);
+  return `${day}, ${clockTime(then, timeZone)}`;
+}
+
+/**
  * A file's size on an attachment chip.
  *
  * @example fileSize(217_088) // '212 KB'

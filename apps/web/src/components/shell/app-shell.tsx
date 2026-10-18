@@ -5,6 +5,7 @@ import {
   BookOpenIcon,
   InboxIcon,
   MessageCircleIcon,
+  SettingsIcon,
   TicketIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -52,6 +53,22 @@ const KNOWLEDGE: Item = {
   active: (path) => path.startsWith('/knowledge'),
 };
 
+const SETTINGS: Item = {
+  label: 'Settings',
+  href: '/settings',
+  icon: SettingsIcon,
+  active: (path) => path.startsWith('/settings'),
+};
+
+/** Holding any of these shows Settings: each reads one of its sections. */
+const SETTINGS_READ = [
+  'organization.read',
+  'user.read',
+  'department.read',
+  'role.read',
+  'audit.read',
+] as const;
+
 /** The sidebar's items by role. An end user's tickets are their requests. */
 const ITEMS = {
   agent: [
@@ -84,7 +101,11 @@ const ITEMS = {
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { isAgent } = useViewer();
+  const { isAgent, can } = useViewer();
+  const items = [
+    ...ITEMS[isAgent ? 'agent' : 'requester'],
+    ...(SETTINGS_READ.some(can) ? [SETTINGS] : []),
+  ];
   const organization = useOrganizationsControllerGetV1({
     query: { retry: false },
   });
@@ -136,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   Support
                 </SidebarGroupLabel>
                 <SidebarMenu>
-                  {ITEMS[isAgent ? 'agent' : 'requester'].map((item) => (
+                  {items.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild

@@ -19,6 +19,7 @@ import { useGoogleSignIn } from './use-google-sign-in';
 type Failure =
   | { kind: 'credentials' }
   | { kind: 'throttled'; seconds: number | null }
+  | { kind: 'frozen' }
   | { kind: 'other'; message: string };
 
 /**
@@ -114,6 +115,16 @@ export function CredentialsForm({
           onOver={() => setFailure(null)}
         />
       )}
+      {failure?.kind === 'frozen' && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>Your organization is closed for now</AlertTitle>
+          <AlertDescription>
+            Its administrator asked to delete it. If that’s a surprise, contact
+            them or SynapseDesk support.
+          </AlertDescription>
+        </Alert>
+      )}
       {failure?.kind === 'other' && (
         <Alert variant="destructive">
           <CircleAlertIcon />
@@ -190,6 +201,14 @@ function failureOf(error: unknown): Failure {
   if (error instanceof ApiError && error.status === 429) {
     return { kind: 'throttled', seconds: error.retryAfterSeconds };
   }
+  // The server's answer for a frozen organization names neither it nor why.
+  if (
+    error instanceof ApiError &&
+    error.status === 403 &&
+    /frozen|temporarily disabled/i.test(error.message)
+  ) {
+    return { kind: 'frozen' };
+  }
   return {
     kind: 'other',
     message:
@@ -200,6 +219,22 @@ function failureOf(error: unknown): Failure {
 }
 
 function NoticeAlert({ notice }: { notice: SignInNotice }) {
+  if (
+    typeof notice === 'object' &&
+    notice !== null &&
+    'organizationDeleted' in notice
+  ) {
+    return (
+      <Alert variant="info">
+        <InfoIcon />
+        <AlertTitle>{notice.organizationDeleted} is being deleted</AlertTitle>
+        <AlertDescription>
+          Everyone was signed out, you included. A platform administrator will
+          finish the deletion, or reverse it if it was a mistake.
+        </AlertDescription>
+      </Alert>
+    );
+  }
   if (typeof notice === 'object' && notice !== null) {
     const ended =
       notice.everywhere === 1 ? '1 session' : `${notice.everywhere} sessions`;

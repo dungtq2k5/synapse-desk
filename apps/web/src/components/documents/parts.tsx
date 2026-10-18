@@ -5,6 +5,13 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, type ReactNode } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useViewer } from '@/hooks/use-viewer';
 import { cn } from '@/lib/utils';
 
@@ -65,7 +72,7 @@ export function Pagination({
       className="flex flex-wrap items-center justify-between gap-3 text-sm"
     >
       <p className="text-muted-foreground">
-        Showing {from}–{to} of {meta.totalItems}
+        Showing {from}–{to} of {meta.totalItems.toLocaleString('en-US')}
       </p>
       <div className="flex gap-2">
         <Button
@@ -111,5 +118,47 @@ export function Empty({
       <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
       {action}
     </div>
+  );
+}
+
+/** A filter select's "All" value, which means no filter. */
+export const ALL = 'all';
+
+/**
+ * A toolbar filter: the label until something's chosen, then "{label}: {value}".
+ * "All" clears it.
+ */
+export function FilterSelect({
+  label,
+  value,
+  options,
+  onValue,
+}: {
+  label: string;
+  value: string | undefined;
+  options: Record<string, string>;
+  onValue: (value: string) => void;
+}) {
+  return (
+    <Select value={value ?? ALL} onValueChange={onValue}>
+      <SelectTrigger aria-label={label} className="w-auto min-w-37 gap-2">
+        {value ? (
+          <span className="flex gap-1">
+            <span className="text-muted-foreground">{label}:</span>
+            <SelectValue />
+          </span>
+        ) : (
+          <span className="text-muted-foreground">{label}</span>
+        )}
+      </SelectTrigger>
+      <SelectContent className="shadow-md">
+        <SelectItem value={ALL}>All</SelectItem>
+        {Object.entries(options).map(([key, text]) => (
+          <SelectItem key={key} value={key}>
+            {text}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

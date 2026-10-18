@@ -93,6 +93,7 @@ function JoinForm({
   }>({});
   const [failure, setFailure] = useState<
     | { kind: 'throttled'; seconds: number | null }
+    | { kind: 'no-seat' }
     | { kind: 'other'; message: string }
     | null
   >(null);
@@ -134,9 +135,12 @@ function JoinForm({
         setFailure({ kind: 'throttled', seconds: error.retryAfterSeconds });
       } else if (error instanceof ApiError && error.status === 400) {
         // "This invitation is no longer valid": used, revoked or expired since
-        // it was checked. (A 429 without a wait is the workspace out of seats,
-        // and a 409 an address that already has an account: their messages.)
+        // it was checked. (A 409 is an address that already has an account:
+        // its message.)
         onDead();
+      } else if (error instanceof ApiError && error.status === 402) {
+        // The seats ran out since it was sent; the invitation still works.
+        setFailure({ kind: 'no-seat' });
       } else {
         setFailure({
           kind: 'other',
@@ -166,6 +170,16 @@ function JoinForm({
           seconds={failure.seconds}
           onOver={() => setFailure(null)}
         />
+      )}
+      {failure?.kind === 'no-seat' && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>{organization} has no free seats right now</AlertTitle>
+          <AlertDescription>
+            Ask the person who invited you to free a seat, then try again. Your
+            invitation still works.
+          </AlertDescription>
+        </Alert>
       )}
       {failure?.kind === 'other' && (
         <Alert variant="destructive">

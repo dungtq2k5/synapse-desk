@@ -41,7 +41,8 @@ import { SectionCard } from './section-card';
 export const sessionName = (session: SessionResponseDto): string =>
   session.deviceName ?? deviceName(session.userAgent);
 
-function DeviceIcon({ userAgent }: { userAgent: string }) {
+/** A session's device, by its browser's user agent. */
+export function DeviceIcon({ userAgent }: { userAgent: string }) {
   const Icon = /iPhone|iPad|Android/.test(userAgent)
     ? SmartphoneIcon
     : /Mac OS X|Macintosh/.test(userAgent)

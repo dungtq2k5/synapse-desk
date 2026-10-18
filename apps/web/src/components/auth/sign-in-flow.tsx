@@ -20,6 +20,8 @@ export type SignInNotice =
   | 'reset-signed-out-elsewhere'
   /** Signed out everywhere, ending this many sessions. */
   | { everywhere: number }
+  /** Its admin deleted this organization, signing everyone out. */
+  | { organizationDeleted: string }
   | null;
 
 type Step =
