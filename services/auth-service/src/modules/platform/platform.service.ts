@@ -41,6 +41,7 @@ import {
   limitAlertStateKeys,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation, normalizeEmail } from '@synapsedesk/core';
+import { organizationConflict } from '../organizations/organizations.service';
 import {
   AuditPublisher,
   requireActor,
@@ -823,13 +824,7 @@ export class PlatformService {
         include: ORGANIZATION_COUNTS,
       });
     } catch (error) {
-      if (isUniqueConstraintViolation(error)) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'That slug or domain is already taken',
-        });
-      }
-      throw error;
+      throw organizationConflict(error) ?? error;
     }
   }
 }

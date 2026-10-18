@@ -56,8 +56,12 @@ export class InvitationsGrpcController implements InvitationServiceController {
 
   revokeInvitation(
     request: InvitationIdRequest,
+    metadata?: Metadata,
   ): Promise<RevokeInvitationResponse> {
-    return this.invitationsService.revokeInvitation(request);
+    return this.invitationsService.revokeInvitation(
+      request,
+      unpackRequestOrigin(metadata),
+    );
   }
 
   previewInvitation(

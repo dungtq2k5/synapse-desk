@@ -127,7 +127,14 @@ export class UserAdminController {
    */
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(UserSummaryResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401', '403'])
+  @ApiFilterErrors(['400', '401', '402', '403'], {
+    descriptions: {
+      '402':
+        'A plan limit: no seat is free. `error` is the sentence to show ' +
+        '("No seats left. Revoke a pending invitation or change the plan to ' +
+        'add people.").',
+    },
+  })
   @Post()
   @RequirePermission('user.create')
   create(
@@ -184,7 +191,14 @@ export class UserAdminController {
   /** 409 if the address was taken while the account was deactivated. */
   @ApiOperation({ summary: 'Restore' })
   @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiFilterErrors(['400', '401', '402', '403', '404'], {
+    descriptions: {
+      '402':
+        'A plan limit: restoring takes a seat back and none is free. ' +
+        '`error` is the sentence to show ("No seats left. Revoke a pending ' +
+        'invitation or change the plan to add people.").',
+    },
+  })
   @Post(':id/restore')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.delete')

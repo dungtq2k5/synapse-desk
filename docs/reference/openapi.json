@@ -4244,6 +4244,44 @@
               }
             }
           },
+          "402": {
+            "description": "A plan limit: the batch needs more seats than are free, counted as the preview counts them, so nothing was sent. `error` is the sentence to show (\"No seats left. Revoke a pending invitation or change the plan to add people.\").",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "403": {
             "description": "Authenticated, but lacking the permission this route requires.",
             "content": {
@@ -5868,6 +5906,44 @@
                     "statusCode": {
                       "type": "number",
                       "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The organization has no free seat right now. `error` is the invitee's sentence (\"This organization has no free seats right now. Ask the person who invited you to free a seat, then try again. Your invitation still works.\").",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
                     },
                     "path": {
                       "type": "string",
@@ -9205,6 +9281,44 @@
               }
             }
           },
+          "402": {
+            "description": "A plan limit: no seat is free. `error` is the sentence to show (\"No seats left. Revoke a pending invitation or change the plan to add people.\").",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "403": {
             "description": "Authenticated, but lacking the permission this route requires.",
             "content": {
@@ -10657,6 +10771,44 @@
                     "statusCode": {
                       "type": "number",
                       "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "A plan limit: restoring takes a seat back and none is free. `error` is the sentence to show (\"No seats left. Revoke a pending invitation or change the plan to add people.\").",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 402
                     },
                     "path": {
                       "type": "string",
@@ -19259,6 +19411,44 @@
                     "statusCode": {
                       "type": "number",
                       "example": 403
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The slug or the domain is taken by another organization. `error` names which: \"That address is already taken by another organization.\" (the slug) or \"That domain is already used by another organization.\"",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
                     },
                     "path": {
                       "type": "string",
@@ -51851,6 +52041,12 @@
                 "DOCUMENT_FLAG_DELETED",
                 "DOCUMENT_FLAG_DISMISSED",
                 "DOCUMENT_FLAG_RESOLVED",
+                "INBOUND_ADDRESS_DISABLED",
+                "INBOUND_ADDRESS_ENABLED",
+                "INBOUND_ADDRESS_ROTATED",
+                "INVITATION_RESENT",
+                "INVITATION_REVOKED",
+                "INVITATION_SENT",
                 "ORGANIZATION_OFFBOARD_REQUESTED",
                 "ORGANIZATION_ONBOARDING_COMPLETED",
                 "ORGANIZATION_SETTINGS_UPDATED",
@@ -51882,7 +52078,11 @@
                 "USER_SESSIONS_REVOKED",
                 "USER_TWO_FACTOR_RESET",
                 "USER_UNLOCKED",
-                "USER_UPDATED"
+                "USER_UPDATED",
+                "WEBHOOK_ENDPOINT_CREATED",
+                "WEBHOOK_ENDPOINT_DELETED",
+                "WEBHOOK_ENDPOINT_UPDATED",
+                "WEBHOOK_SECRET_ROTATED"
               ]
             }
           },
@@ -51905,10 +52105,12 @@
                 "DEPARTMENT",
                 "DOCUMENT_FLAG",
                 "EXPORT",
+                "INVITATION",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
-                "USER"
+                "USER",
+                "WEBHOOK_ENDPOINT"
               ]
             }
           },
@@ -53007,6 +53209,12 @@
                 "DOCUMENT_FLAG_DELETED",
                 "DOCUMENT_FLAG_DISMISSED",
                 "DOCUMENT_FLAG_RESOLVED",
+                "INBOUND_ADDRESS_DISABLED",
+                "INBOUND_ADDRESS_ENABLED",
+                "INBOUND_ADDRESS_ROTATED",
+                "INVITATION_RESENT",
+                "INVITATION_REVOKED",
+                "INVITATION_SENT",
                 "ORGANIZATION_OFFBOARD_REQUESTED",
                 "ORGANIZATION_ONBOARDING_COMPLETED",
                 "ORGANIZATION_SETTINGS_UPDATED",
@@ -53038,7 +53246,11 @@
                 "USER_SESSIONS_REVOKED",
                 "USER_TWO_FACTOR_RESET",
                 "USER_UNLOCKED",
-                "USER_UPDATED"
+                "USER_UPDATED",
+                "WEBHOOK_ENDPOINT_CREATED",
+                "WEBHOOK_ENDPOINT_DELETED",
+                "WEBHOOK_ENDPOINT_UPDATED",
+                "WEBHOOK_SECRET_ROTATED"
               ]
             }
           },
@@ -53061,10 +53273,12 @@
                 "DEPARTMENT",
                 "DOCUMENT_FLAG",
                 "EXPORT",
+                "INVITATION",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
-                "USER"
+                "USER",
+                "WEBHOOK_ENDPOINT"
               ]
             }
           },
@@ -63021,6 +63235,11 @@
               "type": "string"
             }
           },
+          "inboundAddress": {
+            "type": "string",
+            "nullable": true,
+            "description": "The support address customers write to, `null` while inbound email is\noff. A published address, not a secret: rotating it is how an old one\nstops working."
+          },
           "maxDocumentBytesOverride": {
             "type": "number",
             "nullable": true,
@@ -63039,6 +63258,7 @@
           "enforceTwoFactor",
           "allowedEmailDomains",
           "publicDomainWarnings",
+          "inboundAddress",
           "maxDocumentBytesOverride",
           "maxAttachmentBytesOverride",
           "maxAttachmentsPerMessageOverride"
@@ -63096,7 +63316,9 @@
           },
           "unavailableReason": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Why there's no number, when `available` is false: `READ_FAILED` (it\ncouldn't be read just now; try again) or `NOT_AVAILABLE` (this\norganization has no such meter). Null when available.",
+            "enum": ["NOT_AVAILABLE", "READ_FAILED"]
           }
         },
         "required": ["available", "used", "limit", "unavailableReason"]
@@ -66540,6 +66762,12 @@
               "DOCUMENT_FLAG_DELETED",
               "DOCUMENT_FLAG_DISMISSED",
               "DOCUMENT_FLAG_RESOLVED",
+              "INBOUND_ADDRESS_DISABLED",
+              "INBOUND_ADDRESS_ENABLED",
+              "INBOUND_ADDRESS_ROTATED",
+              "INVITATION_RESENT",
+              "INVITATION_REVOKED",
+              "INVITATION_SENT",
               "ORGANIZATION_OFFBOARD_REQUESTED",
               "ORGANIZATION_ONBOARDING_COMPLETED",
               "ORGANIZATION_SETTINGS_UPDATED",
@@ -66571,7 +66799,11 @@
               "USER_SESSIONS_REVOKED",
               "USER_TWO_FACTOR_RESET",
               "USER_UNLOCKED",
-              "USER_UPDATED"
+              "USER_UPDATED",
+              "WEBHOOK_ENDPOINT_CREATED",
+              "WEBHOOK_ENDPOINT_DELETED",
+              "WEBHOOK_ENDPOINT_UPDATED",
+              "WEBHOOK_SECRET_ROTATED"
             ],
             "type": "string"
           },
@@ -66581,10 +66813,12 @@
               "DEPARTMENT",
               "DOCUMENT_FLAG",
               "EXPORT",
+              "INVITATION",
               "ORGANIZATION",
               "ROLE",
               "SUBSCRIPTION_PLAN",
-              "USER"
+              "USER",
+              "WEBHOOK_ENDPOINT"
             ],
             "type": "string"
           },
@@ -66658,6 +66892,12 @@
                 "DOCUMENT_FLAG_DELETED",
                 "DOCUMENT_FLAG_DISMISSED",
                 "DOCUMENT_FLAG_RESOLVED",
+                "INBOUND_ADDRESS_DISABLED",
+                "INBOUND_ADDRESS_ENABLED",
+                "INBOUND_ADDRESS_ROTATED",
+                "INVITATION_RESENT",
+                "INVITATION_REVOKED",
+                "INVITATION_SENT",
                 "ORGANIZATION_OFFBOARD_REQUESTED",
                 "ORGANIZATION_ONBOARDING_COMPLETED",
                 "ORGANIZATION_SETTINGS_UPDATED",
@@ -66689,7 +66929,11 @@
                 "USER_SESSIONS_REVOKED",
                 "USER_TWO_FACTOR_RESET",
                 "USER_UNLOCKED",
-                "USER_UPDATED"
+                "USER_UPDATED",
+                "WEBHOOK_ENDPOINT_CREATED",
+                "WEBHOOK_ENDPOINT_DELETED",
+                "WEBHOOK_ENDPOINT_UPDATED",
+                "WEBHOOK_SECRET_ROTATED"
               ]
             }
           }

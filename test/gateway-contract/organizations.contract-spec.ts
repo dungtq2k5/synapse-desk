@@ -343,7 +343,7 @@ describe('organizations', () => {
     async () => {
       peers.auth.on('OrganizationService/GetOrganizationUsage').reply({
         seats: { available: true, used: 3, limit: 10 },
-        aiTokens: { available: false, unavailableReason: 'Not yet metered' },
+        aiTokens: { available: false, unavailableReason: 'NOT_AVAILABLE' },
         billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
         aiModelTier: 'AI_MODEL_TIER_FAST',
         planName: 'Pro',
@@ -364,7 +364,7 @@ describe('organizations', () => {
         data: {
           seats: { available: true, used: 3, limit: 10 },
           storage: { available: true, used: 500, limit: 1_000_000_000 },
-          aiTokens: { available: false, unavailableReason: 'Not yet metered' },
+          aiTokens: { available: false, unavailableReason: 'NOT_AVAILABLE' },
           planName: 'Pro',
         },
       });
@@ -393,7 +393,7 @@ describe('organizations', () => {
       expect(response.body).toMatchObject({
         data: { storage: { available: false, used: null, limit: null } },
       });
-      expect(response.body.data.storage.unavailableReason).toBeTruthy();
+      expect(response.body.data.storage.unavailableReason).toBe('READ_FAILED');
     },
   );
 
@@ -477,6 +477,27 @@ describe('organizations', () => {
       expect(call.request).toMatchObject({
         reason: 'Customer requested closure',
       });
+    },
+  );
+
+  rowFor('Organizations')(
+    '**`update` with a taken slug answers 409 naming the address**',
+    async () => {
+      const sentence = 'That address is already taken by another organization.';
+      peers.auth
+        .on('OrganizationService/UpdateOrganization')
+        .fail(GrpcStatus.ALREADY_EXISTS, sentence);
+
+      const response = await new Session(gateway.baseUrl).request(
+        'PATCH',
+        `${API}/organizations/current`,
+        { body: { slug: 'taken' }, headers: headers(['organization.update']) },
+      );
+
+      expect(response.status).toBe(409);
+      expect((response.body as { error: string }).error).toBe(
+        `${sentence.slice(0, -1)}!`,
+      );
     },
   );
 });

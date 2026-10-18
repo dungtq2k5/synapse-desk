@@ -143,7 +143,15 @@ export class OrganizationsController {
   /** `slug` changes break existing links; `domain` is security-relevant. */
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(OrganizationResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
+  @ApiFilterErrors(['400', '401', '403', '409'], {
+    descriptions: {
+      '409':
+        'The slug or the domain is taken by another organization. `error` ' +
+        'names which: "That address is already taken by another ' +
+        'organization." (the slug) or "That domain is already used by ' +
+        'another organization."',
+    },
+  })
   @InvalidateCache(CACHE_SCOPES.organizations)
   @Patch()
   @RequirePermission('organization.update')

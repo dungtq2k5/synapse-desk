@@ -146,7 +146,16 @@ export interface OrganizationSettingsResponse {
    */
   maxDocumentBytesOverride?: number | undefined;
   maxAttachmentBytesOverride?: number | undefined;
-  maxAttachmentsPerMessageOverride?: number | undefined;
+  maxAttachmentsPerMessageOverride?:
+    | number
+    | undefined;
+  /**
+   * The inbound-mail token, absent when inbound email is off. The gateway
+   * turns it into the support address (`support+{token}@{domain}`), which is
+   * published to customers rather than secret; the bare token never leaves
+   * the gateway.
+   */
+  inboundToken?: string | undefined;
 }
 
 export interface GetOrganizationSettingsRequest {

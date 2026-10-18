@@ -1,4 +1,5 @@
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { AuditAction, PLAN_LIMIT_DIMENSIONS } from '@synapsedesk/contracts';
 import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
@@ -186,8 +187,9 @@ describe('The plan catalogue (e2e)', () => {
       );
       await plans.applyPlan({ planId: plan.id, dryRun: false }, context());
 
-      // Five users hold seats on a plan that now grants three.
-      const result = await invitations.createInvitations(
+      // Five users hold seats on a plan that now grants three. The batch is
+      // refused whole, before any address is tried.
+      const sending = invitations.createInvitations(
         {
           organizationId: organization.id,
           invitedById: inviter.id,
@@ -202,11 +204,19 @@ describe('The plan catalogue (e2e)', () => {
         { ip: '127.0.0.1', userAgent: 'jest' },
       );
 
-      expect(result.created).toHaveLength(0);
-      expect(result.failed).toHaveLength(1);
+      await expectRpc(sending, status.RESOURCE_EXHAUSTED);
       // **Named.** "Failed" alone sends an admin to the logs; the reason is
       // what lets them fix it themselves by freeing a seat or upgrading.
-      expect(result.failed[0].reason).toMatch(/seat/i);
+      await sending.catch((error: unknown) =>
+        expect((error as RpcException).getError()).toMatchObject({
+          message: expect.stringMatching(/seat/i),
+        }),
+      );
+      expect(
+        await fx.prisma.userInvitation.count({
+          where: { organizationId: organization.id },
+        }),
+      ).toBe(0);
     });
 
     it('3. **An over-seat tenant’s existing agents keep their accounts**', async () => {

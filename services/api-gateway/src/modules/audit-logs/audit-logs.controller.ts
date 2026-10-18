@@ -80,9 +80,8 @@ export class AuditLogsController {
    * retry can trigger, and each would produce another file against a tenant's
    * storage. The plan named GET; the shipped analytics export settled this.
    *
-   * CSV or `application/json` — `audit_logs.metadata` is genuinely nested and
-   * CSV flattens it into one quoted cell, which is the argument for offering
-   * JSON here and not on the ticket export.
+   * **CSV only.** `audit_logs.metadata` is nested, so each row carries it as
+   * one quoted cell holding its JSON.
    *
    * **The request itself is audited**, which closes a circularity: without it
    * the one export whose purpose is compliance was the only act missing from

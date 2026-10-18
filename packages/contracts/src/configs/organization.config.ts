@@ -6,6 +6,17 @@
  * enum instead of in whichever service happened to need them first.
  */
 
+/**
+ * Why a usage meter has no number (`unavailableReason`).
+ *
+ * - `READ_FAILED`: it couldn't be read just now; trying again may work.
+ * - `NOT_AVAILABLE`: this organization has no such meter.
+ */
+export enum UsageUnavailableReason {
+  READ_FAILED = 'READ_FAILED',
+  NOT_AVAILABLE = 'NOT_AVAILABLE',
+}
+
 export enum OrgStatus {
   PENDING_ONBOARDING = 'PENDING_ONBOARDING',
   ACTIVE = 'ACTIVE',

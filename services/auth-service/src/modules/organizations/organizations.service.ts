@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type Redis from 'ioredis';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
@@ -39,15 +40,19 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
+  quotaCounterKey,
+  UsageUnavailableReason,
 } from '@synapsedesk/contracts';
-import { isUniqueConstraintViolation } from '@synapsedesk/core';
+import { isUniqueConstraintViolation, withHttpStatus } from '@synapsedesk/core';
 import {
   AuditPublisher,
+  formatErrorMsg,
   generateInboundToken,
   requireTenant,
   LimitAlertPublisher,
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import { SessionsService } from '../sessions/sessions.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { Organization, Prisma } from '../../generated/prisma/client';
@@ -58,14 +63,62 @@ import {
 } from '../../common/configs/app.config';
 import { toOrganizationResponse } from './organization.mapper';
 
+/** A slug taken by another organization (the profile's "address"). */
+export const SLUG_TAKEN_MESSAGE =
+  'That address is already taken by another organization.';
+
+/** A domain taken by another organization. */
+export const DOMAIN_TAKEN_MESSAGE =
+  'That domain is already used by another organization.';
+
+/**
+ * The 409 for an organization write that hit a unique index, naming the field
+ * from the index it violated, so the page can put the error under it. `null`
+ * for any other error.
+ */
+export function organizationConflict(error: unknown): RpcException | null {
+  if (!isUniqueConstraintViolation(error)) return null;
+  return new RpcException({
+    code: status.ALREADY_EXISTS,
+    message: isUniqueConstraintViolation(error, 'organizations_domain_key')
+      ? DOMAIN_TAKEN_MESSAGE
+      : SLUG_TAKEN_MESSAGE,
+  });
+}
+
+/** The admin's refusal at the seat limit: inviting, adding or restoring someone. */
+export const NO_SEATS_MESSAGE =
+  'No seats left. Revoke a pending invitation or change the plan to add people.';
+
+/** The invitee's refusal at the seat limit, accepting an invitation. */
+export const NO_SEATS_TO_JOIN_MESSAGE =
+  'This organization has no free seats right now. Ask the person who invited you to free a seat, then try again. Your invitation still works.';
+
+/**
+ * A seat refusal: a plan limit, so 402 like storage and the document count.
+ * The marker carries the status across the gRPC hop and the gateway forwards
+ * the sentence. Not 429, the rate limit's ("try again soon" is wrong here).
+ */
+export function noSeats(message: string): RpcException {
+  return new RpcException({
+    code: status.RESOURCE_EXHAUSTED,
+    message: withHttpStatus(402, message),
+  });
+}
+
 @Injectable()
 export class OrganizationsService {
+  private readonly logger = new Logger(OrganizationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
     private readonly sessionsService: SessionsService,
     private readonly notifications: NotificationPublisher,
     private readonly limitAlerts: LimitAlertPublisher,
+    // The Redis the AI allowance counter lives in (`quota:{org}:{cycle}`): the
+    // same address and database every service that charges it uses.
+    @Inject(LIMIT_ALERT_REDIS) private readonly redis: Redis,
   ) {}
 
   async getCurrentOrganization(
@@ -209,15 +262,14 @@ export class OrganizationsService {
     });
 
     this.audit.record(context, {
-      action: AuditAction.ORGANIZATION_UPDATED,
+      action: existing.inboundToken
+        ? AuditAction.INBOUND_ADDRESS_ROTATED
+        : AuditAction.INBOUND_ADDRESS_ENABLED,
       resourceType: AuditResourceType.ORGANIZATION,
       resourceId: existing.id,
       // **The token itself is not recorded, and neither is the old one.** It is
       // not a secret (customers email it), but an audit log is the wrong place
       // to keep a copy of an address somebody rotated precisely to stop using.
-      metadata: {
-        after: { inboundEmail: existing.inboundToken ? 'rotated' : 'enabled' },
-      },
     });
 
     return { inboundToken };
@@ -242,10 +294,9 @@ export class OrganizationsService {
       });
 
       this.audit.record(context, {
-        action: AuditAction.ORGANIZATION_UPDATED,
+        action: AuditAction.INBOUND_ADDRESS_DISABLED,
         resourceType: AuditResourceType.ORGANIZATION,
         resourceId: existing.id,
-        metadata: { after: { inboundEmail: 'disabled' } },
       });
     }
 
@@ -360,6 +411,7 @@ export class OrganizationsService {
       // Only a WRITE can introduce a questionable domain, so a read reports none.
       publicDomainWarnings: [],
       ...toLimitOverrides(organization),
+      inboundToken: organization.inboundToken ?? undefined,
     };
   }
 
@@ -442,6 +494,7 @@ export class OrganizationsService {
       allowedEmailDomains: organization.allowedEmailDomains,
       publicDomainWarnings: warnings,
       ...toLimitOverrides(organization),
+      inboundToken: organization.inboundToken ?? undefined,
     };
   }
 
@@ -488,15 +541,44 @@ export class OrganizationsService {
       // counting bytes and contradicted every refusal that quoted them.
       storage: {
         available: false,
-        unavailableReason: 'Storage usage is answered by ingestion-service',
+        unavailableReason: UsageUnavailableReason.READ_FAILED,
       },
-      aiTokens: {
-        available: false,
-        unavailableReason:
-          'AI usage metering is not enabled for this workspace yet',
-      },
+      aiTokens: await this.aiAllowanceMeter(organization),
       billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
     };
+  }
+
+  /**
+   * The AI allowance this cycle, in micros: what the gate has charged against
+   * the budget. Read from the counter every spending service increments, so it
+   * is the number the gate refuses on. An unreadable counter is `READ_FAILED`,
+   * never 0: a zero would read as "nothing spent".
+   */
+  private async aiAllowanceMeter(
+    organization: Pick<
+      Organization,
+      'id' | 'billingCycleStart' | 'monthlyAiTokenBudget'
+    >,
+  ): Promise<OrganizationUsageResponse['aiTokens']> {
+    try {
+      const spent = await this.redis.get(
+        quotaCounterKey(organization.id, organization.billingCycleStart),
+      );
+      return {
+        available: true,
+        // An absent key is a genuine zero: a new cycle, or nothing spent yet.
+        used: Number(spent ?? 0),
+        limit: Number(organization.monthlyAiTokenBudget),
+      };
+    } catch (error) {
+      this.logger.warn(
+        `AI allowance counter unreadable for ${organization.id}: ${formatErrorMsg(error)}`,
+      );
+      return {
+        available: false,
+        unavailableReason: UsageUnavailableReason.READ_FAILED,
+      };
+    }
   }
 
   /**
@@ -995,13 +1077,7 @@ export class OrganizationsService {
     try {
       return await write();
     } catch (error) {
-      if (isUniqueConstraintViolation(error)) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'That slug or domain is already taken',
-        });
-      }
-      throw error;
+      throw organizationConflict(error) ?? error;
     }
   }
 }

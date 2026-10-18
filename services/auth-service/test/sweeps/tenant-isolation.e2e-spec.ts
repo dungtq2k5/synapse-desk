@@ -270,11 +270,14 @@ describe('tenant isolation sweep (e2e)', () => {
       {
         name: 'invitations.revokeInvitation',
         run: (f, a) =>
-          invitations.revokeInvitation({
-            invitationId: f.invitationId,
-            organizationId: a.organizationId!,
-            actorId: a.sub!,
-          }),
+          invitations.revokeInvitation(
+            {
+              invitationId: f.invitationId,
+              organizationId: a.organizationId!,
+              actorId: a.sub!,
+            },
+            { ip: '127.0.0.1', userAgent: 'jest' },
+          ),
       },
       {
         name: 'invitations.resendInvitation',

@@ -1,5 +1,7 @@
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { expectRpc } from '@synapsedesk/testing/rpc';
+import { AuditAction } from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { seedTenantWithUser } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
@@ -98,6 +100,53 @@ describe('The inbound token lifecycle (e2e)', () => {
         })
       ).inboundToken,
     ).toBeNull();
+  });
+
+  it('3b. **the settings read carries the token through on, rotate and off**', async () => {
+    const tenant = await seedTenantWithUser(fx.prisma);
+    const read = async () =>
+      (await organizations.getOrganizationSettings(caller(tenant)))
+        .inboundToken;
+
+    expect(await read()).toBeUndefined();
+
+    const first = (await organizations.issueInboundToken(caller(tenant)))
+      .inboundToken;
+    expect(await read()).toBe(first);
+
+    const rotated = (await organizations.issueInboundToken(caller(tenant)))
+      .inboundToken;
+    expect(await read()).toBe(rotated);
+
+    await organizations.revokeInboundToken(caller(tenant));
+    expect(await read()).toBeUndefined();
+  });
+
+  it('3c. **on, rotate and off each record their own action, with no token in the metadata**', async () => {
+    const record = jest
+      .spyOn(fx.moduleRef.get(AuditPublisher), 'record')
+      .mockImplementation(() => undefined);
+    try {
+      const tenant = await seedTenantWithUser(fx.prisma);
+      const first = (await organizations.issueInboundToken(caller(tenant)))
+        .inboundToken;
+      const second = (await organizations.issueInboundToken(caller(tenant)))
+        .inboundToken;
+      await organizations.revokeInboundToken(caller(tenant));
+      // Already off: nothing to record.
+      await organizations.revokeInboundToken(caller(tenant));
+
+      expect(record.mock.calls.map(([, event]) => event.action)).toEqual([
+        AuditAction.INBOUND_ADDRESS_ENABLED,
+        AuditAction.INBOUND_ADDRESS_ROTATED,
+        AuditAction.INBOUND_ADDRESS_DISABLED,
+      ]);
+      const recorded = JSON.stringify(record.mock.calls);
+      expect(recorded).not.toContain(first);
+      expect(recorded).not.toContain(second);
+    } finally {
+      record.mockRestore();
+    }
   });
 
   it('4. revoking twice is not an error', async () => {

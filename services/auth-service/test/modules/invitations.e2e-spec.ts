@@ -1,14 +1,26 @@
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { InvitationStatus } from '@synapsedesk/contracts';
+import {
+  AuditAction,
+  AuditResourceType,
+  InvitationStatus,
+} from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
 import { PageRequest, SortOrder } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
+import { RpcException } from '@nestjs/microservices';
+import { withHttpStatus } from '@synapsedesk/core';
 import {
+  addMember,
   createInvitation,
   seedForeignTenant,
   seedTenantWithUser,
 } from '../factories';
-import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
+import {
+  NO_SEATS_MESSAGE,
+  NO_SEATS_TO_JOIN_MESSAGE,
+  OrganizationsService,
+} from '../../src/modules/organizations/organizations.service';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
 
 /**
@@ -232,11 +244,14 @@ describe('Invitations (e2e)', () => {
         ),
       ).resolves.toBeDefined();
 
-      await invitations.revokeInvitation({
-        invitationId: row.id,
-        organizationId: t.org.id,
-        actorId: t.user.id,
-      });
+      await invitations.revokeInvitation(
+        {
+          invitationId: row.id,
+          organizationId: t.org.id,
+          actorId: t.user.id,
+        },
+        { ip: '127.0.0.1', userAgent: 'jest' },
+      );
 
       expect(
         (
@@ -341,6 +356,162 @@ describe('Invitations (e2e)', () => {
       expect(after).toBe(before);
       // Not vacuous: the pending invitation was counted in the first place.
       expect(before).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('at the seat limit', () => {
+    const refusal = async (promise: Promise<unknown>) =>
+      (
+        (await promise.catch((error: unknown) => error)) as RpcException
+      ).getError();
+
+    it('**a batch with more addresses than seats is a 402, and nothing is sent**', async () => {
+      // The admin holds one of two seats; two addresses need two.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 2 },
+      });
+
+      const sending = invitations.createInvitations(
+        {
+          organizationId: t.org.id,
+          invitedById: t.user.id,
+          invitations: [
+            { email: 'one@invite.test', roleIds: [], departmentIds: [] },
+            { email: 'two@invite.test', roleIds: [], departmentIds: [] },
+          ],
+        },
+        { ip: '127.0.0.1', userAgent: 'jest' },
+      );
+
+      await expectRpc(sending, status.RESOURCE_EXHAUSTED);
+      expect(await refusal(sending)).toMatchObject({
+        message: withHttpStatus(402, NO_SEATS_MESSAGE),
+      });
+      expect(
+        await fx.prisma.userInvitation.count({
+          where: { organizationId: t.org.id },
+        }),
+      ).toBe(0);
+    });
+
+    it('counts the batch as the preview does: an address already pending takes no new seat', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 3 },
+      });
+      await createInvitation(fx.prisma, t.org.id, {
+        invitedById: t.user.id,
+        email: 'pending@invite.test',
+      });
+
+      const result = await invitations.createInvitations(
+        {
+          organizationId: t.org.id,
+          invitedById: t.user.id,
+          invitations: [
+            { email: 'pending@invite.test', roleIds: [], departmentIds: [] },
+            { email: 'new@invite.test', roleIds: [], departmentIds: [] },
+          ],
+        },
+        { ip: '127.0.0.1', userAgent: 'jest' },
+      );
+
+      expect(result.created.map(({ email }) => email)).toEqual([
+        'new@invite.test',
+      ]);
+      expect(result.failed).toHaveLength(1);
+    });
+
+    it('**accepting when the seats ran out in between is a 402 with the invitee’s sentence**', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 2 },
+      });
+      const { token } = await createInvitation(fx.prisma, t.org.id, {
+        invitedById: t.user.id,
+        email: 'late@invite.test',
+      });
+      // A member added another way takes the last seat.
+      await addMember(fx.prisma, t.org.id);
+
+      const accepting = invitations.acceptInvitation(
+        { token, fullName: 'Late', password: 'TestPassw0rd!' },
+        { ip: '127.0.0.1', userAgent: 'jest' },
+      );
+
+      await expectRpc(accepting, status.RESOURCE_EXHAUSTED);
+      expect(await refusal(accepting)).toMatchObject({
+        message: withHttpStatus(402, NO_SEATS_TO_JOIN_MESSAGE),
+      });
+    });
+  });
+
+  describe('the audit trail', () => {
+    it('**sending, re-sending and revoking each record one entry, and no token reaches the metadata**', async () => {
+      const record = jest
+        .spyOn(fx.moduleRef.get(AuditPublisher), 'record')
+        .mockImplementation(() => undefined);
+      try {
+        const t = await seedTenantWithUser(fx.prisma, {
+          organization: { maxAgentSeats: 50 },
+        });
+        const origin = { ip: '127.0.0.1', userAgent: 'jest' };
+        const {
+          created: [sent],
+        } = await invitations.createInvitations(
+          {
+            organizationId: t.org.id,
+            invitedById: t.user.id,
+            invitations: [
+              { email: 'audit@invite.test', roleIds: [], departmentIds: [] },
+            ],
+          },
+          origin,
+        );
+        const id = {
+          invitationId: sent.id,
+          organizationId: t.org.id,
+          actorId: t.user.id,
+        };
+        const firstHash = (
+          await fx.prisma.userInvitation.findUniqueOrThrow({
+            where: { id: sent.id },
+          })
+        ).tokenHash;
+        await invitations.resendInvitation(id, origin);
+        const secondHash = (
+          await fx.prisma.userInvitation.findUniqueOrThrow({
+            where: { id: sent.id },
+          })
+        ).tokenHash;
+        await invitations.revokeInvitation(id, origin);
+
+        const entries = record.mock.calls.map(([context, event]) => ({
+          actor: context.sub,
+          action: event.action,
+          resourceType: event.resourceType,
+          resourceId: event.resourceId,
+        }));
+        expect(entries).toEqual(
+          [
+            AuditAction.INVITATION_SENT,
+            AuditAction.INVITATION_RESENT,
+            AuditAction.INVITATION_REVOKED,
+          ].map((action) => ({
+            actor: t.user.id,
+            action,
+            resourceType: AuditResourceType.INVITATION,
+            resourceId: sent.id,
+          })),
+        );
+        const metadata = JSON.stringify(
+          record.mock.calls.map(([, event]) => event.metadata),
+        );
+        expect(metadata).toContain('audit@invite.test');
+        expect(metadata).not.toContain(firstHash);
+        expect(metadata).not.toContain(secondHash);
+        expect(metadata).not.toMatch(/token/i);
+      } finally {
+        record.mockRestore();
+      }
     });
   });
 

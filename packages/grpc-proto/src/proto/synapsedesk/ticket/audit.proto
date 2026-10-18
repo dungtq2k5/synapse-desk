@@ -90,6 +90,22 @@ enum AuditAction {
   AUDIT_ACTION_PLATFORM_PLAN_DELETED = 41;
   // The fan-out, not the edit: whose entitlements were rewritten and when.
   AUDIT_ACTION_PLATFORM_PLAN_APPLIED = 42;
+
+  // Invitations. The address is recorded; the token never is.
+  AUDIT_ACTION_INVITATION_SENT = 43;
+  AUDIT_ACTION_INVITATION_RESENT = 44;
+  AUDIT_ACTION_INVITATION_REVOKED = 45;
+
+  // Webhook endpoints. Never the signing secret.
+  AUDIT_ACTION_WEBHOOK_ENDPOINT_CREATED = 46;
+  AUDIT_ACTION_WEBHOOK_ENDPOINT_UPDATED = 47;
+  AUDIT_ACTION_WEBHOOK_SECRET_ROTATED = 48;
+  AUDIT_ACTION_WEBHOOK_ENDPOINT_DELETED = 49;
+
+  // The inbound support address.
+  AUDIT_ACTION_INBOUND_ADDRESS_ENABLED = 50;
+  AUDIT_ACTION_INBOUND_ADDRESS_ROTATED = 51;
+  AUDIT_ACTION_INBOUND_ADDRESS_DISABLED = 52;
 }
 
 enum AuditResourceType {
@@ -102,6 +118,8 @@ enum AuditResourceType {
   AUDIT_RESOURCE_TYPE_EXPORT = 6;
   // Owned by no tenant, which is the point.
   AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN = 7;
+  AUDIT_RESOURCE_TYPE_INVITATION = 8;
+  AUDIT_RESOURCE_TYPE_WEBHOOK_ENDPOINT = 9;
 }
 
 message AuditLogResponse {

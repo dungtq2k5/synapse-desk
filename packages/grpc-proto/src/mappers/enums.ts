@@ -710,6 +710,26 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_DELETED,
     [AuditAction.DATA_EXPORT_REQUESTED]:
       ProtoAuditAction.AUDIT_ACTION_DATA_EXPORT_REQUESTED,
+    [AuditAction.INVITATION_SENT]:
+      ProtoAuditAction.AUDIT_ACTION_INVITATION_SENT,
+    [AuditAction.INVITATION_RESENT]:
+      ProtoAuditAction.AUDIT_ACTION_INVITATION_RESENT,
+    [AuditAction.INVITATION_REVOKED]:
+      ProtoAuditAction.AUDIT_ACTION_INVITATION_REVOKED,
+    [AuditAction.WEBHOOK_ENDPOINT_CREATED]:
+      ProtoAuditAction.AUDIT_ACTION_WEBHOOK_ENDPOINT_CREATED,
+    [AuditAction.WEBHOOK_ENDPOINT_UPDATED]:
+      ProtoAuditAction.AUDIT_ACTION_WEBHOOK_ENDPOINT_UPDATED,
+    [AuditAction.WEBHOOK_SECRET_ROTATED]:
+      ProtoAuditAction.AUDIT_ACTION_WEBHOOK_SECRET_ROTATED,
+    [AuditAction.WEBHOOK_ENDPOINT_DELETED]:
+      ProtoAuditAction.AUDIT_ACTION_WEBHOOK_ENDPOINT_DELETED,
+    [AuditAction.INBOUND_ADDRESS_ENABLED]:
+      ProtoAuditAction.AUDIT_ACTION_INBOUND_ADDRESS_ENABLED,
+    [AuditAction.INBOUND_ADDRESS_ROTATED]:
+      ProtoAuditAction.AUDIT_ACTION_INBOUND_ADDRESS_ROTATED,
+    [AuditAction.INBOUND_ADDRESS_DISABLED]:
+      ProtoAuditAction.AUDIT_ACTION_INBOUND_ADDRESS_DISABLED,
   },
   ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED,
 );
@@ -731,6 +751,10 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_EXPORT,
     [AuditResourceType.SUBSCRIPTION_PLAN]:
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN,
+    [AuditResourceType.INVITATION]:
+      ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_INVITATION,
+    [AuditResourceType.WEBHOOK_ENDPOINT]:
+      ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_WEBHOOK_ENDPOINT,
   },
   ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
 );

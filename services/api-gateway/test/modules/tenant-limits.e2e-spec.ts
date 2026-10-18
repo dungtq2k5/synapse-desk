@@ -213,6 +213,28 @@ describe('Tenant limit overrides at the HTTP boundary (e2e)', () => {
       expect(res.body.data.maxDocumentBytesOverride).toBeNull();
       expect(res.body.data.maxAttachmentBytesOverride).toBeNull();
       expect(res.body.data.maxAttachmentsPerMessageOverride).toBeNull();
+      expect(res.body.data.inboundAddress).toBeNull();
+    });
+
+    it('**the inbound address is built from the token, and the bare token never leaves**', async () => {
+      const token = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+      fx.stubs.organization.getOrganizationSettings.mockReturnValue(
+        of({
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          publicDomainWarnings: [],
+          inboundToken: token,
+        }),
+      );
+
+      const res = await admin()
+        .get(`${API}/organizations/current/settings`)
+        .expect(200);
+
+      expect(res.body.data.inboundAddress).toBe(
+        `support+${token}@inbound.test`,
+      );
+      expect(res.body.data).not.toHaveProperty('inboundToken');
     });
   });
 });

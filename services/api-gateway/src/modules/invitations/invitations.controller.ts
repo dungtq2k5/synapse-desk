@@ -85,7 +85,15 @@ export class InvitationsController {
   @ApiWrappedResponse(CreateInvitationsResponseDto, {
     status: HttpStatus.CREATED,
   })
-  @ApiFilterErrors(['400', '401', '403'])
+  @ApiFilterErrors(['400', '401', '402', '403'], {
+    descriptions: {
+      '402':
+        'A plan limit: the batch needs more seats than are free, counted as ' +
+        'the preview counts them, so nothing was sent. `error` is the ' +
+        'sentence to show ("No seats left. Revoke a pending invitation or ' +
+        'change the plan to add people.").',
+    },
+  })
   @Post()
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard, PermissionGuard)
   @RequirePermission('user.invite')
@@ -215,7 +223,15 @@ export class InvitationsController {
     security: [],
   })
   @ApiWrappedResponse(LoginResponseDto)
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '402'], {
+    descriptions: {
+      '402':
+        'The organization has no free seat right now. `error` is the ' +
+        'invitee\'s sentence ("This organization has no free seats right ' +
+        'now. Ask the person who invited you to free a seat, then try ' +
+        'again. Your invitation still works.").',
+    },
+  })
   // **No `@InvalidateCache`, and it would not work here.** Acceptance grants
   // roles, which moves `roles.user_assigned` — a field `GET /roles` caches. But
   // `CacheInvalidationInterceptor` derives the tenant from the request context

@@ -7,6 +7,7 @@
  */
 
 import { sign } from 'jsonwebtoken';
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
@@ -515,6 +516,33 @@ describe('invitations', () => {
         expect(call.request.organizationId ?? '').toBe('');
         expect(response.status).not.toBe(500);
       }
+    },
+  );
+
+  /** A plan limit is 402 with auth-service's sentence; the marker stays behind. */
+  rowFor('Invitations')(
+    '**`create` with too few seats answers 402 with the server’s sentence**',
+    async () => {
+      const sentence =
+        'No seats left. Revoke a pending invitation or change the plan to add people.';
+      peers.auth
+        .on('InvitationService/CreateInvitations')
+        .fail(GrpcStatus.RESOURCE_EXHAUSTED, `[http:402] ${sentence}`);
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/users/invitations`,
+        {
+          invitations: [
+            { email: 'invitee@example.com', roleIds: [], departmentIds: [] },
+          ],
+        },
+        headers(['user.invite']),
+      );
+
+      expect(response.status).toBe(402);
+      expect((response.body as { error: string }).error).toBe(
+        `${sentence.slice(0, -1)}!`,
+      );
     },
   );
 });

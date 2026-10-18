@@ -4,11 +4,14 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  AuditAction,
+  AuditResourceType,
   NOTIFICATION_TYPE_VALUES,
   type CallerContext,
   type NotificationType,
 } from '@synapsedesk/contracts';
 import {
+  AuditPublisher,
   MAX_WEBHOOK_ENDPOINTS,
   MAX_WEBHOOK_URL_LENGTH,
   WEBHOOK_DELIVERY_LIMIT,
@@ -55,6 +58,7 @@ export class WebhookAdminService {
     private readonly prisma: PrismaService,
     private readonly sender: WebhookSenderService,
     private readonly configService: ConfigService,
+    private readonly audit: AuditPublisher,
   ) {}
 
   async list(context: CallerContext): Promise<ListWebhookEndpointsResponse> {
@@ -109,6 +113,15 @@ export class WebhookAdminService {
       },
     });
 
+    // The URL and what it receives. **Never the secret**, here or on rotate:
+    // an audit log readable by `audit.read` is not where a signing key goes.
+    this.audit.record(context, {
+      action: AuditAction.WEBHOOK_ENDPOINT_CREATED,
+      resourceType: AuditResourceType.WEBHOOK_ENDPOINT,
+      resourceId: row.id,
+      metadata: { url: row.url, eventTypes: row.eventTypes },
+    });
+
     // **The secret rides only here and on rotate — shown once.** A listing
     // that repeated it would make every read of the settings page a copy of
     // the signing key.
@@ -149,6 +162,24 @@ export class WebhookAdminService {
       },
     });
 
+    this.audit.record(context, {
+      action: AuditAction.WEBHOOK_ENDPOINT_UPDATED,
+      resourceType: AuditResourceType.WEBHOOK_ENDPOINT,
+      resourceId: row.id,
+      metadata: {
+        before: {
+          url: current.url,
+          eventTypes: current.eventTypes,
+          isActive: current.isActive,
+        },
+        after: {
+          url: row.url,
+          eventTypes: row.eventTypes,
+          isActive: row.isActive,
+        },
+      },
+    });
+
     return toWebhookEndpointResponse(row);
   }
 
@@ -162,6 +193,13 @@ export class WebhookAdminService {
     // credentialed integration, and "removed" meaning "still listed somewhere"
     // is the wrong surprise for a security surface.
     await this.prisma.webhookEndpoint.delete({ where: { id: current.id } });
+
+    this.audit.record(context, {
+      action: AuditAction.WEBHOOK_ENDPOINT_DELETED,
+      resourceType: AuditResourceType.WEBHOOK_ENDPOINT,
+      resourceId: current.id,
+      metadata: { url: current.url },
+    });
 
     return { deleted: true };
   }
@@ -186,6 +224,13 @@ export class WebhookAdminService {
           Date.now() + WEBHOOK_ROTATION_OVERLAP_HOURS * 60 * 60 * 1000,
         ),
       },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.WEBHOOK_SECRET_ROTATED,
+      resourceType: AuditResourceType.WEBHOOK_ENDPOINT,
+      resourceId: row.id,
+      metadata: { url: row.url },
     });
 
     return { endpoint: toWebhookEndpointResponse(row), secret };

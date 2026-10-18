@@ -1,6 +1,10 @@
 /** @file What the organization routes return. */
 
-import type { AiModelTier, OrgStatus } from '@synapsedesk/contracts';
+import type {
+  AiModelTier,
+  OrgStatus,
+  UsageUnavailableReason,
+} from '@synapsedesk/contracts';
 
 export class OrganizationResponseDto {
   readonly id!: string;
@@ -24,6 +28,12 @@ export class OrganizationSettingsResponseDto {
   readonly allowedEmailDomains!: string[];
   /** Accepted free-mail domains worth a second look. Never an error. */
   readonly publicDomainWarnings!: string[];
+  /**
+   * The support address customers write to, `null` while inbound email is
+   * off. A published address, not a secret: rotating it is how an old one
+   * stops working.
+   */
+  readonly inboundAddress!: string | null;
 
   /**
    * What this workspace has configured, or `null` where it has configured
@@ -47,7 +57,12 @@ export class UsageMeterResponseDto {
   readonly available!: boolean;
   readonly used!: number | null;
   readonly limit!: number | null;
-  readonly unavailableReason!: string | null;
+  /**
+   * Why there's no number, when `available` is false: `READ_FAILED` (it
+   * couldn't be read just now; try again) or `NOT_AVAILABLE` (this
+   * organization has no such meter). Null when available.
+   */
+  readonly unavailableReason!: UsageUnavailableReason | null;
 }
 
 export class OrganizationUsageResponseDto {

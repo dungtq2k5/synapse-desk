@@ -85,7 +85,12 @@ export class OrganizationsService {
   ): Promise<OrganizationSettingsResponseDto> {
     return this.organizationsGrpcClient
       .getSettings(context)
-      .then(toOrganizationSettingsResponseDto);
+      .then((settings) =>
+        toOrganizationSettingsResponseDto(
+          settings,
+          this.configService.getOrThrow<string>('INBOUND_EMAIL_DOMAIN'),
+        ),
+      );
   }
 
   async updateSettings(
@@ -117,7 +122,12 @@ export class OrganizationsService {
         },
         context,
       )
-      .then(toOrganizationSettingsResponseDto);
+      .then((settings) =>
+        toOrganizationSettingsResponseDto(
+          settings,
+          this.configService.getOrThrow<string>('INBOUND_EMAIL_DOMAIN'),
+        ),
+      );
   }
 
   /**

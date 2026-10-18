@@ -9,6 +9,8 @@ import {
   StorageUsageResponse,
   OrganizationSettingsResponse,
 } from '@synapsedesk/grpc-proto';
+import { UsageUnavailableReason } from '@synapsedesk/contracts';
+import { buildInboundAddress } from '@synapsedesk/nest-common';
 import {
   OnboardingResponseDto,
   OrganizationResponseDto,
@@ -54,6 +56,18 @@ export function toOrganizationResponseDto(
  * whose domain does not exist yet cannot make that claim, and the difference
  * matters to anyone reading a usage page before deciding to upgrade.
  */
+/**
+ * A meter's reason off the wire, as one of the codes. Anything else (an older
+ * peer's sentence, or none) is `READ_FAILED`: the meter didn't answer.
+ */
+function toUsageUnavailableReason(
+  reason: string | undefined,
+): UsageUnavailableReason {
+  return reason === UsageUnavailableReason.NOT_AVAILABLE
+    ? UsageUnavailableReason.NOT_AVAILABLE
+    : UsageUnavailableReason.READ_FAILED;
+}
+
 export function toUsageMeterResponseDto(
   meter: UsageMeter | undefined,
 ): UsageMeterResponseDto {
@@ -65,7 +79,9 @@ export function toUsageMeterResponseDto(
     available: meter.available,
     used: meter.available ? (meter.used ?? null) : null,
     limit: meter.available ? (meter.limit ?? null) : null,
-    unavailableReason: meter.unavailableReason ?? null,
+    unavailableReason: meter.available
+      ? null
+      : toUsageUnavailableReason(meter.unavailableReason),
   };
 }
 
@@ -108,8 +124,7 @@ export function toOrganizationUsageResponseDto(
           available: false,
           used: null,
           limit: null,
-          unavailableReason:
-            'Storage usage could not be read just now — try again shortly',
+          unavailableReason: UsageUnavailableReason.READ_FAILED,
         },
     aiTokens: toUsageMeterResponseDto(response.aiTokens),
     aiModelTier: fromProtoAiModelTier(response.aiModelTier),
@@ -143,9 +158,15 @@ export function toOnboardingResponseDto(
  */
 export function toOrganizationSettingsResponseDto(
   settings: OrganizationSettingsResponse,
+  inboundEmailDomain: string,
 ): OrganizationSettingsResponseDto {
+  // The bare token stays here: the response carries the address built from it.
+  const { inboundToken, ...rest } = settings;
   return {
-    ...settings,
+    ...rest,
+    inboundAddress: inboundToken
+      ? buildInboundAddress(inboundEmailDomain, inboundToken)
+      : null,
     maxDocumentBytesOverride: settings.maxDocumentBytesOverride ?? null,
     maxAttachmentBytesOverride: settings.maxAttachmentBytesOverride ?? null,
     maxAttachmentsPerMessageOverride:

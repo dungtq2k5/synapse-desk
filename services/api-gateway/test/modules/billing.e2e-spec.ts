@@ -645,10 +645,69 @@ describe('Billing at the gateway (e2e)', () => {
         .get(`${API}/organizations/current/usage`)
         .expect(200);
 
-      expect(response.body.data.storage.available).toBe(false);
-      expect(response.body.data.storage.used).toBeNull();
+      expect(response.body.data.storage).toEqual({
+        available: false,
+        used: null,
+        limit: null,
+        unavailableReason: 'READ_FAILED',
+      });
       // The page still renders, and seats are still answered.
       expect(response.body.data.seats.used).toBe(3);
+    });
+
+    it('13c. the AI allowance meter is auth’s, numbers and codes as they come', async () => {
+      fx.stubs.organization.getOrganizationUsage.mockReturnValue(
+        of({
+          seats: { available: true, used: 3, limit: 10 },
+          storage: { available: false, unavailableReason: 'READ_FAILED' },
+          aiTokens: { available: true, used: 2_500_000, limit: 10_000_000 },
+          aiModelTier: toProtoAiModelTier('FAST'),
+          planName: 'Pro',
+          billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+        }),
+      );
+      fx.stubs.document.getStorageUsage.mockReturnValue(
+        of({ usedBytes: 1, limitBytes: 2, documentCount: 1 }),
+      );
+
+      const response = await authenticatedAgent(fx.app, {
+        permissionCodes: ['organization.read'],
+      })
+        .get(`${API}/organizations/current/usage`)
+        .expect(200);
+
+      expect(response.body.data.aiTokens).toEqual({
+        available: true,
+        used: 2_500_000,
+        limit: 10_000_000,
+        unavailableReason: null,
+      });
+    });
+
+    it('13d. an unread meter from auth keeps its code', async () => {
+      fx.stubs.organization.getOrganizationUsage.mockReturnValue(
+        of({
+          seats: { available: true, used: 3, limit: 10 },
+          storage: { available: false, unavailableReason: 'READ_FAILED' },
+          aiTokens: { available: false, unavailableReason: 'NOT_AVAILABLE' },
+          aiModelTier: toProtoAiModelTier('FAST'),
+          planName: 'Pro',
+          billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+        }),
+      );
+      fx.stubs.document.getStorageUsage.mockReturnValue(
+        of({ usedBytes: 1, limitBytes: 2, documentCount: 1 }),
+      );
+
+      const response = await authenticatedAgent(fx.app, {
+        permissionCodes: ['organization.read'],
+      })
+        .get(`${API}/organizations/current/usage`)
+        .expect(200);
+
+      expect(response.body.data.aiTokens.unavailableReason).toBe(
+        'NOT_AVAILABLE',
+      );
     });
   });
 

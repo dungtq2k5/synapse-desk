@@ -3,7 +3,14 @@ import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
-import { InvitationStatus, OrgStatus } from '@synapsedesk/contracts';
+import type Redis from 'ioredis';
+import {
+  InvitationStatus,
+  OrgStatus,
+  quotaCounterKey,
+  UsageUnavailableReason,
+} from '@synapsedesk/contracts';
+import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -17,7 +24,11 @@ import {
   createInvitation,
   seedTenantWithUser,
 } from '../factories';
-import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
+import {
+  DOMAIN_TAKEN_MESSAGE,
+  OrganizationsService,
+  SLUG_TAKEN_MESSAGE,
+} from '../../src/modules/organizations/organizations.service';
 
 describe('Organizations (e2e)', () => {
   let fx: E2eFixture;
@@ -208,6 +219,47 @@ describe('Organizations (e2e)', () => {
     });
   });
 
+  describe('updateOrganization — a taken address or domain', () => {
+    const refusal = async (promise: Promise<unknown>) =>
+      (
+        (await promise.catch((error: unknown) => error)) as RpcException
+      ).getError();
+
+    it('**a taken slug names the address**', async () => {
+      const other = await seedTenantWithUser(fx.prisma);
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const update = organizations.updateOrganization(
+        { slug: other.org.slug },
+        ctx(t),
+      );
+
+      await expectRpc(update, status.ALREADY_EXISTS);
+      expect(await refusal(update)).toMatchObject({
+        message: SLUG_TAKEN_MESSAGE,
+      });
+    });
+
+    it('**a taken domain names the domain**', async () => {
+      const other = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.organization.update({
+        where: { id: other.org.id },
+        data: { domain: 'taken.example.test' },
+      });
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const update = organizations.updateOrganization(
+        { domain: 'taken.example.test' },
+        ctx(t),
+      );
+
+      await expectRpc(update, status.ALREADY_EXISTS);
+      expect(await refusal(update)).toMatchObject({
+        message: DOMAIN_TAKEN_MESSAGE,
+      });
+    });
+  });
+
   describe('completeOnboarding / getOnboarding', () => {
     it('5. completing onboarding from any other status is a 409', async () => {
       // It must not double as a way to un-suspend or un-freeze a tenant.
@@ -336,18 +388,73 @@ describe('Organizations (e2e)', () => {
       );
     });
 
-    it('6d. the meters for domains that do not exist report unavailable, not zero', async () => {
-      // A zero reads as "you have used nothing", which is a claim we cannot make
-      // when the service that would measure it has not been built.
+    it('6d. storage is the gateway’s to fill: auth sends it unread, with a code', async () => {
       const t = await seedTenantWithUser(fx.prisma);
 
       const usage = await organizations.getOrganizationUsage(ctx(t));
 
-      expect(usage.storage!.available).toBe(false);
-      expect(usage.storage!.used).toBeFalsy();
-      expect(usage.storage!.unavailableReason).toBeTruthy();
-      expect(usage.aiTokens!.available).toBe(false);
-      expect(usage.aiTokens!.unavailableReason).toBeTruthy();
+      expect(usage.storage).toEqual({
+        available: false,
+        unavailableReason: UsageUnavailableReason.READ_FAILED,
+      });
+    });
+
+    it('**6e. the AI allowance meter is what the gate charged, against the budget, in micros**', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { monthlyAiTokenBudget: 10_000_000n },
+      });
+      const org = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+      const redis = fx.moduleRef.get<Redis>(LIMIT_ALERT_REDIS);
+      const key = quotaCounterKey(org.id, org.billingCycleStart);
+      await redis.set(key, '2500000');
+
+      try {
+        const usage = await organizations.getOrganizationUsage(ctx(t));
+
+        // 25% of the allowance.
+        expect(usage.aiTokens).toEqual({
+          available: true,
+          used: 2_500_000,
+          limit: 10_000_000,
+        });
+      } finally {
+        await redis.del(key);
+      }
+    });
+
+    it('6f. nothing charged yet this cycle is a real zero', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { monthlyAiTokenBudget: 10_000_000n },
+      });
+
+      const usage = await organizations.getOrganizationUsage(ctx(t));
+
+      expect(usage.aiTokens).toEqual({
+        available: true,
+        used: 0,
+        limit: 10_000_000,
+      });
+    });
+
+    it('**6g. an unreadable counter is READ_FAILED, never 0**', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const redis = fx.moduleRef.get<Redis>(LIMIT_ALERT_REDIS);
+      const get = jest
+        .spyOn(redis, 'get')
+        .mockRejectedValue(new Error('Connection is closed.'));
+
+      try {
+        const usage = await organizations.getOrganizationUsage(ctx(t));
+
+        expect(usage.aiTokens).toEqual({
+          available: false,
+          unavailableReason: UsageUnavailableReason.READ_FAILED,
+        });
+      } finally {
+        get.mockRestore();
+      }
     });
   });
 
