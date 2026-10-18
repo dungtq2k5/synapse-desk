@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models as qm
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from rag_service.settings import EMBEDDING_MODEL as SETTINGS_EMBEDDING_MODEL
 
@@ -62,8 +63,10 @@ async def ensure_collection(client: AsyncQdrantClient) -> None:
     """Creates the collection and its payload indexes if they do not exist.
 
     Idempotent, so it is safe on every boot and safe to run concurrently across
-    replicas — the same discipline the TypeScript seeders use, and for the same
-    reason: `CREATE ... IF NOT EXISTS` has no read-then-write race to lose.
+    replicas and alongside ingestion-service. Both check, then create, so the
+    one that loses the race gets Qdrant's 409; that counts as finding the
+    collection, and the same checks follow. Any other failure still fails the
+    boot.
 
     **Creating the collection is not the interesting part; the indexes are.**
     A collection with no payload indexes works perfectly in a test with fifty
@@ -75,13 +78,20 @@ async def ensure_collection(client: AsyncQdrantClient) -> None:
         await _ensure_payload_indexes(client)
         return
 
-    await client.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=qm.VectorParams(
-            size=EMBEDDING_DIMENSION,
-            distance=qm.Distance.COSINE,
-        ),
-    )
+    try:
+        await client.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=qm.VectorParams(
+                size=EMBEDDING_DIMENSION,
+                distance=qm.Distance.COSINE,
+            ),
+        )
+    except UnexpectedResponse as error:
+        if error.status_code != 409:
+            raise
+        await _assert_model_matches(client)
+        await _ensure_payload_indexes(client)
+        return
     logger.info(
         "Created Qdrant collection %s (%s, %d-dim)",
         COLLECTION_NAME,

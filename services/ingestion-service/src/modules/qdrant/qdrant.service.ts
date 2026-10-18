@@ -54,9 +54,9 @@ export class QdrantService implements OnApplicationBootstrap {
    * Creates the collection and its payload indexes if they are missing.
    *
    * Idempotent, and run on every boot by BOTH services — the same discipline
-   * the Postgres seeders use. Two services racing to create one collection is
-   * fine for exactly the reason `CREATE... IF NOT EXISTS` is: there is no
-   * read-then-write window to lose.
+   * the Postgres seeders use. Both check, then create, so when they boot
+   * together one of them loses the race and gets a 409; that counts as finding
+   * the collection (see {@link createCollection}).
    */
   async onApplicationBootstrap(): Promise<void> {
     await this.ensureCollection();
@@ -82,7 +82,25 @@ export class QdrantService implements OnApplicationBootstrap {
   async ensureCollection(): Promise<void> {
     const exists = await this.client.collectionExists(QDRANT_COLLECTION);
 
-    if (!exists.exists) {
+    if (!exists.exists && (await this.createCollection())) {
+      this.logger.log(
+        `Created Qdrant collection ${QDRANT_COLLECTION} (${EMBEDDING_MODEL}, ${EMBEDDING_DIMENSION}-dim)`,
+      );
+    } else {
+      await this.assertDimensionMatches();
+    }
+
+    await this.ensurePayloadIndexes();
+  }
+
+  /**
+   * Creates the collection, or answers false when it already exists: rag-service
+   * boots alongside and runs the same check-then-create, so the one that loses
+   * the race gets Qdrant's 409 and must go on as if it had found it. Any other
+   * failure still fails the boot.
+   */
+  private async createCollection(): Promise<boolean> {
+    try {
       await this.client.createCollection(QDRANT_COLLECTION, {
         // Cosine, and it must MATCH `rag-service`'s
         // `qm.Distance.COSINE` — the writer creating a collection with one
@@ -97,14 +115,11 @@ export class QdrantService implements OnApplicationBootstrap {
         // Dot would silently depend on that.
         vectors: { size: EMBEDDING_DIMENSION, distance: 'Cosine' },
       });
-      this.logger.log(
-        `Created Qdrant collection ${QDRANT_COLLECTION} (${EMBEDDING_MODEL}, ${EMBEDDING_DIMENSION}-dim)`,
-      );
-    } else {
-      await this.assertDimensionMatches();
+      return true;
+    } catch (error) {
+      if ((error as { status?: unknown } | null)?.status === 409) return false;
+      throw error;
     }
-
-    await this.ensurePayloadIndexes();
   }
 
   /**
