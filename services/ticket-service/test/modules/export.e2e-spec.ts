@@ -279,6 +279,15 @@ describe('The analytics export (e2e)', () => {
       );
     });
 
+    it('**2e. a day with a time on it is refused, not a 500**', async () => {
+      // Both gateways accept any ISO-8601 string; the date column takes days.
+      await expectRpc(
+        request({ from: '2026-03-01T00:00:00.000Z', to: '2026-03-31' }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(await fx.prisma.export.count()).toBe(0);
+    });
+
     it('2d. exactly the cap is accepted', async () => {
       // 92 days inclusive: 1 January to 2 April.
       await expect(

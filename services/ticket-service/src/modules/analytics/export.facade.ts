@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { CallerContext } from '@synapsedesk/contracts';
-import { requireTenant } from '@synapsedesk/nest-common';
+import { parseDay, requireTenant } from '@synapsedesk/nest-common';
 import {
   CreateExportRequest,
   ExportResponse,
@@ -52,8 +52,8 @@ export class ExportFacade {
     const { exportId } = await this.exports.request(
       {
         kind,
-        from: parseDay(request.from),
-        to: parseDay(request.to),
+        from: parseDay(request.from, 'from'),
+        to: parseDay(request.to, 'to'),
         departmentId: request.departmentId,
         filters: request.filters,
       },
@@ -96,9 +96,4 @@ export class ExportFacade {
         : undefined,
     };
   }
-}
-
-/** `YYYY-MM-DD` at UTC midnight — the `date` column's domain. */
-function parseDay(value: string): Date {
-  return new Date(`${value}T00:00:00.000Z`);
 }
