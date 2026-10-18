@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
+import { keepNormalized, stopNormalizing } from './normalize';
 
 /** The two widths every state is drawn at: a laptop, and a phone. */
 const WIDTHS = [
@@ -65,7 +66,7 @@ export async function look(
         await page.evaluate(() => document.documentElement.scrollWidth),
         `${name} at ${width} is wider than the viewport`,
       ).toBeLessThanOrEqual(size.width);
-      await normalize(page);
+      await page.evaluate(keepNormalized);
       // From the top: a full-page capture draws the fixed sidebar wherever the
       // scroll left it, and focus (an escalation notice) scrolls by timing.
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -81,54 +82,9 @@ export async function look(
       }
     }
   }
+  await page.evaluate(stopNormalizing);
   await page.emulateMedia({ colorScheme: 'light' });
   if (initial) await page.setViewportSize(initial);
-}
-
-/**
- * Gives what varies the same text on every run, so a masked box is the same
- * width and nothing after it moves: times, ticket numbers and the run's email
- * addresses. Run before each screenshot, since a resize can re-render them.
- */
-async function normalize(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    // A ticket number is "#" and its digits, often as two text nodes.
-    for (const element of document.querySelectorAll('body *')) {
-      if (
-        element.children.length === 0 &&
-        /^#\d+$/.test(element.textContent?.trim() ?? '')
-      ) {
-        element.textContent = '#0000';
-      }
-    }
-    // A read-only field shows an address too (the profile's email).
-    for (const input of document.querySelectorAll('input')) {
-      if (/@[\w.-]+\.example\.test$/.test(input.value)) {
-        input.value = 'person@northwind.example.test';
-        // Chrome can keep a glyph of the longer address painted; take the
-        // field out of the layout and back so it's drawn afresh.
-        input.style.display = 'none';
-        void input.offsetHeight;
-        input.style.display = '';
-      }
-    }
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-    );
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const text = node.nodeValue ?? '';
-      if (node.parentElement?.closest('time')) node.nodeValue = '00:00';
-      else if (/#\d+/.test(text)) {
-        node.nodeValue = text.replace(/#\d+/g, '#0000');
-      } else if (/@[\w.-]+\.example\.test/.test(text)) {
-        node.nodeValue = text.replace(
-          /[\w.-]+@[\w.-]+\.example\.test/,
-          'person@northwind.example.test',
-        );
-      }
-    }
-  });
 }
 
 /** No `serious` or `critical` axe violation on the page as it is now. */
