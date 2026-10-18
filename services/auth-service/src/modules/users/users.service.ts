@@ -223,7 +223,7 @@ export class UsersService {
     request: UserIdRequest,
     context: CallerContext,
   ): Promise<UserSummaryResponse> {
-    const user = await this.load(request.id, context);
+    const user = await this.load(request.id, context, { includeDeleted: true });
     return toUserSummaryResponse(
       user,
       await this.resolveAvatarUrls([user], context),
@@ -239,7 +239,7 @@ export class UsersService {
     context: CallerContext,
   ): Promise<GetUserPermissionsResponse> {
     // Scoped first, so a foreign id 404s rather than leaking a permission set.
-    await this.load(request.id, context);
+    await this.load(request.id, context, { includeDeleted: true });
 
     const user = await this.prisma.user.findUnique({
       where: { id: request.id },
@@ -1178,9 +1178,18 @@ export class UsersService {
   private async load(
     id: string,
     context: CallerContext,
+    /**
+     * Reads also find a deleted member of the tenant: their page is where
+     * they're restored from. Every change still 404s for them.
+     */
+    { includeDeleted = false }: { includeDeleted?: boolean } = {},
   ): Promise<UserSummaryRow> {
     const user = await this.prisma.user.findFirst({
-      where: { id, ...tenantScope(context) },
+      where: {
+        id,
+        ...tenantScope(context),
+        ...(includeDeleted ? { deletedAt: undefined } : {}),
+      },
       include: USER_SUMMARY_INCLUDE,
     });
     if (!user) {

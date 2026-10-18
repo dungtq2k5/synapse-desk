@@ -326,6 +326,25 @@ describe('Users (e2e)', () => {
       ).not.toBeNull();
     });
 
+    it('**17e. a deleted member is still read by id, for their page; changes still 404**', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 50 },
+      });
+      const leaver = await addMember(fx.prisma, t.org.id);
+      await users.deleteUser({ id: leaver.id }, superuser(t));
+
+      const read = await users.getUser({ id: leaver.id }, superuser(t));
+      expect(read.user?.id).toBe(leaver.id);
+      expect(read.deletedAt).toBeTruthy();
+      await expect(
+        users.getUserPermissions({ id: leaver.id }, superuser(t)),
+      ).resolves.toBeDefined();
+      await expectRpc(
+        users.lockUser({ id: leaver.id, reason: 'x' }, superuser(t)),
+        status.NOT_FOUND,
+      );
+    });
+
     it('17b. restoring when the address is free succeeds, with no sessions back', async () => {
       const t = await seedTenantWithUser(fx.prisma);
       const leaver = await addMember(fx.prisma, t.org.id);
