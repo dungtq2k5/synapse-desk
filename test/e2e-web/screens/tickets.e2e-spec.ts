@@ -173,6 +173,7 @@ test.describe('the app shell', () => {
       /^Tickets$/,
       /^Knowledge$/,
       /^Ask$/,
+      /^Settings$/,
       /^Account$/,
       /^Toggle sidebar$/,
     ]);
