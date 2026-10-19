@@ -90,6 +90,14 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
     return false;
   }
 
+  /** What the envelope's optional `details` carries, and when. */
+  private static final String DETAILS =
+    "Data for the refusals a client acts on, absent on every other error: " +
+    "`overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) " +
+    "when a plan change or Checkout does not fit, and `organizationStatus` " +
+    "(`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization\u2019s status " +
+    "refuses the request.";
+
   private static ApiResponse errorResponse(String status, String description) {
     Schema<Object> schema = new Schema<>();
     schema.setTypes(Set.of("object"));
@@ -120,6 +128,13 @@ public class ErrorEnvelopeOperationCustomizer implements OperationCustomizer {
     Schema<String> error = new Schema<>();
     error.setTypes(TYPE_STRING);
     schema.addProperty("error", error);
+
+    // Optional, so not in `required`: absent on every error but these.
+    Schema<Object> details = new Schema<>();
+    details.setTypes(Set.of("object"));
+    details.setAdditionalProperties(Boolean.TRUE);
+    details.setDescription(DETAILS);
+    schema.addProperty("details", details);
 
     MediaType mediaType = new MediaType();
     mediaType.setSchema(schema);

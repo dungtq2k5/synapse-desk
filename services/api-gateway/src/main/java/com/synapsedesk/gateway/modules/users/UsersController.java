@@ -116,7 +116,13 @@ public class UsersController {
       .user(UserMapper.toUserResponseDto(response.getUser()))
       .permissionCodes(permissions)
       .departmentIds(departments)
-      .hasPassword(response.getHasPassword());
+      .hasPassword(response.getHasPassword())
+      // UNSPECIFIED (a Super Admin, with no organization) reads null.
+      .organizationStatus(
+        CurrentUserResponseDto.OrganizationStatusEnum.fromValue(
+          response.getOrganizationStatus().name().replace("ORG_STATUS_", "")
+        )
+      );
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }

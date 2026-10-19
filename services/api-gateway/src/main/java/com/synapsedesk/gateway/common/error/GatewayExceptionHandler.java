@@ -7,7 +7,9 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -203,7 +205,7 @@ public class GatewayExceptionHandler {
       exception.getStatus().getDescription()
     );
 
-    return envelope(safe.status(), request, safe.message());
+    return envelope(safe.status(), request, safe.message(), safe.details());
   }
 
   /** Anything raised with a status already chosen. */
@@ -218,7 +220,8 @@ public class GatewayExceptionHandler {
     return envelope(
       status,
       request,
-      ErrorMessages.format(reason == null ? status.getReasonPhrase() : reason)
+      ErrorMessages.format(reason == null ? status.getReasonPhrase() : reason),
+      exception instanceof RefusalException refusal ? refusal.details() : null
     );
   }
 
@@ -264,8 +267,22 @@ public class GatewayExceptionHandler {
     HttpServletRequest request,
     String message
   ) {
+    return envelope(status, request, message, null);
+  }
+
+  private ResponseEntity<ErrorEnvelope> envelope(
+    HttpStatus status,
+    HttpServletRequest request,
+    String message,
+    @Nullable Map<String, Object> details
+  ) {
     return ResponseEntity.status(status).body(
-      ErrorEnvelope.of(status.value(), request.getRequestURI(), message)
+      ErrorEnvelope.of(
+        status.value(),
+        request.getRequestURI(),
+        message,
+        details
+      )
     );
   }
 

@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.common.lifecycle;
 
+import com.synapsedesk.gateway.common.error.RefusalException;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -72,7 +73,13 @@ public class LifecyclePolicy {
       );
     }
     if (!ACCESS.getOrDefault(state.status(), Set.of()).contains(kind)) {
-      throw refused(explain(state.status()));
+      // The status as data, so a client tells this refusal from a permission
+      // 403 without reading the sentence.
+      throw new RefusalException(
+        HttpStatus.FORBIDDEN,
+        explain(state.status()),
+        Map.of("organizationStatus", state.status())
+      );
     }
   }
 

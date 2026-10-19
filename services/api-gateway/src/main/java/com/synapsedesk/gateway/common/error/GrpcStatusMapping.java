@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -90,7 +91,20 @@ public final class GrpcStatusMapping {
   }
 
   /** What the client is told, status and message, for one gRPC failure. */
-  public record ClientSafe(HttpStatus status, String message) {}
+  /**
+   * What a client is shown.
+   *
+   * @param details what the service sent behind a details marker, or null
+   */
+  public record ClientSafe(
+    HttpStatus status,
+    String message,
+    @Nullable Map<String, Object> details
+  ) {
+    ClientSafe(HttpStatus status, String message) {
+      this(status, message, null);
+    }
+  }
 
   /**
    * Resolves one gRPC failure.
@@ -109,9 +123,11 @@ public final class GrpcStatusMapping {
     );
 
     if (marked.isPresent()) {
+      ErrorDetails.Lifted lifted = ErrorDetails.lift(stripMarker(text));
       return new ClientSafe(
         HttpStatus.valueOf(marked.get()),
-        ErrorMessages.format(stripMarker(text))
+        ErrorMessages.format(lifted.message()),
+        lifted.details()
       );
     }
 
@@ -129,7 +145,12 @@ public final class GrpcStatusMapping {
       return new ClientSafe(mapped, ErrorMessages.format(INTERNAL_ERROR));
     }
 
-    return new ClientSafe(mapped, ErrorMessages.format(text));
+    ErrorDetails.Lifted lifted = ErrorDetails.lift(text);
+    return new ClientSafe(
+      mapped,
+      ErrorMessages.format(lifted.message()),
+      lifted.details()
+    );
   }
 
   /** The status a `[http:NNN]` marker asks for, if it asks for a plausible one. */

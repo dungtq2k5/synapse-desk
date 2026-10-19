@@ -144,6 +144,48 @@ public class CurrentUserResponseDto {
 
   private Boolean hasPassword;
 
+  /**
+   * The caller's organization's status: the past-due banner and the frozen page
+   * read it. Null for a Super Admin, who has no organization.
+   */
+  public enum OrganizationStatusEnum {
+    ACTIVE("ACTIVE"),
+
+    FROZEN("FROZEN"),
+
+    PENDING_ONBOARDING("PENDING_ONBOARDING"),
+
+    SUSPENDED_PAST_DUE("SUSPENDED_PAST_DUE");
+
+    private final String value;
+
+    OrganizationStatusEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static OrganizationStatusEnum fromValue(String value) {
+      for (OrganizationStatusEnum b : OrganizationStatusEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private OrganizationStatusEnum organizationStatus = null;
+
   public CurrentUserResponseDto() {
     super();
   }
@@ -266,6 +308,27 @@ public class CurrentUserResponseDto {
     this.hasPassword = hasPassword;
   }
 
+  public CurrentUserResponseDto organizationStatus(
+    OrganizationStatusEnum organizationStatus
+  ) {
+    this.organizationStatus = organizationStatus;
+    return this;
+  }
+
+  /**
+   * Get organizationStatus
+   * @return organizationStatus
+   */
+  @JsonProperty("organizationStatus")
+  public OrganizationStatusEnum getOrganizationStatus() {
+    return organizationStatus;
+  }
+
+  @JsonProperty("organizationStatus")
+  public void setOrganizationStatus(OrganizationStatusEnum organizationStatus) {
+    this.organizationStatus = organizationStatus;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -285,13 +348,23 @@ public class CurrentUserResponseDto {
         this.departmentIds,
         currentUserResponseDto.departmentIds
       ) &&
-      Objects.equals(this.hasPassword, currentUserResponseDto.hasPassword)
+      Objects.equals(this.hasPassword, currentUserResponseDto.hasPassword) &&
+      Objects.equals(
+        this.organizationStatus,
+        currentUserResponseDto.organizationStatus
+      )
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(user, permissionCodes, departmentIds, hasPassword);
+    return Objects.hash(
+      user,
+      permissionCodes,
+      departmentIds,
+      hasPassword,
+      organizationStatus
+    );
   }
 
   @Override
@@ -307,6 +380,9 @@ public class CurrentUserResponseDto {
       .append("\n");
     sb.append("    hasPassword: ")
       .append(toIndentedString(hasPassword))
+      .append("\n");
+    sb.append("    organizationStatus: ")
+      .append(toIndentedString(organizationStatus))
       .append("\n");
     sb.append("}");
     return sb.toString();

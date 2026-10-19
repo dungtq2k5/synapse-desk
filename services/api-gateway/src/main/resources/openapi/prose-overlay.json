@@ -1483,6 +1483,54 @@
     },
     "MessageResponseDto.editableUntil": {
       "description": "When the caller may still edit this message, or `null` when they can't:\nthe sender until the edit window closes; a moderator editing an internal\nnote has no window, which reads as `9999-12-31T23:59:59.999Z`. Offer Edit\nwhile it's ahead."
+    },
+    "SubscriptionResponseDto.currentPeriodEnd": {
+      "description": "When the current period ends: the renewal date, or the end date when\n`cancelAtPeriodEnd`. Null until a subscription event has named the tenant."
+    },
+    "SubscriptionResponseDto.cancelAtPeriodEnd": {
+      "description": "True when the subscription ends at `currentPeriodEnd` instead of renewing."
+    },
+    "SubscriptionResponseDto.priceId": {
+      "description": "The Stripe price the subscription is on; null with no subscription."
+    },
+    "SubscriptionResponseDto.interval": {
+      "description": "That price's interval, `month` | `year`; null with no subscription."
+    },
+    "SubscriptionResponseDto.negotiated": {
+      "description": "On a plan agreed with the SynapseDesk team: no self-serve plan change or\nCheckout applies."
+    },
+    "TenantPlanPriceResponseDto.unitAmount": {
+      "description": "What the price charges each interval, in the currency's smallest unit\n(cents for `usd`). Null for a price seeded before amounts were stored."
+    },
+    "TenantPlanPriceResponseDto.currency": {
+      "description": "Stripe's lowercase ISO currency code, e.g. `usd`."
+    },
+    "CurrentUserResponseDto.organizationStatus": {
+      "description": "The caller's organization's status, answered in every status: the\npast-due banner and the frozen page read it. Null for a Super Admin, who\nhas no organization."
+    },
+    "OrganizationResponseDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "SubscriptionResponseDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "TenantPlanResponseDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "SubscriptionPlanResponseDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "CreatePlanDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "UpdatePlanDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "CreatePlatformOrganizationDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "UpdatePlatformOrganizationDto.monthlyAiTokenBudget": {
+      "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
     }
   }
 }

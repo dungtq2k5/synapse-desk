@@ -225,6 +225,10 @@ describe('the tenant lifecycle gate', () => {
       } else {
         expect(response.status).toBe(403);
         expect(errorOf(response.body)).toBe(enveloped(REFUSAL[status]));
+        // The status as data, so a client never reads the sentence.
+        expect((response.body as { details?: unknown }).details).toEqual({
+          organizationStatus: status,
+        });
         // And never reached it.
         expect(downstreamCalls(kind)).toHaveLength(0);
       }
@@ -251,6 +255,8 @@ describe('the tenant lifecycle gate', () => {
       expect(statusCalls()).toHaveLength(1);
       expect(response.status).toBe(403);
       expect(errorOf(response.body)).toBe(enveloped(REFUSAL.CLOSED));
+      // A closed workspace has no status to report; only a status refusal does.
+      expect(response.body).not.toHaveProperty('details');
       expect(downstreamCalls(kind)).toHaveLength(0);
     },
   );

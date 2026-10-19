@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.modules.realtime;
 
+import com.synapsedesk.gateway.common.config.JsIsoFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -130,7 +131,7 @@ public class PresenceService {
     return json
       .createObjectNode()
       .put("state", state)
-      .put("updatedAt", Instant.now().toString())
+      .put("updatedAt", JsIsoFormat.PATTERN.format(Instant.now()))
       .toString();
   }
 }

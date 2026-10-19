@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.modules.billing.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -15,6 +16,10 @@ public class TenantPlanPriceResponseDto {
 
   private String interval;
 
+  private BigDecimal unitAmount = null;
+
+  private String currency = null;
+
   public TenantPlanPriceResponseDto() {
     super();
   }
@@ -22,9 +27,16 @@ public class TenantPlanPriceResponseDto {
   /**
    * Constructor with only required parameters
    */
-  public TenantPlanPriceResponseDto(String stripePriceId, String interval) {
+  public TenantPlanPriceResponseDto(
+    String stripePriceId,
+    String interval,
+    BigDecimal unitAmount,
+    String currency
+  ) {
     this.stripePriceId = stripePriceId;
     this.interval = interval;
+    this.unitAmount = unitAmount;
+    this.currency = currency;
   }
 
   public TenantPlanPriceResponseDto stripePriceId(String stripePriceId) {
@@ -67,6 +79,44 @@ public class TenantPlanPriceResponseDto {
     this.interval = interval;
   }
 
+  public TenantPlanPriceResponseDto unitAmount(BigDecimal unitAmount) {
+    this.unitAmount = unitAmount;
+    return this;
+  }
+
+  /**
+   * Get unitAmount
+   * @return unitAmount
+   */
+  @JsonProperty("unitAmount")
+  public BigDecimal getUnitAmount() {
+    return unitAmount;
+  }
+
+  @JsonProperty("unitAmount")
+  public void setUnitAmount(BigDecimal unitAmount) {
+    this.unitAmount = unitAmount;
+  }
+
+  public TenantPlanPriceResponseDto currency(String currency) {
+    this.currency = currency;
+    return this;
+  }
+
+  /**
+   * Get currency
+   * @return currency
+   */
+  @JsonProperty("currency")
+  public String getCurrency() {
+    return currency;
+  }
+
+  @JsonProperty("currency")
+  public void setCurrency(String currency) {
+    this.currency = currency;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -81,13 +131,16 @@ public class TenantPlanPriceResponseDto {
       Objects.equals(
         this.stripePriceId,
         tenantPlanPriceResponseDto.stripePriceId
-      ) && Objects.equals(this.interval, tenantPlanPriceResponseDto.interval)
+      ) &&
+      Objects.equals(this.interval, tenantPlanPriceResponseDto.interval) &&
+      Objects.equals(this.unitAmount, tenantPlanPriceResponseDto.unitAmount) &&
+      Objects.equals(this.currency, tenantPlanPriceResponseDto.currency)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(stripePriceId, interval);
+    return Objects.hash(stripePriceId, interval, unitAmount, currency);
   }
 
   @Override
@@ -98,6 +151,10 @@ public class TenantPlanPriceResponseDto {
       .append(toIndentedString(stripePriceId))
       .append("\n");
     sb.append("    interval: ").append(toIndentedString(interval)).append("\n");
+    sb.append("    unitAmount: ")
+      .append(toIndentedString(unitAmount))
+      .append("\n");
+    sb.append("    currency: ").append(toIndentedString(currency)).append("\n");
     sb.append("}");
     return sb.toString();
   }

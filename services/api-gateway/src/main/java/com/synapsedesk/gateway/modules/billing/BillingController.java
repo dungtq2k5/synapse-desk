@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.common.auth.CurrentRequest;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.common.error.RefusalException;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
@@ -31,7 +32,9 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -151,14 +154,22 @@ public class BillingController {
     @Valid @RequestBody CreateCheckoutSessionDto createCheckoutSessionDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
-    var response = withStripeMetadata(context).createCheckoutSession(
+    CreateCheckoutSessionRequest checkout =
       CreateCheckoutSessionRequest.newBuilder()
         .setPriceId(createCheckoutSessionDto.getPriceId())
         .setSuccessUrl(createCheckoutSessionDto.getSuccessUrl().toString())
         .setCancelUrl(createCheckoutSessionDto.getCancelUrl().toString())
-        .build()
+        .build();
+
+    // Refused like a plan change when the organization doesn't fit: auth's
+    // preview (which also refuses a second subscription and a negotiated
+    // plan), then storage and documents here.
+    enforcePlanChangeFits(
+      withMetadata(context).previewCheckout(checkout),
+      context
     );
+
+    var response = withStripeMetadata(context).createCheckoutSession(checkout);
 
     return ResponseEntity.ok(
       ApiResponse.of(
@@ -251,7 +262,14 @@ public class BillingController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403", "404", "409", "503" })
+  @ApiErrors(
+    value = { "400", "401", "402", "403", "404", "409", "503" },
+    descriptions = @ApiErrors.Description(
+      status = "402",
+      value = "The card was declined, or needs the bank\u2019s confirmation (3-D Secure), " +
+        "which nothing here can complete. Nothing changed."
+    )
+  )
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<
     ApiResponse<PlanChangeResponseDto>
@@ -307,11 +325,23 @@ public class BillingController {
     PlanChangePreviewResponse preview,
     RequestContext context
   ) {
-    if (preview.getOverLimitCount() > 0) {
-      throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST,
-        "This plan does not fit your current usage — " +
-          String.join("; ", preview.getOverLimitList())
+    // **Either field refuses.** An auth one release older sends only the
+    // text, and reading the items alone would let its change through.
+    if (
+      preview.getOverLimitItemsCount() > 0 || preview.getOverLimitCount() > 0
+    ) {
+      List<Map<String, Object>> items = preview
+        .getOverLimitItemsList()
+        .stream()
+        .map(item ->
+          overLimit(item.getDimension(), item.getInUse(), item.getAllowed())
+        )
+        .toList();
+      throw overLimitRefusal(
+        items.isEmpty()
+          ? preview.getOverLimitList()
+          : items.stream().map(BillingController::overLimitText).toList(),
+        items
       );
     }
 
@@ -335,37 +365,88 @@ public class BillingController {
       );
     }
 
-    List<String> overLimit = new ArrayList<>();
+    List<Map<String, Object>> items = new ArrayList<>();
     if (
       preview.getNarrowedDimensionsList().contains("storage") &&
       usage.getUsedBytes() > preview.getTargetMaxStorageBytes()
     ) {
-      overLimit.add(
-        "maxStorageBytes: " +
-          usage.getUsedBytes() +
-          " used, plan grants " +
+      items.add(
+        overLimit(
+          "STORAGE",
+          usage.getUsedBytes(),
           preview.getTargetMaxStorageBytes()
+        )
       );
     }
     if (
       preview.getNarrowedDimensionsList().contains("documents") &&
       usage.getDocumentCount() > preview.getTargetMaxDocumentUploads()
     ) {
-      overLimit.add(
-        "maxDocumentUploads: " +
-          usage.getDocumentCount() +
-          " held, plan grants " +
+      items.add(
+        overLimit(
+          "DOCUMENTS",
+          usage.getDocumentCount(),
           preview.getTargetMaxDocumentUploads()
+        )
       );
     }
 
-    if (!overLimit.isEmpty()) {
-      throw new ResponseStatusException(
-        HttpStatus.BAD_REQUEST,
-        "This plan does not fit your current usage — " +
-          String.join("; ", overLimit)
+    if (!items.isEmpty()) {
+      throw overLimitRefusal(
+        items.stream().map(BillingController::overLimitText).toList(),
+        items
       );
     }
+  }
+
+  /** One broken limit, as `details.overLimit` carries it. */
+  private static Map<String, Object> overLimit(
+    String dimension,
+    long inUse,
+    long allowed
+  ) {
+    Map<String, Object> item = new LinkedHashMap<>();
+    item.put("dimension", dimension);
+    item.put("inUse", inUse);
+    item.put("allowed", allowed);
+    return item;
+  }
+
+  /** The refusal's sentence for one item: `maxStorageBytes: 6 used, plan grants 5`. */
+  private static String overLimitText(Map<String, Object> item) {
+    Object inUse = item.get("inUse");
+    Object allowed = item.get("allowed");
+    return switch ((String) item.get("dimension")) {
+      case "SEATS" -> "maxAgentSeats: " +
+        inUse +
+        " in use, plan grants " +
+        allowed;
+      case "STORAGE" -> "maxStorageBytes: " +
+        inUse +
+        " used, plan grants " +
+        allowed;
+      default -> "maxDocumentUploads: " +
+        inUse +
+        " held, plan grants " +
+        allowed;
+    };
+  }
+
+  /** The over-limit 400, with its items as `details` when it has any. */
+  private static ResponseStatusException overLimitRefusal(
+    List<String> sentences,
+    List<Map<String, Object>> items
+  ) {
+    String reason =
+      "This plan does not fit your current usage — " +
+      String.join("; ", sentences);
+    return items.isEmpty()
+      ? new ResponseStatusException(HttpStatus.BAD_REQUEST, reason)
+      : new RefusalException(
+          HttpStatus.BAD_REQUEST,
+          reason,
+          Map.of("overLimit", items)
+        );
   }
 
   private static SubscriptionResponseDto toSubscriptionResponseDto(
@@ -382,7 +463,14 @@ public class BillingController {
       BigDecimal.valueOf(response.getMonthlyAiTokenBudget()),
       toAiModelTierEnum(response.getAiModelTier()),
       toOffsetDateTime(response.getBillingCycleStart()),
-      toStatusEnum(response.getStatus())
+      toStatusEnum(response.getStatus()),
+      response.hasCurrentPeriodEnd()
+        ? toOffsetDateTime(response.getCurrentPeriodEnd())
+        : null,
+      response.getCancelAtPeriodEnd(),
+      response.hasPriceId() ? response.getPriceId() : null,
+      response.hasInterval() ? response.getInterval() : null,
+      response.getNegotiated()
     );
   }
 
@@ -420,7 +508,11 @@ public class BillingController {
         .map(price ->
           new TenantPlanPriceResponseDto(
             price.getStripePriceId(),
-            price.getInterval()
+            price.getInterval(),
+            price.hasUnitAmount()
+              ? BigDecimal.valueOf(price.getUnitAmount())
+              : null,
+            price.hasCurrency() ? price.getCurrency() : null
           )
         )
         .toList()

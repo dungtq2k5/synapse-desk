@@ -110,6 +110,17 @@ public class SubscriptionResponseDto {
 
   private StatusEnum status = null;
 
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime currentPeriodEnd = null;
+
+  private Boolean cancelAtPeriodEnd;
+
+  private String priceId = null;
+
+  private String interval = null;
+
+  private Boolean negotiated;
+
   public SubscriptionResponseDto() {
     super();
   }
@@ -126,7 +137,12 @@ public class SubscriptionResponseDto {
     BigDecimal monthlyAiTokenBudget,
     AiModelTierEnum aiModelTier,
     OffsetDateTime billingCycleStart,
-    StatusEnum status
+    StatusEnum status,
+    OffsetDateTime currentPeriodEnd,
+    Boolean cancelAtPeriodEnd,
+    String priceId,
+    String interval,
+    Boolean negotiated
   ) {
     this.stripeCustomerId = stripeCustomerId;
     this.stripeSubscriptionId = stripeSubscriptionId;
@@ -137,6 +153,11 @@ public class SubscriptionResponseDto {
     this.aiModelTier = aiModelTier;
     this.billingCycleStart = billingCycleStart;
     this.status = status;
+    this.currentPeriodEnd = currentPeriodEnd;
+    this.cancelAtPeriodEnd = cancelAtPeriodEnd;
+    this.priceId = priceId;
+    this.interval = interval;
+    this.negotiated = negotiated;
   }
 
   public SubscriptionResponseDto stripeCustomerId(String stripeCustomerId) {
@@ -328,6 +349,105 @@ public class SubscriptionResponseDto {
     this.status = status;
   }
 
+  public SubscriptionResponseDto currentPeriodEnd(
+    OffsetDateTime currentPeriodEnd
+  ) {
+    this.currentPeriodEnd = currentPeriodEnd;
+    return this;
+  }
+
+  /**
+   * Get currentPeriodEnd
+   * @return currentPeriodEnd
+   */
+  @JsonProperty("currentPeriodEnd")
+  public OffsetDateTime getCurrentPeriodEnd() {
+    return currentPeriodEnd;
+  }
+
+  @JsonProperty("currentPeriodEnd")
+  public void setCurrentPeriodEnd(OffsetDateTime currentPeriodEnd) {
+    this.currentPeriodEnd = currentPeriodEnd;
+  }
+
+  public SubscriptionResponseDto cancelAtPeriodEnd(Boolean cancelAtPeriodEnd) {
+    this.cancelAtPeriodEnd = cancelAtPeriodEnd;
+    return this;
+  }
+
+  /**
+   * Get cancelAtPeriodEnd
+   * @return cancelAtPeriodEnd
+   */
+  @NotNull
+  @JsonProperty("cancelAtPeriodEnd")
+  public Boolean getCancelAtPeriodEnd() {
+    return cancelAtPeriodEnd;
+  }
+
+  @JsonProperty("cancelAtPeriodEnd")
+  public void setCancelAtPeriodEnd(Boolean cancelAtPeriodEnd) {
+    this.cancelAtPeriodEnd = cancelAtPeriodEnd;
+  }
+
+  public SubscriptionResponseDto priceId(String priceId) {
+    this.priceId = priceId;
+    return this;
+  }
+
+  /**
+   * Get priceId
+   * @return priceId
+   */
+  @JsonProperty("priceId")
+  public String getPriceId() {
+    return priceId;
+  }
+
+  @JsonProperty("priceId")
+  public void setPriceId(String priceId) {
+    this.priceId = priceId;
+  }
+
+  public SubscriptionResponseDto interval(String interval) {
+    this.interval = interval;
+    return this;
+  }
+
+  /**
+   * Get interval
+   * @return interval
+   */
+  @JsonProperty("interval")
+  public String getInterval() {
+    return interval;
+  }
+
+  @JsonProperty("interval")
+  public void setInterval(String interval) {
+    this.interval = interval;
+  }
+
+  public SubscriptionResponseDto negotiated(Boolean negotiated) {
+    this.negotiated = negotiated;
+    return this;
+  }
+
+  /**
+   * Get negotiated
+   * @return negotiated
+   */
+  @NotNull
+  @JsonProperty("negotiated")
+  public Boolean getNegotiated() {
+    return negotiated;
+  }
+
+  @JsonProperty("negotiated")
+  public void setNegotiated(Boolean negotiated) {
+    this.negotiated = negotiated;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -365,7 +485,18 @@ public class SubscriptionResponseDto {
         this.billingCycleStart,
         subscriptionResponseDto.billingCycleStart
       ) &&
-      Objects.equals(this.status, subscriptionResponseDto.status)
+      Objects.equals(this.status, subscriptionResponseDto.status) &&
+      Objects.equals(
+        this.currentPeriodEnd,
+        subscriptionResponseDto.currentPeriodEnd
+      ) &&
+      Objects.equals(
+        this.cancelAtPeriodEnd,
+        subscriptionResponseDto.cancelAtPeriodEnd
+      ) &&
+      Objects.equals(this.priceId, subscriptionResponseDto.priceId) &&
+      Objects.equals(this.interval, subscriptionResponseDto.interval) &&
+      Objects.equals(this.negotiated, subscriptionResponseDto.negotiated)
     );
   }
 
@@ -380,7 +511,12 @@ public class SubscriptionResponseDto {
       monthlyAiTokenBudget,
       aiModelTier,
       billingCycleStart,
-      status
+      status,
+      currentPeriodEnd,
+      cancelAtPeriodEnd,
+      priceId,
+      interval,
+      negotiated
     );
   }
 
@@ -411,6 +547,17 @@ public class SubscriptionResponseDto {
       .append(toIndentedString(billingCycleStart))
       .append("\n");
     sb.append("    status: ").append(toIndentedString(status)).append("\n");
+    sb.append("    currentPeriodEnd: ")
+      .append(toIndentedString(currentPeriodEnd))
+      .append("\n");
+    sb.append("    cancelAtPeriodEnd: ")
+      .append(toIndentedString(cancelAtPeriodEnd))
+      .append("\n");
+    sb.append("    priceId: ").append(toIndentedString(priceId)).append("\n");
+    sb.append("    interval: ").append(toIndentedString(interval)).append("\n");
+    sb.append("    negotiated: ")
+      .append(toIndentedString(negotiated))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }
