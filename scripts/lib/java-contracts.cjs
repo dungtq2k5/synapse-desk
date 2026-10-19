@@ -82,6 +82,9 @@ function constantName(key) {
     .toUpperCase();
 }
 
+// Code-unit order, as a bare sort() had it: the output is byte-compared.
+const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // NOSONAR
+
 function javaString(value) {
   return `"${String(value).replace(/\\/gu, '\\\\').replace(/"/gu, '\\"')}"`;
 }
@@ -93,7 +96,7 @@ function javaString(value) {
 function renderClass(group, common) {
   const lines = [];
 
-  for (const exportName of [...group.exports].sort()) {
+  for (const exportName of [...group.exports].sort(byCodeUnit)) {
     const value = common[exportName];
     if (value === undefined) {
       throw new Error(
@@ -112,7 +115,7 @@ function renderClass(group, common) {
       continue;
     }
 
-    for (const key of Object.keys(value).sort()) {
+    for (const key of Object.keys(value).sort(byCodeUnit)) {
       const name = `${constantName(exportName.replace(/_PATTERNS$/u, ''))}_${constantName(key)}`;
       lines.push(
         Number.isInteger(value[key])
@@ -168,7 +171,7 @@ function unexportedPatterns(common) {
   return Object.keys(common)
     .filter((name) => /_PATTERNS$/u.test(name))
     .filter((name) => !published.has(name) && !(name in PATTERNS_NOT_EXPORTED))
-    .sort();
+    .sort(byCodeUnit);
 }
 
 module.exports = {

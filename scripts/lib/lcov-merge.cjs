@@ -94,7 +94,7 @@ function merge({ same, other, root }) {
 
   const out = [];
   const paths = new Set([...base.keys(), ...foreign.keys()]);
-  for (const path of [...paths].sort((x, y) => x.localCompare(y))) {
+  for (const path of [...paths].sort((x, y) => x.localeCompare(y))) {
     const a = base.get(path);
     const b = foreign.get(path);
     const lines = new Map(a?.lines);
