@@ -402,6 +402,7 @@ describe('the manifest contract', () => {
       'FIREBASE_AUTH_EMULATOR_HOST',
       'INGESTION_OFFLINE_MODEL',
       'RAG_OFFLINE_MODEL',
+      'STRIPE_API_BASE_URL',
     ]);
 
     /** rag-service declares its variables in Python; its guard is pytest. */
