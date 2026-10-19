@@ -27,13 +27,10 @@ import { useViewer } from '@/hooks/use-viewer';
 import { toastError } from '@/lib/toast';
 import { UserAvatar } from './user-avatar';
 
-/** The account button at the foot of the sidebar: theme and sign-out. */
-export function UserMenu() {
-  const { user } = useViewer();
-  const { theme, setTheme } = useTheme();
+/** Signs out and goes to sign-in; a failure is a toast with Try again. */
+export function useSignOut(): () => Promise<void> {
   const queryClient = useQueryClient();
   const router = useRouter();
-
   const signOut = async () => {
     try {
       await authControllerLogoutV1({});
@@ -46,6 +43,14 @@ export function UserMenu() {
       });
     }
   };
+  return signOut;
+}
+
+/** The account button at the foot of the sidebar: theme and sign-out. */
+export function UserMenu() {
+  const { user } = useViewer();
+  const { theme, setTheme } = useTheme();
+  const signOut = useSignOut();
 
   return (
     <DropdownMenu>

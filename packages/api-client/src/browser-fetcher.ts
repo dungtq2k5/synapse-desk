@@ -31,6 +31,31 @@ export async function browserFetch<T>(
   url: string,
   init: RequestInit,
 ): Promise<T> {
+  try {
+    return await fetchWithSession<T>(url, init);
+  } catch (error) {
+    announceStatus(error);
+    throw error;
+  }
+}
+
+/**
+ * The event a refusal naming the organization's status raises on the window:
+ * `detail` is the status. The one signal the app's shell listens to, so no
+ * screen has to recognize a read-only or frozen refusal itself.
+ */
+export const ORGANIZATION_STATUS_EVENT = 'synapsedesk:organization-status';
+
+function announceStatus(error: unknown): void {
+  const status = error instanceof ApiError ? error.organizationStatus : null;
+  if (status && typeof globalThis.dispatchEvent === 'function') {
+    globalThis.dispatchEvent(
+      new CustomEvent(ORGANIZATION_STATUS_EVENT, { detail: status }),
+    );
+  }
+}
+
+async function fetchWithSession<T>(url: string, init: RequestInit): Promise<T> {
   const sentAt = generation;
   let response = await send(url, init);
   if (response.status !== 401 || !needsSession(init.method ?? 'GET', url)) {

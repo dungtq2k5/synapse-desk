@@ -18,11 +18,11 @@ import { parseEnvFile } from '@synapsedesk/testing/env-file';
  *   is what makes "the Next server calls only the gateway" checkable.
  * - **No color literal**, and no raw primitive: a component's color is a
  *   semantic token, which switches with the theme.
- * - **`apps/web/.env.example` declares only `GATEWAY_URL` and Firebase's web
- *   config.** The dev server proxies the socket too, so the browser needs no
- *   address of its own; Firebase's public config reaches the browser per
- *   request; and a `NEXT_PUBLIC_` variable is baked into the build, so none is
- *   wanted.
+ * - **`apps/web/.env.example` declares only `GATEWAY_URL`, Firebase's web
+ *   config and `SUPPORT_EMAIL`.** The dev server proxies the socket too, so
+ *   the browser needs no address of its own; Firebase's public config and the
+ *   support address reach the browser per request; and a `NEXT_PUBLIC_`
+ *   variable is baked into the build, so none is wanted.
  */
 describe('the web client', () => {
   const REPO_ROOT = join(__dirname, '../../..');
@@ -202,7 +202,7 @@ describe('the web client', () => {
 
   // ------------------------------------------------------------ environment
 
-  it('**apps/web/.env.example declares only GATEWAY_URL and Firebase’s web config**', () => {
+  it('**apps/web/.env.example declares only GATEWAY_URL, Firebase’s web config and the support address**', () => {
     const [example] = readRepoFiles('apps/web/.env.example');
     expect(example).toBeDefined();
 
@@ -216,6 +216,7 @@ describe('the web client', () => {
       'FIREBASE_PROJECT_ID',
       'FIREBASE_STORAGE_EMULATOR_URL',
       'GATEWAY_URL',
+      'SUPPORT_EMAIL',
     ]);
   });
 });

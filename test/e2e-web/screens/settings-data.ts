@@ -32,7 +32,12 @@ export const ok = (data: unknown, statusCode = 200) => ({
   status: statusCode,
   json: { success: true, statusCode, message: 'OK', data },
 });
-export const failed = (status: number, error = 'Failed!') => ({
+export const failed = (
+  status: number,
+  error = 'Failed!',
+  /** The envelope's `details`, for a refusal that carries data. */
+  details?: Record<string, unknown>,
+) => ({
   status,
   json: {
     success: false,
@@ -40,6 +45,7 @@ export const failed = (status: number, error = 'Failed!') => ({
     path: '/api/v1',
     timestamp: '2026-10-18T00:00:00.000Z',
     error,
+    ...(details && { details }),
   },
 });
 export const paged = (items: unknown[], total = items.length, perPage = 20) =>

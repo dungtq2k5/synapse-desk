@@ -288,14 +288,8 @@ jobs:
   # built web app, and the rows in `test/e2e-web`. On a runner every store is
   # this job's own compose stack, so the reset costs nothing.
   #
-  # **One secret, STRIPE_RESTRICT_KEY:** the seed reads the plans from the
-  # Stripe sandbox (products and prices, read only), and nothing else here
-  # calls Stripe. It must be a restricted TEST key (`rk_test_`), and the first
-  # step refuses anything else, an `sk_` or a live key, before any step can
-  # use it. Without it the job FAILS: a suite that quietly doesn't run passes
-  # on nothing. Pull requests from forks get no secrets, and this repository
-  # takes none, so that case is not designed for. The key reaches only the two
-  # steps that read it.
+  # **No secret.** Stripe is the fake `test/system` starts, and the plans
+  # seed reads its catalog, so the suite runs offline as it does locally.
   e2e-web:
     name: e2e (web, Playwright)
     runs-on: ubuntu-latest
@@ -304,19 +298,6 @@ jobs:
     # been timed.
     timeout-minutes: 40
     steps:
-      - name: the Stripe key is a restricted test key
-        env:
-          STRIPE_RESTRICT_KEY: ${{ secrets.STRIPE_RESTRICT_KEY }}
-        run: |
-          case "$STRIPE_RESTRICT_KEY" in
-            '')
-              echo "::error::STRIPE_RESTRICT_KEY is not set: add a restricted test key (rk_test_, read on Products and Prices) as a repository secret."
-              exit 1 ;;
-            rk_test_*) ;;
-            *)
-              echo "::error::STRIPE_RESTRICT_KEY is not a restricted test key: it must start with rk_test_ (never sk_, never live)."
-              exit 1 ;;
-          esac
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -375,7 +356,6 @@ jobs:
       # ends by writing one lcov in Jest's shape.
       - name: e2e-web
         env:
-          STRIPE_RESTRICT_KEY: ${{ secrets.STRIPE_RESTRICT_KEY }}
           SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
           WEB_COVERAGE_DIR: ${{ github.workspace }}/coverage-e2e/web
         run: npm run test:e2e:web

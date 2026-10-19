@@ -118,10 +118,9 @@ export function CredentialsForm({
       {failure?.kind === 'frozen' && (
         <Alert variant="destructive">
           <CircleAlertIcon />
-          <AlertTitle>Your organization is closed for now</AlertTitle>
+          <AlertTitle>This organization can’t be opened</AlertTitle>
           <AlertDescription>
-            Its administrator asked to delete it. If that’s a surprise, contact
-            them or SynapseDesk support.
+            Contact support to restore access.
           </AlertDescription>
         </Alert>
       )}
@@ -201,12 +200,8 @@ function failureOf(error: unknown): Failure {
   if (error instanceof ApiError && error.status === 429) {
     return { kind: 'throttled', seconds: error.retryAfterSeconds };
   }
-  // The server's answer for a frozen organization names neither it nor why.
-  if (
-    error instanceof ApiError &&
-    error.status === 403 &&
-    /frozen|temporarily disabled/i.test(error.message)
-  ) {
+  // A frozen organization, for any cause: the refusal says so as data.
+  if (error instanceof ApiError && error.organizationStatus === 'FROZEN') {
     return { kind: 'frozen' };
   }
   return {

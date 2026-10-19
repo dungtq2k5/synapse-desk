@@ -639,3 +639,50 @@ export async function setStorageLimit(
     await prisma.$disconnect();
   }
 }
+
+/**
+ * The organization's lifecycle status, as Stripe's events would leave it:
+ * written to auth's database, so `/users/me` (read when the page renders)
+ * says it. Found by a member's email.
+ */
+export async function setOrganizationStatus(
+  member: Person,
+  status: 'ACTIVE' | 'SUSPENDED_PAST_DUE' | 'FROZEN',
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    const user = await prisma.user.findFirstOrThrow({
+      where: { email: member.email },
+      select: { organizationId: true },
+    });
+    await prisma.organization.update({
+      where: { id: user.organizationId! },
+      data: { status },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * Replaces `person`'s roles with one custom role holding `codes`, made by
+ * `admin` through the gateway: a read-only billing viewer, say.
+ */
+export async function giveOnly(
+  admin: Person,
+  person: Person,
+  name: string,
+  codes: string[],
+): Promise<void> {
+  const session = await sessionAs(admin);
+  const role = await api<{ id: string }>(session, 'POST', '/roles', {
+    name,
+    permissionCodes: codes,
+  });
+  await api(session, 'PUT', `/users/${person.id}/roles`, {
+    roleIds: [role.id],
+  });
+  await session.dispose();
+}

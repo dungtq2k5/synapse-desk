@@ -31,7 +31,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <HydrationBoundary state={state()}>
-      <AppShell>{children}</AppShell>
+      <AppShell supportEmail={process.env.SUPPORT_EMAIL ?? ''}>
+        {children}
+      </AppShell>
     </HydrationBoundary>
   );
 }

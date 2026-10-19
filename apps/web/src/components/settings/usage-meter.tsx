@@ -1,12 +1,19 @@
-import type { UsageMeterResponseDto } from '@synapsedesk/api-client';
+import type {
+  OrganizationUsageResponseDto,
+  UsageMeterResponseDto,
+} from '@synapsedesk/api-client';
 import {
   CircleAlertIcon,
+  HardDriveIcon,
+  SparklesIcon,
   TriangleAlertIcon,
+  UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { dayDate, fileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /** How full a meter is: under 90%, from 90%, or full. */
@@ -134,4 +141,73 @@ function Heading({
       <span className="text-muted-foreground">{children}</span>
     </div>
   );
+}
+
+/**
+ * The organization's three meters: seats, document storage and the AI
+ * allowance. Organization shows them with their notes; Billing shows the
+ * numbers alone, beside the plan.
+ */
+export function UsageMeters({
+  usage,
+  onRetry,
+  withNotes = false,
+}: {
+  usage: OrganizationUsageResponseDto;
+  onRetry: () => void;
+  withNotes?: boolean;
+}) {
+  return (
+    <>
+      <UsageMeter
+        icon={UsersIcon}
+        label="Seats"
+        noun="seat"
+        meter={usage.seats}
+        amount={(used, limit) => `${used} of ${limit}`}
+        note={
+          withNotes
+            ? (used, limit, level) =>
+                level === 'full'
+                  ? 'No seats left. Revoke a pending invitation or change the plan to add people.'
+                  : level === 'near'
+                    ? `${limit - used} ${limit - used === 1 ? 'seat' : 'seats'} left. Pending invitations hold seats too.`
+                    : null
+            : undefined
+        }
+        onRetry={onRetry}
+      />
+      <UsageMeter
+        icon={HardDriveIcon}
+        label="Document storage"
+        noun="storage"
+        meter={usage.storage}
+        amount={(used, limit) => `${fileSize(used)} of ${fileSize(limit)}`}
+        onRetry={onRetry}
+      />
+      <UsageMeter
+        icon={SparklesIcon}
+        label="AI allowance"
+        noun="AI"
+        meter={usage.aiTokens}
+        amount={(used, limit) =>
+          `${limit > 0 ? Math.round((used / limit) * 100) : 100}% used`
+        }
+        note={
+          withNotes
+            ? () => `Resets with the billing cycle on ${nextCycle(usage)}.`
+            : undefined
+        }
+        onRetry={onRetry}
+      />
+    </>
+  );
+}
+
+/** When the AI allowance resets: the period's end, or a month from its start. */
+function nextCycle(usage: OrganizationUsageResponseDto): string {
+  if (usage.currentPeriodEnd) return dayDate(usage.currentPeriodEnd);
+  const start = new Date(usage.billingCycleStart);
+  start.setUTCMonth(start.getUTCMonth() + 1);
+  return dayDate(start);
 }

@@ -132,6 +132,36 @@ describe('the sign-in form', () => {
     ).toBeInTheDocument();
   });
 
+  it('a frozen organization is told so in the deck’s words, recognized by its details', async () => {
+    stubApi({
+      [LOGIN]: fail(
+        403,
+        "This organization can't be opened. Contact support to restore access!",
+        undefined,
+        { organizationStatus: 'FROZEN' },
+      ),
+    });
+    const { user } = setup();
+
+    await signIn(user);
+
+    expect(
+      await screen.findByText('This organization can’t be opened'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Contact support to restore access.'),
+    ).toBeInTheDocument();
+  });
+
+  it('a 403 that names no status is any other failure, whatever it says', async () => {
+    stubApi({ [LOGIN]: fail(403, 'Organization access temporarily disabled') });
+    const { user } = setup();
+
+    await signIn(user);
+
+    expect(await screen.findByText('Couldn’t sign in')).toBeInTheDocument();
+  });
+
   it('asks to check the connection when the request never lands', async () => {
     stubApi({});
     const { user } = setup();

@@ -557,16 +557,6 @@ test.describe('where a notification leads', () => {
     ).toHaveAttribute('href', '/notifications');
     await look(page, 'notification-not-found');
   });
-
-  test('billing isn’t here yet', async ({ page }) => {
-    const { maya } = await tenant('bell');
-    await signInAs(page, maya);
-    await page.goto('/settings/billing');
-    await expect(
-      page.getByRole('heading', { name: 'Billing isn’t available here yet' }),
-    ).toBeVisible();
-    await look(page, 'billing-placeholder');
-  });
 });
 
 test.describe('all notifications', () => {

@@ -73,6 +73,8 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // text that cite their sources, with no key and no network. A run means
   // the same on every machine; the real model is the Python job's to test.
   process.env.RAG_OFFLINE_MODEL = 'true';
+  // The deck's sample address, so the frozen page and its baselines show one.
+  process.env.SUPPORT_EMAIL = 'support@synapsedesk.com';
   // ingestion-service's half: uploads embed with the same fixed vectors, so
   // an uploaded document reaches INDEXED offline and Ask finds it.
   process.env.INGESTION_OFFLINE_MODEL = 'true';

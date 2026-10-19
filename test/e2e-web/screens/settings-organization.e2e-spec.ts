@@ -188,14 +188,23 @@ test('after deleting: sign-in says why', async ({ page }) => {
 
 test('a frozen organization’s sign-in', async ({ page }) => {
   await page.route('**/api/v1/auth/login', (route) =>
-    route.fulfill(failed(403, 'Organization Northwind Health is frozen!')),
+    route.fulfill({
+      status: 403,
+      json: {
+        ...failed(
+          403,
+          "This organization can't be opened. Contact support to restore access!",
+        ).json,
+        details: { organizationStatus: 'FROZEN' },
+      },
+    }),
   );
   await page.goto('/login');
   await page.getByLabel('Email').fill('priya@northwind.health');
   await page.getByLabel('Password', { exact: true }).fill('a-long-password-1');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(
-    page.getByText('Your organization is closed for now'),
+    page.getByText('This organization can’t be opened'),
   ).toBeVisible();
   await look(page, 'organization-frozen-sign-in');
 });

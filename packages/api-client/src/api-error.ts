@@ -18,6 +18,33 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 
+  /**
+   * The envelope's `details`: data for the refusals a client acts on, or null
+   * on every other error.
+   */
+  get details(): Record<string, unknown> | null {
+    const body = this.body as { details?: unknown } | null;
+    const details = body && typeof body === 'object' ? body.details : null;
+    return details && typeof details === 'object' && !Array.isArray(details)
+      ? (details as Record<string, unknown>)
+      : null;
+  }
+
+  /**
+   * The organization's status a lifecycle refusal names (`SUSPENDED_PAST_DUE`,
+   * `FROZEN`), or null for any other error. Read instead of the sentence.
+   */
+  get organizationStatus(): string | null {
+    const status = this.details?.organizationStatus;
+    return typeof status === 'string' ? status : null;
+  }
+
+  /** The limits a plan that doesn't fit breaks; empty for any other error. */
+  get overLimit(): OverLimit[] {
+    const items = this.details?.overLimit;
+    return Array.isArray(items) ? (items as OverLimit[]) : [];
+  }
+
   private static messageOf(status: number, body: unknown): string {
     // Both gateways put the words in `error` (`{ success, statusCode, path,
     // timestamp, error }`); `message` is what a non-gateway body may carry.
@@ -37,3 +64,10 @@ export class ApiError extends Error {
     return `HTTP ${status}`;
   }
 }
+
+/** One limit a plan would break, as `details.overLimit` carries it. */
+export type OverLimit = {
+  dimension: 'SEATS' | 'STORAGE' | 'DOCUMENTS';
+  inUse: number;
+  allowed: number;
+};

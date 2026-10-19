@@ -88,5 +88,8 @@ export function stubMatchMedia() {
     media,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
+    // next-themes still listens the old way.
+    addListener: () => undefined,
+    removeListener: () => undefined,
   })) as unknown as typeof window.matchMedia;
 }

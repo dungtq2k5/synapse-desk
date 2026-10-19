@@ -7,14 +7,8 @@ import {
   useOrganizationsControllerGetUsageV1,
   useOrganizationsControllerGetV1,
   type OrganizationResponseDto,
-  type OrganizationUsageResponseDto,
 } from '@synapsedesk/api-client';
-import {
-  ChevronRightIcon,
-  HardDriveIcon,
-  SparklesIcon,
-  UsersIcon,
-} from 'lucide-react';
+import { ChevronRightIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
@@ -25,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useViewer } from '@/hooks/use-viewer';
 import { asSentence } from '@/lib/documents';
-import { dayDate, fileSize } from '@/lib/format';
+import { dayDate } from '@/lib/format';
 import { toastError } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { OrganizationStatus } from './badges';
@@ -39,7 +33,7 @@ import {
   SettingsUnavailable,
 } from './settings-frame';
 import { useOrganizationCache } from './use-organization-cache';
-import { UsageMeter } from './usage-meter';
+import { UsageMeters } from './usage-meter';
 
 /** The 409s that name a field, in the server's words. */
 export const SLUG_TAKEN =
@@ -246,13 +240,6 @@ function ProfileCard({
 }
 
 /** The month after a cycle's start: when the AI allowance resets. */
-function nextCycle(usage: OrganizationUsageResponseDto): string {
-  if (usage.currentPeriodEnd) return dayDate(usage.currentPeriodEnd);
-  const start = new Date(usage.billingCycleStart);
-  start.setUTCMonth(start.getUTCMonth() + 1);
-  return dayDate(start);
-}
-
 function UsageCard() {
   const usage = useOrganizationsControllerGetUsageV1();
   const current = usage.data?.data;
@@ -275,44 +262,7 @@ function UsageCard() {
         </header>
         {current ? (
           <>
-            <UsageMeter
-              icon={UsersIcon}
-              label="Seats"
-              noun="seat"
-              meter={current.seats}
-              amount={(used, limit) => `${used} of ${limit}`}
-              note={(used, limit, level) =>
-                level === 'full'
-                  ? 'No seats left. Revoke a pending invitation or change the plan to add people.'
-                  : level === 'near'
-                    ? `${limit - used} ${limit - used === 1 ? 'seat' : 'seats'} left. Pending invitations hold seats too.`
-                    : null
-              }
-              onRetry={retry}
-            />
-            <UsageMeter
-              icon={HardDriveIcon}
-              label="Document storage"
-              noun="storage"
-              meter={current.storage}
-              amount={(used, limit) =>
-                `${fileSize(used)} of ${fileSize(limit)}`
-              }
-              onRetry={retry}
-            />
-            <UsageMeter
-              icon={SparklesIcon}
-              label="AI allowance"
-              noun="AI"
-              meter={current.aiTokens}
-              amount={(used, limit) =>
-                `${limit > 0 ? Math.round((used / limit) * 100) : 100}% used`
-              }
-              note={() =>
-                `Resets with the billing cycle on ${nextCycle(current)}.`
-              }
-              onRetry={retry}
-            />
+            <UsageMeters usage={current} onRetry={retry} withNotes />
             <p className={cn('text-sm text-muted-foreground')}>
               {[
                 `${current.planName} plan`,

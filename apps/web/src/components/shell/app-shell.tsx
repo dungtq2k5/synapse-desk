@@ -29,6 +29,12 @@ import {
 import { NotificationsLive } from '@/components/notifications/store';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
 import { useViewer } from '@/hooks/use-viewer';
+import { SupportEmailContext } from '@/lib/support';
+import {
+  FrozenPage,
+  useOrganizationStatus,
+  useOrganizationStatusRefusals,
+} from './organization-status';
 import { TwoStepWarning } from './two-step-warning';
 import { UserMenu } from './user-menu';
 
@@ -99,7 +105,24 @@ const ITEMS = {
  * it. The items depend on who is looking: an agent's queue comes first, an
  * end user's Ask.
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  supportEmail = '',
+}: {
+  children: ReactNode;
+  /** The web server's `SUPPORT_EMAIL`, for the frozen page's mail link. */
+  supportEmail?: string;
+}) {
+  return (
+    <SupportEmailContext value={supportEmail}>
+      <Shell>{children}</Shell>
+    </SupportEmailContext>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  useOrganizationStatusRefusals();
+  const frozen = useOrganizationStatus() === 'FROZEN';
   const pathname = usePathname();
   const { isAgent, can } = useViewer();
   const items = [
@@ -109,6 +132,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const organization = useOrganizationsControllerGetV1({
     query: { retry: false },
   });
+
+  if (frozen) return <FrozenPage />;
 
   return (
     <RealtimeProvider>

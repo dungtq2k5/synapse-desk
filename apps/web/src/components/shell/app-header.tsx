@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { useViewer } from '@/hooks/use-viewer';
 import { NotificationBell } from '@/components/notifications/bell';
+import { PastDueBanner } from './organization-status';
 import { VerifyEmailBanner } from './verify-email-banner';
 
 /**
@@ -64,6 +65,7 @@ export function AppHeader({
           <NotificationBell />
         </div>
       </header>
+      <PastDueBanner />
       {isMobile && <VerifyEmailBanner />}
     </>
   );

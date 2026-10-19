@@ -512,6 +512,6 @@ test('deleting the organization signs everyone out, and sign-in says why', async
   await expectSignedOut(theirs);
   await signIn(theirs, sam.email, DEMO_PASSWORD);
   await expect(
-    theirs.getByText('Your organization is closed for now'),
+    theirs.getByText('This organization can’t be opened'),
   ).toBeVisible();
 });

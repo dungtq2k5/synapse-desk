@@ -12,6 +12,9 @@ export function toastError(
   description: string,
   action?: { label: string; onClick: () => void },
 ): void {
+  // A refusal the shell already said in the deck's words (read-only): the
+  // screen's own toast for it would be a second, vaguer one.
+  if (Date.now() < quietUntil) return;
   toast.error(title, { description, action, duration: Infinity });
   announce(`${title}. ${description}`, 'assertive');
 }
@@ -31,4 +34,14 @@ export function announce(
   globalThis.setTimeout(() => {
     region.textContent = text;
   }, 50);
+}
+
+let quietUntil = 0;
+
+/**
+ * Holds back screens' error toasts for a moment: the shell calls it when it
+ * has said why a write was refused, just before the screen hears the error.
+ */
+export function quietScreenErrors(milliseconds = 1_500): void {
+  quietUntil = Date.now() + milliseconds;
 }

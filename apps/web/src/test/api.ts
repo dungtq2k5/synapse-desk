@@ -46,6 +46,8 @@ export function fail(
   status: number,
   message: string,
   headers?: Record<string, string>,
+  /** The envelope's `details`, for a refusal that carries data. */
+  details?: Record<string, unknown>,
 ): Reply {
   return {
     status,
@@ -55,6 +57,7 @@ export function fail(
       path: '/api/v1',
       timestamp: '2026-10-17T00:00:00.000Z',
       error: message,
+      ...(details && { details }),
     },
     headers,
   };

@@ -1,5 +1,9 @@
 import { ApiError } from './api-error';
-import { browserFetch, needsSession } from './browser-fetcher';
+import {
+  browserFetch,
+  needsSession,
+  ORGANIZATION_STATUS_EVENT,
+} from './browser-fetcher';
 
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
@@ -187,6 +191,51 @@ describe('browserFetch', () => {
       body: envelope,
       message: 'Ticket not found',
     });
+  });
+
+  it('a refusal naming the organization’s status is raised on the window, once', async () => {
+    const dispatch = jest.fn();
+    globalThis.dispatchEvent = dispatch;
+    fetchMock.mockResolvedValueOnce(
+      json(403, {
+        success: false,
+        error: 'Read-only!',
+        details: { organizationStatus: 'SUSPENDED_PAST_DUE' },
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      json(403, { success: false, error: 'No!' }),
+    );
+
+    const refused = await browserFetch('/api/v1/departments', {
+      method: 'POST',
+    }).catch((error: unknown) => error);
+    await browserFetch('/api/v1/departments', { method: 'POST' }).catch(
+      () => undefined,
+    );
+    const heard = dispatch.mock.calls.map(([event]: [CustomEvent<string>]) => [
+      event.type,
+      event.detail,
+    ]);
+
+    expect(heard).toEqual([[ORGANIZATION_STATUS_EVENT, 'SUSPENDED_PAST_DUE']]);
+    expect((refused as ApiError).organizationStatus).toBe('SUSPENDED_PAST_DUE');
+    expect((refused as ApiError).details).toEqual({
+      organizationStatus: 'SUSPENDED_PAST_DUE',
+    });
+  });
+
+  it('reads the over-limit items, and nothing from a body without details', () => {
+    const items = [{ dimension: 'SEATS', inUse: 12, allowed: 10 }];
+    expect(
+      new ApiError(400, { details: { overLimit: items } }).overLimit,
+    ).toEqual(items);
+    for (const body of [null, 'text', { details: [1] }, { error: 'x' }]) {
+      const error = new ApiError(400, body);
+      expect(error.details).toBeNull();
+      expect(error.overLimit).toEqual([]);
+      expect(error.organizationStatus).toBeNull();
+    }
   });
 
   it('an empty 2xx body is undefined', async () => {
