@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { obliterateQueues } from '@synapsedesk/testing/queues';
 import { AppModule } from '../../src/app.module';
@@ -168,6 +169,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       .mockImplementation(() => {}),
   };
 
+  const config = moduleRef.get(ConfigService);
+  const seededAccounts = [
+    config.getOrThrow<string>('SYSTEM_USER_EMAIL'),
+    config.getOrThrow<string>('SUPER_ADMIN_EMAIL'),
+  ];
+
   const reset = async (): Promise<void> => {
     // Deliberately DELETE-with-predicate rather than TRUNCATE, for two reasons
     // that are not stylistic.
@@ -261,6 +268,13 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         'DELETE FROM users WHERE organization_id IS NOT NULL',
       ),
       prisma.$executeRawUnsafe('DELETE FROM organizations'),
+      // A null tenant means a Super Admin (the CHECK constraint), and tests
+      // mint their own through the platform API. Only the two the seeder owns
+      // survive; the rest would pile up across runs and push the users a test
+      // seeds off the first page of the platform's cross-tenant list.
+      prisma.user.deleteMany({
+        where: { organizationId: null, email: { notIn: seededAccounts } },
+      }),
     ]);
 
     // Cheap now — everything it creates is already there — but kept because it

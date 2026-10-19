@@ -78,4 +78,33 @@ describe('e2e bootstrap (auth-service)', () => {
       await fx.prisma.role.count({ where: { organizationId: null } }),
     ).toBe(4);
   });
+
+  it('reset() removes a Super Admin a test made, and keeps the two the seeder owns', async () => {
+    // A null tenant is a Super Admin (the CHECK constraint). Left behind, they
+    // accumulate across runs and push seeded users off the platform's
+    // cross-tenant first page, which is how this first showed up.
+    await fx.prisma.user.create({
+      data: {
+        email: `operator-${Date.now()}@example.test`,
+        fullName: 'Test Operator',
+        isSuperAdmin: true,
+        organizationId: null,
+      },
+    });
+
+    await fx.reset();
+
+    expect(
+      (
+        await fx.prisma.user.findMany({
+          where: { organizationId: null },
+          select: { email: true },
+        })
+      )
+        .map((user) => user.email)
+        .sort(),
+    ).toEqual(
+      [process.env.SUPER_ADMIN_EMAIL, process.env.SYSTEM_USER_EMAIL].sort(),
+    );
+  });
 });
