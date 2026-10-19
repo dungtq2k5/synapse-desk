@@ -182,6 +182,11 @@ export class CreatePlatformOrganizationDto {
   // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxStorageBytes?: number;
 
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   @IsOptional()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
@@ -243,6 +248,11 @@ export class UpdatePlatformOrganizationDto {
   // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxStorageBytes?: number;
 
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   @IsOptional()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
@@ -414,6 +424,11 @@ export class CreatePlanDto {
   @Min(MIN_STORAGE_BYTES)
   readonly maxStorageBytes!: number;
 
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
   readonly monthlyAiTokenBudget!: number;
@@ -532,6 +547,11 @@ export class UpdatePlanDto {
   @Min(MIN_STORAGE_BYTES)
   readonly maxStorageBytes?: number;
 
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   @IsOptional()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)

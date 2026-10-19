@@ -247,6 +247,7 @@ export class EntitlementWriterService {
     eventType: string,
   ): Promise<boolean> {
     const cycleStart = periodStartOf(subscription);
+    const periodEnd = periodEndOf(subscription);
     const status = this.lifecycleStatusFor(subscription, eventType);
 
     // Read before the write, so "did anything change" is answerable. One extra
@@ -297,6 +298,12 @@ export class EntitlementWriterService {
         // manual reset endpoint is now break-glass.
         ...(cycleStart ? { billingCycleStart: cycleStart } : {}),
         ...(status ? { status } : {}),
+        // The period facts the billing page reads instead of calling Stripe:
+        // state, delivered here like `status`. A missing period end leaves the
+        // column as it was, for the reason `periodStartOf` gives.
+        stripePriceId: priceIdOf(subscription),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
       },
     });
 
@@ -529,6 +536,16 @@ function periodStartOf(subscription: Stripe.Subscription): Date | null {
     subscription.items?.data?.[0]?.current_period_start ??
     (subscription as unknown as { current_period_start?: number })
       .current_period_start;
+
+  return typeof raw === 'number' ? new Date(raw * 1000) : null;
+}
+
+/** The period's end, read from the item or the subscription as `periodStartOf` does. */
+function periodEndOf(subscription: Stripe.Subscription): Date | null {
+  const raw =
+    subscription.items?.data?.[0]?.current_period_end ??
+    (subscription as unknown as { current_period_end?: number })
+      .current_period_end;
 
   return typeof raw === 'number' ? new Date(raw * 1000) : null;
 }

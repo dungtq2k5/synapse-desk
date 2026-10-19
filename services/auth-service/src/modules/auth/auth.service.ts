@@ -43,6 +43,7 @@ import {
   extractEmailLocalPart,
   isUniqueConstraintViolation,
   normalizeEmail,
+  withErrorDetails,
 } from '@synapsedesk/core';
 import {
   AuditPublisher,
@@ -763,9 +764,15 @@ export class AuthService {
     }
 
     if (user.organization?.status === OrgStatus.FROZEN) {
+      // The same words for every cause (a deletion, an ended subscription, a
+      // hold): the sign-in page can't tell them apart either. The status rides
+      // as `details`, so a client never matches on the sentence.
       throw new RpcException({
         code: status.PERMISSION_DENIED,
-        message: 'Organization access temporarily disabled',
+        message: withErrorDetails(
+          "This organization can't be opened. Contact support to restore access",
+          { organizationStatus: OrgStatus.FROZEN },
+        ),
       });
     }
 

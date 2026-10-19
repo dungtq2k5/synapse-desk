@@ -106,6 +106,16 @@ export class BillingGrpcController implements BillingServiceController {
     );
   }
 
+  previewCheckout(
+    request: CreateCheckoutSessionRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangePreviewResponse> {
+    return this.planChange.previewCheckout(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
   changePlan(
     request: PlanChangeRequest,
     metadata?: Metadata,

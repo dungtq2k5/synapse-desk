@@ -5,6 +5,7 @@ import {
   DocumentStatus as ProtoDocumentStatus,
   IngestionJobStatus as ProtoIngestionJobStatus,
   TicketSource as ProtoTicketSource,
+  toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,6 +36,7 @@ import { SCHEMA_PATH } from '../../src/common/config/graphql.config';
 import { compareAlphabetically } from '@synapsedesk/core';
 import { CacheService } from '../../src/common/cache/cache.service';
 import { CACHE_SCOPES } from '../../src/common/config/cache.config';
+import { OrgStatus } from '@synapsedesk/contracts';
 
 /**
  * The GraphQL surface.
@@ -180,6 +182,7 @@ describe('The GraphQL surface (e2e)', () => {
           permissionCodes: [],
           departmentIds: [],
           hasPassword: true,
+          organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
         }),
       );
 
@@ -1042,6 +1045,7 @@ describe('The GraphQL surface (e2e)', () => {
           permissionCodes: [],
           departmentIds: [departmentId],
           hasPassword: true,
+          organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
         }),
       );
       fx.stubs.department.listDepartmentsByIds.mockReturnValue(

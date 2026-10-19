@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import { BillingGrpcClient } from './billing-grpc.client';
-import { PlanChangeGuard } from './plan-change.guard';
+import type { PlanChangePreviewResponse } from '@synapsedesk/grpc-proto';
+import { PlanChangeGuard, overLimitText } from './plan-change.guard';
 import {
   toInvoiceResponseDtos,
   toPlanChangeResponseDto,
@@ -62,10 +63,27 @@ export class BillingService {
     );
   }
 
-  createCheckoutSession(
+  /**
+   * Checkout, refused like a plan change when the organization doesn't fit
+   * the plan: auth's preview (which also refuses a second subscription and a
+   * negotiated plan), then the gateway's storage and documents.
+   */
+  async createCheckoutSession(
     dto: CreateCheckoutSessionDto,
     context: RequestContext,
   ): Promise<CheckoutSessionResponseDto> {
+    await this.refuseUnlessItFits(
+      await this.billingGrpcClient.previewCheckout(
+        {
+          priceId: dto.priceId,
+          successUrl: dto.successUrl,
+          cancelUrl: dto.cancelUrl,
+        },
+        context,
+      ),
+      context,
+    );
+
     return this.billingGrpcClient.createCheckoutSession(dto, context);
   }
 
@@ -118,6 +136,21 @@ export class BillingService {
       context,
     );
 
+    await this.refuseUnlessItFits(preview, context);
+
+    return toPlanChangeResponseDto(
+      await this.billingGrpcClient.changePlan(
+        { planId: dto.planId, priceId: dto.priceId, idempotencyKey },
+        context,
+      ),
+    );
+  }
+
+  /** The gateway's half of the over-limit refusal, for a change and for Checkout. */
+  private async refuseUnlessItFits(
+    preview: PlanChangePreviewResponse,
+    context: RequestContext,
+  ): Promise<void> {
     const verdict = await this.planChangeGuard.verify(preview, context);
 
     if (!verdict.allowed) {
@@ -130,18 +163,12 @@ export class BillingService {
         );
       }
 
-      // Names what to reduce and by how much. The person who tried is reading
-      // this, which is why it is a refusal rather than a notification.
-      throw new BadRequestException(
-        `This plan does not fit your current usage — ${verdict.overLimit.join('; ')}`,
-      );
+      // Names what to reduce and by how much, in words and as data: a client
+      // reads `details.overLimit`, never the sentence.
+      throw new BadRequestException({
+        message: `This plan does not fit your current usage — ${verdict.overLimit.map(overLimitText).join('; ')}`,
+        details: { overLimit: verdict.overLimit },
+      });
     }
-
-    return toPlanChangeResponseDto(
-      await this.billingGrpcClient.changePlan(
-        { planId: dto.planId, priceId: dto.priceId, idempotencyKey },
-        context,
-      ),
-    );
   }
 }

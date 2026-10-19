@@ -173,7 +173,13 @@ export class BillingController {
    */
   @ApiOperation({ summary: 'Change the workspace plan' })
   @ApiWrappedResponse(PlanChangeResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404', '409', '503'])
+  @ApiFilterErrors(['400', '401', '402', '403', '404', '409', '503'], {
+    descriptions: {
+      '402':
+        'The card was declined, or needs the bank’s confirmation (3-D Secure), ' +
+        'which nothing here can complete. Nothing changed.',
+    },
+  })
   @Post('plan')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')

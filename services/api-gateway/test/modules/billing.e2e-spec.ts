@@ -2,6 +2,7 @@ import request from 'supertest';
 import { of, throwError } from 'rxjs';
 import { status } from '@grpc/grpc-js';
 import { OrgStatus } from '@synapsedesk/contracts';
+import { withErrorDetails, withHttpStatus } from '@synapsedesk/core';
 import { toProtoAiModelTier, toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import {
   API,
@@ -10,7 +11,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { grpcError } from '../fixtures/wire';
+import { grpcError, wireUser } from '../fixtures/wire';
 
 describe('Billing at the gateway (e2e)', () => {
   let fx: E2eFixture;
@@ -215,6 +216,66 @@ describe('Billing at the gateway (e2e)', () => {
       expect(response.status).toBe(403);
     });
 
+    it('A lifecycle refusal carries the status as details; a permission refusal carries none', async () => {
+      // How a client tells "your organization is read-only" from "you lack a
+      // permission" without matching either sentence.
+      fx.stubs.organization.getOrganizationStatus.mockReturnValue(
+        of({
+          status: toProtoOrgStatus(OrgStatus.SUSPENDED_PAST_DUE),
+          deleted: false,
+        }),
+      );
+
+      const write = await authenticatedAgent(fx.app, {
+        permissionCodes: ['organization.update'],
+      })
+        .patch(`${API}/organizations/current`)
+        .send({ name: 'Renamed' });
+
+      expect(write.status).toBe(403);
+      expect(write.body.details).toEqual({
+        organizationStatus: OrgStatus.SUSPENDED_PAST_DUE,
+      });
+
+      const permission = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/billing/subscription`);
+
+      expect(permission.status).toBe(403);
+      expect(permission.body).not.toHaveProperty('details');
+
+      fx.stubs.organization.getOrganizationStatus.mockReturnValue(
+        of({ status: toProtoOrgStatus(OrgStatus.FROZEN), deleted: false }),
+      );
+
+      const frozen = await authenticatedAgent(fx.app, {
+        permissionCodes: ['organization.read'],
+      }).get(`${API}/billing/subscription`);
+
+      expect(frozen.status).toBe(403);
+      expect(frozen.body.details).toEqual({
+        organizationStatus: OrgStatus.FROZEN,
+      });
+
+      // `/users/me` still answers (`AUTH`), and says so: the frozen page reads it.
+      fx.stubs.user.getCurrentUser.mockReturnValue(
+        of({
+          user: wireUser(),
+          permissionCodes: [],
+          departmentIds: [],
+          hasPassword: true,
+          organizationStatus: toProtoOrgStatus(OrgStatus.FROZEN),
+        }),
+      );
+
+      const me = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/users/me`);
+
+      expect(me.status).toBe(200);
+      expect(me.body.data.organizationStatus).toBe(OrgStatus.FROZEN);
+    });
+
     it('Reaches billing while the tenant is SUSPENDED_PAST_DUE', async () => {
       // `OrgAccess.BILLING`, and it is the whole point of that access kind: a
       // tenant locked out of the page where they would pay their overdue
@@ -234,6 +295,8 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('QUALITY'),
           billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
           status: toProtoOrgStatus(OrgStatus.SUSPENDED_PAST_DUE),
+          cancelAtPeriodEnd: false,
+          negotiated: false,
         }),
       );
 
@@ -257,6 +320,8 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('FAST'),
           billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
           status: toProtoOrgStatus(OrgStatus.ACTIVE),
+          cancelAtPeriodEnd: false,
+          negotiated: false,
         }),
       );
 
@@ -270,6 +335,16 @@ describe('Billing at the gateway (e2e)', () => {
     });
 
     it('1. Creates a checkout session and writes nothing itself', async () => {
+      fx.stubs.billing.previewCheckout.mockReturnValue(
+        of({
+          overLimit: [],
+          overLimitItems: [],
+          narrowedDimensions: [],
+          targetMaxStorageBytes: 0,
+          targetMaxDocumentUploads: 0,
+          planName: 'Pro',
+        }),
+      );
       fx.stubs.billing.createCheckoutSession.mockReturnValue(
         of({ url: 'https://checkout.stripe.test/session' }),
       );
@@ -329,6 +404,7 @@ describe('Billing at the gateway (e2e)', () => {
     const preview = (overrides: Record<string, unknown> = {}) =>
       of({
         overLimit: [],
+        overLimitItems: [],
         narrowedDimensions: [],
         targetMaxStorageBytes: 5_368_709_120,
         targetMaxDocumentUploads: 100,
@@ -383,6 +459,7 @@ describe('Billing at the gateway (e2e)', () => {
       fx.stubs.billing.previewPlanChange.mockReturnValue(
         preview({
           overLimit: ['maxAgentSeats: 12 in use, plan grants 10'],
+          overLimitItems: [{ dimension: 'SEATS', inUse: 12, allowed: 10 }],
         }),
       );
 
@@ -392,6 +469,9 @@ describe('Billing at the gateway (e2e)', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('12 in use, plan grants 10');
+      expect(response.body.details).toEqual({
+        overLimit: [{ dimension: 'SEATS', inUse: 12, allowed: 10 }],
+      });
       expect(fx.stubs.billing.changePlan).not.toHaveBeenCalled();
       // Seats are auth's to answer, so no usage leg is dialled for them.
       expect(fx.stubs.document.getStorageUsage).not.toHaveBeenCalled();
@@ -465,6 +545,15 @@ describe('Billing at the gateway (e2e)', () => {
       expect(response.body.error).toContain(
         'maxStorageBytes: 8461348864 used, plan grants 5368709120',
       );
+      expect(response.body.details).toEqual({
+        overLimit: [
+          {
+            dimension: 'STORAGE',
+            inUse: 8_461_348_864,
+            allowed: 5_368_709_120,
+          },
+        ],
+      });
       expect(fx.stubs.billing.changePlan).not.toHaveBeenCalled();
     });
 
@@ -487,6 +576,105 @@ describe('Billing at the gateway (e2e)', () => {
       expect(response.body.error).toContain(
         'maxDocumentUploads: 140 held, plan grants 100',
       );
+      expect(response.body.details).toEqual({
+        overLimit: [{ dimension: 'DOCUMENTS', inUse: 140, allowed: 100 }],
+      });
+    });
+
+    it('11d. Checkout refuses on the same terms, seats from auth and storage from the gateway', async () => {
+      fx.stubs.billing.previewCheckout.mockReturnValue(
+        preview({
+          overLimit: ['maxAgentSeats: 8 in use, plan grants 5'],
+          overLimitItems: [{ dimension: 'SEATS', inUse: 8, allowed: 5 }],
+          narrowedDimensions: ['storage'],
+          targetMaxStorageBytes: 10,
+        }),
+      );
+      fx.stubs.document.getStorageUsage.mockReturnValue(
+        of({ usedBytes: 20, limitBytes: 100, documentCount: 1 }),
+      );
+
+      const response = await changer()
+        .post(`${API}/billing/checkout-session`)
+        .send({
+          priceId: PRICE,
+          successUrl: 'https://app.test/ok',
+          cancelUrl: 'https://app.test/no',
+        });
+
+      // Auth's seat overrun is decided before usage is read, as on a change.
+      expect(response.status).toBe(400);
+      expect(response.body.details).toEqual({
+        overLimit: [{ dimension: 'SEATS', inUse: 8, allowed: 5 }],
+      });
+      expect(fx.stubs.billing.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('11e. Checkout passes auth’s own refusal through: a second subscription is a 400 in its words', async () => {
+      fx.stubs.billing.previewCheckout.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            status.FAILED_PRECONDITION,
+            'This workspace already has a subscription — change your plan instead',
+          ),
+        ),
+      );
+
+      const response = await changer()
+        .post(`${API}/billing/checkout-session`)
+        .send({
+          priceId: PRICE,
+          successUrl: 'https://app.test/ok',
+          cancelUrl: 'https://app.test/no',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('change your plan instead');
+      expect(response.body).not.toHaveProperty('details');
+      expect(fx.stubs.billing.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('11f. A declined card is a 402 in the deck’s words, and details from auth reach the envelope', async () => {
+      fx.stubs.billing.previewPlanChange.mockReturnValue(preview());
+      fx.stubs.billing.changePlan.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            status.FAILED_PRECONDITION,
+            withHttpStatus(402, 'Your card was declined'),
+          ),
+        ),
+      );
+
+      const declined = await changer()
+        .post(`${API}/billing/plan`)
+        .send({ planId: PLAN, priceId: PRICE });
+
+      expect(declined.status).toBe(402);
+      expect(declined.body.error).toBe('Your card was declined!');
+
+      // Auth's re-check, refused after the preview passed: its items arrive.
+      fx.stubs.billing.changePlan.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            status.FAILED_PRECONDITION,
+            withErrorDetails('This plan does not fit your current usage', {
+              overLimit: [{ dimension: 'SEATS', inUse: 11, allowed: 10 }],
+            }),
+          ),
+        ),
+      );
+
+      const raced = await changer()
+        .post(`${API}/billing/plan`)
+        .send({ planId: PLAN, priceId: PRICE });
+
+      expect(raced.status).toBe(400);
+      expect(raced.body.error).toBe(
+        'This plan does not fit your current usage!',
+      );
+      expect(raced.body.details).toEqual({
+        overLimit: [{ dimension: 'SEATS', inUse: 11, allowed: 10 }],
+      });
     });
 
     it('11c. A narrowing change the tenant FITS goes through', async () => {
@@ -735,7 +923,12 @@ describe('Billing at the gateway (e2e)', () => {
               maxDocumentUploads: 100,
               maxAnalyticsRangeDays: 30,
               prices: [
-                { stripePriceId: 'price_starter_monthly', interval: 'month' },
+                {
+                  stripePriceId: 'price_starter_monthly',
+                  interval: 'month',
+                  unitAmount: 2900,
+                  currency: 'usd',
+                },
               ],
             },
           ],
@@ -752,7 +945,12 @@ describe('Billing at the gateway (e2e)', () => {
 
       expect(plan.name).toBe('Starter');
       expect(plan.prices).toEqual([
-        { stripePriceId: 'price_starter_monthly', interval: 'month' },
+        {
+          stripePriceId: 'price_starter_monthly',
+          interval: 'month',
+          unitAmount: 2900,
+          currency: 'usd',
+        },
       ]);
 
       for (const field of [

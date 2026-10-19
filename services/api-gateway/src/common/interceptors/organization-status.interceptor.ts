@@ -81,7 +81,12 @@ export class OrganizationStatusInterceptor implements NestInterceptor {
 
     const allowed = ORG_STATUS_ACCESS[state.status] ?? [];
     if (!allowed.includes(kind)) {
-      throw new ForbiddenException(explain(state.status));
+      // The status rides as data, so a client tells this refusal from a
+      // permission 403 without reading the sentence.
+      throw new ForbiddenException({
+        message: explain(state.status),
+        details: { organizationStatus: state.status },
+      });
     }
 
     return next.handle();

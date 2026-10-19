@@ -22,6 +22,10 @@ message CurrentUserResponse {
   // Whether the account has a password; a Google-only one doesn't. Never the
   // hash.
   bool has_password = 4;
+  // The caller's organization's lifecycle status, answered in every status
+  // (this read is `AUTH`), so a client can tell past due and frozen from one
+  // call. UNSPECIFIED for a Super Admin, who has no organization.
+  OrgStatus organization_status = 5;
 }
 
 // ---------------------------------------------------------------------------

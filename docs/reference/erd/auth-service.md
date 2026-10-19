@@ -27,6 +27,9 @@ erDiagram
     String timezone "❓"
     String stripe_customer_id "❓"
     String stripe_subscription_id "❓"
+    String stripe_price_id "❓"
+    DateTime current_period_end "❓"
+    Boolean cancel_at_period_end 
     DateTime created_at 
     DateTime updated_at 
     DateTime deleted_at "❓"
@@ -234,6 +237,8 @@ erDiagram
     String plan_id 
     String stripe_price_id 
     String interval 
+    Int unit_amount "❓"
+    String currency "❓"
     }
   
 

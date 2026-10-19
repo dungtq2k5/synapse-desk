@@ -1,6 +1,7 @@
 import {
   CurrentUserResponse,
   fromProtoGender,
+  fromProtoOrgStatus,
   fromProtoTimestamp,
   ListUsersRequest,
   ListUsersResponse,
@@ -195,6 +196,7 @@ export function toCurrentUserResponseDto(
     permissionCodes: response.permissionCodes as PermissionCode[],
     departmentIds: response.departmentIds,
     hasPassword: response.hasPassword,
+    organizationStatus: fromProtoOrgStatus(response.organizationStatus),
   };
 }
 

@@ -46,6 +46,16 @@ export const ERROR_ENVELOPE_PROPERTIES = {
   path: { type: 'string', example: '/api/v1/tickets' },
   timestamp: { type: 'string', format: 'date-time' },
   error: { type: 'string' },
+  details: {
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'Data for the refusals a client acts on, absent on every other error: ' +
+      '`overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) ' +
+      'when a plan change or Checkout does not fit, and `organizationStatus` ' +
+      '(`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status ' +
+      'refuses the request.',
+  },
 } as const satisfies Record<string, SchemaObject>;
 
 /**

@@ -8,6 +8,11 @@ export class SubscriptionResponseDto {
   planName!: string;
   maxAgentSeats!: number;
   maxStorageBytes!: number;
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   monthlyAiTokenBudget!: number;
   aiModelTier!: AiModelTier | null;
   billingCycleStart!: Date | null;
@@ -18,6 +23,22 @@ export class SubscriptionResponseDto {
    * `InvoiceResponseDto.status` carries Stripe's vocabulary.
    */
   status!: OrgStatus | null;
+  /**
+   * When the current period ends: the renewal date, or the end date when
+   * `cancelAtPeriodEnd`. Null until a subscription event has named the tenant.
+   */
+  currentPeriodEnd!: Date | null;
+  /** True when the subscription ends at `currentPeriodEnd` instead of renewing. */
+  cancelAtPeriodEnd!: boolean;
+  /** The Stripe price the subscription is on; null with no subscription. */
+  priceId!: string | null;
+  /** That price's interval, `month` | `year`; null with no subscription. */
+  interval!: string | null;
+  /**
+   * On a plan agreed with the SynapseDesk team: no self-serve plan change or
+   * Checkout applies.
+   */
+  negotiated!: boolean;
 }
 
 export class CheckoutSessionResponseDto {
@@ -53,6 +74,13 @@ export class TenantPlanPriceResponseDto {
   stripePriceId!: string;
   /** Stripe's literal — `month` | `year` in practice, and wider in theory. */
   interval!: string;
+  /**
+   * What the price charges each interval, in the currency's smallest unit
+   * (cents for `usd`). Null for a price seeded before amounts were stored.
+   */
+  unitAmount!: number | null;
+  /** Stripe's lowercase ISO currency code, e.g. `usd`. */
+  currency!: string | null;
 }
 
 /**
@@ -69,6 +97,11 @@ export class TenantPlanResponseDto {
   name!: string;
   maxAgentSeats!: number;
   maxStorageBytes!: number;
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   monthlyAiTokenBudget!: number;
   /** `AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}. */
   aiModelTier!: AiModelTier | null;

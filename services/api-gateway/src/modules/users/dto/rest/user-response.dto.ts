@@ -16,6 +16,7 @@
 
 import {
   Gender,
+  OrgStatus,
   PERMISSION_CODES,
   type PermissionCode,
 } from '@synapsedesk/contracts';
@@ -148,4 +149,13 @@ export class CurrentUserResponseDto {
    */
   @IsBoolean()
   readonly hasPassword!: boolean;
+
+  /**
+   * The caller's organization's status, answered in every status: the
+   * past-due banner and the frozen page read it. Null for a Super Admin, who
+   * has no organization.
+   */
+  @IsNullable()
+  @IsEnum(OrgStatus)
+  readonly organizationStatus!: OrgStatus | null;
 }

@@ -1,7 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import type { PermissionCode } from '@synapsedesk/contracts';
-import { AiModelTier } from '@synapsedesk/grpc-proto';
+import { AiModelTier, toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -11,6 +11,7 @@ import {
   flushTestRedis,
 } from '../utils';
 import { grpcError, timestamp, wirePage, wireUser } from '../fixtures/wire';
+import { OrgStatus } from '@synapsedesk/contracts';
 
 describe('response envelope sweep (e2e)', () => {
   let fx: E2eFixture;
@@ -100,6 +101,7 @@ describe('response envelope sweep (e2e)', () => {
             permissionCodes: [],
             departmentIds: [],
             hasPassword: true,
+            organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
           }),
         ),
       fail: (f) =>

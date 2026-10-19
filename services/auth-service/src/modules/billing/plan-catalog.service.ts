@@ -70,9 +70,4 @@ export class PlanCatalogService {
       displayName: price.plan.name,
     };
   }
-
-  /** Whether any price at all is sellable — used to reject a bogus checkout. */
-  async priceExists(priceId: string): Promise<boolean> {
-    return (await this.entitlementsForPrice(priceId)) !== null;
-  }
 }

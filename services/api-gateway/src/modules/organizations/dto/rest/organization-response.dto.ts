@@ -17,6 +17,11 @@ export class OrganizationResponseDto {
   readonly allowedEmailDomains!: string[];
   readonly maxAgentSeats!: number;
   readonly maxStorageBytes!: number;
+  /**
+   * The AI allowance a month, in millionths of a US dollar (1000000 is
+   * $1.00), charged by what each AI request costs. Not tokens, whatever the
+   * name says.
+   */
   readonly monthlyAiTokenBudget!: number;
   readonly billingCycleStart!: Date;
   readonly createdAt!: Date;

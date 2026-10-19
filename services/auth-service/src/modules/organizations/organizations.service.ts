@@ -529,7 +529,10 @@ export class OrganizationsService {
       // the moment someone is already blocked.
       aiModelTier: toProtoAiModelTier(organization.aiModelTier),
       planName: planLabelFor(organization),
-      currentPeriodEnd: undefined,
+      // Kept on the row by the webhook; absent for a tenant no event has named.
+      currentPeriodEnd: organization.currentPeriodEnd
+        ? toProtoTimestamp(organization.currentPeriodEnd)
+        : undefined,
       seats: {
         available: true,
         used: seatsUsed,

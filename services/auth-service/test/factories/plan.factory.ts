@@ -32,7 +32,14 @@ export const PLAN_FIXTURES = [
     // plan layer bite has one fixture that does it on every grant.
     maxDocumentUploads: 1_000,
     maxAnalyticsRangeDays: 30,
-    prices: [{ stripePriceId: 'price_starter_monthly', interval: 'month' }],
+    prices: [
+      {
+        stripePriceId: 'price_starter_monthly',
+        interval: 'month',
+        unitAmount: 2_900,
+        currency: 'usd',
+      },
+    ],
   },
   {
     name: 'Pro',
@@ -46,10 +53,20 @@ export const PLAN_FIXTURES = [
     maxDocumentUploads: 10_000,
     maxAnalyticsRangeDays: 180,
     prices: [
-      { stripePriceId: 'price_pro_monthly', interval: 'month' },
+      {
+        stripePriceId: 'price_pro_monthly',
+        interval: 'month',
+        unitAmount: 9_900,
+        currency: 'usd',
+      },
       // A SECOND price on one plan, which is the shape the product keying
       // exists for: monthly and annual must resolve to the same entitlements.
-      { stripePriceId: 'price_pro_annual', interval: 'year' },
+      {
+        stripePriceId: 'price_pro_annual',
+        interval: 'year',
+        unitAmount: 99_000,
+        currency: 'usd',
+      },
     ],
   },
   {
@@ -63,7 +80,14 @@ export const PLAN_FIXTURES = [
     maxAttachmentBytes: 10n * MIB,
     maxDocumentUploads: 100_000,
     maxAnalyticsRangeDays: 400,
-    prices: [{ stripePriceId: 'price_enterprise_monthly', interval: 'month' }],
+    prices: [
+      {
+        stripePriceId: 'price_enterprise_monthly',
+        interval: 'month',
+        unitAmount: 49_900,
+        currency: 'usd',
+      },
+    ],
   },
 ] as const;
 

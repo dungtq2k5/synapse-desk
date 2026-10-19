@@ -71,6 +71,27 @@ export interface SubscriptionResponse {
     | undefined;
   /** The tenant lifecycle status the subscription drove. */
   status: OrgStatus;
+  /**
+   * The subscription's state as its last `customer.subscription.*` event gave
+   * it, kept on the organization row. Absent until an event names the tenant.
+   */
+  currentPeriodEnd?:
+    | Timestamp
+    | undefined;
+  /** True when the subscription ends at `current_period_end` instead of renewing. */
+  cancelAtPeriodEnd: boolean;
+  priceId?:
+    | string
+    | undefined;
+  /** The current price's interval, from the plan catalog: `month` | `year`. */
+  interval?:
+    | string
+    | undefined;
+  /**
+   * On a plan agreed with the SynapseDesk team (`entitlements_pinned`): no
+   * self-serve change applies to it.
+   */
+  negotiated: boolean;
 }
 
 export interface CreateCheckoutSessionRequest {
@@ -152,6 +173,12 @@ export interface TenantPlanPriceResponse {
   stripePriceId: string;
   /** Stripe's literal — `month` | `year` in practice, and wider in theory. */
   interval: string;
+  /**
+   * What the price charges, in the currency's smallest unit, and Stripe's
+   * lowercase currency code. Absent for a price seeded before amounts were.
+   */
+  unitAmount?: number | undefined;
+  currency?: string | undefined;
 }
 
 export interface ListTenantPlansResponse {
@@ -176,7 +203,10 @@ export interface PlanChangeRequest {
  * target grants as numbers. The gateway dials ingestion only for those.
  */
 export interface PlanChangePreviewResponse {
-  /** Seat overruns, already formatted — `maxAgentSeats: 12 in use, plan grants 10`. */
+  /**
+   * Seat overruns, already formatted — `maxAgentSeats: 12 in use, plan grants 10`.
+   * Superseded by `over_limit_items`; kept until the release after (ADR 0044).
+   */
   overLimit: string[];
   /**
    * Dimensions where the target grant is BELOW this tenant's current grant, out
@@ -192,6 +222,19 @@ export interface PlanChangePreviewResponse {
   targetMaxStorageBytes: number;
   targetMaxDocumentUploads: number;
   planName: string;
+  /**
+   * The seat overruns as data, one per broken limit. Auth only ever answers
+   * `SEATS`; the gateway adds storage and documents.
+   */
+  overLimitItems: OverLimit[];
+}
+
+/** A limit the target plan would break: what is in use and what it allows. */
+export interface OverLimit {
+  /** `SEATS` | `STORAGE` | `DOCUMENTS`. */
+  dimension: string;
+  inUse: number;
+  allowed: number;
 }
 
 /**
@@ -275,6 +318,14 @@ export interface BillingServiceClient {
   previewPlanChange(request: PlanChangeRequest, metadata?: Metadata): Observable<PlanChangePreviewResponse>;
 
   changePlan(request: PlanChangeRequest, metadata?: Metadata): Observable<PlanChangeResponse>;
+
+  /**
+   * Checkout's half of the same check, for a tenant with no subscription yet:
+   * refuses a tenant that already has one, and a negotiated one, then answers
+   * as `PreviewPlanChange` does for the plan the price belongs to.
+   */
+
+  previewCheckout(request: CreateCheckoutSessionRequest, metadata?: Metadata): Observable<PlanChangePreviewResponse>;
 }
 
 export interface BillingServiceController {
@@ -340,6 +391,17 @@ export interface BillingServiceController {
     request: PlanChangeRequest,
     metadata?: Metadata,
   ): Promise<PlanChangeResponse> | Observable<PlanChangeResponse> | PlanChangeResponse;
+
+  /**
+   * Checkout's half of the same check, for a tenant with no subscription yet:
+   * refuses a tenant that already has one, and a negotiated one, then answers
+   * as `PreviewPlanChange` does for the plan the price belongs to.
+   */
+
+  previewCheckout(
+    request: CreateCheckoutSessionRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangePreviewResponse> | Observable<PlanChangePreviewResponse> | PlanChangePreviewResponse;
 }
 
 export function BillingServiceControllerMethods() {
@@ -353,6 +415,7 @@ export function BillingServiceControllerMethods() {
       "listTenantPlans",
       "previewPlanChange",
       "changePlan",
+      "previewCheckout",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

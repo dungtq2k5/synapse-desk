@@ -127,6 +127,17 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
+  /** Checkout's preview: local reads only, like `previewPlanChange`. */
+  previewCheckout(
+    request: CreateCheckoutSessionRequest,
+    context: RequestContext,
+  ): Promise<PlanChangePreviewResponse> {
+    return this.call(
+      (metadata) => this.billingGrpcService.previewCheckout(request, metadata),
+      context,
+    );
+  }
+
   changePlan(
     request: PlanChangeRequest,
     context: RequestContext,

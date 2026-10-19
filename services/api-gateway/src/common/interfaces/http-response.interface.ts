@@ -18,4 +18,10 @@ export interface ErrorResponse {
   path: string;
   timestamp: string;
   error: string;
+  /**
+   * Data for the refusals a client acts on: `overLimit` on a plan that doesn't
+   * fit, `organizationStatus` on a lifecycle refusal. Absent on every other
+   * error.
+   */
+  details?: Record<string, unknown>;
 }

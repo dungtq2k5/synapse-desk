@@ -9,7 +9,10 @@ import {
   STRIPE_PORTAL_MARKER,
 } from '@synapsedesk/contracts';
 import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
-import { fromProtoAiModelTier } from '@synapsedesk/grpc-proto';
+import {
+  fromProtoAiModelTier,
+  fromProtoTimestamp,
+} from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -83,6 +86,8 @@ describe('Billing and entitlements (e2e)', () => {
     createdAt?: Date;
     subscriptionStatus?: string;
     periodStart?: Date;
+    periodEnd?: Date;
+    cancelAtPeriodEnd?: boolean;
   }): Record<string, unknown> => {
     eventCounter += 1;
 
@@ -100,6 +105,7 @@ describe('Billing and entitlements (e2e)', () => {
           object: 'subscription',
           customer: options.customerId,
           status: options.subscriptionStatus ?? 'active',
+          cancel_at_period_end: options.cancelAtPeriodEnd ?? false,
           items: {
             object: 'list',
             data: [
@@ -109,6 +115,11 @@ describe('Billing and entitlements (e2e)', () => {
                 current_period_start: Math.floor(
                   (options.periodStart ?? new Date()).getTime() / 1000,
                 ),
+                ...(options.periodEnd && {
+                  current_period_end: Math.floor(
+                    options.periodEnd.getTime() / 1000,
+                  ),
+                }),
               },
             ],
           },
@@ -1331,6 +1342,82 @@ describe('Billing and entitlements (e2e)', () => {
 
       expect(fromProtoAiModelTier(usage.aiModelTier)).toBe('QUALITY');
       expect(usage.planName).toBe(planForPrice(PRO).name);
+    });
+
+    it('13. Keeps the period facts each subscription event carries, and reads them back with no Stripe call', async () => {
+      const organization = await createOrganization(fx.prisma, {
+        stripeCustomerId: 'cus_period',
+      });
+      const ctx = memberContext({ id: 'u', organizationId: organization.id });
+      const periodEnd = new Date('2026-11-01T00:00:00.000Z');
+
+      await deliver(
+        subscriptionEvent({
+          type: 'customer.subscription.created',
+          customerId: 'cus_period',
+          priceId: 'price_pro_annual',
+          periodEnd,
+        }),
+      );
+
+      const apiSpy = faults.spy(stripe, 'api', 'get');
+      const renewing = await billing.getSubscription(ctx);
+
+      expect(apiSpy).not.toHaveBeenCalled();
+      expect(fromProtoTimestamp(renewing.currentPeriodEnd)).toEqual(periodEnd);
+      expect(renewing.cancelAtPeriodEnd).toBe(false);
+      expect(renewing.priceId).toBe('price_pro_annual');
+      expect(renewing.interval).toBe('year');
+      expect(renewing.negotiated).toBe(false);
+
+      const usage = await organizations.getOrganizationUsage(ctx);
+      expect(fromProtoTimestamp(usage.currentPeriodEnd)).toEqual(periodEnd);
+
+      // A portal cancel toggle arrives as an update with the flag set.
+      await deliver(
+        subscriptionEvent({
+          customerId: 'cus_period',
+          priceId: 'price_pro_annual',
+          periodEnd,
+          cancelAtPeriodEnd: true,
+          createdAt: new Date(Date.now() + 2_000),
+        }),
+      );
+
+      const ending = await billing.getSubscription(ctx);
+      expect(ending.cancelAtPeriodEnd).toBe(true);
+      expect(fromProtoTimestamp(ending.currentPeriodEnd)).toEqual(periodEnd);
+
+      // An event with no period end leaves the one already kept.
+      await deliver(
+        subscriptionEvent({
+          customerId: 'cus_period',
+          priceId: PRO,
+          createdAt: new Date(Date.now() + 4_000),
+        }),
+      );
+
+      const moved = await billing.getSubscription(ctx);
+      expect(moved.priceId).toBe(PRO);
+      expect(moved.interval).toBe('month');
+      expect(moved.cancelAtPeriodEnd).toBe(false);
+      expect(fromProtoTimestamp(moved.currentPeriodEnd)).toEqual(periodEnd);
+    });
+
+    it('13b. Says a negotiated tenant is one, and a tenant no event named has no period facts', async () => {
+      const organization = await createOrganization(fx.prisma, {
+        entitlementsPinned: true,
+      });
+
+      const response = await billing.getSubscription(
+        memberContext({ id: 'u', organizationId: organization.id }),
+      );
+
+      expect(response.negotiated).toBe(true);
+      expect(response.currentPeriodEnd).toBeUndefined();
+      expect(response.priceId).toBeUndefined();
+      expect(response.interval).toBeUndefined();
+      expect(response.cancelAtPeriodEnd).toBe(false);
     });
 
     it('4b. Labels a grandfathered tenant "Free" rather than by its tier', async () => {

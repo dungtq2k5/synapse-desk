@@ -6,6 +6,8 @@ import {
 } from './utils/bootstrap';
 import { anonymousAgent, API, authenticatedAgent } from './utils/auth';
 import { wireUser } from './fixtures/wire';
+import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
+import { OrgStatus } from '@synapsedesk/contracts';
 
 /**
  * Proves the e2e fixture itself, before any suite depends on it.
@@ -34,6 +36,7 @@ describe('e2e bootstrap', () => {
         permissionCodes: [],
         departmentIds: [],
         hasPassword: true,
+        organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
       }),
     );
 

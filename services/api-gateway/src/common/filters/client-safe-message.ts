@@ -1,6 +1,10 @@
 import { HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { readHttpStatusHint } from '@synapsedesk/core';
+import {
+  type ErrorDetails,
+  readErrorDetails,
+  readHttpStatusHint,
+} from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 
 /**
@@ -91,9 +95,13 @@ export type ClientSafeOptions = {
 export function clientSafeError(
   error: unknown,
   { isProduction, logger, context = 'a request' }: ClientSafeOptions,
-): { statusCode: HttpStatus; message: string } {
+): { statusCode: HttpStatus; message: string; details?: ErrorDetails } {
   if (error instanceof HttpException) {
-    return { statusCode: error.getStatus(), message: formatErrorMsg(error) };
+    return {
+      statusCode: error.getStatus(),
+      message: formatErrorMsg(error),
+      ...detailsOf(error),
+    };
   }
 
   if (isGrpcError(error)) {
@@ -115,9 +123,13 @@ export function clientSafeError(
         return { statusCode: mapped, message: formatErrorMsg(fixed) };
       }
 
+      // Details ride behind the status marker; lifted out here, so the
+      // sentence a client sees never carries them.
+      const { details, message } = readErrorDetails(hint.message);
       return {
         statusCode: hint.httpStatus ?? mapped,
-        message: hint.message,
+        message: formatErrorMsg(message),
+        ...(details && { details }),
       };
     }
 
@@ -150,4 +162,20 @@ export function clientSafeMessage(
   options: ClientSafeOptions,
 ): string {
   return clientSafeError(error, options).message;
+}
+
+/**
+ * The `details` an HttpException was thrown with, when its response is an
+ * object carrying one: `new BadRequestException({ message, details })`.
+ */
+function detailsOf(error: HttpException): { details?: ErrorDetails } {
+  const response = error.getResponse();
+  if (typeof response !== 'object' || response === null) return {};
+
+  const { details } = response as { details?: unknown };
+  return details !== null &&
+    typeof details === 'object' &&
+    !Array.isArray(details)
+    ? { details: details as ErrorDetails }
+    : {};
 }

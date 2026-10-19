@@ -33,7 +33,7 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
   constructor(private readonly isProduction: boolean) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const { statusCode, message } = this.resolve(exception, host);
+    const { statusCode, message, details } = this.resolve(exception, host);
 
     if (host.getType<GqlContextType>() === 'graphql') {
       // Apollo formats the error envelope; normalize the message and re-throw.
@@ -56,13 +56,15 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
       path: request.originalUrl,
       timestamp: new Date().toISOString(),
       error: message,
+      // Only on the refusals a client acts on by data: absent everywhere else.
+      ...(details && { details }),
     } satisfies ErrorResponse);
   }
 
   private resolve(
     exception: unknown,
     host: ArgumentsHost,
-  ): { statusCode: number; message: string } {
+  ): ReturnType<typeof clientSafeError> {
     return clientSafeError(exception, {
       isProduction: this.isProduction,
       logger: this.logger,

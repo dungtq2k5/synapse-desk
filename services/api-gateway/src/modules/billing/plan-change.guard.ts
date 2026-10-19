@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/contracts';
+import {
+  type OverLimitDimension,
+  type OverLimitItem,
+  RequestContext,
+} from '@synapsedesk/contracts';
 import { exceedsLimit } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import type {
@@ -11,7 +15,7 @@ import { DocumentsGrpcClient } from '../documents/documents-grpc.client';
 /** What the gate decided, and why. */
 export type PlanChangeVerdict =
   | { allowed: true }
-  | { allowed: false; reason: 'over-limit'; overLimit: string[] }
+  | { allowed: false; reason: 'over-limit'; overLimit: OverLimitItem[] }
   | { allowed: false; reason: 'unverifiable'; dimensions: string[] };
 
 /**
@@ -64,11 +68,15 @@ export class PlanChangeGuard {
     preview: PlanChangePreviewResponse,
     context: RequestContext,
   ): Promise<PlanChangeVerdict> {
-    if (preview.overLimit.length > 0) {
+    if (preview.overLimitItems.length > 0) {
       return {
         allowed: false,
         reason: 'over-limit',
-        overLimit: preview.overLimit,
+        overLimit: preview.overLimitItems.map((item) => ({
+          dimension: item.dimension as OverLimitDimension,
+          inUse: Number(item.inUse),
+          allowed: Number(item.allowed),
+        })),
       };
     }
 
@@ -101,7 +109,7 @@ export class PlanChangeGuard {
       };
     }
 
-    const overLimit: string[] = [];
+    const overLimit: OverLimitItem[] = [];
 
     // **`usage.limitBytes` is deliberately unread.** It is the tenant's CURRENT
     // ceiling, resolved by ingestion calling back into auth. The comparison is
@@ -111,22 +119,42 @@ export class PlanChangeGuard {
       const used = Number(usage.usedBytes);
 
       if (exceedsLimit(used, Number(preview.targetMaxStorageBytes))) {
-        overLimit.push(
-          `maxStorageBytes: ${used} used, plan grants ${preview.targetMaxStorageBytes}`,
-        );
+        overLimit.push({
+          dimension: 'STORAGE',
+          inUse: used,
+          allowed: Number(preview.targetMaxStorageBytes),
+        });
       }
     }
 
     if (preview.narrowedDimensions.includes('documents')) {
       if (exceedsLimit(usage.documentCount, preview.targetMaxDocumentUploads)) {
-        overLimit.push(
-          `maxDocumentUploads: ${usage.documentCount} held, plan grants ${preview.targetMaxDocumentUploads}`,
-        );
+        overLimit.push({
+          dimension: 'DOCUMENTS',
+          inUse: usage.documentCount,
+          allowed: preview.targetMaxDocumentUploads,
+        });
       }
     }
 
     return overLimit.length > 0
       ? { allowed: false, reason: 'over-limit', overLimit }
       : { allowed: true };
+  }
+}
+
+/**
+ * One over-limit item as the refusal's sentence names it:
+ * `maxStorageBytes: 6 used, plan grants 5`. The items themselves go out as
+ * `details.overLimit`, which is what a client reads.
+ */
+export function overLimitText(item: OverLimitItem): string {
+  switch (item.dimension) {
+    case 'SEATS':
+      return `maxAgentSeats: ${item.inUse} in use, plan grants ${item.allowed}`;
+    case 'STORAGE':
+      return `maxStorageBytes: ${item.inUse} used, plan grants ${item.allowed}`;
+    case 'DOCUMENTS':
+      return `maxDocumentUploads: ${item.inUse} held, plan grants ${item.allowed}`;
   }
 }

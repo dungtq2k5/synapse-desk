@@ -36,6 +36,11 @@ export function toSubscriptionResponseDto(
       'billingCycleStart',
     ),
     status: fromProtoOrgStatus(response.status),
+    currentPeriodEnd: fromProtoTimestamp(response.currentPeriodEnd) ?? null,
+    cancelAtPeriodEnd: response.cancelAtPeriodEnd,
+    priceId: response.priceId ?? null,
+    interval: response.interval ?? null,
+    negotiated: response.negotiated,
   };
 }
 
@@ -82,6 +87,9 @@ export function toTenantPlanResponseDtos(
     prices: plan.prices.map((price) => ({
       stripePriceId: price.stripePriceId,
       interval: price.interval,
+      unitAmount:
+        price.unitAmount === undefined ? null : Number(price.unitAmount),
+      currency: price.currency ?? null,
     })),
   }));
 }

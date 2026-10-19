@@ -1,5 +1,5 @@
 import { of } from 'rxjs';
-import { AiModelTier } from '@synapsedesk/grpc-proto';
+import { AiModelTier, toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +13,7 @@ import {
   flushTestRedis,
 } from '../utils';
 import { timestamp, wirePage, wireUser } from '../fixtures/wire';
+import { OrgStatus } from '@synapsedesk/contracts';
 
 /**
  * `PermissionGuard` ANY semantics.
@@ -298,6 +299,7 @@ describe('PermissionGuard on real routes (e2e)', () => {
         permissionCodes: [],
         departmentIds: [],
         hasPassword: true,
+        organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
       }),
     );
 
