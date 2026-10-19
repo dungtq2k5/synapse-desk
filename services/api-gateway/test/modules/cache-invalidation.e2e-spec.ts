@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { of } from 'rxjs';
 import {
+  BILLING_PATTERNS,
   TICKET_PATTERNS,
   DOCUMENT_PATTERNS,
   OrgStatus,
@@ -143,6 +144,27 @@ describe('Cache invalidation (e2e)', () => {
       expect(await survives(organizationId, CACHE_SCOPES.documents)).toBe(
         false,
       );
+    });
+
+    it('**a billing event drops the tenant’s lifecycle status too**, so Stripe’s past due gates the next write', async () => {
+      await fx.redis.set(
+        `org-status:${organizationId}`,
+        JSON.stringify({ status: 'ACTIVE', deleted: false }),
+      );
+      await fx.redis.set(
+        `org-status:${otherOrganizationId}`,
+        JSON.stringify({ status: 'ACTIVE', deleted: false }),
+      );
+
+      await fx.publishOn(BILLING_PATTERNS.entitlementsChanged, {
+        organizationId,
+      });
+      await settle();
+
+      expect(await fx.redis.get(`org-status:${organizationId}`)).toBeNull();
+      expect(
+        await fx.redis.get(`org-status:${otherOrganizationId}`),
+      ).not.toBeNull();
     });
 
     it('**but `document.uploaded` does NOT** — nothing is readable yet', async () => {

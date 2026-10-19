@@ -8,6 +8,7 @@ import { CacheInvalidationConsumer } from './cache-invalidation.consumer';
 import { CacheInvalidationInterceptor } from '../interceptors/cache-invalidation.interceptor';
 import { CACHE_SCOPES } from '../config/cache.config';
 import type { CacheService } from './cache.service';
+import type { OrganizationStatusService } from '../organization-status/organization-status.service';
 
 describe('cache invalidation', () => {
   /** The subjects a method actually subscribes to, read back from metadata. */
@@ -55,7 +56,12 @@ describe('cache invalidation', () => {
 
   describe('A consumer failure never kills the process', () => {
     const consumerWith = (cache: Partial<CacheService>) =>
-      new CacheInvalidationConsumer(cache as CacheService);
+      new CacheInvalidationConsumer(
+        cache as CacheService,
+        {
+          invalidate: () => Promise.resolve(),
+        } as unknown as OrganizationStatusService,
+      );
 
     it('a rejected invalidation is caught, not left to the process', async () => {
       // An unhandled rejection in a NATS handler takes the gateway down. A

@@ -7,6 +7,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { CacheService } from './cache.service';
+import { OrganizationStatusService } from '../organization-status/organization-status.service';
 import { CACHE_SCOPES } from '../config/cache.config';
 
 /**
@@ -34,7 +35,10 @@ import { CACHE_SCOPES } from '../config/cache.config';
 export class CacheInvalidationConsumer {
   private readonly logger = new Logger(CacheInvalidationConsumer.name);
 
-  constructor(private readonly cache: CacheService) {}
+  constructor(
+    private readonly cache: CacheService,
+    private readonly statuses: OrganizationStatusService,
+  ) {}
 
   /**
    * Anything that happened to a ticket drops the tenant's ticket lists.
@@ -85,6 +89,12 @@ export class CacheInvalidationConsumer {
   entitlementsChanged(@Payload() event: unknown): void {
     this.drop(CACHE_SCOPES.settings, event);
     this.drop(CACHE_SCOPES.organizations, event);
+    // **And the lifecycle status.** Stripe's events move it (past due, frozen)
+    // and the gateway only relays them, so no write here invalidates it: the
+    // gate would let a past-due tenant write for the status cache's thirty
+    // seconds. The same event that carries the new grants carries this.
+    const organizationId = organizationIdOf(event);
+    if (organizationId) void this.statuses.invalidate(organizationId);
   }
 
   /**
