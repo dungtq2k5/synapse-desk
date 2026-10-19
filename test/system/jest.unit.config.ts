@@ -1,5 +1,4 @@
 import type { Config } from 'jest';
-import systemConfig from './jest.config.ts';
 
 /**
  * The harness's OWN unit tests — no stack, no stores, no `globalSetup`.
@@ -10,19 +9,21 @@ import systemConfig from './jest.config.ts';
  * system `testRegex` cannot match it, and registered in the root `--projects`
  * so `npm test` — which must run on a machine with nothing started — carries
  * it.
+ *
+ * Standalone rather than a spread of `jest.config.ts`: importing that file
+ * makes Node load it itself, and where `test/` declares no module type it
+ * warns (MODULE_TYPELESS_PACKAGE_JSON) on every run. `stack.spec.ts` imports
+ * no `@synapsedesk` package, so it needs none of that config's mappings.
  */
 const config: Config = {
-  ...systemConfig,
   displayName: 'system:unit',
+  rootDir: '.',
+  testEnvironment: 'node',
   testRegex: String.raw`test/system/.*\.spec\.ts$`,
-  globalSetup: undefined,
-  globalTeardown: undefined,
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+  },
   testTimeout: 30_000,
 };
-
-// `delete`, not `: undefined` — under `--projects` jest warns on the KEY being
-// present ("testSequencer is not supported in an individual project
-// configuration"), and a spread from the system config carries it in.
-delete (config as Record<string, unknown>).testSequencer;
 
 export default config;
