@@ -17,6 +17,7 @@ import {
 } from '@synapsedesk/contracts';
 import { ORG_ACCESS_KEY } from '../decorators/org-access.decorator';
 import { OrganizationStatusService } from '../organization-status/organization-status.service';
+import { withDetails } from '../filters/client-safe-message';
 
 /**
  * Enforces the tenant lifecycle (api-endpoints-plan).
@@ -83,9 +84,8 @@ export class OrganizationStatusInterceptor implements NestInterceptor {
     if (!allowed.includes(kind)) {
       // The status rides as data, so a client tells this refusal from a
       // permission 403 without reading the sentence.
-      throw new ForbiddenException({
-        message: explain(state.status),
-        details: { organizationStatus: state.status },
+      throw withDetails(new ForbiddenException(explain(state.status)), {
+        organizationStatus: state.status,
       });
     }
 

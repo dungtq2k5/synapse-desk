@@ -15,7 +15,14 @@ import { DocumentsGrpcClient } from '../documents/documents-grpc.client';
 /** What the gate decided, and why. */
 export type PlanChangeVerdict =
   | { allowed: true }
-  | { allowed: false; reason: 'over-limit'; overLimit: OverLimitItem[] }
+  | {
+      allowed: false;
+      reason: 'over-limit';
+      /** The broken limits as data; empty when only auth's old text came. */
+      overLimit: OverLimitItem[];
+      /** The same limits as the refusal's sentence names them. */
+      sentences: string[];
+    }
   | { allowed: false; reason: 'unverifiable'; dimensions: string[] };
 
 /**
@@ -68,15 +75,23 @@ export class PlanChangeGuard {
     preview: PlanChangePreviewResponse,
     context: RequestContext,
   ): Promise<PlanChangeVerdict> {
-    if (preview.overLimitItems.length > 0) {
+    // **Either field refuses.** An auth one release older sends only the
+    // text, and reading the items alone would let its over-limit change
+    // through (ADR 0044: both fields stand until the release after).
+    if (preview.overLimitItems.length > 0 || preview.overLimit.length > 0) {
+      const overLimit = preview.overLimitItems.map((item) => ({
+        dimension: item.dimension as OverLimitDimension,
+        inUse: Number(item.inUse),
+        allowed: Number(item.allowed),
+      }));
       return {
         allowed: false,
         reason: 'over-limit',
-        overLimit: preview.overLimitItems.map((item) => ({
-          dimension: item.dimension as OverLimitDimension,
-          inUse: Number(item.inUse),
-          allowed: Number(item.allowed),
-        })),
+        overLimit,
+        sentences:
+          overLimit.length > 0
+            ? overLimit.map(overLimitText)
+            : preview.overLimit,
       };
     }
 
@@ -138,7 +153,12 @@ export class PlanChangeGuard {
     }
 
     return overLimit.length > 0
-      ? { allowed: false, reason: 'over-limit', overLimit }
+      ? {
+          allowed: false,
+          reason: 'over-limit',
+          overLimit,
+          sentences: overLimit.map(overLimitText),
+        }
       : { allowed: true };
   }
 }

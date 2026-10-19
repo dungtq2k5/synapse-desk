@@ -165,17 +165,24 @@ export function clientSafeMessage(
 }
 
 /**
- * The `details` an HttpException was thrown with, when its response is an
- * object carrying one: `new BadRequestException({ message, details })`.
+ * Gives an HttpException the `details` the envelope carries beside its
+ * message.
+ *
+ * A property, not the response body: built from an object, an HttpException
+ * loses Nest's own `{ statusCode, message, error }` shape, and GraphQL's error
+ * code goes with it (a 403 read back as INTERNAL_SERVER_ERROR).
+ *
+ * @example throw withDetails(new ForbiddenException(text), { organizationStatus })
  */
-function detailsOf(error: HttpException): { details?: ErrorDetails } {
-  const response = error.getResponse();
-  if (typeof response !== 'object' || response === null) return {};
+export function withDetails<T extends HttpException>(
+  exception: T,
+  details: ErrorDetails,
+): T {
+  return Object.assign(exception, { details });
+}
 
-  const { details } = response as { details?: unknown };
-  return details !== null &&
-    typeof details === 'object' &&
-    !Array.isArray(details)
-    ? { details: details as ErrorDetails }
-    : {};
+/** The `details` {@link withDetails} gave an exception, if any. */
+function detailsOf(error: HttpException): { details?: ErrorDetails } {
+  const { details } = error as { details?: ErrorDetails };
+  return details ? { details } : {};
 }

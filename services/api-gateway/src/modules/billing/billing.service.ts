@@ -6,7 +6,8 @@ import {
 import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
 import { BillingGrpcClient } from './billing-grpc.client';
 import type { PlanChangePreviewResponse } from '@synapsedesk/grpc-proto';
-import { PlanChangeGuard, overLimitText } from './plan-change.guard';
+import { PlanChangeGuard } from './plan-change.guard';
+import { withDetails } from '../../common/filters/client-safe-message';
 import {
   toInvoiceResponseDtos,
   toPlanChangeResponseDto,
@@ -165,10 +166,12 @@ export class BillingService {
 
       // Names what to reduce and by how much, in words and as data: a client
       // reads `details.overLimit`, never the sentence.
-      throw new BadRequestException({
-        message: `This plan does not fit your current usage — ${verdict.overLimit.map(overLimitText).join('; ')}`,
-        details: { overLimit: verdict.overLimit },
-      });
+      const refusal = new BadRequestException(
+        `This plan does not fit your current usage — ${verdict.sentences.join('; ')}`,
+      );
+      throw verdict.overLimit.length > 0
+        ? withDetails(refusal, { overLimit: verdict.overLimit })
+        : refusal;
     }
   }
 }

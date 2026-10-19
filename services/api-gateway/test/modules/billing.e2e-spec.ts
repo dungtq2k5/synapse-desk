@@ -581,6 +581,21 @@ describe('Billing at the gateway (e2e)', () => {
       });
     });
 
+    it('2b. An auth one release older, sending only the text, still refuses: no details, never an allow', async () => {
+      fx.stubs.billing.previewPlanChange.mockReturnValue(
+        preview({ overLimit: ['maxAgentSeats: 12 in use, plan grants 10'] }),
+      );
+
+      const response = await changer()
+        .post(`${API}/billing/plan`)
+        .send({ planId: PLAN, priceId: PRICE });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('12 in use, plan grants 10');
+      expect(response.body).not.toHaveProperty('details');
+      expect(fx.stubs.billing.changePlan).not.toHaveBeenCalled();
+    });
+
     it('11d. Checkout refuses on the same terms, seats from auth and storage from the gateway', async () => {
       fx.stubs.billing.previewCheckout.mockReturnValue(
         preview({

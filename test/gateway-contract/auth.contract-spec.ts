@@ -11,7 +11,9 @@
  */
 
 import { sign } from 'jsonwebtoken';
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { OrgStatus } from '@synapsedesk/contracts';
+import { withErrorDetails } from '@synapsedesk/core';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session, parseSetCookie } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
@@ -105,6 +107,60 @@ describe('authentication', () => {
       deleted: false,
     });
   });
+
+  rowFor('Auth')(
+    '**a frozen organization’s sign-in** is a 403 in auth’s words, with the status as `details`',
+    async () => {
+      peers.auth
+        .on('AuthService/Login')
+        .fail(
+          GrpcStatus.PERMISSION_DENIED,
+          withErrorDetails(
+            "This organization can't be opened. Contact support to restore access",
+            { organizationStatus: OrgStatus.FROZEN },
+          ),
+        );
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/login`,
+        { email: 'ada@example.com', password: 'correct horse battery staple' },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error:
+          "This organization can't be opened. Contact support to restore access!",
+        details: { organizationStatus: OrgStatus.FROZEN },
+      });
+    },
+  );
+
+  rowFor('Users')(
+    '**`/users/me` says the organization’s status, and null for a Super Admin**',
+    async () => {
+      const me = async (organizationStatus: number) => {
+        peers.auth.on('UserService/GetCurrentUser').reply({
+          user: wireUser(),
+          permissionCodes: [],
+          departmentIds: [],
+          hasPassword: true,
+          organizationStatus,
+        });
+        return new Session(gateway.baseUrl).get(`${API}/users/me`, {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+        });
+      };
+
+      const pastDue = await me(toProtoOrgStatus(OrgStatus.SUSPENDED_PAST_DUE));
+      expect(pastDue.status).toBe(200);
+      expect(pastDue.body).toMatchObject({
+        data: { organizationStatus: OrgStatus.SUSPENDED_PAST_DUE },
+      });
+
+      const none = await me(toProtoOrgStatus(null));
+      expect(none.body).toMatchObject({ data: { organizationStatus: null } });
+    },
+  );
 
   rowFor('Auth')(
     '**tenant selection is checked BEFORE 2FA**, when a peer response carries both',
