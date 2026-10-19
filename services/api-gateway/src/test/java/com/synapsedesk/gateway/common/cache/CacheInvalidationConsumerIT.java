@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import com.synapsedesk.gateway.common.config.StoreProperties;
+import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
 import io.nats.client.Connection;
 import io.nats.client.Nats;
 import java.io.IOException;
@@ -57,7 +58,8 @@ class CacheInvalidationConsumerIT {
     consumer = new CacheInvalidationConsumer(
       new StoreProperties(redisUrl, natsUrl),
       cache,
-      new ObjectMapper()
+      new ObjectMapper(),
+      org.mockito.Mockito.mock(OrganizationStatusService.class)
     );
 
     try {

@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.common.cache;
 
 import com.synapsedesk.gateway.common.config.StoreProperties;
 import com.synapsedesk.gateway.common.contracts.Subjects;
+import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.common.nats.NatsEnvelope;
 import com.synapsedesk.gateway.common.runtime.RuntimeParticipant;
 import io.nats.client.Connection;
@@ -86,17 +87,20 @@ public class CacheInvalidationConsumer implements RuntimeParticipant {
   private final StoreProperties store;
   private final CacheService cache;
   private final ObjectMapper json;
+  private final OrganizationStatusService statuses;
 
   private volatile Connection connection;
 
   public CacheInvalidationConsumer(
     StoreProperties store,
     CacheService cache,
-    ObjectMapper json
+    ObjectMapper json,
+    OrganizationStatusService statuses
   ) {
     this.store = store;
     this.cache = cache;
     this.json = json;
+    this.statuses = statuses;
   }
 
   @Override
@@ -157,6 +161,17 @@ public class CacheInvalidationConsumer implements RuntimeParticipant {
 
     for (String scope : scopes) {
       drop(scope, message.getData());
+    }
+
+    // **And the lifecycle status.** Stripe's events move it (past due, frozen)
+    // and the gateway only relays them, so no write here invalidates it: the
+    // gate would let a past-due tenant write for the status cache's thirty
+    // seconds. The same event that carries the new grants carries this.
+    if (Subjects.BILLING_ENTITLEMENTS_CHANGED.equals(message.getSubject())) {
+      String organizationId = organizationIdOf(message.getData());
+      if (organizationId != null) {
+        statuses.invalidate(organizationId);
+      }
     }
   }
 

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.config.StoreProperties;
+import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
 import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -33,8 +34,11 @@ class CacheInvalidationConsumerTest {
     "redis://localhost:6379",
     "nats://localhost:4222"
   );
+  private final OrganizationStatusService statuses = mock(
+    OrganizationStatusService.class
+  );
   private final CacheInvalidationConsumer consumer =
-    new CacheInvalidationConsumer(store, cache, JSON);
+    new CacheInvalidationConsumer(store, cache, JSON, statuses);
 
   @Test
   void everyTicketPatternDropsTheTicketsScope() {
@@ -157,6 +161,22 @@ class CacheInvalidationConsumerTest {
 
     verify(cache).invalidateScope(eq("org-4"), eq("settings"));
     verify(cache).invalidateScope(eq("org-4"), eq("organizations"));
+    // Stripe moved its status, maybe: the gate reads it fresh next time.
+    verify(statuses).invalidate("org-4");
+  }
+
+  @Test
+  void onlyTheBillingEventDropsTheLifecycleStatus() {
+    Message message = mock(Message.class);
+    when(message.getSubject()).thenReturn("ticket.created");
+    when(message.getData()).thenReturn(
+      "{\"organizationId\":\"org-5\"}".getBytes(StandardCharsets.UTF_8)
+    );
+    when(cache.invalidateScope(anyString(), anyString())).thenReturn(0);
+
+    consumer.onMessage(message);
+
+    verify(statuses, never()).invalidate(anyString());
   }
 
   @Test
