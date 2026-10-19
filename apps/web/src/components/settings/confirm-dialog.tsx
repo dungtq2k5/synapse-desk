@@ -19,7 +19,8 @@ export type Refusal = { title: string; description: ReactNode };
 
 /**
  * The destructive confirmation: the title as a question, the consequence
- * first, Cancel focused. `onConfirm` answers a refusal to show in place, or
+ * first, Cancel focused. `onConfirm` answers a refusal to show in place,
+ * `false` to stay open as it is (its own fields said what's wrong), or
  * nothing when it went through (the dialog then closes).
  *
  * @example <ConfirmDialog open={…} title="Delete Sam?" … onConfirm={remove} />
@@ -42,7 +43,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   icon?: LucideIcon;
   destructive?: boolean;
-  onConfirm: () => Promise<Refusal | void>;
+  onConfirm: () => Promise<Refusal | false | void>;
   /** Extra fields between the description and the buttons. */
   children?: ReactNode;
 }) {
@@ -53,6 +54,7 @@ export function ConfirmDialog({
     setBusy(true);
     try {
       const refused = await onConfirm();
+      if (refused === false) return;
       if (refused) setRefusal(refused);
       else onOpenChange(false);
     } finally {

@@ -388,6 +388,162 @@ describe('one document', () => {
       await screen.findByRole('heading', { name: 'Document not found' }),
     ).toBeInTheDocument();
   });
+
+  it('says when the document couldn’t load, and offers to try again', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': fail(500, 'Down!'),
+    });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Couldn’t load the document',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
+  });
+
+  it('retries a canceled job, and says when it couldn’t', async () => {
+    const routes = {
+      'GET /api/v1/documents/d1': ok(doc({ status: 'FAILED' })),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ status: 'CANCELLED', processedAt: null }),
+      ]),
+    };
+    const { calls, user } = show(<DocumentView documentId="d1" />, MANAGER, {
+      ...routes,
+      'POST /api/v1/ingestion-jobs/j1/retry': ok({}),
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(
+      await screen.findByText('Processing Remote Work Policy.pdf again.'),
+    ).toBeInTheDocument();
+    expect(calls.some((call) => call.url.endsWith('/j1/retry'))).toBe(true);
+  });
+
+  it('a refused retry says so', async () => {
+    const { user } = show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(doc({ status: 'FAILED' })),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ status: 'CANCELLED', processedAt: null }),
+      ]),
+      'POST /api/v1/ingestion-jobs/j1/retry': fail(409, 'Already running!'),
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Couldn’t retry it')).toBeInTheDocument();
+  });
+
+  it('stops a running job after asking, and says when it couldn’t', async () => {
+    const { calls, user } = show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(doc({ status: 'PROCESSING' })),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ status: 'CHUNKING', processedAt: null }),
+      ]),
+      'DELETE /api/v1/ingestion-jobs/j1': fail(409, 'Already finished!'),
+    });
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Stop processing' }),
+    );
+    const dialog = await screen.findByRole('alertdialog', {
+      name: 'Stop processing Remote Work Policy.pdf?',
+    });
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Stop processing' }),
+    );
+    expect(
+      await screen.findByText('Couldn’t stop processing'),
+    ).toBeInTheDocument();
+    expect(
+      calls.some(
+        (call) => call.method === 'DELETE' && call.url.endsWith('/j1'),
+      ),
+    ).toBe(true);
+    await waitFor(() =>
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('moves sharing to departments: needs one, then sets them before leaving everyone', async () => {
+    const { calls, user } = show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(doc()),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([job()]),
+      'GET /api/v1/documents/d1/chunks': page([]),
+      'PUT /api/v1/documents/d1/departments': ok({}),
+      'PATCH /api/v1/documents/d1': ok(doc()),
+    });
+
+    await user.click(
+      await screen.findByRole('radio', { name: /Only some departments/ }),
+    );
+    const save = screen.getByRole('button', { name: 'Save sharing' });
+    await user.click(save);
+    expect(
+      screen.getByText('Choose at least one department.'),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Choose departments' }),
+    );
+    await user.click(
+      await screen.findByRole('menuitemcheckbox', { name: 'IT support' }),
+    );
+    await user.keyboard('{Escape}');
+    await user.click(save);
+    expect(await screen.findByText('Sharing saved.')).toBeInTheDocument();
+    const writes = calls.filter((call) => call.method !== 'GET');
+    expect(writes.map((call) => [call.method, call.body])).toEqual([
+      ['PUT', { departmentIds: ['it'] }],
+      ['PATCH', { isOrganizationWide: false }],
+    ]);
+  });
+
+  it('discards a sharing change, and says when saving one failed', async () => {
+    const { user } = show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({ isOrganizationWide: false, departmentIds: ['hr'] }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([job()]),
+      'GET /api/v1/documents/d1/chunks': page([]),
+      'PATCH /api/v1/documents/d1': fail(500, 'Down!'),
+    });
+
+    const everyone = await screen.findByRole('radio', {
+      name: /Everyone in Northwind Health/,
+    });
+    await user.click(everyone);
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.getByRole('button', { name: 'Remove HR' })).toBeEnabled();
+
+    await user.click(everyone);
+    await user.click(screen.getByRole('button', { name: 'Save sharing' }));
+    expect(
+      await screen.findByText('Couldn’t save sharing'),
+    ).toBeInTheDocument();
+  });
+
+  it('a deleted document reads who could see it, naming a department it can’t', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({
+          isOrganizationWide: false,
+          departmentIds: ['it', 'gone'],
+          deletedAt: '2026-10-03T09:00:00Z',
+          deletedById: 'maya',
+        }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([job()]),
+      'GET /api/v1/documents/d1/chunks': page([]),
+    });
+
+    expect(
+      await screen.findByText('Only IT support and Unknown department'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Everyone else won’t see it in Search or Ask.'),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('a flag', () => {

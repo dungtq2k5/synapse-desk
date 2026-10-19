@@ -113,7 +113,7 @@ export function LockDialog({
           found.when = 'Choose a time after now.';
         }
         setErrors(found);
-        if (Object.keys(found).length > 0) return;
+        if (Object.keys(found).length > 0) return false;
         try {
           await userAdminControllerLockV1(person.id, {
             reason: reason.trim(),

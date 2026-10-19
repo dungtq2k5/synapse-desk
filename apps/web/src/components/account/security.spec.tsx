@@ -414,3 +414,143 @@ describe('the sessions section', () => {
     expect(push).toHaveBeenCalledWith('/login?signed-out-everywhere=3');
   });
 });
+
+describe('the account sections’ other refusals', () => {
+  async function changePassword(reply: Reply) {
+    const wrapped = wrap(
+      <PasswordSection email="maya@northwind.health" hasPassword />,
+      { 'PATCH /api/v1/auth/password': reply },
+    );
+    const { user } = wrapped;
+    await user.type(screen.getByLabelText('Current password'), 'Old-pass-1');
+    await user.type(screen.getByLabelText('New password'), STRONG);
+    await user.type(screen.getByLabelText('Confirm new password'), STRONG);
+    await user.click(screen.getByRole('button', { name: 'Change password' }));
+    return wrapped;
+  }
+
+  it('a new password the server refuses (a 400) is said on that field', async () => {
+    await changePassword(fail(400, 'That password was in a breach'));
+    expect(
+      await screen.findByText('That password was in a breach'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('New password')).toHaveFocus();
+  });
+
+  it('too many attempts (a 429) pauses changing it', async () => {
+    await changePassword(fail(429, 'Too many', { 'Retry-After': '30' }));
+    expect(await screen.findByText('Too many attempts')).toBeInTheDocument();
+  });
+
+  it('anything else is said in the server’s words', async () => {
+    await changePassword(fail(500, 'Down'));
+    expect(
+      await screen.findByText('Couldn’t change your password'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Down')).toBeInTheDocument();
+  });
+
+  it.each([
+    [fail(429, 'Too many', { 'Retry-After': '30' }), 'Too many requests'],
+    [fail(500, 'Down'), 'Couldn’t send the link'],
+  ])(
+    'sending the set-password link, refused, says so',
+    async (reply, words) => {
+      const { user } = wrap(
+        <PasswordSection email="maya@northwind.health" hasPassword={false} />,
+        { 'POST /api/v1/auth/password/forgot': reply },
+      );
+      await user.click(screen.getByRole('button', { name: 'Set a password' }));
+      expect(await screen.findByText(words)).toBeInTheDocument();
+    },
+  );
+
+  const STATUS = {
+    'GET /api/v1/auth/2fa/backup-codes': ok({
+      remaining: 7,
+      used: 3,
+      expiresAt: '2027-10-12T12:00:00Z',
+    }),
+  };
+
+  it('regenerating refused for another reason says so in the dialog', async () => {
+    const { user } = wrap(
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
+      { ...STATUS, 'POST /api/v1/auth/2fa/backup-codes': fail(500, 'Down') },
+    );
+    await user.click(screen.getByRole('button', { name: 'Regenerate codes' }));
+    const confirm = screen.getByRole('alertdialog');
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Regenerate codes' }),
+    );
+    // No password yet: the field is asked for first.
+    expect(within(confirm).getByLabelText('Password')).toHaveFocus();
+    await user.type(within(confirm).getByLabelText('Password'), 'Pass-word-1');
+    await user.click(
+      within(confirm).getByRole('button', { name: 'Regenerate codes' }),
+    );
+    expect(
+      await within(confirm).findByText('Something went wrong'),
+    ).toBeInTheDocument();
+  });
+
+  it('turning off needs the password and the code; a 400 means the organization requires it', async () => {
+    const { calls, user } = wrap(
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
+      {
+        ...STATUS,
+        'DELETE /api/v1/auth/2fa': fail(400, 'Two-step is required'),
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    const dialog = screen.getByRole('alertdialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+    expect(
+      within(dialog).getByText('Enter your password.'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Enter the 6-digit code.'),
+    ).toBeInTheDocument();
+    expect(calls.filter((call) => call.method === 'DELETE')).toHaveLength(0);
+
+    await user.type(within(dialog).getByLabelText('Password'), 'Pass-word-1');
+    await user.type(within(dialog).getByRole('textbox'), '123456');
+    await user.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+    expect(calls.filter((call) => call.method === 'DELETE')).toHaveLength(1);
+  });
+
+  it('turning off refused for another reason says so', async () => {
+    const { user } = wrap(
+      <TwoStepSection
+        hasPassword
+        enabled
+        required={false}
+        organizationName="N"
+      />,
+      {
+        ...STATUS,
+        'DELETE /api/v1/auth/2fa': fail(429, 'Too many', {
+          'Retry-After': '30',
+        }),
+      },
+    );
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    const dialog = screen.getByRole('alertdialog');
+    await user.type(within(dialog).getByLabelText('Password'), 'Pass-word-1');
+    await user.type(within(dialog).getByRole('textbox'), '123456');
+    await user.click(within(dialog).getByRole('button', { name: 'Turn off' }));
+    expect(
+      await within(dialog).findByText('Too many attempts'),
+    ).toBeInTheDocument();
+  });
+});
