@@ -56,7 +56,11 @@
       // emitted nothing for the files it believed current. Measured: edit,
       // build, revert (hit), edit again (miss) left the edit out of `dist/`.
       // `.next/` is a client app's output, less its own cache.
-      "outputs": ["dist/**", "*.tsbuildinfo", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", "*.tsbuildinfo", ".next/**", "!.next/cache/**"],
+      // The web's coverage build (source maps, for the e2e suite's coverage):
+      // passed through, and part of the hash, so a cached plain build is never
+      // replayed for a coverage run or the reverse.
+      "env": ["WEB_COVERAGE"]
     },
     // The clients' own typecheck (the root program doesn't include apps/):
     // against their dependencies' built packages and their generated tokens.

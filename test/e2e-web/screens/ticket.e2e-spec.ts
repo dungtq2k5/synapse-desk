@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Page, type WebSocketRoute } from '@playwright/test';
+import { expect, test, type Page, type WebSocketRoute } from '../coverage';
 import { CLIENT_EVENTS, REALTIME_EVENTS } from '@synapsedesk/contracts';
 import { api } from '../support';
 import { look, tabsThrough } from './look';

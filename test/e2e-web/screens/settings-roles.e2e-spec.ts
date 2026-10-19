@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../coverage';
 import { look } from './look';
 import { ROLES, failed, settings, type Overrides } from './settings-data';
 import { signInAs, tenant } from './tenant';

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '../coverage';
 import { api } from '../support';
 import { look } from './look';
 import { sessionAs, signInAs, tenant, type Person } from './tenant';

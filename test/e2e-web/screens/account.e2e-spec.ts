@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '../coverage';
 import { REPO_ROOT } from '../../system/services';
 import { look, tabsThrough } from './look';
 import {

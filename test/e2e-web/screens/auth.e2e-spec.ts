@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '../coverage';
 import { signInInPopup } from '../firebase';
 import { look, tabsThrough } from './look';
 

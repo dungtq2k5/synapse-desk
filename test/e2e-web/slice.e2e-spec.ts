@@ -4,7 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from '@playwright/test';
+} from './coverage';
 import {
   api,
   clearThrottles,

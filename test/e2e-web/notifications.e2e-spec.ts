@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from './coverage';
 import { sessionAs, setPhone, signInAs, tenant } from './screens/tenant';
 import { api, clearThrottles } from './support';
 

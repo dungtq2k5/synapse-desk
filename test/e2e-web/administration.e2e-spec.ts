@@ -5,7 +5,7 @@ import {
   type APIRequestContext,
   type Browser,
   type Page,
-} from '@playwright/test';
+} from './coverage';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient as AuthPrisma } from '../../services/auth-service/src/generated/prisma/client';
 import { invitationLink, markVerified } from './emailed';

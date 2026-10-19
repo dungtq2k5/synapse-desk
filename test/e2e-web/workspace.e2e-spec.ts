@@ -5,7 +5,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
-} from '@playwright/test';
+} from './coverage';
 import { REPO_ROOT } from '../system/services';
 import { sessionAs, signInAs, tenant, type Person } from './screens/tenant';
 import { api, clearThrottles } from './support';

@@ -369,11 +369,24 @@ jobs:
       - name: the Playwright image the screens render in
         run: docker pull "mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
 
+      # **Coverage for Sonar** (`WEB_COVERAGE_DIR`, see
+      # test/e2e-web/global-setup.ts): the web is built with source maps, the
+      # browser's and the renderer's V8 coverage are collected, and the run
+      # ends by writing one lcov in Jest's shape.
       - name: e2e-web
         env:
           STRIPE_RESTRICT_KEY: ${{ secrets.STRIPE_RESTRICT_KEY }}
           SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
+          WEB_COVERAGE_DIR: ${{ github.workspace }}/coverage-e2e/web
         run: npm run test:e2e:web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-web
+          path: coverage-e2e/web/lcov.info
+          # A run that wrote no lcov would read as uncovered code in Sonar;
+          # failing here names the cause.
+          if-no-files-found: error
 
       # test-results holds each failed screenshot's -actual, -expected and
       # -diff images beside the trace.
@@ -663,7 +676,8 @@ jobs:
 
   # ----------------------------------------------------------------- sonar
   #
-  # SonarCloud analysis, with the coverage the unit and python jobs wrote.
+  # SonarCloud analysis, with the coverage the unit, e2e, e2e-web, python and
+  # Java jobs wrote.
   # Skipped when SONAR_TOKEN is absent (a fork's pull request), rather than
   # failing a job the contributor cannot fix. Needs SonarCloud's Automatic
   # Analysis switched off: the two refuse to run on one project.
@@ -674,9 +688,11 @@ jobs:
     # is `main-java`. An analysis of any other ref, a pull request included,
     # is one the plan refuses, so it is not run.
     if: github.ref_name == 'main-java'
-    needs: [unit, e2e, python, gateway-java-verify, contract]
+    needs: [unit, e2e, e2e-web, python, gateway-java-verify, contract]
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # The bar new code is held to, read from SonarCloud after the analysis.
+      NEW_CODE_COVERAGE_MIN: '90.0'
     steps:
       - uses: actions/checkout@v4
         if: env.SONAR_TOKEN != ''
@@ -708,5 +724,44 @@ jobs:
         with:
           pattern: coverage-contract-*
           path: coverage-contract
+      - uses: actions/download-artifact@v4
+        if: env.SONAR_TOKEN != ''
+        with:
+          name: coverage-web
+          path: coverage-e2e/web
+      # One lcov for Sonar: Jest's reports unioned as Sonar would, the web
+      # suite's folded in line by line, because it numbers branches its own
+      # way and Sonar's union by key would count them twice
+      # (scripts/lib/lcov-merge.cjs).
+      - name: merge the JavaScript coverage
+        if: env.SONAR_TOKEN != ''
+        run: >-
+          node scripts/merge-lcov.mjs --out coverage-merged/lcov.info
+          --same coverage/lcov.info
+          coverage-e2e/auth-service/lcov.info coverage-e2e/ticket-service/lcov.info
+          coverage-e2e/notification-service/lcov.info
+          coverage-e2e/ingestion-service/lcov.info coverage-e2e/storage-service/lcov.info
+          --other coverage-e2e/web/lcov.info
+      # Waits for SonarCloud to finish the analysis, so the gate and the
+      # coverage read below are this commit's.
       - uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
         if: env.SONAR_TOKEN != ''
+        with:
+          args: -Dsonar.qualitygate.wait=true
+      # **New code is held to NEW_CODE_COVERAGE_MIN**, whatever the gate's own
+      # condition says: SonarCloud's built-in gate can't be edited.
+      - name: new-code coverage
+        if: env.SONAR_TOKEN != ''
+        run: |
+          coverage=$(curl -sf -u "$SONAR_TOKEN:" \
+            "https://sonarcloud.io/api/measures/component?component=dungtq2k5_synapse-desk&branch=${GITHUB_REF_NAME}&metricKeys=new_coverage" \
+            | jq -r '.component.measures[] | select(.metric == "new_coverage") | (.period.value // .periods[0].value)')
+          if [ -z "$coverage" ] || [ "$coverage" = "null" ]; then
+            echo "::error::SonarCloud returned no new-code coverage for ${GITHUB_REF_NAME}."
+            exit 1
+          fi
+          echo "New-code coverage: ${coverage}% (needs at least ${NEW_CODE_COVERAGE_MIN}%)"
+          if awk -v have="$coverage" -v need="$NEW_CODE_COVERAGE_MIN" 'BEGIN { exit !(have + 0 < need + 0) }'; then
+            echo "::error::New-code coverage is ${coverage}%, below ${NEW_CODE_COVERAGE_MIN}%."
+            exit 1
+          fi

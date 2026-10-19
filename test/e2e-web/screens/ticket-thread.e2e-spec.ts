@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../coverage';
 import { api } from '../support';
 import { look } from './look';
 import { sessionAs, signInAs, tenant, type Person } from './tenant';

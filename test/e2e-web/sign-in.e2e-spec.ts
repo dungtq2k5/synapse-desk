@@ -1,9 +1,4 @@
-import {
-  expect,
-  request as newRequest,
-  test,
-  type Page,
-} from '@playwright/test';
+import { expect, request as newRequest, test, type Page } from './coverage';
 import { WEB_URL } from './ingress';
 import {
   api,

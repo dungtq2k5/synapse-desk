@@ -5,7 +5,7 @@ import {
   type APIRequestContext,
   type Browser,
   type Page,
-} from '@playwright/test';
+} from './coverage';
 import { join } from 'node:path';
 import { REPO_ROOT } from '../system/services';
 import { emailCode, invitationLink, markVerified, resetLink } from './emailed';

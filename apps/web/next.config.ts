@@ -46,6 +46,15 @@ const nextConfig: NextConfig = {
             },
           ],
     ),
+  // A coverage build only (`WEB_COVERAGE=1`): source maps for the browser's
+  // chunks and the server's, so the e2e suite's V8 coverage maps back to the
+  // sources. The image is built without it.
+  ...(process.env.WEB_COVERAGE === '1'
+    ? {
+        productionBrowserSourceMaps: true,
+        experimental: { serverSourceMaps: true },
+      }
+    : {}),
   headers: () =>
     Promise.resolve([{ source: '/:path*', headers: SECURITY_HEADERS }]),
 };

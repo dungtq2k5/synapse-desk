@@ -4,7 +4,7 @@ import {
   type Page,
   type Route,
   type WebSocketRoute,
-} from '@playwright/test';
+} from '../coverage';
 import { REALTIME_EVENTS } from '@synapsedesk/contracts';
 import { api } from '../support';
 import { look } from './look';

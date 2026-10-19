@@ -15,6 +15,10 @@ cspell.json
 *.tsbuildinfo
 .claude/
 coverage/
+# The e2e suites' coverage (CI writes it per service; a web run writes its raw
+# V8 data and lcov here), and the one lcov merged from all of them for Sonar.
+coverage-e2e/
+coverage-merged/
 # pytest-cov output: the XML report Sonar reads, and coverage.py's data file.
 services/rag-service/coverage.xml
 services/rag-service/.coverage

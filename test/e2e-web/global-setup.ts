@@ -1,10 +1,11 @@
-import { cpSync } from 'node:fs';
+import { cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import systemSetup from '../system/global-setup';
 import systemTeardown from '../system/global-teardown';
 import { REPO_ROOT, type ServiceSpec } from '../system/services';
 import { startStack } from '../system/stack';
 import { startBrowserServer, stopBrowserServer } from './browser-server';
+import { writeWebCoverage } from './coverage-report';
 import { useAuthEmulator } from './firebase';
 import { startIngress, WEB_PORT } from './ingress';
 
@@ -22,6 +23,25 @@ const WEB: ServiceSpec = {
   probe: { kind: 'http', path: '/login' },
   command: ['node', ['server.js']],
 };
+
+/**
+ * Where a coverage run writes: the browser's raw V8 coverage (`coverage.ts`),
+ * the renderer's (`NODE_V8_COVERAGE`, written as it exits), then the lcov
+ * made from both. Unset, nothing is collected and the build is the plain one.
+ */
+const COVERAGE_DIR = process.env.WEB_COVERAGE_DIR;
+
+/** The renderer under `NODE_V8_COVERAGE`, for a coverage run only. */
+function webSpec(): ServiceSpec {
+  if (!COVERAGE_DIR) return WEB;
+  return {
+    ...WEB,
+    command: [
+      'env',
+      [`NODE_V8_COVERAGE=${join(COVERAGE_DIR, 'server')}`, 'node', 'server.js'],
+    ],
+  };
+}
 
 /**
  * The two directories `standalone` leaves out by design, copied beside its
@@ -56,6 +76,12 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // ingestion-service's half: uploads embed with the same fixed vectors, so
   // an uploaded document reaches INDEXED offline and Ask finds it.
   process.env.INGESTION_OFFLINE_MODEL = 'true';
+  if (COVERAGE_DIR) {
+    // A previous run's raw files would be counted twice.
+    rmSync(COVERAGE_DIR, { recursive: true, force: true });
+    // The web is built with source maps (next.config.ts).
+    process.env.WEB_COVERAGE = '1';
+  }
   await systemSetup();
 
   completeStandalone();
@@ -65,7 +91,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   process.env.PORT = String(WEB_PORT);
   process.env.HOSTNAME = '127.0.0.1';
   try {
-    await startStack({ services: [WEB] });
+    await startStack({ services: [webSpec()] });
   } catch (error) {
     await systemTeardown();
     throw error;
@@ -78,5 +104,15 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     ingress.closeAllConnections();
     await new Promise((resolve) => ingress.close(resolve));
     await systemTeardown();
+    if (COVERAGE_DIR) {
+      // After the renderer has exited: its coverage is written on exit.
+      const files = await writeWebCoverage(COVERAGE_DIR);
+      if (files === 0) {
+        throw new Error(`No web coverage was written under ${COVERAGE_DIR}`);
+      }
+      console.log(
+        `Web coverage: ${files} source files, ${COVERAGE_DIR}/lcov.info`,
+      );
+    }
   };
 }
