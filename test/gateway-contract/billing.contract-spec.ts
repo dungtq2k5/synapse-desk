@@ -8,12 +8,16 @@
 import { sign } from 'jsonwebtoken';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { OrgStatus } from '@synapsedesk/contracts';
+import { withErrorDetails, withHttpStatus } from '@synapsedesk/core';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
 import { rowFor } from './pending';
+
+/** The error envelope's two fields these rows read. */
+type Envelope = { error?: string; details?: unknown };
 
 describe('billing', () => {
   let gateway: Gateway;
@@ -73,6 +77,11 @@ describe('billing', () => {
         aiModelTier: 'AI_MODEL_TIER_FAST',
         billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
         status: toProtoOrgStatus(OrgStatus.ACTIVE),
+        currentPeriodEnd: { seconds: 1_793_491_200, nanos: 0 },
+        cancelAtPeriodEnd: true,
+        priceId: 'price_123',
+        interval: 'year',
+        negotiated: false,
       });
 
       const response = await new Session(gateway.baseUrl).get(
@@ -86,6 +95,11 @@ describe('billing', () => {
           stripeCustomerId: 'cus_123',
           planName: 'Pro',
           maxAgentSeats: 10,
+          currentPeriodEnd: '2026-11-01T00:00:00.000Z',
+          cancelAtPeriodEnd: true,
+          priceId: 'price_123',
+          interval: 'year',
+          negotiated: false,
         },
       });
     },
@@ -94,6 +108,12 @@ describe('billing', () => {
   rowFor('Billing')(
     '**`createCheckoutSession` forwards the price and URLs, returns the Stripe URL**',
     async () => {
+      peers.auth.on('BillingService/PreviewCheckout').reply({
+        overLimit: [],
+        overLimitItems: [],
+        narrowedDimensions: [],
+        planName: 'Pro',
+      });
       peers.auth
         .on('BillingService/CreateCheckoutSession')
         .reply({ url: 'https://checkout.stripe.com/abc' });
@@ -204,7 +224,15 @@ describe('billing', () => {
             maxAttachmentBytes: '10485760',
             maxDocumentUploads: 1000,
             maxAnalyticsRangeDays: 90,
-            prices: [{ stripePriceId: 'price_123', interval: 'month' }],
+            prices: [
+              {
+                stripePriceId: 'price_123',
+                interval: 'month',
+                unitAmount: '9900',
+                currency: 'usd',
+              },
+              { stripePriceId: 'price_old', interval: 'year' },
+            ],
           },
         ],
       });
@@ -220,7 +248,21 @@ describe('billing', () => {
           {
             id: 'plan_pro',
             name: 'Pro',
-            prices: [{ stripePriceId: 'price_123', interval: 'month' }],
+            prices: [
+              {
+                stripePriceId: 'price_123',
+                interval: 'month',
+                unitAmount: 9900,
+                currency: 'usd',
+              },
+              // A price seeded before amounts were: null, not absent.
+              {
+                stripePriceId: 'price_old',
+                interval: 'year',
+                unitAmount: null,
+                currency: null,
+              },
+            ],
           },
         ],
       });
@@ -354,7 +396,185 @@ describe('billing', () => {
       );
 
       expect(response.status).toBe(400);
+      expect((response.body as Envelope).details).toEqual({
+        overLimit: [
+          {
+            dimension: 'STORAGE',
+            inUse: 5_000_000_000,
+            allowed: 1_000_000_000,
+          },
+        ],
+      });
       expect(peers.auth.calls('BillingService/ChangePlan')).toHaveLength(0);
+    },
+  );
+
+  rowFor('Billing')(
+    '**`changePlan`: auth’s seat items reach `details.overLimit`**',
+    async () => {
+      peers.auth.on('BillingService/PreviewPlanChange').reply({
+        overLimit: ['maxAgentSeats: 12 in use, plan grants 10'],
+        overLimitItems: [{ dimension: 'SEATS', inUse: '12', allowed: '10' }],
+        narrowedDimensions: [],
+        planName: 'Starter',
+      });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/plan`,
+        {
+          planId: '22222222-1111-4111-8111-222222222222',
+          priceId: 'price_starter',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-seat-items',
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({
+        success: false,
+        statusCode: 400,
+        error:
+          'This plan does not fit your current usage — maxAgentSeats: 12 in use, plan grants 10!',
+        details: {
+          overLimit: [{ dimension: 'SEATS', inUse: 12, allowed: 10 }],
+        },
+      });
+    },
+  );
+
+  rowFor('Billing')(
+    '**`createCheckoutSession` refuses over a limit before Stripe, with the items**',
+    async () => {
+      peers.auth.on('BillingService/PreviewCheckout').reply({
+        overLimit: [],
+        overLimitItems: [],
+        narrowedDimensions: ['documents'],
+        targetMaxDocumentUploads: 100,
+        planName: 'Starter',
+      });
+      peers.ingestion.on('DocumentService/GetStorageUsage').reply({
+        usedBytes: '1',
+        limitBytes: '10',
+        documentCount: 140,
+      });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/checkout-session`,
+        {
+          priceId: 'price_starter',
+          successUrl: 'https://app.test/success',
+          cancelUrl: 'https://app.test/cancel',
+        },
+        headers(['organization.update']),
+      );
+
+      expect(response.status).toBe(400);
+      expect((response.body as Envelope).details).toEqual({
+        overLimit: [{ dimension: 'DOCUMENTS', inUse: 140, allowed: 100 }],
+      });
+      expect(
+        peers.auth.calls('BillingService/CreateCheckoutSession'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Billing')(
+    '**`createCheckoutSession`: auth’s refusal of a second subscription is a 400 in its words, no details**',
+    async () => {
+      peers.auth
+        .on('BillingService/PreviewCheckout')
+        .fail(
+          GrpcStatus.FAILED_PRECONDITION,
+          'This workspace already has a subscription — change your plan instead',
+        );
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/checkout-session`,
+        {
+          priceId: 'price_pro',
+          successUrl: 'https://app.test/success',
+          cancelUrl: 'https://app.test/cancel',
+        },
+        headers(['organization.update']),
+      );
+
+      expect(response.status).toBe(400);
+      expect((response.body as Envelope).error).toBe(
+        'This workspace already has a subscription — change your plan instead!',
+      );
+      expect(response.body).not.toHaveProperty('details');
+    },
+  );
+
+  rowFor('Billing')(
+    '**`changePlan`: a declined card is a 402 in the deck’s words**',
+    async () => {
+      peers.auth.on('BillingService/PreviewPlanChange').reply({
+        overLimit: [],
+        narrowedDimensions: [],
+        planName: 'Pro',
+      });
+      peers.auth
+        .on('BillingService/ChangePlan')
+        .fail(
+          GrpcStatus.FAILED_PRECONDITION,
+          withHttpStatus(402, 'Your card was declined'),
+        );
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/plan`,
+        {
+          planId: '66666666-1111-4111-8111-666666666666',
+          priceId: 'price_pro',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-declined',
+        },
+      );
+
+      expect(response.status).toBe(402);
+      expect((response.body as Envelope).error).toBe('Your card was declined!');
+      expect(response.body).not.toHaveProperty('details');
+    },
+  );
+
+  rowFor('Billing')(
+    '**`changePlan`: details auth sends with a refusal reach the envelope**',
+    async () => {
+      peers.auth.on('BillingService/PreviewPlanChange').reply({
+        overLimit: [],
+        narrowedDimensions: [],
+        planName: 'Starter',
+      });
+      peers.auth.on('BillingService/ChangePlan').fail(
+        GrpcStatus.FAILED_PRECONDITION,
+        withErrorDetails('This plan does not fit your current usage', {
+          overLimit: [{ dimension: 'SEATS', inUse: 11, allowed: 10 }],
+        }),
+      );
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/plan`,
+        {
+          planId: '77777777-1111-4111-8111-777777777777',
+          priceId: 'price_starter',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-raced',
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect((response.body as Envelope).error).toBe(
+        'This plan does not fit your current usage!',
+      );
+      expect((response.body as Envelope).details).toEqual({
+        overLimit: [{ dimension: 'SEATS', inUse: 11, allowed: 10 }],
+      });
     },
   );
 

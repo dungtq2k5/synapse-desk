@@ -8,7 +8,7 @@ import {
   OrgStatus,
   SystemRoleName,
 } from '@synapsedesk/contracts';
-import { compareAlphabetically } from '@synapsedesk/core';
+import { compareAlphabetically, readErrorDetails } from '@synapsedesk/core';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -31,6 +31,7 @@ import { OrganizationsService } from '../../src/modules/organizations/organizati
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
 import { UsersService } from '../../src/modules/users/users.service';
 import { hashToken } from '../../src/common/utils';
+import { fromProtoOrgStatus } from '@synapsedesk/grpc-proto';
 
 describe('Auth core (e2e)', () => {
   let fx: E2eFixture;
@@ -576,13 +577,53 @@ describe('Auth core (e2e)', () => {
         organization: { status: OrgStatus.FROZEN },
       });
 
-      await expectRpc(
-        auth.login(
-          { email: user.email, password: TEST_PASSWORD },
-          requestOrigin(),
+      const error = await auth
+        .login({ email: user.email, password: TEST_PASSWORD }, requestOrigin())
+        .then(
+          () => {
+            throw new Error('Expected a refusal');
+          },
+          (caught: RpcException) =>
+            caught.getError() as { code: number; message: string },
+        );
+
+      // The deck's words for every cause, and the status as data: the web
+      // recognizes the refusal by `details`, never by the sentence.
+      expect(error.code).toBe(status.PERMISSION_DENIED);
+      expect(readErrorDetails(error.message)).toEqual({
+        details: { organizationStatus: OrgStatus.FROZEN },
+        message:
+          "This organization can't be opened. Contact support to restore access",
+      });
+    });
+
+    it('/users/me says the organization’s status in every status, and nothing for a Super Admin', async () => {
+      const users = fx.moduleRef.get(UsersService);
+
+      for (const organizationStatus of [
+        OrgStatus.ACTIVE,
+        OrgStatus.SUSPENDED_PAST_DUE,
+        OrgStatus.FROZEN,
+      ]) {
+        const { user } = await seedTenantWithUser(fx.prisma, {
+          organization: { status: organizationStatus },
+        });
+
+        expect(
+          fromProtoOrgStatus(
+            (await users.getCurrentUser(user.id)).organizationStatus,
+          ),
+        ).toBe(organizationStatus);
+      }
+
+      const superAdmin = await fx.prisma.user.findFirstOrThrow({
+        where: { organizationId: null },
+      });
+      expect(
+        fromProtoOrgStatus(
+          (await users.getCurrentUser(superAdmin.id)).organizationStatus,
         ),
-        status.PERMISSION_DENIED,
-      );
+      ).toBeNull();
     });
   });
 

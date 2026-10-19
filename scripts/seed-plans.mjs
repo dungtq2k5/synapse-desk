@@ -122,7 +122,24 @@ if (mode === 'LIVE' && apply) {
   );
 }
 
-const stripe = new Stripe(key, { apiVersion: '2026-07-29.dahlia' });
+// `STRIPE_API_BASE_URL` points the client at the test stack's fake Stripe,
+// whose catalog then becomes the database's. Unset means Stripe.
+const base = process.env.STRIPE_API_BASE_URL
+  ? new URL(process.env.STRIPE_API_BASE_URL)
+  : null;
+if (base && process.env.NODE_ENV === 'production') {
+  console.error('STRIPE_API_BASE_URL is refused under NODE_ENV=production.');
+  process.exit(1);
+}
+const stripe = new Stripe(key, {
+  apiVersion: '2026-07-29.dahlia',
+  ...(base && {
+    host: base.hostname,
+    port: base.port || (base.protocol === 'https:' ? 443 : 80),
+    protocol: base.protocol.replace(':', ''),
+  }),
+});
+if (base) console.log(`stripe api: ${base.origin}`);
 const say = (line) => console.log(`${apply ? '' : '[dry-run] '}${line}`);
 
 const products = await stripe.products.list({ limit: 100, active: true });
@@ -177,7 +194,10 @@ try {
     );
 
     for (const price of prices.data) {
-      say(`  price ${price.id} (${price.recurring?.interval ?? 'one-time'})`);
+      say(
+        `  price ${price.id} (${price.recurring?.interval ?? 'one-time'}, ` +
+          `${price.unit_amount ?? '?'} ${price.currency})`,
+      );
     }
 
     if (!apply) continue;
@@ -222,12 +242,22 @@ try {
     for (const price of prices.data) {
       await client.query(
         `INSERT INTO subscription_plan_prices
-           (plan_id, stripe_price_id, interval)
-         VALUES ($1, $2, $3)
+           (plan_id, stripe_price_id, interval, unit_amount, currency)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (stripe_price_id) DO UPDATE SET
            plan_id = EXCLUDED.plan_id,
-           interval = EXCLUDED.interval`,
-        [planId, price.id, price.recurring?.interval ?? 'month'],
+           interval = EXCLUDED.interval,
+           unit_amount = EXCLUDED.unit_amount,
+           currency = EXCLUDED.currency`,
+        // The amount is the price's for good: Stripe never edits it, so a
+        // new amount arrives as a new price id and a new row.
+        [
+          planId,
+          price.id,
+          price.recurring?.interval ?? 'month',
+          price.unit_amount,
+          price.currency,
+        ],
       );
     }
   }

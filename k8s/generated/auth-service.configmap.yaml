@@ -10,6 +10,7 @@
 #
 # Documented and deliberately absent:
 #   FIREBASE_AUTH_EMULATOR_HOST — production verifies real Google sign-ins; setting this points the SDK at an emulator that is not there
+#   STRIPE_API_BASE_URL — production calls the real Stripe; auth-service refuses to boot with another host under NODE_ENV=production
 apiVersion: v1
 kind: ConfigMap
 metadata:

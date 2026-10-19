@@ -1,5 +1,7 @@
 import Stripe from 'stripe';
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
+import { readErrorDetails, withHttpStatus } from '@synapsedesk/core';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { waitFor } from '@synapsedesk/testing/wait';
 import { BillingEventSource, BillingEventStatus } from '@synapsedesk/contracts';
@@ -12,6 +14,7 @@ import {
 } from '../factories';
 import { PlanChangeService } from '../../src/modules/billing/plan-change.service';
 import { StripeService } from '../../src/modules/billing/stripe.service';
+import { BillingService } from '../../src/modules/billing/billing.service';
 import { EntitlementWriterService } from '../../src/modules/billing/entitlement-writer.service';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 
@@ -32,6 +35,8 @@ describe('Plan change (e2e)', () => {
 
   let retrieve: jest.Mock;
   let update: jest.Mock;
+  let customersCreate: jest.Mock;
+  let billing: BillingService;
 
   const ctx = (t: { user: { id: string; organizationId: string | null } }) =>
     memberContext(t.user, ['organization.update', 'organization.read']);
@@ -139,9 +144,12 @@ describe('Plan change (e2e)', () => {
     // we ASK Stripe rather than what it answers.
     retrieve = jest.fn();
     update = jest.fn();
+    customersCreate = jest.fn();
     jest.spyOn(fx.moduleRef.get(StripeService), 'api', 'get').mockReturnValue({
       subscriptions: { retrieve, update },
+      customers: { create: customersCreate },
     } as never);
+    billing = fx.moduleRef.get(BillingService);
   });
 
   beforeEach(async () => {
@@ -344,6 +352,21 @@ describe('Plan change (e2e)', () => {
 
       const listed = await planChange.listTenantPlans(ctx(t));
       expect(listed.items.map((plan) => plan.name)).not.toContain('Starter');
+      // Each price with the amount the seed stored beside it.
+      expect(listed.items.find((plan) => plan.name === 'Pro')?.prices).toEqual([
+        {
+          stripePriceId: 'price_pro_monthly',
+          interval: 'month',
+          unitAmount: 9_900,
+          currency: 'usd',
+        },
+        {
+          stripePriceId: 'price_pro_annual',
+          interval: 'year',
+          unitAmount: 99_000,
+          currency: 'usd',
+        },
+      ]);
       // Not vacuous: the other plans are still listed. The seeded FREE plan is
       // absent from this count on purpose — it carries no prices, so it is not
       // joinable and the next test pins that.
@@ -417,15 +440,40 @@ describe('Plan change (e2e)', () => {
         });
       }
 
-      await expectRpc(
-        planChange.changePlan(
+      const error = await planChange
+        .changePlan(
           { planId: starter.id, priceId: 'price_starter_monthly' },
           ctx(t),
-        ),
-        status.FAILED_PRECONDITION,
-      );
+        )
+        .then(
+          () => {
+            throw new Error('Expected a refusal');
+          },
+          (caught: RpcException) =>
+            caught.getError() as { code: number; message: string },
+        );
 
+      expect(error.code).toBe(status.FAILED_PRECONDITION);
+      // The items cross gRPC as details; the gateway lifts them out.
+      expect(readErrorDetails(error.message)).toEqual({
+        details: {
+          overLimit: [{ dimension: 'SEATS', inUse: 6, allowed: 5 }],
+        },
+        message:
+          'This plan does not fit your current usage — maxAgentSeats: 6 in use, plan grants 5',
+      });
       expect(update).not.toHaveBeenCalled();
+
+      const preview = await planChange.previewPlanChange(
+        { planId: starter.id, priceId: 'price_starter_monthly' },
+        ctx(t),
+      );
+      expect(preview.overLimitItems).toEqual([
+        { dimension: 'SEATS', inUse: 6, allowed: 5 },
+      ]);
+      expect(preview.overLimit).toEqual([
+        'maxAgentSeats: 6 in use, plan grants 5',
+      ]);
     });
 
     it('1. Uses the SAME seat count the invitation gate does — locked users included', async () => {
@@ -482,6 +530,127 @@ describe('Plan change (e2e)', () => {
   });
 
   // ------------------------------------------------------- narrowing and Stripe
+
+  describe('Checkout, refused like a plan change', () => {
+    const CHECKOUT = {
+      successUrl: 'https://app.test/ok',
+      cancelUrl: 'https://app.test/no',
+    };
+
+    /** A tenant on Free: no Stripe customer, no subscription. */
+    const freeTenant = (overrides: Record<string, unknown> = {}) =>
+      seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 10, ...overrides },
+      });
+
+    it('Answers the preview for the plan the price belongs to', async () => {
+      const t = await freeTenant();
+
+      const preview = await planChange.previewCheckout(
+        { priceId: 'price_pro_annual', ...CHECKOUT },
+        ctx(t),
+      );
+
+      expect(preview.planName).toBe('Pro');
+      expect(preview.overLimitItems).toEqual([]);
+    });
+
+    it('Refuses a plan too small for the people already here, with the items, in the preview and at create', async () => {
+      const t = await freeTenant();
+      for (let i = 0; i < 7; i += 1) {
+        await createInvitation(fx.prisma, t.org.id, {
+          invitedById: t.user.id,
+          email: `checkout-${i}@plan-change.test`,
+        });
+      }
+
+      const preview = await planChange.previewCheckout(
+        { priceId: 'price_starter_monthly', ...CHECKOUT },
+        ctx(t),
+      );
+      expect(preview.overLimitItems).toEqual([
+        { dimension: 'SEATS', inUse: 8, allowed: 5 },
+      ]);
+
+      const error = await billing
+        .createCheckoutSession(
+          { priceId: 'price_starter_monthly', ...CHECKOUT },
+          ctx(t),
+        )
+        .then(
+          () => {
+            throw new Error('Expected a refusal');
+          },
+          (caught: RpcException) =>
+            caught.getError() as { code: number; message: string },
+        );
+
+      expect(error.code).toBe(status.FAILED_PRECONDITION);
+      expect(readErrorDetails(error.message).details).toEqual({
+        overLimit: [{ dimension: 'SEATS', inUse: 8, allowed: 5 }],
+      });
+      expect(customersCreate).not.toHaveBeenCalled();
+    });
+
+    it('Refuses an organization that already pays: a second Checkout would start a second subscription', async () => {
+      const t = await subscribedTenant();
+
+      for (const call of [
+        () =>
+          planChange.previewCheckout(
+            { priceId: 'price_pro_monthly', ...CHECKOUT },
+            ctx(t),
+          ),
+        () =>
+          billing.createCheckoutSession(
+            { priceId: 'price_pro_monthly', ...CHECKOUT },
+            ctx(t),
+          ),
+      ]) {
+        const error = await call().then(
+          () => {
+            throw new Error('Expected a refusal');
+          },
+          (caught: RpcException) =>
+            caught.getError() as { code: number; message: string },
+        );
+        expect(error).toEqual({
+          code: status.FAILED_PRECONDITION,
+          message:
+            'This workspace already has a subscription — change your plan instead',
+        });
+      }
+      expect(customersCreate).not.toHaveBeenCalled();
+    });
+
+    it('Refuses a negotiated organization, and a price no joinable plan owns', async () => {
+      const pinned = await freeTenant({ entitlementsPinned: true });
+
+      await expectRpc(
+        planChange.previewCheckout(
+          { priceId: 'price_pro_monthly', ...CHECKOUT },
+          ctx(pinned),
+        ),
+        status.FAILED_PRECONDITION,
+      );
+
+      const t = await freeTenant();
+      await fx.prisma.subscriptionPlan.update({
+        where: { id: (await planNamed('Enterprise')).id },
+        data: { isActive: false },
+      });
+
+      for (const priceId of [
+        'price_not_in_the_catalog',
+        'price_enterprise_monthly',
+      ]) {
+        await expectRpc(
+          planChange.previewCheckout({ priceId, ...CHECKOUT }, ctx(t)),
+          status.INVALID_ARGUMENT,
+        );
+      }
+    });
+  });
 
   describe('What the preview hands the gateway', () => {
     it('Names only the dimensions that NARROW, with the target grants as numbers', async () => {
@@ -566,7 +735,11 @@ describe('Plan change (e2e)', () => {
 
       const [subscriptionId, params, options] = update.mock.calls[0] as [
         string,
-        { items: { id: string; price: string }[]; proration_behavior: string },
+        {
+          items: { id: string; price: string }[];
+          proration_behavior: string;
+          payment_behavior: string;
+        },
         { idempotencyKey?: string },
       ];
 
@@ -576,9 +749,62 @@ describe('Plan change (e2e)', () => {
       ]);
       // Immediate in both directions, and billed at the moment the grant moves.
       expect(params.proration_behavior).toBe('always_invoice');
+      // …and applied only if that invoice is paid: a decline refuses the
+      // change rather than leaving an open invoice that makes the org past due.
+      expect(params.payment_behavior).toBe('error_if_incomplete');
       // Derived rather than generated: a generated key makes every retry a new
       // operation, which is the whole failure it guards.
       expect(options.idempotencyKey).toContain(t.org.id);
+    });
+
+    it('5b. **A declined card, or one needing 3-D Secure, is a 402, and nothing moves**', async () => {
+      const t = await subscribedTenant();
+      const starter = await planNamed('Starter');
+      const before = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+
+      for (const refusal of [
+        new Stripe.errors.StripeCardError({
+          message: 'Your card was declined.',
+          code: 'card_declined',
+        }),
+        // `error_if_incomplete` answers a card that needs the bank's
+        // confirmation with a 402 too; nothing here can complete it.
+        Object.assign(
+          new Stripe.errors.StripeInvalidRequestError({
+            message: 'This payment requires authentication.',
+          }),
+          { statusCode: 402 },
+        ),
+      ]) {
+        update.mockRejectedValueOnce(refusal);
+
+        const error = await planChange
+          .changePlan(
+            { planId: starter.id, priceId: 'price_starter_monthly' },
+            ctx(t),
+          )
+          .then(
+            () => {
+              throw new Error('Expected a refusal');
+            },
+            (caught: RpcException) =>
+              caught.getError() as { code: number; message: string },
+          );
+
+        expect(error).toEqual({
+          code: status.FAILED_PRECONDITION,
+          message: withHttpStatus(402, 'Your card was declined'),
+        });
+      }
+
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+      expect(after.status).toBe(before.status);
+      expect(after.planId).toBe(before.planId);
+      expect(after.maxAgentSeats).toBe(before.maxAgentSeats);
     });
 
     it('Reports a CREDIT rather than a refund when the proration is negative', async () => {

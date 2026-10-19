@@ -29,6 +29,7 @@ import {
 } from './stack';
 import { assertSeeded, isSeeded } from './seeded';
 import { resetStores } from './stores';
+import { startFakeStripe, stopFakeStripe, useFakeStripe } from './fake-stripe';
 
 function run(command: string, args: string[]): void {
   execFileSync(command, args, { cwd: REPO_ROOT, stdio: 'inherit' });
@@ -64,6 +65,12 @@ export default async function globalSetup(): Promise<void> {
     stdio: 'inherit',
   });
 
+  // **Stripe is the fake, for every service and seed this run starts.** Set
+  // before the spawn, since a child reads its environment once; the plans
+  // seed below reads the fake's catalog the same way.
+  useFakeStripe();
+  await startFakeStripe();
+
   // **The spawn itself is inside the guard**, because jest does NOT run
   // `globalTeardown` when `globalSetup` throws. An earlier version guarded only
   // what came after `startStack()` — with a comment claiming "everything after
@@ -79,6 +86,7 @@ export default async function globalSetup(): Promise<void> {
     await ensureSeeded();
   } catch (error) {
     await stopStack();
+    await stopFakeStripe();
     throw error;
   }
 }

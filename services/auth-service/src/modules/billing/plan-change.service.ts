@@ -6,8 +6,13 @@ import {
   BillingEventSource,
   BillingEventStatus,
   CallerContext,
+  type OverLimitItem,
 } from '@synapsedesk/contracts';
-import { isUniqueConstraintViolation, withHttpStatus } from '@synapsedesk/core';
+import {
+  isUniqueConstraintViolation,
+  withErrorDetails,
+  withHttpStatus,
+} from '@synapsedesk/core';
 import {
   formatErrorMsg,
   requireActor,
@@ -16,6 +21,7 @@ import {
 import {
   toProtoAiModelTier,
   toProtoTimestamp,
+  type CreateCheckoutSessionRequest,
   type ListTenantPlansResponse,
   type PlanChangePreviewResponse,
   type PlanChangeRequest,
@@ -101,6 +107,8 @@ export class PlanChangeService {
         prices: plan.prices.map((price) => ({
           stripePriceId: price.stripePriceId,
           interval: price.interval,
+          unitAmount: price.unitAmount ?? undefined,
+          currency: price.currency ?? undefined,
         })),
       })),
     };
@@ -119,8 +127,64 @@ export class PlanChangeService {
   ): Promise<PlanChangePreviewResponse> {
     const { organization, plan } = await this.resolve(request, context);
 
+    return this.preview(organization, plan);
+  }
+
+  /**
+   * Checkout's half of the check, for a tenant moving ONTO a plan: the same
+   * answer as {@link previewPlanChange}, for the plan the price belongs to.
+   *
+   * Refuses first what Checkout must never start: a second subscription for a
+   * tenant that already has one, and any subscription for a negotiated one.
+   */
+  async previewCheckout(
+    request: CreateCheckoutSessionRequest,
+    context: CallerContext,
+  ): Promise<PlanChangePreviewResponse> {
+    const { organization, plan } = await this.resolveForCheckout(
+      request.priceId,
+      context,
+    );
+
+    return this.preview(organization, plan);
+  }
+
+  /**
+   * Every refusal Checkout has, seats included, for `createCheckoutSession` to
+   * run again before Stripe is called: the preview was a round trip ago.
+   */
+  async assertCheckoutAllowed(
+    priceId: string,
+    context: CallerContext,
+  ): Promise<void> {
+    const { organization, plan } = await this.resolveForCheckout(
+      priceId,
+      context,
+    );
+    await this.refuseSeatOverruns(organization.id, plan.maxAgentSeats);
+  }
+
+  private async preview(
+    organization: {
+      id: string;
+      maxStorageBytes: bigint;
+      maxDocumentUploads: number;
+    },
+    plan: {
+      name: string;
+      maxAgentSeats: number;
+      maxStorageBytes: bigint;
+      maxDocumentUploads: number;
+    },
+  ): Promise<PlanChangePreviewResponse> {
+    const overLimitItems = await this.seatOverruns(
+      organization.id,
+      plan.maxAgentSeats,
+    );
+
     return {
-      overLimit: await this.seatOverruns(organization.id, plan.maxAgentSeats),
+      overLimit: overLimitItems.map(legacyOverLimitText),
+      overLimitItems,
       narrowedDimensions: narrowedDimensions(organization, plan),
       // **Numbers off the row, never a rendered string.** The plan-apply
       // projection carries `"before -> after"` for display and the gateway's
@@ -160,16 +224,7 @@ export class PlanChangeService {
 
     const { organization, plan } = await this.resolve(request, context);
 
-    const overLimit = await this.seatOverruns(
-      organization.id,
-      plan.maxAgentSeats,
-    );
-    if (overLimit.length > 0) {
-      throw new RpcException({
-        code: status.FAILED_PRECONDITION,
-        message: `This plan does not fit your current usage — ${overLimit.join('; ')}`,
-      });
-    }
+    await this.refuseSeatOverruns(organization.id, plan.maxAgentSeats);
 
     const idempotencyKey = this.idempotencyKeyFor(organization.id, request);
     await this.claim(organization.id, idempotencyKey, request);
@@ -212,6 +267,12 @@ export class PlanChangeService {
           // default computes line items and leaves them for the next invoice,
           // so an upgrade grants now and collects later.
           proration_behavior: 'always_invoice',
+          // **Applied only if paid.** Stripe's default applies the change and
+          // leaves an unpaid invoice open, which puts the whole organization
+          // past due over a failed upgrade. This refuses instead (402), and a
+          // card needing the bank's confirmation is refused the same way:
+          // nothing here can complete it. `pending_if_incomplete` is not used.
+          payment_behavior: 'error_if_incomplete',
           // **Quantity is deliberately not passed.** Stripe resets a changed
           // item's quantity to 1, which is correct here because this repo bills
           // per PLAN — seats are an entitlement column, not a Stripe quantity.
@@ -345,6 +406,67 @@ export class PlanChangeService {
   }
 
   /**
+   * Checkout's refusals, cheapest first: a subscription already there, a
+   * negotiated plan, a price no joinable plan owns.
+   */
+  private async resolveForCheckout(priceId: string, context: CallerContext) {
+    const organizationId = requireTenant(context);
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: {
+        id: true,
+        entitlementsPinned: true,
+        stripeSubscriptionId: true,
+        maxStorageBytes: true,
+        maxDocumentUploads: true,
+      },
+    });
+
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Organization not found',
+      });
+    }
+
+    // A second Checkout would start a second subscription beside the first,
+    // and bill for both.
+    if (organization.stripeSubscriptionId) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'This workspace already has a subscription — change your plan instead',
+      });
+    }
+
+    if (organization.entitlementsPinned) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'This workspace is on a negotiated plan — contact support to change it',
+      });
+    }
+
+    const price = await this.prisma.subscriptionPlanPrice.findUnique({
+      where: { stripePriceId: priceId },
+      include: { plan: true },
+    });
+
+    // Validated against the catalog BEFORE Stripe is called. A price the
+    // webhook could not map is a price that would take payment and then fail
+    // to grant anything.
+    if (!price || price.plan.deletedAt !== null || !price.plan.isActive) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `'${priceId}' is not a plan this workspace can subscribe to`,
+      });
+    }
+
+    return { organization, plan: price.plan };
+  }
+
+  /**
    * Seat overruns, in the string shape the plan-apply projection already uses.
    *
    * `seatsInUse` and nothing local: the count that decides this refusal has to
@@ -355,15 +477,32 @@ export class PlanChangeService {
   private async seatOverruns(
     organizationId: string,
     maxAgentSeats: number,
-  ): Promise<string[]> {
+  ): Promise<OverLimitItem[]> {
     const seatsInUse = await this.organizations.seatsInUse(
       this.prisma,
       organizationId,
     );
 
     return seatsInUse > maxAgentSeats
-      ? [`maxAgentSeats: ${seatsInUse} in use, plan grants ${maxAgentSeats}`]
+      ? [{ dimension: 'SEATS', inUse: seatsInUse, allowed: maxAgentSeats }]
       : [];
+  }
+
+  /** The seat half of the over-limit refusal, with its items as `details`. */
+  private async refuseSeatOverruns(
+    organizationId: string,
+    maxAgentSeats: number,
+  ): Promise<void> {
+    const overLimit = await this.seatOverruns(organizationId, maxAgentSeats);
+    if (overLimit.length === 0) return;
+
+    throw new RpcException({
+      code: status.FAILED_PRECONDITION,
+      message: withErrorDetails(
+        `This plan does not fit your current usage — ${overLimit.map(legacyOverLimitText).join('; ')}`,
+        { overLimit },
+      ),
+    });
   }
 
   /**
@@ -510,6 +649,18 @@ function planChangeFailure(error: Stripe.errors.StripeError): {
     };
   }
 
+  // A decline, and a card that needs the bank's confirmation: both 402 under
+  // `error_if_incomplete`. The deck's words; Stripe's own sentence is logged.
+  if (
+    error instanceof Stripe.errors.StripeCardError ||
+    error.statusCode === 402
+  ) {
+    return {
+      code: status.FAILED_PRECONDITION,
+      message: withHttpStatus(402, 'Your card was declined'),
+    };
+  }
+
   if (error instanceof Stripe.errors.StripeIdempotencyError) {
     return {
       code: status.ALREADY_EXISTS,
@@ -590,4 +741,12 @@ function prorationCredited(
   if (typeof invoice !== 'object' || invoice === null) return undefined;
 
   return invoice.total < 0;
+}
+
+/**
+ * The over-limit text the string field kept before `over_limit_items`:
+ * `maxAgentSeats: 12 in use, plan grants 10`.
+ */
+function legacyOverLimitText(item: OverLimitItem): string {
+  return `maxAgentSeats: ${item.inUse} in use, plan grants ${item.allowed}`;
 }

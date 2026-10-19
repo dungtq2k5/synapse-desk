@@ -9,7 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
-import { Gender, PageMeta, PageRequest, UserResponse } from "./common";
+import { Gender, OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
 
 export enum UserProjection {
   /** USER_PROJECTION_NOTIFICATION - The default keeps the existing caller working with no change at its call site. */
@@ -31,6 +31,12 @@ export interface CurrentUserResponse {
    * hash.
    */
   hasPassword: boolean;
+  /**
+   * The caller's organization's lifecycle status, answered in every status
+   * (this read is `AUTH`), so a client can tell past due and frozen from one
+   * call. UNSPECIFIED for a Super Admin, who has no organization.
+   */
+  organizationStatus: OrgStatus;
 }
 
 /**

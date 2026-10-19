@@ -502,3 +502,18 @@ export const SNAPSHOT_TTL_SECONDS = 3 * 60 * 60;
  * only and there is no plan to look one up from.
  */
 export const MAX_FINANCE_RANGE_DAYS = 366;
+
+/**
+ * The limits a plan can be too small for, as the over-limit refusal names them
+ * in `details.overLimit[].dimension`. Seats are auth's to count; storage and
+ * documents are the gateway's, from ingestion's usage.
+ */
+export const OVER_LIMIT_DIMENSIONS = ['SEATS', 'STORAGE', 'DOCUMENTS'] as const;
+export type OverLimitDimension = (typeof OVER_LIMIT_DIMENSIONS)[number];
+
+/** One limit a plan would break, as `details.overLimit` carries it. */
+export interface OverLimitItem {
+  dimension: OverLimitDimension;
+  inUse: number;
+  allowed: number;
+}

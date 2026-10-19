@@ -453,6 +453,7 @@ describe('the manifest contract', () => {
       'FIREBASE_AUTH_EMULATOR_HOST',
       'INGESTION_OFFLINE_MODEL',
       'RAG_OFFLINE_MODEL',
+      'STRIPE_API_BASE_URL',
     ]);
 
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */

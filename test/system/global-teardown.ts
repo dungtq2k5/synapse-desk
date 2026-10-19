@@ -7,10 +7,12 @@
  * the mess known-gap #7 describes.
  */
 
+import { stopFakeStripe } from './fake-stripe';
 import { stopStack } from './stack';
 import { resetStores } from './stores';
 
 export default async function globalTeardown(): Promise<void> {
   await stopStack();
+  await stopFakeStripe();
   await resetStores();
 }

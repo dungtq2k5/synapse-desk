@@ -61,6 +61,18 @@ message SubscriptionResponse {
 
   // The tenant lifecycle status the subscription drove.
   OrgStatus status = 9;
+
+  // The subscription's state as its last `customer.subscription.*` event gave
+  // it, kept on the organization row. Absent until an event names the tenant.
+  optional google.protobuf.Timestamp current_period_end = 10;
+  // True when the subscription ends at `current_period_end` instead of renewing.
+  bool cancel_at_period_end = 11;
+  optional string price_id = 12;
+  // The current price's interval, from the plan catalog: `month` | `year`.
+  optional string interval = 13;
+  // On a plan agreed with the SynapseDesk team (`entitlements_pinned`): no
+  // self-serve change applies to it.
+  bool negotiated = 14;
 }
 
 message CreateCheckoutSessionRequest {
@@ -126,6 +138,10 @@ message TenantPlanPriceResponse {
   string stripe_price_id = 1;
   // Stripe's literal — `month` | `year` in practice, and wider in theory.
   string interval = 2;
+  // What the price charges, in the currency's smallest unit, and Stripe's
+  // lowercase currency code. Absent for a price seeded before amounts were.
+  optional int64 unit_amount = 3;
+  optional string currency = 4;
 }
 
 message ListTenantPlansResponse { repeated TenantPlanResponse items = 1; }
@@ -145,6 +161,7 @@ message PlanChangeRequest {
 // target grants as numbers. The gateway dials ingestion only for those.
 message PlanChangePreviewResponse {
   // Seat overruns, already formatted — `maxAgentSeats: 12 in use, plan grants 10`.
+  // Superseded by `over_limit_items`; kept until the release after (ADR 0044).
   repeated string over_limit = 1;
 
   // Dimensions where the target grant is BELOW this tenant's current grant, out
@@ -159,6 +176,18 @@ message PlanChangePreviewResponse {
   int32 target_max_document_uploads = 4;
 
   string plan_name = 5;
+
+  // The seat overruns as data, one per broken limit. Auth only ever answers
+  // `SEATS`; the gateway adds storage and documents.
+  repeated OverLimit over_limit_items = 6;
+}
+
+// A limit the target plan would break: what is in use and what it allows.
+message OverLimit {
+  // `SEATS` | `STORAGE` | `DOCUMENTS`.
+  string dimension = 1;
+  int64 in_use = 2;
+  int64 allowed = 3;
 }
 
 // What Stripe accepted. **Not the entitlement change** — entitlements are
@@ -217,4 +246,9 @@ service BillingService {
   // have to trust.
   rpc PreviewPlanChange(PlanChangeRequest) returns (PlanChangePreviewResponse);
   rpc ChangePlan(PlanChangeRequest) returns (PlanChangeResponse);
+
+  // Checkout's half of the same check, for a tenant with no subscription yet:
+  // refuses a tenant that already has one, and a negotiated one, then answers
+  // as `PreviewPlanChange` does for the plan the price belongs to.
+  rpc PreviewCheckout(CreateCheckoutSessionRequest) returns (PlanChangePreviewResponse);
 }

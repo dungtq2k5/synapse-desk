@@ -227,6 +227,15 @@ model Organization {
   stripeCustomerId     String? @unique @map("stripe_customer_id") @db.VarChar(255)
   stripeSubscriptionId String? @unique @map("stripe_subscription_id") @db.VarChar(255)
 
+  /// The subscription's state as the last `customer.subscription.*` event
+  /// gave it, written by the entitlement writer beside `status`. State, not
+  /// catalog: they say where THIS subscription stands (which price, when the
+  /// period ends, whether it ends there), so the billing page reads them from
+  /// here and never calls Stripe. NULL until the first event names the tenant.
+  stripePriceId     String?   @map("stripe_price_id") @db.VarChar(255)
+  currentPeriodEnd  DateTime? @map("current_period_end") @db.Timestamptz
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
+
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
@@ -958,6 +967,13 @@ model SubscriptionPlanPrice {
   /// against a webhook payload — and Stripe's vocabulary is wider than these
   /// two, so this is not an enum of ours waiting to be written.
   interval String @db.VarChar(20)
+
+  /// What the price charges, in the currency's smallest unit, and that
+  /// currency (Stripe's lowercase ISO code). Stored because Stripe never
+  /// changes a price's amount: a new amount is a new price, and the plans
+  /// seed writes it as a new row. Nullable for rows seeded before the column.
+  unitAmount Int?    @map("unit_amount")
+  currency   String? @db.VarChar(3)
 
   plan SubscriptionPlan @relation(fields: [planId], references: [id])
 

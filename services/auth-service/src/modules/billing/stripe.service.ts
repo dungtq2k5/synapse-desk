@@ -51,7 +51,10 @@ export class StripeService implements OnModuleInit {
     // different APIs across two environments — and a Stripe-side version bump
     // changes this service's behaviour with no deploy and no diff. The
     // provisioning script pins the same version for the same reason.
-    this.client = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
+    this.client = new Stripe(secretKey, {
+      apiVersion: STRIPE_API_VERSION,
+      ...hostOptions(this.configService.get<string>('STRIPE_API_BASE_URL')),
+    });
   }
 
   get isConfigured(): boolean {
@@ -125,4 +128,21 @@ export class StripeService implements OnModuleInit {
 
     return this.client;
   }
+}
+
+/**
+ * `STRIPE_API_BASE_URL` as stripe-node's host options: the test stack's fake
+ * Stripe. Unset leaves the SDK on Stripe's own host.
+ */
+function hostOptions(baseUrl: string | undefined): Stripe.StripeConfig {
+  if (!baseUrl) return {};
+
+  const url = new URL(baseUrl);
+  const protocol = url.protocol === 'https:' ? 'https' : 'http';
+
+  return {
+    host: url.hostname,
+    port: Number(url.port) || (protocol === 'https' ? 443 : 80),
+    protocol,
+  };
 }

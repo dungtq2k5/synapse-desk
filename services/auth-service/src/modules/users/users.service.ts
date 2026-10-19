@@ -28,6 +28,7 @@ import {
   SetUserRolesRequest,
   toPageMeta,
   ProtoTimestamp,
+  toProtoOrgStatus,
   toProtoTimestamp,
   UserProjection,
   UnlockUserResponse,
@@ -138,6 +139,8 @@ export class UsersService {
       permissionCodes: flattenPermissionCodes(user.roles),
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),
       hasPassword: user.passwordHash !== null,
+      // UNSPECIFIED for a Super Admin, who has no organization.
+      organizationStatus: toProtoOrgStatus(user.organization?.status),
     };
   }
 

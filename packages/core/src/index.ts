@@ -6,6 +6,7 @@ export * from './utils/limits';
 export * from './utils/rollup-window';
 export * from './utils/prisma-errors';
 export * from './utils/http-status-hint';
+export * from './utils/error-details';
 export * from './utils/text-normalize';
 export * from './utils/resend-errors';
 export * from './utils/job-staleness';

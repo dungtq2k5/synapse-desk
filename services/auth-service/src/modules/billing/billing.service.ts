@@ -27,7 +27,7 @@ import {
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
-import { PlanCatalogService } from './plan-catalog.service';
+import { PlanChangeService } from './plan-change.service';
 
 /** How many invoices a page shows. Stripe's own default is 10. */
 const DEFAULT_INVOICE_LIMIT = 12;
@@ -65,7 +65,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripe: StripeService,
-    private readonly planCatalog: PlanCatalogService,
+    private readonly planChange: PlanChangeService,
   ) {}
 
   /**
@@ -94,6 +94,14 @@ export class BillingService {
       ? (organization.plan?.name ?? organization.aiModelTier)
       : 'Free';
 
+    // The interval is the catalog's, by the price the last event named.
+    const price = organization.stripePriceId
+      ? await this.prisma.subscriptionPlanPrice.findUnique({
+          where: { stripePriceId: organization.stripePriceId },
+          select: { interval: true },
+        })
+      : null;
+
     return {
       stripeCustomerId: organization.stripeCustomerId ?? undefined,
       stripeSubscriptionId: organization.stripeSubscriptionId ?? undefined,
@@ -104,6 +112,14 @@ export class BillingService {
       aiModelTier: toProtoAiModelTier(organization.aiModelTier),
       billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
       status: toProtoOrgStatus(organization.status),
+      // The period facts the webhook keeps on the row: still zero Stripe calls.
+      currentPeriodEnd: organization.currentPeriodEnd
+        ? toProtoTimestamp(organization.currentPeriodEnd)
+        : undefined,
+      cancelAtPeriodEnd: organization.cancelAtPeriodEnd,
+      priceId: organization.stripePriceId ?? undefined,
+      interval: price?.interval,
+      negotiated: organization.entitlementsPinned,
     };
   }
 
@@ -123,15 +139,10 @@ export class BillingService {
     const organization = await this.load(context);
     requireActor(context);
 
-    // Validated against the catalog BEFORE Stripe is called. A price the
-    // webhook could not map is a price that would take payment and then fail
-    // to grant anything — the customer pays and stays on the old plan.
-    if (!(await this.planCatalog.priceExists(request.priceId))) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `'${request.priceId}' is not a plan this workspace can subscribe to`,
-      });
-    }
+    // Every Checkout refusal again — a second subscription, a negotiated
+    // plan, an unknown price, too many people — before Stripe is called. The
+    // gateway's preview ran a round trip ago.
+    await this.planChange.assertCheckoutAllowed(request.priceId, context);
 
     const customerId = await this.ensureCustomer(organization);
 
@@ -367,6 +378,10 @@ export class BillingService {
         billingCycleStart: true,
         stripeCustomerId: true,
         stripeSubscriptionId: true,
+        stripePriceId: true,
+        currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+        entitlementsPinned: true,
         // The plan's own name, for the label above. One join rather than a
         // reverse-lookup by tier that could not tell two QUALITY plans apart.
         plan: { select: { name: true } },

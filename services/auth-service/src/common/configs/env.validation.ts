@@ -159,6 +159,13 @@ export const envValidationSchema = Joi.object({
   // degrades to UNAVAILABLE on the billing endpoints alone.
   STRIPE_SECRET_KEY: Joi.string().optional(),
   STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
+  // Where the Stripe client sends its calls: the test stack's fake Stripe.
+  // Unset means Stripe. Refused under NODE_ENV=production, where every call
+  // must reach the real one.
+  STRIPE_API_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .optional()
+    .when('NODE_ENV', { is: 'production', then: Joi.forbidden() }),
 
   // -------------------------------------------------------------- 8 POLICY
 

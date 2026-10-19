@@ -153,6 +153,10 @@ const EXCLUDED = new Map([
     'production embeds with the real model; ingestion-service refuses to boot with the offline client under NODE_ENV=production',
   ],
   [
+    'STRIPE_API_BASE_URL',
+    'production calls the real Stripe; auth-service refuses to boot with another host under NODE_ENV=production',
+  ],
+  [
     'RAG_OFFLINE_MODEL',
     'production answers with the real model; rag-service refuses to boot with the offline one under APP_ENV=production',
   ],
