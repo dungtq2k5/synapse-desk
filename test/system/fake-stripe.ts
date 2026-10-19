@@ -121,8 +121,11 @@ export async function startFakeStripe(
   const checkouts = new Map<string, CheckoutSession>();
   const portals = new Map<string, PortalSession>();
   const nextChange = new Map<string, ChangeOutcome>();
+  // Unique across runs as well: the databases outlive the fake, and a second
+  // run's `cus_fake_1` would collide with the first's on a unique column.
+  const run = Date.now().toString(36);
   let seq = 0;
-  const id = (prefix: string) => `${prefix}_fake_${(seq += 1)}`;
+  const id = (prefix: string) => `${prefix}_fake_${run}_${(seq += 1)}`;
 
   const priceById = (priceId: string) =>
     FAKE_CATALOG.flatMap((plan) => plan.prices).find(
