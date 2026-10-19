@@ -17,7 +17,8 @@
  * Redis and JetStream. See `stores.ts` for why that is not tidiness.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { REPO_ROOT } from './services';
 import {
   assertPortsFree,
@@ -32,6 +33,21 @@ import { startFakeStripe, stopFakeStripe, useFakeStripe } from './fake-stripe';
 
 function run(command: string, args: string[]): void {
   execFileSync(command, args, { cwd: REPO_ROOT, stdio: 'inherit' });
+}
+
+/**
+ * The same, without blocking this process: the fake Stripe answers from it,
+ * and the plans seed calls the fake, so a synchronous child would wait on a
+ * server that can't run until the child ends.
+ */
+async function runWhileServing(command: string, args: string[]): Promise<void> {
+  const child = promisify(execFile)(command, args, {
+    cwd: REPO_ROOT,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const { stdout, stderr } = await child;
+  process.stdout.write(stdout);
+  process.stderr.write(stderr);
 }
 
 export default async function globalSetup(): Promise<void> {
@@ -107,8 +123,8 @@ export default async function globalSetup(): Promise<void> {
 async function ensureSeeded(): Promise<void> {
   if (await isSeeded()) return;
 
-  run('npm', ['run', 'plans:seed:apply']);
-  run('npm', ['run', 'seed:demo:apply']);
+  await runWhileServing('npm', ['run', 'plans:seed:apply']);
+  await runWhileServing('npm', ['run', 'seed:demo:apply']);
 
   // A post-condition rather than a pre-condition: the seeders above either
   // wrote the dataset or failed loudly, and this turns "they ran" into "it is
