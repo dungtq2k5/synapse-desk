@@ -82,3 +82,37 @@ async def test_any_other_create_failure_fails_the_boot():
     with pytest.raises(UnexpectedResponse):
         await ensure_collection(client)  # type: ignore[arg-type]
     assert client.indexed == []
+
+
+class _Loading(_Client):
+    """A collection the other service just created: it exists, still loading."""
+
+    def __init__(self, failures: int):
+        super().__init__(create_error=None)
+        self.failures = failures
+
+    async def collection_exists(self, _name: str) -> bool:
+        return True
+
+    async def get_collection(self, _name: str) -> SimpleNamespace:
+        if self.failures > 0:
+            self.failures -= 1
+            raise _refusal(500, "Internal Server Error")
+        return await super().get_collection(_name)
+
+
+async def test_a_collection_still_loading_is_waited_for(monkeypatch):
+    monkeypatch.setattr("rag_service.qdrant.collection.READ_DELAY_SECONDS", 0)
+    client = _Loading(failures=3)
+
+    await ensure_collection(client)  # type: ignore[arg-type]
+
+    assert client.read_back
+    assert len(client.indexed) == 5
+
+
+async def test_a_collection_that_never_loads_still_fails_the_boot(monkeypatch):
+    monkeypatch.setattr("rag_service.qdrant.collection.READ_DELAY_SECONDS", 0)
+
+    with pytest.raises(UnexpectedResponse):
+        await ensure_collection(_Loading(failures=100))  # type: ignore[arg-type]

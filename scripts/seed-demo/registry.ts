@@ -12,10 +12,11 @@ import type { SeedClients } from './clients';
 import { authStep } from './steps/auth.step';
 import { ticketStep } from './steps/ticket.step';
 import { ingestionStep } from './steps/ingestion.step';
+import { analyticsStep } from './steps/analytics.step';
 import type { Manifest } from './manifest';
 import type { Profile } from './profiles';
 
-export type SeedService = 'auth' | 'ticket' | 'ingestion';
+export type SeedService = 'auth' | 'ticket' | 'ingestion' | 'analytics';
 
 export type StepContext = {
   /** Filled by the auth step, consumed by every later one. */
@@ -49,9 +50,8 @@ export type SeedStep = {
  * weaker property is satisfied by an order that puts ingestion before ticket,
  * which would write AI rows naming tickets that do not exist yet.
  *
- * The ingestion → ticket edge carries no rows today, because seeding the AI
- * ledger is deliberately out of scope. It becomes load-bearing the day that
- * lands, which is exactly the day nobody re-reads this file.
+ * The ingestion → ticket edge carries the chat answers' `ticket_id`, and the
+ * analytics step reads every other step's rows.
  */
 export const SEED_EDGES: ReadonlyArray<{
   from: SeedService;
@@ -65,6 +65,8 @@ export const SEED_EDGES: ReadonlyArray<{
   },
   { from: 'ingestion', to: 'auth', via: 'organization_id, uploaded_by_id' },
   { from: 'ingestion', to: 'ticket', via: 'ai_generations.ticket_id' },
+  { from: 'analytics', to: 'ingestion', via: 'the rollups read every row' },
+  { from: 'analytics', to: 'ticket', via: 'the rollups read every row' },
 ];
 
 /**
@@ -90,4 +92,9 @@ export function tenantsOf(context: StepContext): Manifest['tenants'] {
  *
  * Adding a domain is one step file and one entry here.
  */
-export const STEPS: readonly SeedStep[] = [authStep, ticketStep, ingestionStep];
+export const STEPS: readonly SeedStep[] = [
+  authStep,
+  ticketStep,
+  ingestionStep,
+  analyticsStep,
+];
