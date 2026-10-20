@@ -1,23 +1,27 @@
 /**
- * @file Documents and their chunks.
+ * @file Documents, their chunks, and the AI ledger behind AI usage.
  *
  * Third in the order, and the reason is not only `organization_id`:
- * `ai_generations.ticket_id` points at `postgres_ticket`, so ingestion sits
- * after it in the DAG. That edge carries no rows today — seeding the AI ledger
- * is out of scope — which is exactly why the order test asserts the edge rather
- * than the current data.
+ * `ai_generations.ticket_id` points at `postgres_ticket` (a chat answer names
+ * its ticket), so ingestion sits after it in the DAG.
  */
 
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { faker } from '@faker-js/faker';
-import { DocumentStatus } from '@synapsedesk/contracts';
+import {
+  AiGenerationOutcome,
+  AiGenerationPurpose,
+  AiGenerationStatus,
+  DocumentStatus,
+} from '@synapsedesk/contracts';
 import {
   buildTenant,
   createChunks,
   createDocument,
 } from '../../../services/ingestion-service/test/factories';
+import type { Prisma } from '../../../services/ingestion-service/src/generated/prisma/client';
 import type { PrismaService } from '../../../services/ingestion-service/src/modules/prisma/prisma.service';
 import type { ManifestTenant } from '../manifest';
 import type { Profile } from '../profiles';
@@ -172,7 +176,11 @@ export async function seedDocuments(
     if (!apply) continue;
 
     const files = await prisma.$transaction(
-      async (tx) => writeDocuments(tx as PrismaService, tenant, plan),
+      async (tx) => {
+        const written = await writeDocuments(tx as PrismaService, tenant, plan);
+        await writeGenerations(tx as PrismaService, tenant);
+        return written;
+      },
       { timeout: TRANSACTION_TIMEOUT_MS, maxWait: TRANSACTION_MAX_WAIT_MS },
     );
     // After the rows commit: a network write has no place in a transaction.
@@ -223,4 +231,171 @@ async function writeDocuments(
     await createChunks(tx, document, CHUNKS_PER_DOCUMENT, tenant.departmentIds);
   }
   return files;
+}
+
+/** Days of AI history, ending today. */
+const LEDGER_DAYS = 60;
+
+/**
+ * A day's calls by purpose, `[min, max]`, and the model each runs on. Costs
+ * are micro-dollars per call, kept small: a month stays well under the
+ * smallest plan's allowance, so seeding never turns a tenant's AI off.
+ */
+const CALLS: Record<
+  AiGenerationPurpose,
+  { per: [number, number]; model: string; cost: [number, number] }
+> = {
+  [AiGenerationPurpose.CHAT_ANSWER]: {
+    per: [2, 6],
+    model: 'gemini-2.5-pro',
+    cost: [400, 900],
+  },
+  [AiGenerationPurpose.DRAFT]: {
+    per: [2, 5],
+    model: 'gemini-2.5-pro',
+    cost: [300, 700],
+  },
+  [AiGenerationPurpose.REVIEW]: {
+    per: [2, 5],
+    model: 'gemini-2.5-pro',
+    cost: [150, 350],
+  },
+  [AiGenerationPurpose.SUMMARY]: {
+    per: [1, 3],
+    model: 'gemini-2.5-pro',
+    cost: [150, 300],
+  },
+  [AiGenerationPurpose.SUGGESTIONS]: {
+    per: [1, 3],
+    model: 'gemini-3.5-flash-lite',
+    cost: [40, 120],
+  },
+  [AiGenerationPurpose.CLASSIFY]: {
+    per: [2, 5],
+    model: 'gemini-3.5-flash-lite',
+    cost: [20, 60],
+  },
+  [AiGenerationPurpose.INJECTION_CLASSIFY]: {
+    per: [2, 6],
+    model: 'gemini-3.5-flash-lite',
+    cost: [10, 40],
+  },
+  [AiGenerationPurpose.GREETING_CLASSIFY]: {
+    per: [1, 4],
+    model: 'gemini-3.5-flash-lite',
+    cost: [10, 30],
+  },
+  [AiGenerationPurpose.REFORMULATION]: {
+    per: [1, 3],
+    model: 'gemini-3.5-flash-lite',
+    cost: [10, 30],
+  },
+  [AiGenerationPurpose.EMBEDDING]: {
+    per: [1, 3],
+    model: 'gemini-embedding-2',
+    cost: [5, 20],
+  },
+};
+
+const ANSWERING = new Set<string>([
+  AiGenerationPurpose.CHAT_ANSWER,
+  AiGenerationPurpose.DRAFT,
+]);
+
+/**
+ * The AI ledger: calls across every purpose for the last {@link LEDGER_DAYS}
+ * days. Answers retrieve from the first two thirds of the documents and cite
+ * from the first third, so the Knowledge lists have documents most cited,
+ * retrieved but never cited, and never retrieved; some find nothing (gaps).
+ * Drafts carry the outcome an agent gave them.
+ */
+async function writeGenerations(
+  tx: PrismaService,
+  tenant: ManifestTenant,
+): Promise<void> {
+  const chunks = await tx.documentChunk.findMany({
+    where: { organizationId: tenant.organizationId },
+    select: { id: true, documentId: true },
+    orderBy: [{ documentId: 'asc' }, { chunkIndex: 'asc' }],
+  });
+  const documents = [...new Set(chunks.map((chunk) => chunk.documentId))];
+  const third = Math.max(1, Math.floor(documents.length / 3));
+  const cited = new Set(documents.slice(0, third));
+  const found = chunks.filter(
+    (chunk) => documents.indexOf(chunk.documentId) < third * 2,
+  );
+  const agents = tenant.agentIds ?? [tenant.adminUserId];
+  const chats = tenant.chatTicketIds ?? [];
+
+  const rows: Prisma.AiGenerationCreateManyInput[] = [];
+  for (let back = LEDGER_DAYS - 1; back >= 0; back--) {
+    const day = new Date();
+    day.setUTCDate(day.getUTCDate() - back);
+    for (const [name, call] of Object.entries(CALLS)) {
+      const purpose = name as AiGenerationPurpose;
+      const count = faker.number.int({ min: call.per[0], max: call.per[1] });
+      for (let index = 0; index < count; index++) {
+        const at = new Date(
+          Math.min(
+            Date.UTC(
+              day.getUTCFullYear(),
+              day.getUTCMonth(),
+              day.getUTCDate(),
+              faker.number.int({ min: 7, max: 19 }),
+              faker.number.int({ min: 0, max: 59 }),
+            ),
+            Date.now(),
+          ),
+        );
+        const answering = ANSWERING.has(purpose);
+        const retrieved =
+          answering && found.length && faker.number.float() > 0.15
+            ? faker.helpers.arrayElements(found, { min: 1, max: 3 })
+            : [];
+        rows.push({
+          organizationId: tenant.organizationId,
+          userId:
+            purpose === AiGenerationPurpose.DRAFT
+              ? faker.helpers.arrayElement(agents)
+              : null,
+          ticketId:
+            purpose === AiGenerationPurpose.CHAT_ANSWER && chats.length
+              ? faker.helpers.arrayElement(chats)
+              : null,
+          purpose,
+          modelName: call.model,
+          promptTokens: faker.number.int({ min: 200, max: 2400 }),
+          completionTokens:
+            purpose === AiGenerationPurpose.EMBEDDING
+              ? 0
+              : faker.number.int({ min: 20, max: 600 }),
+          estimatedCostMicros: BigInt(
+            faker.number.int({ min: call.cost[0], max: call.cost[1] }),
+          ),
+          latencyMs: faker.number.int({
+            min: 150,
+            max: answering ? 5200 : 1400,
+          }),
+          status:
+            faker.number.float() < 0.02
+              ? AiGenerationStatus.FAILED
+              : AiGenerationStatus.SUCCESS,
+          retrievedChunkIds: retrieved.map((chunk) => chunk.id),
+          citedChunkIds: retrieved
+            .filter((chunk) => cited.has(chunk.documentId))
+            .map((chunk) => chunk.id),
+          outcome:
+            purpose === AiGenerationPurpose.DRAFT
+              ? faker.helpers.weightedArrayElement([
+                  { value: AiGenerationOutcome.ACCEPTED, weight: 6 },
+                  { value: AiGenerationOutcome.EDITED, weight: 3 },
+                  { value: AiGenerationOutcome.DISCARDED, weight: 2 },
+                ])
+              : null,
+          createdAt: at,
+        });
+      }
+    }
+  }
+  await tx.aiGeneration.createMany({ data: rows });
 }

@@ -37,6 +37,9 @@ const TRANSACTION_TIMEOUT_MS = 30_000;
  */
 const TRANSACTION_MAX_WAIT_MS = 15_000;
 
+/** Users after the admin who get the agent role, where the tenant has them. */
+const AGENTS = 2;
+
 /**
  * The lifecycle spread, so the platform list has something to filter.
  *
@@ -346,6 +349,15 @@ async function writeTenant(
     where: { id: userIds[0] },
     data: { roles: { connect: { id: adminRole.id } } },
   });
+  // Two more answer tickets, so Analytics has agents to list.
+  const agentRole = await findSystemRole(tx, SystemRoleName.SUPPORT_AGENT);
+  const agentIds = [userIds[0], ...userIds.slice(1, AGENTS + 1)];
+  for (const id of agentIds.slice(1)) {
+    await tx.user.update({
+      where: { id },
+      data: { roles: { connect: { id: agentRole.id } } },
+    });
+  }
 
   await writeBillingHistory(tx, organization.id, profile);
 
@@ -366,6 +378,7 @@ async function writeTenant(
     departmentIds: [department.id],
     userIds,
     adminUserId: userIds[0],
+    agentIds,
   };
 }
 

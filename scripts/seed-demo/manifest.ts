@@ -43,6 +43,10 @@ export type ManifestTenant = {
   /** Every live user, admin first. */
   userIds: string[];
   adminUserId: string;
+  /** Who answers tickets: the admin and the users given the agent role. */
+  agentIds?: string[];
+  /** The chat tickets the ticket step wrote, for the AI ledger's answers. */
+  chatTicketIds?: string[];
 };
 
 export type Manifest = {

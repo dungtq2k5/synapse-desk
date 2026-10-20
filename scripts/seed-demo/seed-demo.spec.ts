@@ -6,7 +6,7 @@ import { DEFAULT_SEED, parseArgs } from './args';
 import { SEED_EDGES, STEPS } from './registry';
 import { PROFILES, bytesFor, countFor, type Profile } from './profiles';
 import { planTenant } from './steps/auth.step';
-import { ticketCountFor } from './steps/ticket.step';
+import { historyFor, ticketCountFor } from './steps/ticket.step';
 import {
   DOCUMENT_FIXTURES,
   documentPlanFor,
@@ -372,4 +372,58 @@ describe('the files behind the demo documents', () => {
       if (file.endsWith('.docx')) expect(head).toBe('PK\u0003\u0004');
     },
   );
+});
+
+describe('a ticket’s history, as the dashboards count it', () => {
+  const tenant = {
+    organizationId: 'org',
+    adminUserId: 'admin',
+    agentIds: ['admin', 'agent'],
+    departmentIds: ['dept'],
+  } as ManifestTenant;
+  const ticket = (status: string, source: string, authorId = 'admin') => ({
+    id: 't',
+    authorId,
+    status,
+    source,
+    createdAt: new Date(Date.now() - 86_400_000),
+  });
+
+  beforeEach(() => faker.seed(1));
+
+  it('leaves a chat that resolved on its own with no person: deflected', () => {
+    const history = historyFor(tenant, ticket('RESOLVED', 'CHAT'), 0);
+
+    expect(history.update.currentAssigneeId).toBeNull();
+    expect(history.assignment).toBeNull();
+    expect(history.update.resolvedAt).toBeInstanceOf(Date);
+    expect(history.messages.map((message) => message.isAiGenerated)).toEqual([
+      true,
+    ]);
+  });
+
+  it('gives an escalated ticket an agent who isn’t its author, and a reply', () => {
+    const history = historyFor(tenant, ticket('ESCALATED', 'WEB'), 0);
+
+    expect(history.update.currentAssigneeId).toBe('agent');
+    expect(history.update.escalatedAt).toBeInstanceOf(Date);
+    expect(history.assignment?.assignedToId).toBe('agent');
+    expect(history.messages.map((message) => message.senderId)).toEqual([
+      'agent',
+    ]);
+  });
+
+  it('puts nothing in the future', () => {
+    const fresh = { ...ticket('CLOSED', 'WEB'), createdAt: new Date() };
+    const history = historyFor(tenant, fresh, 1);
+    const times = [
+      history.update.resolvedAt,
+      history.assignment?.assignedAt,
+      ...history.messages.map((message) => message.createdAt),
+    ] as Date[];
+
+    for (const time of times) {
+      expect(time.getTime()).toBeLessThanOrEqual(Date.now());
+    }
+  });
 });
