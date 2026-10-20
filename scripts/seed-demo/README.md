@@ -8,19 +8,9 @@ npm run seed:demo -- --apply --only=ticket
 npm run seed:demo -- --apply --force --seed=99
 ```
 
-**Preconditions.** Boot auth-service once (`npm run dev`) so its `DatabaseSeeder`
-writes the permission catalogue and the system roles, then
-`npm run plans:seed:apply`. Every seeded quantity is derived from a plan grant,
-so without the catalogue there is nothing to derive from — both are checked up
-front with a message saying what to run.
+**Preconditions.** Boot auth-service once (`npm run dev`) so its `DatabaseSeeder` writes the permission catalogue and the system roles, then `npm run plans:seed:apply`. Every seeded quantity is derived from a plan grant, so without the catalogue there is nothing to derive from — both are checked up front with a message saying what to run.
 
-**Run `npm run typecheck` before an `--apply` that matters.** `tsx`
-compiles and runs without typechecking, so a wrong enum member is `undefined` at
-runtime rather than an error. That is not hypothetical: an early revision wrote
-`DocumentStatus.COMPLETED`, which does not exist, and Prisma silently applied the
-column default — every seeded document came out `PENDING` and the run reported
-success. These files are in the root tsconfig's program precisely so the repo's
-own typecheck sees them; there is no separate command to remember.
+**Run `npm run typecheck` before an `--apply` that matters.** `tsx` compiles and runs without typechecking, so a wrong enum member is `undefined` at runtime rather than an error. That is not hypothetical: an early revision wrote `DocumentStatus.COMPLETED`, which does not exist, and Prisma silently applied the column default — every seeded document came out `PENDING` and the run reported success. These files are in the root tsconfig's program precisely so the repo's own typecheck sees them; there is no separate command to remember.
 
 ---
 
@@ -35,47 +25,23 @@ These are demo surfaces that will look broken. **None of them is a bug.**
 | **The notification feed** | the bell is empty | Domain E rows are produced by CONSUMING commands. Writing them directly means minting `event_id` values — the column whose partial unique index decides *"have we already told this person?"* — and a collision there suppresses a real notification forever, silently. **The feed fills the first time you click through the app with the services running**, which is the honest way to produce those rows. |
 | **Stripe customers and subscriptions** | the billing page says "Free" and lists no invoices | Both ids stay `NULL`, which is the grandfathered state the code handles everywhere: `listInvoices` returns empty *before* touching Stripe, and the portal is unreachable. A fake `cus_…` would send a live API read that fails. |
 
-**Seeded billing history is display-only and unreplayable.** `billing_events`
-rows are written for tenants that deliberately have no `stripe_customer_id`, and
-on the real path a webhook resolves its tenant *by* that column — so this history
-could never have been produced by the integration that normally writes it. The
-rows are read by tenant id, which is what the finance dashboard does with them.
+**Seeded billing history is display-only and unreplayable.** `billing_events` rows are written for tenants that deliberately have no `stripe_customer_id`, and on the real path a webhook resolves its tenant *by* that column — so this history could never have been produced by the integration that normally writes it. The rows are read by tenant id, which is what the finance dashboard does with them.
 
 ---
 
 ## Shape
 
-- **Order is the failure model.** `auth → ticket → ingestion → analytics`, one
-  transaction per tenant per service. A failure leaves every earlier step committed and
-  internally consistent: a smaller demo, never an invalid one.
-- **Every quantity comes from the tenant's plan grant**, never a fixed range, so
-  a seeded tenant is never over a limit the product enforces. One tenant is
-  seeded just past 80% on purpose, so the level alarm has something to show.
-- **Deterministic.** The same `--seed` produces the same demo. The factories'
-  counters are per-process, so ids are stable across identical runs and not
-  across runs that seed a different set.
-- **`--force` needs a different `--seed`.** A second run at the same seed
-  regenerates the first run's slugs exactly, and `slug` is globally unique.
+- **Order is the failure model.** `auth → ticket → ingestion → analytics`, one transaction per tenant per service. A failure leaves every earlier step committed and internally consistent: a smaller demo, never an invalid one.
+- **Every quantity comes from the tenant's plan grant**, never a fixed range, so a seeded tenant is never over a limit the product enforces. One tenant is seeded just past 80% on purpose, so the level alarm has something to show.
+- **Deterministic.** The same `--seed` produces the same demo. The factories' counters are per-process, so ids are stable across identical runs and not across runs that seed a different set.
+- **`--force` needs a different `--seed`.** A second run at the same seed regenerates the first run's slugs exactly, and `slug` is globally unique.
 
 ---
 
 ## The history the dashboards count, and the analytics step
 
-The analytics pages read daily rollups, so the seed writes history, not only
-open tickets: tickets resolved and escalated with their times and assignees,
-agent first replies, a quarter of tickets arriving through the chat (answered
-by the AI and rated), and 60 days of AI calls across every purpose in the
-ledger. Users 1 and 2 of each tenant are Support Agents, so Agents lists more
-than the admin.
+The analytics pages read daily rollups, so the seed writes history, not only open tickets: tickets resolved and escalated with their times and assignees, agent first replies, a quarter of tickets arriving through the chat (answered by the AI and rated), and 60 days of AI calls across every purpose in the ledger. Users 1 and 2 of each tenant are Support Agents, so Agents lists more than the admin.
 
-**The last step, `analytics`, runs through the gateway as the Super Admin**
-(`SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` from
-`services/auth-service/.env`): it backfills both rollups for the seeded
-organizations only, then runs `ledger-daily` once, which writes the
-documents' usage counters and the quality flags. **With no gateway
-listening, it prints the command to run later**
-(`npm run seed:demo -- --apply --only=analytics`) and the seed still
-succeeds.
+**The last step, `analytics`, runs through the gateway as the Super Admin** (`SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` from `services/auth-service/.env`): it backfills both rollups for the seeded organizations only, then runs `ledger-daily` once, which writes the documents' usage counters and the quality flags. **With no gateway listening, it prints the command to run later** (`npm run seed:demo -- --apply --only=analytics`) and the seed still succeeds.
 
-`--profile=small` seeds 4 tickets per tenant, which the status rotation
-leaves with none resolved; use the default or `large` to see every chart.
+`--profile=small` seeds 4 tickets per tenant, which the status rotation leaves with none resolved; use the default or `large` to see every chart.
