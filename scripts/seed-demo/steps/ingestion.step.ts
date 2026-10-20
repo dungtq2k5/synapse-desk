@@ -14,7 +14,10 @@ import {
   AiGenerationOutcome,
   AiGenerationPurpose,
   AiGenerationStatus,
+  CHEAP_MODEL,
   DocumentStatus,
+  EMBEDDING_MODEL,
+  GENERATION_MODEL_BY_TIER,
 } from '@synapsedesk/contracts';
 import {
   buildTenant,
@@ -233,6 +236,9 @@ async function writeDocuments(
   return files;
 }
 
+/** The model the Quality tier answers with. */
+const QUALITY_MODEL = GENERATION_MODEL_BY_TIER.QUALITY;
+
 /** Days of AI history, ending today. */
 const LEDGER_DAYS = 60;
 
@@ -247,52 +253,52 @@ const CALLS: Record<
 > = {
   [AiGenerationPurpose.CHAT_ANSWER]: {
     per: [2, 6],
-    model: 'gemini-2.5-pro',
+    model: QUALITY_MODEL,
     cost: [400, 900],
   },
   [AiGenerationPurpose.DRAFT]: {
     per: [2, 5],
-    model: 'gemini-2.5-pro',
+    model: QUALITY_MODEL,
     cost: [300, 700],
   },
   [AiGenerationPurpose.REVIEW]: {
     per: [2, 5],
-    model: 'gemini-2.5-pro',
+    model: QUALITY_MODEL,
     cost: [150, 350],
   },
   [AiGenerationPurpose.SUMMARY]: {
     per: [1, 3],
-    model: 'gemini-2.5-pro',
+    model: QUALITY_MODEL,
     cost: [150, 300],
   },
   [AiGenerationPurpose.SUGGESTIONS]: {
     per: [1, 3],
-    model: 'gemini-3.5-flash-lite',
+    model: CHEAP_MODEL,
     cost: [40, 120],
   },
   [AiGenerationPurpose.CLASSIFY]: {
     per: [2, 5],
-    model: 'gemini-3.5-flash-lite',
+    model: CHEAP_MODEL,
     cost: [20, 60],
   },
   [AiGenerationPurpose.INJECTION_CLASSIFY]: {
     per: [2, 6],
-    model: 'gemini-3.5-flash-lite',
+    model: CHEAP_MODEL,
     cost: [10, 40],
   },
   [AiGenerationPurpose.GREETING_CLASSIFY]: {
     per: [1, 4],
-    model: 'gemini-3.5-flash-lite',
+    model: CHEAP_MODEL,
     cost: [10, 30],
   },
   [AiGenerationPurpose.REFORMULATION]: {
     per: [1, 3],
-    model: 'gemini-3.5-flash-lite',
+    model: CHEAP_MODEL,
     cost: [10, 30],
   },
   [AiGenerationPurpose.EMBEDDING]: {
     per: [1, 3],
-    model: 'gemini-embedding-2',
+    model: EMBEDDING_MODEL,
     cost: [5, 20],
   },
 };
