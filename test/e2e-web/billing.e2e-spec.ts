@@ -366,9 +366,11 @@ test('past due: the banner for an admin and a member, a write refused, billing s
     page.getByText(`${org.name} is read-only`, { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(
-      'A payment failed, so nothing can be created or changed until it’s settled. Update the payment in Billing.',
-    ),
+    page
+      .getByRole('region', { name: 'Notifications alt+T' })
+      .getByText(
+        'A payment failed, so nothing can be created or changed until it’s settled. Update the payment in Billing.',
+      ),
   ).toBeVisible();
 
   const other = await anotherBrowser(browser, member);

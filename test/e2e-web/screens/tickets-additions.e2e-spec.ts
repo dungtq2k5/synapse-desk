@@ -200,7 +200,7 @@ test.describe('the export', () => {
     ).toBeVisible();
     await expect(
       page
-        .getByRole('region', { name: /Notifications/ })
+        .getByRole('region', { name: 'Notifications alt+T' })
         .getByText('Your export is ready'),
     ).toBeVisible();
     await look(page, 'export-ready-toast', { viewportOnly: true });

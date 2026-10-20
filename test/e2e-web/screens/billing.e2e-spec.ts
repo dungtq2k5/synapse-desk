@@ -496,7 +496,11 @@ test.describe('the Stripe round trip', () => {
     await page
       .getByRole('button', { name: 'Manage billing on Stripe (opens Stripe)' })
       .click();
-    await expect(page.getByText('Couldn’t open Stripe')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Notifications alt+T' })
+        .getByText('Couldn’t open Stripe'),
+    ).toBeVisible();
     await look(page, 'stripe-unreachable-toast', { viewportOnly: true });
   });
 });

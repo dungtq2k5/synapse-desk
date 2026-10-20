@@ -799,7 +799,11 @@ test.describe('notification settings', () => {
       .getByRole('switch', { name: 'Escalated, In-app' })
       .first();
     await inApp.click();
-    await expect(page.getByText('Couldn’t save that change')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Notifications alt+T' })
+        .getByText('Couldn’t save that change'),
+    ).toBeVisible();
     await expect(inApp).toBeChecked();
     await look(page, 'settings-save-failed', { viewportOnly: true });
   });

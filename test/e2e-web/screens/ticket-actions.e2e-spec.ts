@@ -154,7 +154,11 @@ test.describe('status', () => {
       .click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
     await page.getByRole('button', { name: 'Resolve', exact: true }).click();
-    await expect(page.getByText('Status changed to Resolved')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Notifications alt+T' })
+        .getByText('Status changed to Resolved'),
+    ).toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Status: Resolved. Change status' }),
     ).toBeVisible();
@@ -235,7 +239,11 @@ test.describe('assigning', () => {
     await look(page, 'actions-unassigned', { viewportOnly: true });
 
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(page.getByText('Assigned to Maya Chen')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Notifications alt+T' })
+        .getByText('Assigned to Maya Chen'),
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reassign…' })).toBeVisible();
   });
 });

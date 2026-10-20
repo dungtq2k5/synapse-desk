@@ -216,7 +216,11 @@ test.describe('the app shell', () => {
     await page.goto('/tickets');
     await page.getByRole('button', { name: 'Account' }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
-    await expect(page.getByText('Couldn’t sign out')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: 'Notifications alt+T' })
+        .getByText('Couldn’t sign out'),
+    ).toBeVisible();
     // The menu closes first; axe runs on the page, not the closing menu.
     await expect(page.getByRole('menu')).toHaveCount(0);
     await look(page, 'shell-sign-out-failed', { viewportOnly: true });
