@@ -11,6 +11,13 @@ import type {
   SatisfactionResponseDto,
   VolumeResponseDto,
 } from '@synapsedesk/api-client';
+import {
+  CHEAP_MODEL,
+  EMBEDDING_MODEL,
+  GENERATION_MODEL_BY_TIER,
+} from '@synapsedesk/contracts';
+
+const QUALITY = GENERATION_MODEL_BY_TIER.QUALITY;
 
 /**
  * Analytics as design 10 draws it: Northwind Health on Pro, the last 30 days
@@ -296,21 +303,21 @@ export const AI_USAGE: AiUsageResponseDto = {
     costMicros: spend[index] * 10_000,
   })),
   byPurpose: [
-    slice('CHAT_ANSWER', 'gemini-2.5-pro', 412, 1.92, 310, 3.4, 2),
-    slice('DRAFT', 'gemini-2.5-pro', 480, 1.31, 205, 4.1, 3),
-    slice('REVIEW', 'gemini-2.5-pro', 612, 0.62, 86, 2.2, 1),
-    slice('SUMMARY', 'gemini-2.5-pro', 310, 0.41, 52, 2.8, 0),
-    slice('SUGGESTIONS', 'gemini-3.5-flash-lite', 290, 0.88, 31, 1.1, 1),
-    slice('CLASSIFY', 'gemini-3.5-flash-lite', 415, 0.63, 22, 0.6, 0),
-    slice('INJECTION_CLASSIFY', 'gemini-3.5-flash-lite', 892, 0.41, 14, 0.4, 4),
-    slice('GREETING_CLASSIFY', 'gemini-3.5-flash-lite', 427, 0.26, 9, 0.4, 0),
-    slice('REFORMULATION', 'gemini-3.5-flash-lite', 384, 0.21, 7, 0.5, 0),
-    slice('EMBEDDING', 'gemini-embedding-2', 590, 1.18, 4, 0.2, 0),
+    slice('CHAT_ANSWER', QUALITY, 412, 1.92, 310, 3.4, 2),
+    slice('DRAFT', QUALITY, 480, 1.31, 205, 4.1, 3),
+    slice('REVIEW', QUALITY, 612, 0.62, 86, 2.2, 1),
+    slice('SUMMARY', QUALITY, 310, 0.41, 52, 2.8, 0),
+    slice('SUGGESTIONS', CHEAP_MODEL, 290, 0.88, 31, 1.1, 1),
+    slice('CLASSIFY', CHEAP_MODEL, 415, 0.63, 22, 0.6, 0),
+    slice('INJECTION_CLASSIFY', CHEAP_MODEL, 892, 0.41, 14, 0.4, 4),
+    slice('GREETING_CLASSIFY', CHEAP_MODEL, 427, 0.26, 9, 0.4, 0),
+    slice('REFORMULATION', CHEAP_MODEL, 384, 0.21, 7, 0.5, 0),
+    slice('EMBEDDING', EMBEDDING_MODEL, 590, 1.18, 4, 0.2, 0),
   ],
   byModel: [
-    slice('', 'gemini-2.5-pro', 1814, 4.26, 653, 3.2, 6),
-    slice('', 'gemini-3.5-flash-lite', 2408, 2.39, 83, 0.6, 5),
-    slice('', 'gemini-embedding-2', 590, 1.18, 4, 0.2, 0),
+    slice('', QUALITY, 1814, 4.26, 653, 3.2, 6),
+    slice('', CHEAP_MODEL, 2408, 2.39, 83, 0.6, 5),
+    slice('', EMBEDDING_MODEL, 590, 1.18, 4, 0.2, 0),
   ],
   totalCostMicros: 7_400_000,
   totalGenerations: 4812,
