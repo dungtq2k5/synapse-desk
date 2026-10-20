@@ -30,15 +30,15 @@ type Parameter = {
   name: string;
   in: string;
   required?: boolean;
-  schema?: { enum?: string[] };
+  schema?: { enum?: (string | number)[] };
 };
 
 type Row = [
   method: string,
   path: string,
   parameter: string,
-  valid: string,
-  allValid: string[],
+  valid: string | number,
+  allValid: (string | number)[],
   required: string,
 ];
 
@@ -151,8 +151,8 @@ describe('enum-valued query parameters', () => {
     method: string,
     path: string,
     parameter: string,
-    _valid: string,
-    _all: string[],
+    _valid: string | number,
+    _all: (string | number)[],
     required: string,
   ) => {
     const response = await send(
@@ -174,12 +174,13 @@ describe('enum-valued query parameters', () => {
     method: string,
     path: string,
     parameter: string,
-    valid: string,
-    _all: string[],
+    valid: string | number,
+    _all: (string | number)[],
     required: string,
   ) => {
+    const text = String(valid);
     const flipped =
-      valid.toLowerCase() === valid ? valid.toUpperCase() : valid.toLowerCase();
+      text.toLowerCase() === text ? text.toUpperCase() : text.toLowerCase();
     const response = await send(
       method,
       path,
@@ -203,7 +204,12 @@ describe('enum-valued query parameters', () => {
   // `fileType` is the one parameter DELIBERATELY read case-insensitively (the
   // stored values are lowercase, so `?fileType=PDF` would otherwise 400), so it has its own row below instead of these.
   const CASE_INSENSITIVE = new Set(['fileType']);
-  const caseRows = rows().filter(([, , name]) => !CASE_INSENSITIVE.has(name));
+  // A number has no case: `?rating=` is `1` or `-1`, and the rows above already
+  // refuse anything else.
+  const caseRows = rows().filter(
+    ([, , name, valid]) =>
+      !CASE_INSENSITIVE.has(name) && typeof valid === 'string',
+  );
 
   rowFor('Ops').each(caseRows)(
     '**`%s %s` refuses a `%s` that differs from its enum only in case**',
@@ -216,7 +222,7 @@ describe('enum-valued query parameters', () => {
       const response = await send(
         method,
         path,
-        `${parameter}=${valid.toUpperCase()}`,
+        `${parameter}=${String(valid).toUpperCase()}`,
         required,
       );
 
