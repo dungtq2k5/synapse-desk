@@ -51527,6 +51527,16 @@
             }
           },
           {
+            "name": "rating",
+            "in": "query",
+            "description": "Only this thumb: `1` for up, `-1` for down.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "enum": [-1, 1]
+            }
+          },
+          {
             "name": "citationAccurate",
             "in": "query",
             "required": false,

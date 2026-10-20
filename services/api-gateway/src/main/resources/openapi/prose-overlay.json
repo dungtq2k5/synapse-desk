@@ -741,7 +741,8 @@
     "GET /api/v1/tickets query:includeDeleted": "Requires `ticket.delete` — the module's manage permission — which the\ncontroller enforces. Without that gate any member could enumerate deleted\ntickets, which is exactly the history someone would delete a ticket to\nremove.",
     "GET /api/v1/tickets query:sortBy": "Which column the list is ordered by. Defaults to the search default.",
     "GET /api/v1/tickets/{ticketId}/messages query:sortBy": "Default sort column. `createdAt` suits most resources, but NOT all —\n`user_departments` has `assignedAt` and no `createdAt` at all — so a list\nDTO whose resource differs MUST override this default.\n\nGetting it wrong is not a cosmetic problem: the service allowlists sortable\ncolumns and rejects anything else with 400, so an unoverridden default\nmakes the endpoint fail on a request with NO query parameters at all —\ni.e. every default call from the UI.",
-    "GET /api/v1/users query:includeDeleted": "Requires `user.delete`, checked in the controller."
+    "GET /api/v1/users query:includeDeleted": "Requires `user.delete`, checked in the controller.",
+    "GET /api/v1/feedback query:rating": "Only this thumb: `1` for up, `-1` for down."
   },
   "properties": {
     "AcceptInvitationDto.deviceName": {

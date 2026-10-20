@@ -200,6 +200,10 @@ public class FeedbackController {
       required = false
     ) @Nullable String searchTerm,
     @Valid @RequestParam(
+      value = "rating",
+      required = false
+    ) SubmitFeedbackDto.@Nullable RatingEnum rating,
+    @Valid @RequestParam(
       value = "citationAccurate",
       required = false
     ) @Nullable Boolean citationAccurate,
@@ -228,6 +232,9 @@ public class FeedbackController {
     ListFeedbackRequest.Builder wire = ListFeedbackRequest.newBuilder().setPage(
       pageRequest
     );
+    if (rating != null) {
+      wire.setRating(rating.getValue().intValue());
+    }
     if (citationAccurate != null) {
       wire.setCitationAccurate(citationAccurate);
     }
