@@ -24,12 +24,23 @@ import {
   FeedbackRating,
   MAX_MESSAGE_CONTENT_LENGTH,
 } from '@synapsedesk/contracts';
-import { requireActor, requireTenant } from '@synapsedesk/nest-common';
+import {
+  parseAnalyticsRange,
+  requireActor,
+  requireTenant,
+} from '@synapsedesk/nest-common';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { AiResponseFeedback, Prisma } from '../../generated/prisma/client';
 
-function toFeedbackResponse(feedback: AiResponseFeedback): FeedbackResponse {
+/** The rated message's ticket, as a feedback row names it. */
+type RatedTicket = { id: string; ticketNumber: bigint };
+
+function toFeedbackResponse(
+  feedback: AiResponseFeedback,
+  ticket: RatedTicket | undefined,
+): FeedbackResponse {
   return {
     id: feedback.id,
     ticketMessageId: feedback.ticketMessageId,
@@ -40,6 +51,8 @@ function toFeedbackResponse(feedback: AiResponseFeedback): FeedbackResponse {
     citationAccurate: feedback.citationAccurate ?? undefined,
     createdAt: toProtoTimestamp(feedback.createdAt),
     updatedAt: toProtoTimestamp(feedback.updatedAt),
+    ticketId: ticket?.id,
+    ticketNumber: ticket ? Number(ticket.ticketNumber) : undefined,
   };
 }
 
@@ -58,6 +71,7 @@ export class FeedbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: TicketAccessService,
+    private readonly authReference: AuthReferenceService,
   ) {}
 
   /**
@@ -77,7 +91,10 @@ export class FeedbackService {
     const rating = this.requireRating(request.rating);
     const feedbackText = this.normalizeText(request.feedbackText);
 
-    await this.assertMessageVisible(request.ticketMessageId, context);
+    const ticket = await this.assertMessageVisible(
+      request.ticketMessageId,
+      context,
+    );
 
     const feedback = await this.prisma.aiResponseFeedback.upsert({
       where: {
@@ -104,7 +121,7 @@ export class FeedbackService {
       },
     });
 
-    return toFeedbackResponse(feedback);
+    return toFeedbackResponse(feedback, ticket);
   }
 
   /**
@@ -127,7 +144,10 @@ export class FeedbackService {
   ): Promise<GetFeedbackResponse> {
     const userId = requireActor(context);
 
-    await this.assertMessageVisible(request.ticketMessageId, context);
+    const ticket = await this.assertMessageVisible(
+      request.ticketMessageId,
+      context,
+    );
 
     const feedback = await this.prisma.aiResponseFeedback.findUnique({
       where: {
@@ -146,7 +166,7 @@ export class FeedbackService {
       return {};
     }
 
-    return { feedback: toFeedbackResponse(feedback) };
+    return { feedback: toFeedbackResponse(feedback, ticket) };
   }
 
   /**
@@ -210,6 +230,16 @@ export class FeedbackService {
 
     const from = fromProtoTimestamp(request.from);
     const to = fromProtoTimestamp(request.to);
+    // The same range limit as every analytics read: a dashboard's list can't
+    // show a longer window than its charts. Checked on the calendar days the
+    // two instants fall on.
+    if (from && to) {
+      parseAnalyticsRange(
+        from.toISOString().slice(0, 10),
+        to.toISOString().slice(0, 10),
+        await this.authReference.getAnalyticsRangeDays(context),
+      );
+    }
 
     // `?searchTerm=` was advertised on this route and honoured by nobody
     // (known-gaps #6). `feedbackText` is the only free-text column, and it is
@@ -243,8 +273,12 @@ export class FeedbackService {
       this.prisma.aiResponseFeedback.count({ where }),
     ]);
 
+    const tickets = await this.ticketsOf(items);
+
     return {
-      items: items.map(toFeedbackResponse),
+      items: items.map((item) =>
+        toFeedbackResponse(item, tickets.get(item.ticketMessageId)),
+      ),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -291,10 +325,28 @@ export class FeedbackService {
    * either, which is why this reuses the ticket visibility check rather than
    * merely confirming the message row exists.
    */
+  /**
+   * Each rated message's ticket, by message id, in one read. The row has no
+   * relation to its message (the message may be redacted or gone), so this is
+   * a lookup, and a missing message leaves its row without a ticket.
+   */
+  private async ticketsOf(
+    items: AiResponseFeedback[],
+  ): Promise<Map<string, RatedTicket>> {
+    const messages = await this.prisma.ticketMessage.findMany({
+      where: { id: { in: items.map((item) => item.ticketMessageId) } },
+      select: {
+        id: true,
+        ticket: { select: { id: true, ticketNumber: true } },
+      },
+    });
+    return new Map(messages.map((message) => [message.id, message.ticket]));
+  }
+
   private async assertMessageVisible(
     ticketMessageId: string,
     context: CallerContext,
-  ): Promise<void> {
+  ): Promise<RatedTicket> {
     const message = await this.prisma.ticketMessage.findUnique({
       where: { id: ticketMessageId },
       select: { ticketId: true, isInternalNote: true },
@@ -308,6 +360,6 @@ export class FeedbackService {
     }
 
     // Throws NOT_FOUND if the ticket is another tenant's or not theirs to see.
-    await this.access.load(message.ticketId, context);
+    return this.access.load(message.ticketId, context);
   }
 }

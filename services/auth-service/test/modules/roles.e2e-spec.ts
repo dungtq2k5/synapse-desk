@@ -1,7 +1,11 @@
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc, rpcCode } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { PERMISSION_CODES, SystemRoleName } from '@synapsedesk/contracts';
+import {
+  PERMISSION_CODES,
+  SYSTEM_ROLE_PERMISSIONS,
+  SystemRoleName,
+} from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import {
   E2eFixture,
@@ -59,6 +63,25 @@ describe('Roles & Permissions (e2e)', () => {
       );
       // And nothing belonging to anyone else.
       expect(names).not.toContain(theirs.role.name);
+    });
+
+    it('1a. each system role holds exactly its default grants (a Knowledge Manager reads departments, for the analytics filter)', async () => {
+      for (const name of Object.values(SystemRoleName)) {
+        const role = await fx.prisma.role.findFirstOrThrow({
+          where: { organizationId: null, name },
+          include: { permissions: { select: { code: true } } },
+        });
+        expect([
+          name,
+          role.permissions.map((p) => p.code).sort(compareAlphabetically),
+        ]).toEqual([
+          name,
+          [...SYSTEM_ROLE_PERMISSIONS[name]].sort(compareAlphabetically),
+        ]);
+      }
+      expect(
+        SYSTEM_ROLE_PERMISSIONS[SystemRoleName.KNOWLEDGE_MANAGER],
+      ).toContain('department.read');
     });
 
     it("1b. includeSystem=false narrows it to the tenant's own roles", async () => {

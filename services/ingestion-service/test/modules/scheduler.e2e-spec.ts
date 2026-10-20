@@ -3,6 +3,8 @@ import { Queue } from 'bullmq';
 import {
   repeatJobId,
   jobsOwnedBy,
+  DocumentFlagType,
+  DocumentStatus,
   PROJECTION_LAG_MS,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
@@ -18,6 +20,8 @@ import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft
 import { DocumentFlagWriter } from '../../src/modules/scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';
+import { AiLedgerGrpcController } from '../../src/modules/ai-ledger/ai-ledger-grpc.controller';
+import { buildTenant, createChunks, createDocument } from '../factories';
 
 /**
  * The scheduler.
@@ -300,6 +304,51 @@ describe('The scheduler (e2e)', () => {
 
       const [, days] = rollup.mock.calls[0];
       expect(days).toBeGreaterThan(1);
+    });
+  });
+
+  describe('the daily sequence BY HAND (`/platform/jobs/ledger-daily/run`)', () => {
+    const runByHand = () =>
+      fx.moduleRef.get(AiLedgerGrpcController).runAiRollup({});
+
+    it('**7b. runs the whole sequence, seeding the projection cursor a fresh database lacks**', async () => {
+      // The schedule's run refuses without a cursor (seeding it resets every
+      // counter); an operator's run is the deliberate command that may.
+      const tenant = buildTenant();
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      await createChunks(fx.prisma, document, 2);
+
+      await expect(runByHand()).resolves.toEqual(
+        expect.objectContaining({ tenants: expect.any(Number) }),
+      );
+
+      expect(
+        await fx.prisma.projectionCursor.findUnique({
+          where: { name: 'chunk-usage-projection' },
+        }),
+      ).not.toBeNull();
+      // The flag writer ran: an indexed document nobody's question reached.
+      expect(
+        await fx.prisma.documentFlag.findMany({
+          where: { documentId: document.id },
+          select: { flagType: true },
+        }),
+      ).toEqual([{ flagType: DocumentFlagType.UNRETRIEVED }]);
+    });
+
+    it('7c. **names a failed step** rather than reporting success', async () => {
+      jest
+        .spyOn(fx.moduleRef.get(DocumentFlagWriter), 'detect')
+        .mockRejectedValue(new Error('flags exploded'));
+      await createDocument(fx.prisma, buildTenant(), {
+        status: DocumentStatus.INDEXED,
+      });
+
+      await expect(runByHand()).rejects.toMatchObject({
+        message: 'ledger.daily ran, and these steps failed: document-flags',
+      });
     });
   });
 

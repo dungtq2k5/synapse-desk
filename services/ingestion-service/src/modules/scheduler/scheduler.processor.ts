@@ -1,21 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import {
-  PROJECTION_LAG_MS,
-  ROLLUP_TRAILING_DAYS,
-  SCHEDULED_JOBS,
-  SCHEDULER_QUEUE,
-} from '@synapsedesk/contracts';
-import { formatErrorMsg, JobRunRecorder } from '@synapsedesk/nest-common';
-import { PrismaService } from '../prisma/prisma.service';
-import { ChunkUsageProjection } from '../scheduled/chunk-usage.projection';
+import { SCHEDULED_JOBS, SCHEDULER_QUEUE } from '@synapsedesk/contracts';
+import { JobRunRecorder } from '@synapsedesk/nest-common';
 import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
-import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
-import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
 import { ScopeReconcileSweep } from '../ingestion/scope-reconcile.sweep';
 import { IngestionReconcileSweep } from '../ingestion/ingestion-reconcile.sweep';
+import { LedgerDailySequence, runStep } from './ledger-daily.sequence';
 
 /**
  * The thing that was missing
@@ -42,12 +34,9 @@ export class SchedulerProcessor extends WorkerHost {
   private readonly logger = new Logger(SchedulerProcessor.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly projection: ChunkUsageProjection,
     private readonly draftSweep: DiscardedDraftSweep,
     private readonly quota: QuotaReconciliationJob,
-    private readonly flags: DocumentFlagWriter,
-    private readonly aiRollup: AiGenerationRollupJob,
+    private readonly sequence: LedgerDailySequence,
     private readonly reconcile: IngestionReconcileSweep,
     private readonly runs: JobRunRecorder,
     private readonly scopeReconcile: ScopeReconcileSweep,
@@ -124,102 +113,12 @@ export class SchedulerProcessor extends WorkerHost {
     });
   }
 
-  /**
-   * Daily: **projection → rollup → flags**, and the order is load-bearing.
-   *
-   *   1. `ChunkUsageProjection` first. It reads the retrieved/cited chunk id
-   *      arrays on `ai_generations`, which ledger retention will eventually
-   *      drop — anything that runs after retention reads nothing, permanently.
-   *   2. `AiGenerationRollupJob` second, for the same reason: it aggregates the
-   *      same rows retention removes.
-   *   3. `DocumentFlagWriter` LAST, because `UNRETRIEVED` and `UNCITED` are
-   *      computed from the counters step 1 writes. Flagging first means
-   *      flagging against yesterday's numbers.
-   *
-   * When retention is built it goes at the END of this method and nowhere else.
-   *
-   * **Steps 1 and 2 have the same re-run semantics by opposite mechanisms.**
-   * The rollup deletes and re-inserts, so recomputing an interval it already
-   * covered is free; the projection ADDS, so it cannot recompute and takes a
-   * cursor instead.
-   *
-   * **What that does NOT buy is sequencing.** `step()` catches and does not
-   * rethrow, so every step runs whatever the one before it did — a projection
-   * that throws still lets `document-flags` compute against counters this run
-   * did not write. The cursor makes those counters STALE rather than wrong,
-   * and the next run closes the gap however long the outage; nothing here
-   * makes the three steps atomic, and a reader looking for that should not
-   * infer it from the ordering above.
-   */
+  /** Daily: the `ledger.daily` sequence, unseeded (see `LedgerDailySequence`). */
   private async daily(): Promise<void> {
-    await this.step('chunk-usage-projection', async () => {
-      // **Cursor-driven, so it gets an upper bound and finds its own lower
-      // one.** It ADDS to the chunk counters, so an interval overlapping its
-      // predecessor counts a generation twice. The lag is what a cursor needs
-      // and a window does not: see `PROJECTION_LAG_MS`.
-      const updated = await this.projection.project(
-        new Date(Date.now() - PROJECTION_LAG_MS),
-      );
-
-      return `${updated} chunk counter(s) updated`;
-    });
-
-    await this.step('ai-generation-rollup', async () => {
-      // Window-driven, and correctly so: this step deletes and re-inserts, so
-      // recomputing a day it already had is free and a wide window only
-      // self-heals a missed night. `AiGenerationRollupJob.run` builds the
-      // window itself from `days`.
-      const outcome = await this.aiRollup.run(new Date(), ROLLUP_TRAILING_DAYS);
-
-      return `${outcome.tenants} tenant(s), ${outcome.rows} row(s)`;
-    });
-
-    // Per tenant, because `detect()` is scoped to one. Tenants are read from
-    // the documents table rather than from auth-service: a tenant with no
-    // documents has nothing to flag, and asking auth-service would add a
-    // cross-service dependency to a job that does not need one.
-    await this.step('document-flags', async () => {
-      const tenants = await this.prisma.document.groupBy({
-        by: ['organizationId'],
-        where: { deletedAt: null },
-      });
-
-      let flagged = 0;
-      for (const tenant of tenants) {
-        flagged += await this.flags.detect(tenant.organizationId);
-      }
-
-      return `${flagged} flag(s) across ${tenants.length} tenant(s)`;
-    });
+    await this.sequence.run({ seedCursor: false });
   }
 
-  /**
-   * Runs one step, logs its outcome, and **does not let a failure stop the
-   * sequence**.
-   *
-   * A step that throws is logged and the next one still runs test
-   * 5. The alternative would let one bad tenant's projection cost that night's
-   * rollup and flags as well, turning a small fault into a missing day.
-   *
-   * The order still holds under failure: a failed projection means the rollup
-   * runs against stale counters, which is worse than nothing only if it also
-   * hides. It does not — the error is logged and the heartbeat records it.
-   */
   private async step(name: string, run: () => Promise<string>): Promise<void> {
-    const startedAt = Date.now();
-
-    try {
-      // Each STEP gets its own heartbeat row as well as the job's. The job's
-      // row would otherwise read "succeeded" for a night in which the
-      // projection failed and only the rollup ran — which is the difference
-      // between "we have numbers" and "we have the right numbers".
-      const summary = await this.runs.track(name, run);
-
-      this.logger.log(`${name}: ${summary} (${Date.now() - startedAt}ms)`);
-    } catch (error) {
-      this.logger.error(
-        `${name} FAILED after ${Date.now() - startedAt}ms: ${formatErrorMsg(error)}`,
-      );
-    }
+    await runStep(this.runs, this.logger, name, run);
   }
 }

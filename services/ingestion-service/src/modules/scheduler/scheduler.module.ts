@@ -6,6 +6,7 @@ import { AiAnalyticsModule } from '../analytics/analytics.module';
 import { ScheduledModule } from '../scheduled/scheduled.module';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';
+import { LedgerDailySequence } from './ledger-daily.sequence';
 import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
 
@@ -39,6 +40,6 @@ import { SchedulerRegistrar } from './scheduler.registrar';
     IngestionModule,
     AiAnalyticsModule,
   ],
-  providers: [SchedulerProcessor, SchedulerRegistrar],
+  providers: [SchedulerProcessor, SchedulerRegistrar, LedgerDailySequence],
 })
 export class SchedulerModule {}

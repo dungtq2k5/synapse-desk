@@ -203,6 +203,8 @@ message RunRollupRequest {
   // Both inclusive, `YYYY-MM-DD`. Absent = the routine trailing window.
   optional string from = 1;
   optional string to = 2;
+  // A backfill for one organization only; absent, every tenant with activity.
+  optional string organization_id = 3;
 }
 
 message RunRollupResponse {

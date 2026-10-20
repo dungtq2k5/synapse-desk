@@ -1,4 +1,5 @@
 import { Controller } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import type { Metadata } from '@grpc/grpc-js';
@@ -30,6 +31,7 @@ import { JobHealthService } from '@synapsedesk/nest-common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
+import { LedgerDailySequence } from '../scheduler/ledger-daily.sequence';
 
 /**
  * The ledger's remote write path — `ai_generations` keeps ONE writer.
@@ -53,6 +55,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
     private readonly analytics: AiAnalyticsService,
     private readonly rollup: AiGenerationRollupJob,
     private readonly jobHealth: JobHealthService,
+    private readonly modules: ModuleRef,
   ) {}
 
   /**
@@ -155,14 +158,30 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    * only way a mistake in this job can ever be corrected.
    */
   async runAiRollup(request: RunAiRollupRequest): Promise<RunAiRollupResponse> {
-    const outcome =
-      request.from && request.to
-        ? await this.rollup.backfill(
-            new Date(`${request.from}T00:00:00.000Z`),
-            new Date(`${request.to}T00:00:00.000Z`),
-          )
-        : await this.rollup.run();
+    if (request.from && request.to) {
+      // A backfill is the rollup's alone: the projection ADDS and can't
+      // recompute a range, and flags are a judgement on today's counters.
+      const outcome = await this.rollup.backfill(
+        new Date(`${request.from}T00:00:00.000Z`),
+        new Date(`${request.to}T00:00:00.000Z`),
+        request.organizationId,
+      );
+      return { tenants: outcome.tenants, rows: outcome.rows };
+    }
 
+    // **A run by hand is the whole sequence the schedule runs**, so the
+    // document counters and flags a dashboard reads move too. Resolved at call
+    // time: `SchedulerModule` imports the modules this one belongs to, so a
+    // constructor dependency would be a cycle.
+    const outcome = await this.modules
+      .get(LedgerDailySequence, { strict: false })
+      .run({ seedCursor: true });
+    if (outcome.failed.length > 0) {
+      throw new RpcException({
+        code: status.INTERNAL,
+        message: `ledger.daily ran, and these steps failed: ${outcome.failed.join(', ')}`,
+      });
+    }
     return { tenants: outcome.tenants, rows: outcome.rows };
   }
 

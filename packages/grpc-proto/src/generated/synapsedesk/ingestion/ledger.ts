@@ -377,7 +377,11 @@ export interface AiJobHealthResponse {
 
 export interface RunAiRollupRequest {
   from?: string | undefined;
-  to?: string | undefined;
+  to?:
+    | string
+    | undefined;
+  /** A backfill for one organization only; absent, every tenant with activity. */
+  organizationId?: string | undefined;
 }
 
 export interface RunAiRollupResponse {

@@ -288,6 +288,25 @@ describe('The analytics export (e2e)', () => {
       expect(await fx.prisma.export.count()).toBe(0);
     });
 
+    it('**2f. an analytics export can’t cover more than the plan’s analytics range; the audit log isn’t held to it**', async () => {
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'getAnalyticsRangeDays')
+        .mockResolvedValue(30);
+
+      // March is 31 days: over a 30-day plan.
+      await expectRpc(request(), status.INVALID_ARGUMENT);
+      await expectRpc(
+        request({ kind: toProtoExportKind(ExportKind.TICKET) }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(await fx.prisma.export.count()).toBe(0);
+
+      await expect(request({ to: '2026-03-30' })).resolves.toBeDefined();
+      await expect(
+        request({ kind: toProtoExportKind(ExportKind.AUDIT_LOG) }),
+      ).resolves.toBeDefined();
+    });
+
     it('2d. exactly the cap is accepted', async () => {
       // 92 days inclusive: 1 January to 2 April.
       await expect(

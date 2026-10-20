@@ -331,4 +331,60 @@ describe('analytics', () => {
       expect(peers.ticket.calls('AnalyticsService/GetExport')).toHaveLength(2);
     },
   );
+
+  rowFor('Analytics')(
+    '**ai-usage carries this cycle’s allowance from auth**, read live beside the cached range',
+    async () => {
+      peers.ingestion.on('AiLedgerService/GetAiUsage').reply({
+        points: [],
+        byPurpose: [],
+        byModel: [],
+        totalCostMicros: 4_500,
+        totalGenerations: 9,
+        monthlyBudgetMicros: 1_000_000,
+        draftAcceptance: { numerator: 0, denominator: 0 },
+        emptyRetrievalRate: { numerator: 0, denominator: 0 },
+        dataThrough: '2024-01-31',
+      });
+      const usage = (aiTokens: object) => ({
+        seats: { available: true, used: 1, limit: 5 },
+        storage: { available: false },
+        aiTokens,
+        billingCycleStart: { seconds: 1_704_067_200, nanos: 0 },
+        cycleResetsAt: { seconds: 1_706_745_600, nanos: 0 },
+        planName: 'Pro',
+      });
+      peers.auth
+        .on('OrganizationService/GetOrganizationUsage')
+        .reply(usage({ available: true, used: 250_000, limit: 1_000_000 }));
+      peers.auth
+        .on('OrganizationService/GetOrganizationUsage')
+        .reply(usage({ available: false }));
+      const session = new Session(gateway.baseUrl);
+      const read = () =>
+        session.get(
+          `${API}/analytics/ai-usage?from=2024-01-01&to=2024-01-31`,
+          cookie(),
+        );
+
+      const first = await read();
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({
+        data: {
+          totalCostMicros: 4_500,
+          cycleSpentMicros: 250_000,
+          planName: 'Pro',
+          cycleResetsAt: '2024-02-01T00:00:00.000Z',
+        },
+      });
+
+      // The closed range came from the cache; the allowance didn't, and an
+      // unreadable counter is unknown, not zero.
+      const second = await read();
+      expect(second.body).toMatchObject({ data: { cycleSpentMicros: null } });
+      expect(peers.ingestion.calls('AiLedgerService/GetAiUsage')).toHaveLength(
+        1,
+      );
+    },
+  );
 });

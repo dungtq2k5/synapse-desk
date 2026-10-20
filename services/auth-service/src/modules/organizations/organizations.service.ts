@@ -548,6 +548,7 @@ export class OrganizationsService {
       },
       aiTokens: await this.aiAllowanceMeter(organization),
       billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
+      cycleResetsAt: toProtoTimestamp(cycleResetsAt(organization)),
     };
   }
 
@@ -1106,6 +1107,23 @@ function planLabelFor(organization: {
   // into whichever one it found first — so two tenants on different plans could
   // read the same label. The row knows.
   return organization.plan?.name ?? organization.aiModelTier;
+}
+
+/**
+ * When the AI allowance next resets: the invoice period's end, kept by the
+ * webhook, or, for a tenant with no period, a calendar month after the cycle
+ * start (in UTC, as the cycle start is written).
+ *
+ * @example cycleResetsAt({ currentPeriodEnd: null, billingCycleStart: new Date('2026-10-05T00:00:00Z') }) // 2026-11-05T00:00:00Z
+ */
+export function cycleResetsAt(organization: {
+  currentPeriodEnd: Date | null;
+  billingCycleStart: Date;
+}): Date {
+  if (organization.currentPeriodEnd) return organization.currentPeriodEnd;
+  const next = new Date(organization.billingCycleStart);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  return next;
 }
 
 /**

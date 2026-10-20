@@ -56,19 +56,28 @@ export class AiGenerationRollupJob {
    *
    * Load-bearing here in a way it is not for tickets: a bug in this rollup is
    * uncorrectable once retention has eaten the raw rows, so the backfill is the
-   * ONLY window in which a mistake can be fixed at all.
+   * ONLY window in which a mistake can be fixed at all. `organizationId`
+   * limits it to one tenant, active or not.
    */
-  async backfill(fromDay: Date, toDay: Date): Promise<AiRollupOutcome> {
+  async backfill(
+    fromDay: Date,
+    toDay: Date,
+    organizationId?: string,
+  ): Promise<AiRollupOutcome> {
     this.logger.log(
       `Backfilling AI rollups ${fromDay.toISOString().slice(0, 10)} → ` +
-        `${toDay.toISOString().slice(0, 10)}`,
+        `${toDay.toISOString().slice(0, 10)}` +
+        (organizationId ? ` for ${organizationId}` : ''),
     );
 
-    return this.rollup(backfillWindow(fromDay, toDay));
+    return this.rollup(backfillWindow(fromDay, toDay), organizationId);
   }
 
-  private async rollup(window: RollupWindow): Promise<AiRollupOutcome> {
-    const organizationIds = await this.activeTenants(window);
+  private async rollup(
+    window: RollupWindow,
+    only?: string,
+  ): Promise<AiRollupOutcome> {
+    const organizationIds = only ? [only] : await this.activeTenants(window);
     if (organizationIds.length === 0) {
       this.logger.log('No AI activity in window; nothing to roll up');
 

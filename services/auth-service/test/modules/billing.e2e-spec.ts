@@ -1372,6 +1372,8 @@ describe('Billing and entitlements (e2e)', () => {
 
       const usage = await organizations.getOrganizationUsage(ctx);
       expect(fromProtoTimestamp(usage.currentPeriodEnd)).toEqual(periodEnd);
+      // The allowance resets when the invoice period ends.
+      expect(fromProtoTimestamp(usage.cycleResetsAt)).toEqual(periodEnd);
 
       // A portal cancel toggle arrives as an update with the flag set.
       await deliver(
@@ -1428,6 +1430,21 @@ describe('Billing and entitlements (e2e)', () => {
       );
 
       expect(usage.planName).toBe('Free');
+    });
+
+    it('4c. A tenant with no invoice period resets a calendar month after its cycle start', async () => {
+      const organization = await createOrganization(fx.prisma, {
+        billingCycleStart: new Date('2026-01-31T00:00:00.000Z'),
+      });
+
+      const usage = await organizations.getOrganizationUsage(
+        memberContext({ id: 'u', organizationId: organization.id }),
+      );
+
+      // `setUTCMonth` rolls 31 January into March, as the web's meter does.
+      expect(fromProtoTimestamp(usage.cycleResetsAt)).toEqual(
+        new Date('2026-03-03T00:00:00.000Z'),
+      );
     });
   });
 });

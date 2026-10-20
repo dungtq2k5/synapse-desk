@@ -326,6 +326,37 @@ describe('The AI generation rollup (e2e)', () => {
       expect(mine[0].generations).toBe(1);
     });
 
+    it('11b. **A backfill for one organization rolls up that one only**', async () => {
+      const other = buildTenant();
+      await generation();
+      await fx.prisma.aiGeneration.create({
+        data: {
+          organizationId: other.organizationId,
+          purpose: AiGenerationPurpose.CHAT_ANSWER,
+          modelName: MODEL,
+          createdAt: at('2026-03-02T09:00:00.000Z'),
+        },
+      });
+
+      const outcome = await rollup.backfill(
+        at('2026-03-01T00:00:00.000Z'),
+        at('2026-03-04T00:00:00.000Z'),
+        tenant.organizationId,
+      );
+
+      expect(outcome.tenants).toBe(1);
+      expect(
+        await fx.prisma.aiGenerationDailyStat.count({
+          where: { organizationId: tenant.organizationId },
+        }),
+      ).toBe(1);
+      expect(
+        await fx.prisma.aiGenerationDailyStat.count({
+          where: { organizationId: other.organizationId },
+        }),
+      ).toBe(0);
+    });
+
     it('12. Stores no averaged column', async () => {
       const columns = await fx.prisma.$queryRawUnsafe<
         { column_name: string }[]

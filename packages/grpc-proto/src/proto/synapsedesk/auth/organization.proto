@@ -279,6 +279,9 @@ message OrganizationUsageResponse {
   string plan_name = 6;
   // Absent for a grandfathered tenant, who has no invoice period at all.
   optional google.protobuf.Timestamp current_period_end = 7;
+  // When the AI allowance next resets: the invoice period's end, or a month
+  // after the cycle start for a tenant with no period.
+  google.protobuf.Timestamp cycle_resets_at = 8;
 }
 
 

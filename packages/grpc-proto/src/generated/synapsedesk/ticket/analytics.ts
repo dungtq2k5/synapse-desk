@@ -256,7 +256,11 @@ export interface JobHealthResponse {
 export interface RunRollupRequest {
   /** Both inclusive, `YYYY-MM-DD`. Absent = the routine trailing window. */
   from?: string | undefined;
-  to?: string | undefined;
+  to?:
+    | string
+    | undefined;
+  /** A backfill for one organization only; absent, every tenant with activity. */
+  organizationId?: string | undefined;
 }
 
 export interface RunRollupResponse {
