@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -63,6 +63,14 @@ export class SubmitFeedbackDto {
 }
 
 export class ListFeedbackQueryDto extends SearchPaginationDto {
+  // Published explicitly for the reason `SubmitFeedbackDto.rating` is: the
+  // plugin can't map `1 | -1`, so the filter was missing from the document and
+  // a client generated from it couldn't send one.
+  @ApiPropertyOptional({
+    type: Number,
+    enum: FEEDBACK_RATINGS,
+    description: 'Only this thumb: `1` for up, `-1` for down.',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

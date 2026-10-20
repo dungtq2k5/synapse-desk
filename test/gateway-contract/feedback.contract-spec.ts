@@ -226,6 +226,42 @@ describe('feedback', () => {
   );
 
   rowFor('Feedback')(
+    '**the list filters by a thumb**: `-1` reaches the peer; anything but `1` or `-1` is a 400 first',
+    async () => {
+      peers.ticket.on('FeedbackService/ListFeedback').reply({
+        items: [],
+        meta: {
+          totalItems: 0,
+          itemCount: 0,
+          itemsPerPage: 10,
+          totalPages: 0,
+          currentPage: 1,
+        },
+      });
+      const cookie = {
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken(['analytics.read'])}`,
+      };
+      const session = new Session(gateway.baseUrl);
+
+      const filtered = await session.get(`${API}/feedback?rating=-1`, cookie);
+      expect(filtered.status).toBe(200);
+      const [call] = peers.ticket.calls('FeedbackService/ListFeedback');
+      expect(call.request).toMatchObject({ rating: -1 });
+
+      for (const value of ['0', '2', 'up']) {
+        const refused = await session.get(
+          `${API}/feedback?rating=${value}`,
+          cookie,
+        );
+        expect([value, refused.status]).toEqual([value, 400]);
+      }
+      expect(peers.ticket.calls('FeedbackService/ListFeedback')).toHaveLength(
+        1,
+      );
+    },
+  );
+
+  rowFor('Feedback')(
     '**`1.0` is the thumb `1`**: a rating is compared as a number, not as text',
     async () => {
       // Raw text, because `JSON.stringify(1.0)` is `1`: a client in a language
