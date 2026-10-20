@@ -10,6 +10,7 @@ tests are the ones that matter most in Domain C.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -150,6 +151,30 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
             )
 
 
+#: How long a collection another service just created may take to load.
+READ_ATTEMPTS = 20
+READ_DELAY_SECONDS = 0.5
+
+
+async def _read_collection(client: AsyncQdrantClient) -> qm.CollectionInfo:
+    """The collection's info, once it has loaded.
+
+    A collection ingestion-service created a moment ago already "exists" but
+    answers 500 ("0 of 0 read operations failed") until its shards load, so a
+    5xx is waited out for a few seconds rather than failing the boot.
+    """
+    for attempt in range(READ_ATTEMPTS):
+        try:
+            return await client.get_collection(COLLECTION_NAME)
+        except UnexpectedResponse as error:
+            if error.status_code is None or error.status_code < 500:
+                raise
+            if attempt == READ_ATTEMPTS - 1:
+                raise
+            await asyncio.sleep(READ_DELAY_SECONDS)
+    raise AssertionError("unreachable")
+
+
 async def _assert_model_matches(client: AsyncQdrantClient) -> None:
     """Refuses to serve a collection built for a different vector size.
 
@@ -159,7 +184,7 @@ async def _assert_model_matches(client: AsyncQdrantClient) -> None:
     dimension in the first place: a same-dimension *different* model produces
     no error at all, just quietly meaningless neighbours.
     """
-    info = await client.get_collection(COLLECTION_NAME)
+    info = await _read_collection(client)
     params = info.config.params.vectors
 
     size = params.size if isinstance(params, qm.VectorParams) else None
