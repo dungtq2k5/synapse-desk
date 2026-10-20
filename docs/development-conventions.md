@@ -173,6 +173,8 @@ Four things can bound one operation: a **platform ceiling** (a code constant), t
 { "success": false, "statusCode": 404, "path": "/api/v1/users/x", "timestamp": "…", "error": "User not found!" }
 ```
 
+**`details` is optional on a failure** and absent unless a refusal has data a client must act on (a plan over its limits, the organization's status). Never put a sentence there; the sentence is `error`.
+
 `success` is the single discriminant a client branches on. Therefore:
 
 - Handlers **MUST** return raw data. Returning `{ data, message }` yields a double-wrapped response.

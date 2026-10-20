@@ -232,7 +232,7 @@ The consequence for a service that spends: it increments Redis **directly**, not
 
 **Two things that sound like one.** *Plan management* — who is on Starter vs Pro, what it costs, when it renews, whether the card cleared — is Stripe's job and is not modelled here. *Entitlements* — what a plan actually grants — are the five columns on Table 1. Stripe does not replace them; **it becomes the machine that writes them.**
 
-**Keep exactly two Stripe columns.** `stripe_customer_id` and `stripe_subscription_id`. Mirroring price points, plan names or feature lists into Postgres creates two sources of truth that diverge the first time someone edits a price in the Stripe dashboard.
+**Two Stripe ids, plus the subscription's state.** `stripe_customer_id` and `stripe_subscription_id` identify the customer. Beside them, the webhook writes the subscription's **state**, as it already writes `status`: `stripe_price_id`, `current_period_end` and `cancel_at_period_end`, from every `customer.subscription.*` event (renewals and portal cancel toggles included). So the billing page reads Postgres and works while Stripe is down. What stays out is the **catalog**: plan names and feature lists mirrored from Stripe would diverge the first time someone edits them in the dashboard.
 
 **The webhook is the entitlement writer, and it is the whole integration:**
 
@@ -359,6 +359,9 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 | **ai_model_tier** | VARCHAR(20) | NOT NULL, Default: 'FAST' | `FAST \| QUALITY`. The generation-model entitlement — the sellable AI tier. Resolved into concrete model names by the settings layer (§1.15), **never** compared to a model string at a call site. Written by the entitlement webhook. Does not apply to the embedding model, which is fixed for the life of the Qdrant collection (§1.14, Table 19). |
 | **stripe_customer_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Customer`. NULL before the tenant ever reaches checkout. |
 | **stripe_subscription_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Subscription`. Plan *definitions* live in Stripe and are deliberately not mirrored here — see §1.15. |
+| **stripe_price_id** | VARCHAR(255) | Nullable | The subscription's current price, written by every `customer.subscription.*` event. Joined to `subscription_plan_prices` for the interval and amount. NULL with no subscription. |
+| **current_period_end** | TIMESTAMPTZ | Nullable | When the current period ends: the renewal date, or the end date when `cancel_at_period_end`. Written by the same events. |
+| **cancel_at_period_end** | BOOLEAN | NOT NULL, Default: false | Canceled in the portal, ending at `current_period_end`. Written by the same events. |
 | **plan_id** | UUID | Nullable, FK ➔ subscription_plans.id | The catalogue plan this workspace is on (Table 40). **NULL means "no plan; the entitlement columns above are authoritative"** — which is every tenant today, and stays true for any tenant that never subscribes. There is no backfill: a workspace acquires a plan by subscribing or by direct assignment, and until then behaves exactly as it does now. The same state the system is in when the Stripe API key is absent, where every tenant stays grandfathered. |
 | **entitlements_pinned** | BOOLEAN | NOT NULL, Default: false | Whether a Stripe webhook may rewrite this workspace's entitlements. **Set when a Super Admin grants something off-catalogue.** Without it the writer re-derives all five columns from the price on the next routine event — a renewal, a card update — and a negotiated seat count silently reverts. The monotonic guard cannot help: it compares Stripe's `created` timestamps and a manual edit has none. A **flag** rather than a parallel set of override columns, so "this tenant is off-catalogue" is a state one query can list rather than something inferred by diffing columns against a plan. |
 | **enforce_two_factor** | BOOLEAN | NOT NULL, Default: false | Forces 2FA setup for every user in the tenant during login. |
@@ -655,7 +658,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 
 **Keyed on Stripe *Product*, not Price.** Stripe's model is one Product per plan with multiple Prices only for billing variants — monthly versus annual, or currencies — because Checkout and invoices render the **Product** name on every line item, so tiers sharing a Product are indistinguishable on a customer's receipt. Keying this table by price id would make "Pro monthly" and "Pro annual" two rows carrying duplicated entitlements that drift.
 
-**What a plan *costs* is Stripe's, and is deliberately absent here.** Mirroring an amount is the two-sources-of-truth problem `billing.config.ts` was written to prevent, and the divergence is silent because both sides keep answering confidently.
+**A price's amount is stored beside its id** (`unit_amount`, `currency`), written by the plans seed. This doesn't create a second source of truth: **a Stripe price's amount can't be changed.** A new amount is a new price, with a new id, which the seed writes as a new row. So the amount keyed by price id can't drift.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :--- | :--- | :--- | :--- |
@@ -688,6 +691,8 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **plan_id** | UUID | NOT NULL, FK ➔ subscription_plans.id, Indexed | The plan this price sells. |
 | **stripe_price_id** | VARCHAR(255) | NOT NULL, **UNIQUE** | The lookup the webhook performs. UNIQUE because one price belongs to exactly one plan — **and because the uniqueness is what makes an unmapped price a `FAILED` event rather than an ambiguous one.** |
 | **interval** | VARCHAR(20) | NOT NULL | `month \| year`. **Display and ordering only — never an entitlement input.** Lowercase because it is **Stripe's literal, stored as it arrives**: §7.3's *"values are SCREAMING_SNAKE_CASE, with no exceptions"* is about values this repo *defines*, and upper-casing a foreign literal breaks the comparison the moment anything matches it against a webhook payload. Stripe's vocabulary is also wider than these two, so this is not an enum of ours waiting to be written. |
+| **unit_amount** | INTEGER | Nullable | The price in the currency's smallest unit, written by the plans seed. Safe to store: a Stripe price's amount can't change. |
+| **currency** | VARCHAR(3) | Nullable | ISO 4217, lowercase as Stripe writes it. |
 
 ### **Domain B: Support Tickets & Real-Time Messaging**
 
