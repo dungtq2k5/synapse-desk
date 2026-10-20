@@ -105,7 +105,7 @@ export function grantLines(grants: Grants, locale?: string): string[] {
     ...lines,
     `Documents up to ${mb(grants.maxDocumentBytes)}, attachments up to ${mb(grants.maxAttachmentBytes)}`,
     `${count(grants.maxDocumentUploads, locale)} documents`,
-    `Analytics for the last ${grants.maxAnalyticsRangeDays} days`,
+    `Analytics ranges up to ${grants.maxAnalyticsRangeDays} days`,
   ];
 }
 
@@ -217,7 +217,7 @@ export function comparison(
     count(n, locale),
   );
   add(
-    'Analytics history',
+    'Analytics range',
     from.maxAnalyticsRangeDays,
     to.maxAnalyticsRangeDays,
     (n) => `${n} days`,

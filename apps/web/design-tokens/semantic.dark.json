@@ -259,58 +259,63 @@
     "chart": {
       "1": {
         "$type": "color",
-        "$value": "{color.teal.400}",
+        "$value": "{color.teal.500}",
         "$extensions": {
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--chart-1)"
             }
           }
-        }
+        },
+        "$description": "Categorical chart slot 1. Light teal.600 (3:1 on the card), Dark teal.500 (validated as a set: lightness band, CVD and normal-vision separation; see design 10)."
       },
       "2": {
         "$type": "color",
-        "$value": "{color.blue.400}",
+        "$value": "{color.amber.500}",
         "$extensions": {
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--chart-2)"
             }
           }
-        }
+        },
+        "$description": "Categorical chart slot 2. Light amber.500, Dark amber.500 (validated as a set: lightness band, chroma, CVD and normal-vision separation; see design 10)."
       },
       "3": {
         "$type": "color",
-        "$value": "{color.amber.400}",
+        "$value": "{color.violet.500}",
         "$extensions": {
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--chart-3)"
             }
           }
-        }
+        },
+        "$description": "Categorical chart slot 3. Light violet.700, Dark violet.500 (validated as a set: lightness band, chroma, CVD and normal-vision separation; see design 10)."
       },
       "4": {
         "$type": "color",
-        "$value": "{color.violet.400}",
+        "$value": "{color.pink.700}",
         "$extensions": {
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--chart-4)"
             }
           }
-        }
+        },
+        "$description": "Categorical chart slot 4. Light pink.700, Dark pink.700 (validated as a set: lightness band, chroma, CVD and normal-vision separation; see design 10)."
       },
       "5": {
         "$type": "color",
-        "$value": "{color.pink.400}",
+        "$value": "{color.blue.600}",
         "$extensions": {
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--chart-5)"
             }
           }
-        }
+        },
+        "$description": "Categorical chart slot 5. Light blue.500, Dark blue.600 (validated as a set: lightness band, chroma, CVD and normal-vision separation; see design 10)."
       }
     },
     "sidebar": {

@@ -86,7 +86,7 @@ describe('grants', () => {
       'Quality AI model',
       'Documents up to 25 MB, attachments up to 5 MB',
       '10,000 documents',
-      'Analytics for the last 180 days',
+      'Analytics ranges up to 180 days',
     ]);
     expect(grantLines(FREE, 'en-US')).toHaveLength(4);
   });
@@ -153,7 +153,7 @@ describe('the comparison', () => {
       'AI model',
       'Largest document',
       'Documents',
-      'Analytics history',
+      'Analytics range',
     ]);
     expect(rows[4]).toMatchObject({
       from: 'Quality',

@@ -19,13 +19,7 @@ import {
   SearchXIcon,
   XIcon,
 } from 'lucide-react';
-import {
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type SubmitEvent,
-} from 'react';
+import { useEffect, useMemo, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
 import {
   ALL,
@@ -77,6 +71,7 @@ import {
 import { useViewer } from '@/hooks/use-viewer';
 import { RESOURCE_TYPE_WORDS, auditActionWords } from '@/lib/administration';
 import { dayDate, logTime } from '@/lib/format';
+import { useStoredExport } from '@/lib/stored-export';
 import { announce } from '@/lib/toast';
 import { refusalText } from '../people/person-dialogs';
 import { useOrganizationName, useRoles } from '../people/shared';
@@ -89,7 +84,10 @@ import {
 } from '../settings-frame';
 
 const PAGE_SIZE = 20;
-/** Where a requested export waits while the viewer is elsewhere. */
+/**
+ * Where a requested export waits while the viewer is elsewhere. Also the
+ * event the same tab's writers raise.
+ */
 const EXPORT_KEY = 'synapsedesk.audit-export';
 
 const RANGES = {
@@ -144,55 +142,6 @@ function filterWords(
 /** An export asked for: its id and what it covers, in words. */
 type Requested = { id: string; from: string; to: string; filters: string[] };
 
-/** Same-tab writers say so; other tabs are heard through `storage`. */
-const STORE_EVENT = 'synapsedesk.audit-export';
-
-function subscribe(onChange: () => void) {
-  globalThis.addEventListener('storage', onChange);
-  globalThis.addEventListener(STORE_EVENT, onChange);
-  return () => {
-    globalThis.removeEventListener('storage', onChange);
-    globalThis.removeEventListener(STORE_EVENT, onChange);
-  };
-}
-
-function readRaw(): string | null {
-  try {
-    return globalThis.localStorage.getItem(EXPORT_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The export this browser asked for, kept so it's still waiting after the
- * viewer leaves and comes back. A blocked store only means it isn't kept.
- */
-function useStoredExport(): [
-  Requested | null,
-  (next: Requested | null) => void,
-] {
-  const raw = useSyncExternalStore(subscribe, readRaw, () => null);
-  const value = useMemo(() => {
-    try {
-      return raw ? (JSON.parse(raw) as Requested) : null;
-    } catch {
-      return null;
-    }
-  }, [raw]);
-  const set = (next: Requested | null) => {
-    try {
-      if (next)
-        globalThis.localStorage.setItem(EXPORT_KEY, JSON.stringify(next));
-      else globalThis.localStorage.removeItem(EXPORT_KEY);
-    } catch {
-      // Not kept; the card goes with the page.
-    }
-    globalThis.dispatchEvent(new Event(STORE_EVENT));
-  };
-  return [value, set];
-}
-
 /** Settings › Audit log: who did what, filtered, each entry in a sheet; export. */
 export function AuditView() {
   const { can, query: viewer } = useViewer();
@@ -206,7 +155,7 @@ export function AuditView() {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<AuditLogResponseDto | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [requested, setRequested] = useStoredExport();
+  const [requested, setRequested] = useStoredExport<Requested>(EXPORT_KEY);
   const bounds = useMemo(() => rangeBounds(range), [range]);
   const list = useAuditLogsControllerListV1(
     {

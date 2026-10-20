@@ -3,6 +3,7 @@
 import { useOrganizationsControllerGetV1 } from '@synapsedesk/api-client';
 import {
   BookOpenIcon,
+  ChartColumnIcon,
   InboxIcon,
   MessageCircleIcon,
   SettingsIcon,
@@ -57,6 +58,13 @@ const KNOWLEDGE: Item = {
   href: '/knowledge',
   icon: BookOpenIcon,
   active: (path) => path.startsWith('/knowledge'),
+};
+
+const ANALYTICS: Item = {
+  label: 'Analytics',
+  href: '/analytics',
+  icon: ChartColumnIcon,
+  active: (path) => path.startsWith('/analytics'),
 };
 
 const SETTINGS: Item = {
@@ -127,6 +135,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { isAgent, can } = useViewer();
   const items = [
     ...ITEMS[isAgent ? 'agent' : 'requester'],
+    ...(can('analytics.read') ? [ANALYTICS] : []),
     ...(SETTINGS_READ.some(can) ? [SETTINGS] : []),
   ];
   const organization = useOrganizationsControllerGetV1({

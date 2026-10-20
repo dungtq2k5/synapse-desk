@@ -3,11 +3,27 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+function Table({
+  className,
+  scrollLabel,
+  containerClassName,
+  ...props
+}: React.ComponentProps<'table'> & {
+  /** The container's own classes: a height to scroll within, say. */
+  containerClassName?: string;
+  /**
+   * Names the container as a region and makes it a tab stop, for a table that
+   * may scroll sideways: a scroll area the keyboard can't reach hides columns.
+   */
+  scrollLabel?: string;
+}) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn('relative w-full overflow-x-auto', containerClassName)}
+      {...(scrollLabel
+        ? { role: 'region', 'aria-label': scrollLabel, tabIndex: 0 }
+        : {})}
     >
       <table
         data-slot="table"

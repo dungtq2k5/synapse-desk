@@ -667,6 +667,31 @@ export async function setOrganizationStatus(
 }
 
 /**
+ * The organization's analytics range, as a plan would grant it: written to
+ * auth's database, since the page reads the organization on the server.
+ */
+export async function setAnalyticsRange(
+  member: Person,
+  days: number,
+): Promise<void> {
+  const prisma = new AuthPrisma({
+    adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
+  });
+  try {
+    const user = await prisma.user.findFirstOrThrow({
+      where: { email: member.email },
+      select: { organizationId: true },
+    });
+    await prisma.organization.update({
+      where: { id: user.organizationId! },
+      data: { maxAnalyticsRangeDays: days },
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
  * Replaces `person`'s roles with one custom role holding `codes`, made by
  * `admin` through the gateway: a read-only billing viewer, say.
  */
