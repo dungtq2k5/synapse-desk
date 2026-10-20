@@ -8,6 +8,7 @@ import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.modules.auth.UserMapper;
+import com.synapsedesk.gateway.modules.organizations.AnalyticsRange;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OffboardResponseDto;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OrganizationResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizationDto;
@@ -422,6 +423,11 @@ public class PlatformOrganizationsService {
         BigDecimal.valueOf(organization.getMonthlyAiTokenBudget())
       )
       .billingCycleStart(toOffsetDateTime(organization.getBillingCycleStart()))
+      .analyticsRangeDays(
+        BigDecimal.valueOf(
+          AnalyticsRange.resolve(organization.getMaxAnalyticsRangeDays())
+        )
+      )
       .createdAt(toOffsetDateTime(organization.getCreatedAt()))
       .updatedAt(toOffsetDateTime(organization.getUpdatedAt()));
   }

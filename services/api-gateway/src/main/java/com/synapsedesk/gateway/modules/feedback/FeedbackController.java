@@ -163,7 +163,14 @@ public class FeedbackController {
   }
 
   @GetMapping(value = "/feedback", produces = { "application/json" })
-  @ApiErrors({ "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "400",
+      value = "Among others: `from` to `to` spans more than the organization's " +
+        "`analyticsRangeDays`, as every analytics read refuses."
+    )
+  )
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
   public ResponseEntity<
     ApiResponse<PagedData<FeedbackResponseDto>>
@@ -256,7 +263,13 @@ public class FeedbackController {
       feedback.hasCitationAccurate() ? feedback.getCitationAccurate() : null,
       toOffsetDateTime(feedback.getCreatedAt()),
       toOffsetDateTime(feedback.getUpdatedAt())
-    );
+    )
+      .ticketId(feedback.hasTicketId() ? feedback.getTicketId() : null)
+      .ticketNumber(
+        feedback.hasTicketNumber()
+          ? BigDecimal.valueOf(feedback.getTicketNumber())
+          : null
+      );
   }
 
   private static OffsetDateTime toOffsetDateTime(

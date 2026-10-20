@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.feedback.dto.rest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -33,6 +34,10 @@ public class FeedbackResponseDto {
 
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime updatedAt;
+
+  private String ticketId = null;
+
+  private BigDecimal ticketNumber = null;
 
   public FeedbackResponseDto() {
     super();
@@ -246,6 +251,44 @@ public class FeedbackResponseDto {
     this.updatedAt = updatedAt;
   }
 
+  public FeedbackResponseDto ticketId(String ticketId) {
+    this.ticketId = ticketId;
+    return this;
+  }
+
+  /**
+   * Get ticketId
+   * @return ticketId
+   */
+  @JsonProperty("ticketId")
+  public String getTicketId() {
+    return ticketId;
+  }
+
+  @JsonProperty("ticketId")
+  public void setTicketId(String ticketId) {
+    this.ticketId = ticketId;
+  }
+
+  public FeedbackResponseDto ticketNumber(BigDecimal ticketNumber) {
+    this.ticketNumber = ticketNumber;
+    return this;
+  }
+
+  /**
+   * Get ticketNumber
+   * @return ticketNumber
+   */
+  @JsonProperty("ticketNumber")
+  public BigDecimal getTicketNumber() {
+    return ticketNumber;
+  }
+
+  @JsonProperty("ticketNumber")
+  public void setTicketNumber(BigDecimal ticketNumber) {
+    this.ticketNumber = ticketNumber;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -270,7 +313,9 @@ public class FeedbackResponseDto {
         feedbackResponseDto.citationAccurate
       ) &&
       Objects.equals(this.createdAt, feedbackResponseDto.createdAt) &&
-      Objects.equals(this.updatedAt, feedbackResponseDto.updatedAt)
+      Objects.equals(this.updatedAt, feedbackResponseDto.updatedAt) &&
+      Objects.equals(this.ticketId, feedbackResponseDto.ticketId) &&
+      Objects.equals(this.ticketNumber, feedbackResponseDto.ticketNumber)
     );
   }
 
@@ -285,7 +330,9 @@ public class FeedbackResponseDto {
       feedbackText,
       citationAccurate,
       createdAt,
-      updatedAt
+      updatedAt,
+      ticketId,
+      ticketNumber
     );
   }
 
@@ -313,6 +360,10 @@ public class FeedbackResponseDto {
       .append("\n");
     sb.append("    updatedAt: ")
       .append(toIndentedString(updatedAt))
+      .append("\n");
+    sb.append("    ticketId: ").append(toIndentedString(ticketId)).append("\n");
+    sb.append("    ticketNumber: ")
+      .append(toIndentedString(ticketNumber))
       .append("\n");
     sb.append("}");
     return sb.toString();

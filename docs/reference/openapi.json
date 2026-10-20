@@ -33382,7 +33382,7 @@
             }
           },
           "400": {
-            "description": "Validation failed, or the request is malformed.",
+            "description": "Among others: a range over 92 days, or over the organization's `analyticsRangeDays` (an audit-log export has only the 92-day cap).",
             "content": {
               "application/json": {
                 "schema": {
@@ -51564,6 +51564,49 @@
               }
             }
           },
+          "400": {
+            "description": "Among others: `from` to `to` spans more than the organization's `analyticsRangeDays`, as every analytics read refuses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
           "401": {
             "description": "No valid session cookie, or the session has expired.",
             "content": {
@@ -64545,6 +64588,10 @@
             "type": "string",
             "format": "date-time"
           },
+          "analyticsRangeDays": {
+            "type": "number",
+            "description": "The longest analytics range, in days, one request may span: the plan's\ngrant, held to the platform's limit (400). A longer range is refused\nwith a 400."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -64556,6 +64603,7 @@
         },
         "required": [
           "allowedEmailDomains",
+          "analyticsRangeDays",
           "billingCycleStart",
           "createdAt",
           "domain",
@@ -64733,6 +64781,11 @@
           "to": {
             "type": "string",
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
+          "organizationId": {
+            "type": ["string", "null"],
+            "format": "uuid",
+            "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does."
           }
         },
         "required": ["from", "reason", "to"]
@@ -65005,6 +65058,14 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "ticketId": {
+            "type": ["string", "null"],
+            "description": "The rated answer's ticket, to open it from. Null only when the message is gone."
+          },
+          "ticketNumber": {
+            "type": ["number", "null"],
+            "description": "That ticket's number, as \"Ticket #{n}\" shows it."
           }
         },
         "required": [
@@ -65014,7 +65075,9 @@
           "id",
           "organizationId",
           "rating",
+          "ticketId",
           "ticketMessageId",
+          "ticketNumber",
           "updatedAt",
           "userId"
         ]
@@ -71131,6 +71194,19 @@
           "dataThrough": {
             "type": ["string", "null"],
             "description": "See `OverviewResponseDto.dataThrough`."
+          },
+          "cycleSpentMicros": {
+            "type": ["number", "null"],
+            "description": "What the allowance gate has charged this billing cycle, in micros — the\nallowance's spend, read live. `totalCostMicros` is the chosen range's.\nNull when the counter couldn't be read: unknown, not zero."
+          },
+          "planName": {
+            "type": "string",
+            "description": "The plan, as the usage page names it."
+          },
+          "cycleResetsAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the allowance resets: the invoice period's end, or a month after the\ncycle start for an organization with no period."
           }
         },
         "required": [
@@ -71138,10 +71214,13 @@
           "byModel",
           "byPurpose",
           "computedAt",
+          "cycleResetsAt",
+          "cycleSpentMicros",
           "dataThrough",
           "draftAcceptance",
           "emptyRetrievalRate",
           "monthlyBudgetMicros",
+          "planName",
           "points",
           "totalCostMicros",
           "totalGenerations"

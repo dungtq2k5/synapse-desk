@@ -1531,6 +1531,27 @@
     },
     "UpdatePlatformOrganizationDto.monthlyAiTokenBudget": {
       "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
+    },
+    "OrganizationResponseDto.analyticsRangeDays": {
+      "description": "The longest analytics range, in days, one request may span: the plan's\ngrant, held to the platform's limit (400). A longer range is refused\nwith a 400."
+    },
+    "FeedbackResponseDto.ticketId": {
+      "description": "The rated answer's ticket, to open it from. Null only when the message is gone."
+    },
+    "FeedbackResponseDto.ticketNumber": {
+      "description": "That ticket's number, as \"Ticket #{n}\" shows it."
+    },
+    "AiUsageResponseDto.cycleSpentMicros": {
+      "description": "What the allowance gate has charged this billing cycle, in micros — the\nallowance's spend, read live. `totalCostMicros` is the chosen range's.\nNull when the counter couldn't be read: unknown, not zero."
+    },
+    "AiUsageResponseDto.planName": {
+      "description": "The plan, as the usage page names it."
+    },
+    "AiUsageResponseDto.cycleResetsAt": {
+      "description": "When the allowance resets: the invoice period's end, or a month after the\ncycle start for an organization with no period."
+    },
+    "BackfillJobDto.organizationId": {
+      "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does."
     }
   }
 }

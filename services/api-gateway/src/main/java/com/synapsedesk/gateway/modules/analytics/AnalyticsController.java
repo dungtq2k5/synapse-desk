@@ -136,6 +136,7 @@ public class AnalyticsController {
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics;
   private final AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledger;
   private final synapsedesk.auth.UserServiceGrpc.UserServiceBlockingStub users;
+  private final synapsedesk.auth.OrganizationServiceGrpc.OrganizationServiceBlockingStub organizations;
   private final CurrentUser currentUser;
   private final CacheService cache;
 
@@ -143,12 +144,14 @@ public class AnalyticsController {
     AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
     AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledger,
     synapsedesk.auth.UserServiceGrpc.UserServiceBlockingStub users,
+    synapsedesk.auth.OrganizationServiceGrpc.OrganizationServiceBlockingStub organizations,
     CurrentUser currentUser,
     CacheService cache
   ) {
     this.analytics = analytics;
     this.ledger = ledger;
     this.users = users;
+    this.organizations = organizations;
     this.currentUser = currentUser;
     this.cache = cache;
   }
@@ -177,6 +180,16 @@ public class AnalyticsController {
     RequestContext context
   ) {
     return users
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
+  }
+
+  private synapsedesk.auth.OrganizationServiceGrpc.OrganizationServiceBlockingStub organizationsWith(
+    RequestContext context
+  ) {
+    return organizations
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
@@ -438,6 +451,15 @@ public class AnalyticsController {
       AiUsageResponseDto.class,
       () -> toAiUsageDto(ledgerWith(context).getAiUsage(wire.build()))
     );
+    // This cycle's allowance, read live beside the cached range: a closed
+    // range is cached for a day, and the allowance moves with every
+    // generation. The same read as the usage page's meter.
+    withAllowance(
+      data,
+      organizationsWith(context).getOrganizationUsage(
+        synapsedesk.auth.Organization.GetOrganizationUsageRequest.getDefaultInstance()
+      )
+    );
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
@@ -450,7 +472,14 @@ public class AnalyticsController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401", "403" })
+  @ApiErrors(
+    value = { "400", "401", "403" },
+    descriptions = @ApiErrors.Description(
+      status = "400",
+      value = "Among others: a range over 92 days, or over the organization's " +
+        "`analyticsRangeDays` (an audit-log export has only the 92-day cap)."
+    )
+  )
   @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
   public ResponseEntity<
@@ -1113,6 +1142,25 @@ public class AnalyticsController {
       .dataThrough(
         response.hasDataThrough() ? response.getDataThrough() : null
       );
+  }
+
+  /**
+   * The allowance this cycle, from auth's usage read: the spend the gate
+   * charged (null when the counter couldn't be read), the plan, and the reset.
+   */
+  private static void withAllowance(
+    AiUsageResponseDto data,
+    synapsedesk.auth.Organization.OrganizationUsageResponse allowance
+  ) {
+    data
+      .cycleSpentMicros(
+        allowance.getAiTokens().getAvailable() &&
+          allowance.getAiTokens().hasUsed()
+          ? BigDecimal.valueOf(allowance.getAiTokens().getUsed())
+          : null
+      )
+      .planName(allowance.getPlanName())
+      .cycleResetsAt(toOffsetDateTime(allowance.getCycleResetsAt()));
   }
 
   private static AiUsageResponseDto toAiUsageDto(AiUsageResponse response) {

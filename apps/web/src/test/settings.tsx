@@ -67,6 +67,7 @@ export const ORGANIZATION: OrganizationResponseDto = {
   maxStorageBytes: 5 * 1024 ** 3,
   monthlyAiTokenBudget: 1_000_000,
   billingCycleStart: '2026-10-01T00:00:00.000Z',
+  analyticsRangeDays: 180,
   createdAt: '2026-01-10T09:00:00.000Z',
   updatedAt: '2026-10-01T09:00:00.000Z',
 };

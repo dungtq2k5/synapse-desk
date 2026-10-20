@@ -22,7 +22,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -146,7 +148,7 @@ public class PlatformJobsController {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    JobRunResultResponseDto data = dispatch(name, context, null, null);
+    JobRunResultResponseDto data = dispatch(name, context, null, null, null);
 
     return ResponseEntity.ok(ApiResponse.of(200, "Job run complete", data));
   }
@@ -173,11 +175,13 @@ public class PlatformJobsController {
       );
     }
 
+    UUID organizationId = backfillJobDto.getOrganizationId();
     LOG.warn(
-      "BACKFILL {} {}..{} by {}: {}",
+      "BACKFILL {} {}..{}{} by {}: {}",
       name,
       backfillJobDto.getFrom(),
       backfillJobDto.getTo(),
+      organizationId == null ? "" : " (" + organizationId + ")",
       context.sub(),
       backfillJobDto.getReason()
     );
@@ -186,7 +190,8 @@ public class PlatformJobsController {
       name,
       context,
       backfillJobDto.getFrom(),
-      backfillJobDto.getTo()
+      backfillJobDto.getTo(),
+      organizationId
     );
 
     return ResponseEntity.ok(ApiResponse.of(200, "Backfill complete", data));
@@ -196,7 +201,8 @@ public class PlatformJobsController {
     String jobName,
     RequestContext context,
     String from,
-    String to
+    String to,
+    @Nullable UUID organizationId
   ) {
     if (ANALYTICS_DAILY.equals(jobName)) {
       RunRollupRequest.Builder wire = RunRollupRequest.newBuilder();
@@ -205,6 +211,9 @@ public class PlatformJobsController {
       }
       if (to != null) {
         wire.setTo(to);
+      }
+      if (organizationId != null) {
+        wire.setOrganizationId(organizationId.toString());
       }
       RunRollupResponse response = withAnalyticsMetadata(context).runRollup(
         wire.build()
@@ -228,6 +237,9 @@ public class PlatformJobsController {
       }
       if (to != null) {
         wire.setTo(to);
+      }
+      if (organizationId != null) {
+        wire.setOrganizationId(organizationId.toString());
       }
       RunAiRollupResponse response = withLedgerMetadata(context).runAiRollup(
         wire.build()

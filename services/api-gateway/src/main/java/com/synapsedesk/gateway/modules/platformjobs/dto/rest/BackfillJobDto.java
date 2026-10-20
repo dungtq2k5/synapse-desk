@@ -2,8 +2,10 @@ package com.synapsedesk.gateway.modules.platformjobs.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.synapsedesk.gateway.common.validation.StrictIso8601;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.Objects;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -17,6 +19,8 @@ public class BackfillJobDto {
   private String from;
 
   private String to;
+
+  private @Nullable UUID organizationId;
 
   public BackfillJobDto() {
     super();
@@ -94,6 +98,26 @@ public class BackfillJobDto {
     this.to = to;
   }
 
+  public BackfillJobDto organizationId(@Nullable UUID organizationId) {
+    this.organizationId = organizationId;
+    return this;
+  }
+
+  /**
+   * Get organizationId
+   * @return organizationId
+   */
+  @Valid
+  @JsonProperty("organizationId")
+  public @Nullable UUID getOrganizationId() {
+    return organizationId;
+  }
+
+  @JsonProperty("organizationId")
+  public void setOrganizationId(@Nullable UUID organizationId) {
+    this.organizationId = organizationId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -106,13 +130,14 @@ public class BackfillJobDto {
     return (
       Objects.equals(this.reason, backfillJobDto.reason) &&
       Objects.equals(this.from, backfillJobDto.from) &&
-      Objects.equals(this.to, backfillJobDto.to)
+      Objects.equals(this.to, backfillJobDto.to) &&
+      Objects.equals(this.organizationId, backfillJobDto.organizationId)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(reason, from, to);
+    return Objects.hash(reason, from, to, organizationId);
   }
 
   @Override
@@ -122,6 +147,9 @@ public class BackfillJobDto {
     sb.append("    reason: ").append(toIndentedString(reason)).append("\n");
     sb.append("    from: ").append(toIndentedString(from)).append("\n");
     sb.append("    to: ").append(toIndentedString(to)).append("\n");
+    sb.append("    organizationId: ")
+      .append(toIndentedString(organizationId))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }

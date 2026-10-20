@@ -77,6 +77,13 @@ public class AiUsageResponseDto {
 
   private String dataThrough = null;
 
+  private BigDecimal cycleSpentMicros = null;
+
+  private String planName;
+
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime cycleResetsAt;
+
   public AiUsageResponseDto() {
     super();
   }
@@ -376,6 +383,66 @@ public class AiUsageResponseDto {
     this.dataThrough = dataThrough;
   }
 
+  public AiUsageResponseDto cycleSpentMicros(BigDecimal cycleSpentMicros) {
+    this.cycleSpentMicros = cycleSpentMicros;
+    return this;
+  }
+
+  /**
+   * Get cycleSpentMicros
+   * @return cycleSpentMicros
+   */
+  @JsonProperty("cycleSpentMicros")
+  public BigDecimal getCycleSpentMicros() {
+    return cycleSpentMicros;
+  }
+
+  @JsonProperty("cycleSpentMicros")
+  public void setCycleSpentMicros(BigDecimal cycleSpentMicros) {
+    this.cycleSpentMicros = cycleSpentMicros;
+  }
+
+  public AiUsageResponseDto planName(String planName) {
+    this.planName = planName;
+    return this;
+  }
+
+  /**
+   * Get planName
+   * @return planName
+   */
+  @NotNull
+  @JsonProperty("planName")
+  public String getPlanName() {
+    return planName;
+  }
+
+  @JsonProperty("planName")
+  public void setPlanName(String planName) {
+    this.planName = planName;
+  }
+
+  public AiUsageResponseDto cycleResetsAt(OffsetDateTime cycleResetsAt) {
+    this.cycleResetsAt = cycleResetsAt;
+    return this;
+  }
+
+  /**
+   * Get cycleResetsAt
+   * @return cycleResetsAt
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("cycleResetsAt")
+  public OffsetDateTime getCycleResetsAt() {
+    return cycleResetsAt;
+  }
+
+  @JsonProperty("cycleResetsAt")
+  public void setCycleResetsAt(OffsetDateTime cycleResetsAt) {
+    this.cycleResetsAt = cycleResetsAt;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -411,7 +478,13 @@ public class AiUsageResponseDto {
         aiUsageResponseDto.emptyRetrievalRate
       ) &&
       Objects.equals(this.computedAt, aiUsageResponseDto.computedAt) &&
-      Objects.equals(this.dataThrough, aiUsageResponseDto.dataThrough)
+      Objects.equals(this.dataThrough, aiUsageResponseDto.dataThrough) &&
+      Objects.equals(
+        this.cycleSpentMicros,
+        aiUsageResponseDto.cycleSpentMicros
+      ) &&
+      Objects.equals(this.planName, aiUsageResponseDto.planName) &&
+      Objects.equals(this.cycleResetsAt, aiUsageResponseDto.cycleResetsAt)
     );
   }
 
@@ -428,7 +501,10 @@ public class AiUsageResponseDto {
       draftAcceptance,
       emptyRetrievalRate,
       computedAt,
-      dataThrough
+      dataThrough,
+      cycleSpentMicros,
+      planName,
+      cycleResetsAt
     );
   }
 
@@ -464,6 +540,13 @@ public class AiUsageResponseDto {
       .append("\n");
     sb.append("    dataThrough: ")
       .append(toIndentedString(dataThrough))
+      .append("\n");
+    sb.append("    cycleSpentMicros: ")
+      .append(toIndentedString(cycleSpentMicros))
+      .append("\n");
+    sb.append("    planName: ").append(toIndentedString(planName)).append("\n");
+    sb.append("    cycleResetsAt: ")
+      .append(toIndentedString(cycleResetsAt))
       .append("\n");
     sb.append("}");
     return sb.toString();

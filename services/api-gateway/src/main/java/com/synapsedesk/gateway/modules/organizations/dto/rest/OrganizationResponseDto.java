@@ -81,6 +81,8 @@ public class OrganizationResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime billingCycleStart;
 
+  private BigDecimal analyticsRangeDays;
+
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime createdAt;
 
@@ -364,6 +366,29 @@ public class OrganizationResponseDto {
     this.billingCycleStart = billingCycleStart;
   }
 
+  public OrganizationResponseDto analyticsRangeDays(
+    BigDecimal analyticsRangeDays
+  ) {
+    this.analyticsRangeDays = analyticsRangeDays;
+    return this;
+  }
+
+  /**
+   * Get analyticsRangeDays
+   * @return analyticsRangeDays
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("analyticsRangeDays")
+  public BigDecimal getAnalyticsRangeDays() {
+    return analyticsRangeDays;
+  }
+
+  @JsonProperty("analyticsRangeDays")
+  public void setAnalyticsRangeDays(BigDecimal analyticsRangeDays) {
+    this.analyticsRangeDays = analyticsRangeDays;
+  }
+
   public OrganizationResponseDto createdAt(OffsetDateTime createdAt) {
     this.createdAt = createdAt;
     return this;
@@ -447,7 +472,11 @@ public class OrganizationResponseDto {
         organizationResponseDto.billingCycleStart
       ) &&
       Objects.equals(this.createdAt, organizationResponseDto.createdAt) &&
-      Objects.equals(this.updatedAt, organizationResponseDto.updatedAt)
+      Objects.equals(this.updatedAt, organizationResponseDto.updatedAt) &&
+      Objects.equals(
+        this.analyticsRangeDays,
+        organizationResponseDto.analyticsRangeDays
+      )
     );
   }
 
@@ -466,7 +495,8 @@ public class OrganizationResponseDto {
       monthlyAiTokenBudget,
       billingCycleStart,
       createdAt,
-      updatedAt
+      updatedAt,
+      analyticsRangeDays
     );
   }
 
@@ -502,6 +532,9 @@ public class OrganizationResponseDto {
       .append("\n");
     sb.append("    updatedAt: ")
       .append(toIndentedString(updatedAt))
+      .append("\n");
+    sb.append("    analyticsRangeDays: ")
+      .append(toIndentedString(analyticsRangeDays))
       .append("\n");
     sb.append("}");
     return sb.toString();

@@ -581,6 +581,11 @@ public class OrganizationsController {
         BigDecimal.valueOf(organization.getMonthlyAiTokenBudget())
       )
       .billingCycleStart(toOffsetDateTime(organization.getBillingCycleStart()))
+      .analyticsRangeDays(
+        BigDecimal.valueOf(
+          AnalyticsRange.resolve(organization.getMaxAnalyticsRangeDays())
+        )
+      )
       .createdAt(toOffsetDateTime(organization.getCreatedAt()))
       .updatedAt(toOffsetDateTime(organization.getUpdatedAt()));
   }
