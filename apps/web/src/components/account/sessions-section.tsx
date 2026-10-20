@@ -17,7 +17,6 @@ import {
   ShieldCheckIcon,
   SmartphoneIcon,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -34,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { calendarDate, calendarTime } from '@/lib/format';
 import { deviceName } from '@/lib/sign-in';
+import { leaveFor } from '@/lib/leave';
 import { toastError } from '@/lib/toast';
 import { SectionCard } from './section-card';
 
@@ -58,7 +58,6 @@ export function DeviceIcon({ userAgent }: { userAgent: string }) {
  */
 export function SessionsSection() {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const sessions = useSessionsControllerListV1();
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -87,8 +86,7 @@ export function SessionsSection() {
     setBusy('everywhere');
     try {
       const answer = await authControllerLogoutAllV1();
-      queryClient.clear();
-      router.push(
+      leaveFor(
         `/login?signed-out-everywhere=${answer.data?.revokedSessionCount ?? 1}`,
       );
     } catch {

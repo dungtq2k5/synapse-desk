@@ -128,7 +128,9 @@ test('Export: a date range with the current filters', async ({ page }) => {
 
 test('Export: preparing', async ({ page }) => {
   await exporting(page, 'PENDING');
-  await expect(page.getByText('Preparing your export')).toBeVisible();
+  await expect(
+    page.locator('#main').getByText('Preparing your export'),
+  ).toBeVisible();
   await look(page, 'audit-export-preparing', {
     // The spinner turns.
     mask: [page.locator('.animate-spin')],
@@ -146,7 +148,9 @@ test('Export: ready', async ({ page }) => {
 
 test('Export: failed', async ({ page }) => {
   await exporting(page, 'FAILED');
-  await expect(page.getByText('The export failed')).toBeVisible();
+  await expect(
+    page.locator('#main').getByText('The export failed'),
+  ).toBeVisible();
   await look(page, 'audit-export-failed');
 });
 

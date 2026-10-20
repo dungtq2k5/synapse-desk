@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { leaveFor } from '@/lib/leave';
 import { keepTwoStepWarning, readTwoStepWarning } from '@/lib/two-step-warning';
 import { fail, ok, stubApi, type Reply } from '@/test/api';
 import { AppHeader } from './app-header';
@@ -17,6 +18,8 @@ jest.mock('next/navigation', () => ({
   usePathname: () => pathname,
   useRouter: () => ({ push }),
 }));
+
+jest.mock('@/lib/leave', () => ({ leaveFor: jest.fn() }));
 
 // No socket in these tests: the provider only passes its children through.
 jest.mock('@/components/realtime/realtime-provider', () => ({
@@ -52,6 +55,7 @@ afterEach(() => {
   pathname = '/tickets/t-1';
   sessionStorage.clear();
   push.mockReset();
+  jest.mocked(leaveFor).mockClear();
   jest.restoreAllMocks();
 });
 
@@ -177,7 +181,9 @@ describe('the account menu', () => {
     await user.click(screen.getByRole('button', { name: 'Account' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/login?signed-out'));
+    await waitFor(() =>
+      expect(leaveFor).toHaveBeenCalledWith('/login?signed-out'),
+    );
     expect(calls.map(({ method, url }) => `${method} ${url}`)).toContain(
       'POST /api/v1/auth/logout',
     );
@@ -210,14 +216,16 @@ describe('the account menu', () => {
         'Couldn’t sign out. Check your connection and try again.',
       ),
     );
-    expect(push).not.toHaveBeenCalled();
+    expect(leaveFor).not.toHaveBeenCalled();
 
     failing = false;
     const retry = error.mock.calls[0][1]?.action as unknown as {
       onClick: () => void;
     };
     act(() => retry.onClick());
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/login?signed-out'));
+    await waitFor(() =>
+      expect(leaveFor).toHaveBeenCalledWith('/login?signed-out'),
+    );
     region.remove();
   });
 });

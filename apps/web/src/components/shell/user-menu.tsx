@@ -1,7 +1,6 @@
 'use client';
 
 import { authControllerLogoutV1 } from '@synapsedesk/api-client';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   BellIcon,
   ChevronsUpDownIcon,
@@ -11,7 +10,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,18 +22,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenuButton } from '@/components/ui/sidebar';
 import { useViewer } from '@/hooks/use-viewer';
+import { leaveFor } from '@/lib/leave';
 import { toastError } from '@/lib/toast';
 import { UserAvatar } from './user-avatar';
 
 /** Signs out and goes to sign-in; a failure is a toast with Try again. */
 export function useSignOut(): () => Promise<void> {
-  const queryClient = useQueryClient();
-  const router = useRouter();
   const signOut = async () => {
     try {
       await authControllerLogoutV1({});
-      queryClient.clear();
-      router.push('/login?signed-out');
+      leaveFor('/login?signed-out');
     } catch {
       toastError('Couldn’t sign out', 'Check your connection and try again.', {
         label: 'Try again',

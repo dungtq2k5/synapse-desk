@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { fail, ok, stubApi, type Reply } from '@/test/api';
 import '@/test/dom';
+import { leaveFor } from '@/lib/leave';
 import { PasswordSection, signedOutElsewhere } from './password-section';
 import { SessionsSection } from './sessions-section';
 import { TwoStepSection } from './two-step-section';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+jest.mock('@/lib/leave', () => ({ leaveFor: jest.fn() }));
 jest.mock('sonner', () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));
@@ -411,7 +413,7 @@ describe('the sessions section', () => {
     await user.click(
       within(confirm).getByRole('button', { name: 'Sign out everywhere' }),
     );
-    expect(push).toHaveBeenCalledWith('/login?signed-out-everywhere=3');
+    expect(leaveFor).toHaveBeenCalledWith('/login?signed-out-everywhere=3');
   });
 });
 

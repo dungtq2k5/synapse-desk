@@ -361,7 +361,9 @@ test('an export: started, the page reloaded, resumed, downloaded', async ({
   await page.getByRole('button', { name: 'Export' }).click();
   await page.getByRole('button', { name: 'Start export' }).click();
   await expect(
-    page.getByText(/Preparing your export…|Your export is ready/),
+    page
+      .getByRole('dialog', { name: 'Export tickets' })
+      .getByText(/Preparing your export…|Your export is ready/),
   ).toBeVisible();
 
   await page.reload();

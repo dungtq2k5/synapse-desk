@@ -166,7 +166,9 @@ describe('frozen', () => {
     ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/login?signed-out'));
+    await waitFor(() =>
+      expect(leaveFor).toHaveBeenCalledWith('/login?signed-out'),
+    );
   });
 
   it('a frozen refusal while signed in re-reads `/users/me` and shows the page', async () => {

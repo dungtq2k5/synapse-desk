@@ -437,7 +437,9 @@ test('the audit log shows the journey’s own actions and exports a CSV', async 
   await page.getByRole('button', { name: /^Export/ }).click();
   await page.getByRole('button', { name: 'Request export' }).click();
   await expect(
-    page.getByText(/Preparing your export|Your export is ready/),
+    page
+      .locator('#main')
+      .getByText(/Preparing your export|Your export is ready/),
   ).toBeVisible();
   await page.reload();
   const download = page.getByRole('button', { name: 'Download CSV' });

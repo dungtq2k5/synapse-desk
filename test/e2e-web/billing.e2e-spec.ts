@@ -362,7 +362,9 @@ test('past due: the banner for an admin and a member, a write refused, billing s
   const profile = page.getByRole('region', { name: 'Profile' });
   await profile.getByLabel('Name').fill(`${org.name} Renamed`);
   await profile.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText(`${org.name} is read-only`)).toBeVisible();
+  await expect(
+    page.getByText(`${org.name} is read-only`, { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByText(
       'A payment failed, so nothing can be created or changed until it’s settled. Update the payment in Billing.',

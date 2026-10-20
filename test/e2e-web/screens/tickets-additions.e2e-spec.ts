@@ -198,7 +198,11 @@ test.describe('the export', () => {
     await expect(
       page.getByRole('button', { name: 'Export, running' }),
     ).toBeVisible();
-    await expect(page.getByText('Your export is ready')).toBeVisible();
+    await expect(
+      page
+        .getByRole('region', { name: /Notifications/ })
+        .getByText('Your export is ready'),
+    ).toBeVisible();
     await look(page, 'export-ready-toast', { viewportOnly: true });
   });
 });
