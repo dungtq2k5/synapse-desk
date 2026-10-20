@@ -31,7 +31,7 @@ These are demo surfaces that will look broken. **None of them is a bug.**
 | Not seeded | What you will see | Why |
 | :--- | :--- | :--- |
 | **Qdrant vectors** | knowledge search and `Ask` return nothing | Real embeddings cost money per run and need an API key. Fake ones rank nonsense, which demos worse than an honest empty state. The chunk rows exist with `vector_point_id = NULL` — the state the pipeline genuinely holds between writing rows and upserting. |
-| **Firebase Storage objects** | a document download 404s | Documents carry a `file_url` path and no object behind it. The alternative is generating and uploading hundreds of PDFs. |
+| **Files, without the Storage emulator** | a document download 404s | Each document's file (one of the three fixtures in `fixtures/`) is uploaded to the Storage emulator. With no emulator running, the seed says so and writes the rows without files. |
 | **The notification feed** | the bell is empty | Domain E rows are produced by CONSUMING commands. Writing them directly means minting `event_id` values — the column whose partial unique index decides *"have we already told this person?"* — and a collision there suppresses a real notification forever, silently. **The feed fills the first time you click through the app with the services running**, which is the honest way to produce those rows. |
 | **Stripe customers and subscriptions** | the billing page says "Free" and lists no invoices | Both ids stay `NULL`, which is the grandfathered state the code handles everywhere: `listInvoices` returns empty *before* touching Stripe, and the portal is unreachable. A fake `cus_…` would send a live API read that fails. |
 
@@ -45,8 +45,8 @@ rows are read by tenant id, which is what the finance dashboard does with them.
 
 ## Shape
 
-- **Order is the failure model.** `auth → ticket → ingestion`, one transaction
-  per tenant per service. A failure leaves every earlier step committed and
+- **Order is the failure model.** `auth → ticket → ingestion → analytics`, one
+  transaction per tenant per service. A failure leaves every earlier step committed and
   internally consistent: a smaller demo, never an invalid one.
 - **Every quantity comes from the tenant's plan grant**, never a fixed range, so
   a seeded tenant is never over a limit the product enforces. One tenant is
@@ -56,3 +56,26 @@ rows are read by tenant id, which is what the finance dashboard does with them.
   across runs that seed a different set.
 - **`--force` needs a different `--seed`.** A second run at the same seed
   regenerates the first run's slugs exactly, and `slug` is globally unique.
+
+---
+
+## The history the dashboards count, and the analytics step
+
+The analytics pages read daily rollups, so the seed writes history, not only
+open tickets: tickets resolved and escalated with their times and assignees,
+agent first replies, a quarter of tickets arriving through the chat (answered
+by the AI and rated), and 60 days of AI calls across every purpose in the
+ledger. Users 1 and 2 of each tenant are Support Agents, so Agents lists more
+than the admin.
+
+**The last step, `analytics`, runs through the gateway as the Super Admin**
+(`SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` from
+`services/auth-service/.env`): it backfills both rollups for the seeded
+organizations only, then runs `ledger-daily` once, which writes the
+documents' usage counters and the quality flags. **With no gateway
+listening, it prints the command to run later**
+(`npm run seed:demo -- --apply --only=analytics`) and the seed still
+succeeds.
+
+`--profile=small` seeds 4 tickets per tenant, which the status rotation
+leaves with none resolved; use the default or `large` to see every chart.
