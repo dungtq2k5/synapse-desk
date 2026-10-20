@@ -198,6 +198,7 @@ describe('PermissionGuard on real routes (e2e)', () => {
             // value rather than substituting a date, so omitting it here
             // produces a 500 and the route never reports on its guard.
             billingCycleStart: timestamp(),
+            cycleResetsAt: timestamp(),
             aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
             planName: 'Free',
           }),

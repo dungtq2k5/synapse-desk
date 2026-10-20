@@ -176,6 +176,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<
     'document.reindex',
     'analytics.read',
     'ticket.read.all',
+    // Analytics filters by department: the filter lists them.
+    'department.read',
   ],
 
   [SystemRoleName.SUPPORT_AGENT]: [

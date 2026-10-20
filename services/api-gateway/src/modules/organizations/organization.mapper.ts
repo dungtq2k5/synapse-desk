@@ -9,7 +9,10 @@ import {
   StorageUsageResponse,
   OrganizationSettingsResponse,
 } from '@synapsedesk/grpc-proto';
-import { UsageUnavailableReason } from '@synapsedesk/contracts';
+import {
+  resolveAnalyticsRangeDays,
+  UsageUnavailableReason,
+} from '@synapsedesk/contracts';
 import { buildInboundAddress } from '@synapsedesk/nest-common';
 import {
   OnboardingResponseDto,
@@ -43,6 +46,9 @@ export function toOrganizationResponseDto(
     billingCycleStart: requireProtoTimestamp(
       organization.billingCycleStart,
       'billingCycleStart',
+    ),
+    analyticsRangeDays: resolveAnalyticsRangeDays(
+      organization.maxAnalyticsRangeDays,
     ),
     createdAt: requireProtoTimestamp(organization.createdAt, 'createdAt'),
     updatedAt: requireProtoTimestamp(organization.updatedAt, 'updatedAt'),

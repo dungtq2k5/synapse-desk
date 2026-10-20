@@ -66,19 +66,28 @@ export class TicketRollupJob {
    * and the alternative is discovering a rollup bug with no way to recompute:
    * a metric that stays wrong forever because the fix only applies going
    * forward. Both days inclusive, which is what an operator means by
-   * "backfill March".
+   * "backfill March". `organizationId` limits it to one tenant, active or
+   * not, so recomputing one organization doesn't recompute them all.
    */
-  async backfill(fromDay: Date, toDay: Date): Promise<RollupOutcome> {
+  async backfill(
+    fromDay: Date,
+    toDay: Date,
+    organizationId?: string,
+  ): Promise<RollupOutcome> {
     this.logger.log(
       `Backfilling ticket rollups ${fromDay.toISOString().slice(0, 10)} → ` +
-        `${toDay.toISOString().slice(0, 10)}`,
+        `${toDay.toISOString().slice(0, 10)}` +
+        (organizationId ? ` for ${organizationId}` : ''),
     );
 
-    return this.rollup(backfillWindow(fromDay, toDay));
+    return this.rollup(backfillWindow(fromDay, toDay), organizationId);
   }
 
-  private async rollup(window: RollupWindow): Promise<RollupOutcome> {
-    const organizationIds = await this.activeTenants(window);
+  private async rollup(
+    window: RollupWindow,
+    only?: string,
+  ): Promise<RollupOutcome> {
+    const organizationIds = only ? [only] : await this.activeTenants(window);
     if (organizationIds.length === 0) {
       // **No rows for a quiet tenant, and that is correct** (
       // 5). Absent is not broken: the endpoints read a missing row as zero, and

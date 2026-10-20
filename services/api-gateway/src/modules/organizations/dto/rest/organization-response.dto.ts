@@ -24,6 +24,12 @@ export class OrganizationResponseDto {
    */
   readonly monthlyAiTokenBudget!: number;
   readonly billingCycleStart!: Date;
+  /**
+   * The longest analytics range, in days, one request may span: the plan's
+   * grant, held to the platform's limit (400). A longer range is refused
+   * with a 400.
+   */
+  readonly analyticsRangeDays!: number;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 }

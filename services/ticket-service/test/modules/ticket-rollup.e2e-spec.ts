@@ -489,6 +489,35 @@ describe('The ticket rollup (e2e)', () => {
       expect(theirs[0].ticketsCreated).toBe(1);
     });
 
+    it('16b. **A backfill for one organization recomputes that one only**', async () => {
+      // The web suite's databases keep every run's tenants: a journey's
+      // backfill must not recompute them all.
+      const other = buildTenant();
+      for (const t of [tenant, other]) {
+        await createTicket(fx.prisma, t, {
+          createdAt: at('2026-03-02T09:00:00.000Z'),
+        });
+      }
+
+      const outcome = await rollup.backfill(
+        at('2026-03-01T00:00:00.000Z'),
+        at('2026-03-04T00:00:00.000Z'),
+        tenant.organizationId,
+      );
+
+      expect(outcome.tenants).toBe(1);
+      expect(
+        await fx.prisma.ticketDailyStat.count({
+          where: { organizationId: tenant.organizationId },
+        }),
+      ).toBe(1);
+      expect(
+        await fx.prisma.ticketDailyStat.count({
+          where: { organizationId: other.organizationId },
+        }),
+      ).toBe(0);
+    });
+
     it('17. Records WHEN it ran, so a backfill can invalidate a cache', async () => {
       await createTicket(fx.prisma, tenant, {
         createdAt: at('2026-03-02T09:00:00.000Z'),

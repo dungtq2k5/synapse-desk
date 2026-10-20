@@ -108,6 +108,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
         ? await this.rollup.backfill(
             new Date(`${request.from}T00:00:00.000Z`),
             new Date(`${request.to}T00:00:00.000Z`),
+            request.organizationId,
           )
         : await this.rollup.run();
 

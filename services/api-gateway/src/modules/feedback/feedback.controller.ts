@@ -128,7 +128,13 @@ export class FeedbackController {
       'Tenant feedback stream for quality review; filters ?rating=&citationAccurate=&from=&to=',
   })
   @ApiWrappedResponse(Paginated(FeedbackResponseDto))
-  @ApiFilterErrors(['401', '403'])
+  @ApiFilterErrors(['400', '401', '403'], {
+    descriptions: {
+      '400':
+        "Among others: `from` to `to` spans more than the organization's " +
+        '`analyticsRangeDays`, as every analytics read refuses.',
+    },
+  })
   @Get()
   @RequirePermission('analytics.read')
   list(

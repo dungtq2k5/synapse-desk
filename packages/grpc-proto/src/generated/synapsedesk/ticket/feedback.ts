@@ -24,7 +24,15 @@ export interface FeedbackResponse {
   feedbackText?: string | undefined;
   citationAccurate?: boolean | undefined;
   createdAt: Timestamp | undefined;
-  updatedAt: Timestamp | undefined;
+  updatedAt:
+    | Timestamp
+    | undefined;
+  /**
+   * The rated message's ticket, so a dashboard row can open it. Absent only
+   * when the message is gone.
+   */
+  ticketId?: string | undefined;
+  ticketNumber?: number | undefined;
 }
 
 /**

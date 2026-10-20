@@ -9,7 +9,7 @@ import {
   ScheduledJobName,
 } from '@synapsedesk/contracts';
 import { checkStaleness, JobHeartbeat } from '@synapsedesk/core';
-import { PlatformJobsClient } from './platform-jobs.client';
+import { BackfillRange, PlatformJobsClient } from './platform-jobs.client';
 import { BackfillJobDto } from './dto/platform-jobs.dto';
 import {
   JobHealthResponseDto,
@@ -198,16 +198,20 @@ export class PlatformJobsService {
     // backfill rewrites numbers somebody may already have acted on, and the
     // reason is the only part a reader cannot reconstruct from the rows.
     this.logger.warn(
-      `BACKFILL ${jobName} ${dto.from}..${dto.to} by ${context.sub}: ${dto.reason}`,
+      `BACKFILL ${jobName} ${dto.from}..${dto.to}${dto.organizationId ? ` (${dto.organizationId})` : ''} by ${context.sub}: ${dto.reason}`,
     );
 
-    return this.dispatch(jobName, context, { from: dto.from, to: dto.to });
+    return this.dispatch(jobName, context, {
+      from: dto.from,
+      to: dto.to,
+      organizationId: dto.organizationId,
+    });
   }
 
   private async dispatch(
     jobName: string,
     context: RequestContext,
-    range?: { from: string; to: string },
+    range?: BackfillRange,
   ): Promise<JobRunResultResponseDto> {
     switch (jobName) {
       case SCHEDULED_JOBS.ANALYTICS_DAILY: {

@@ -31,6 +31,13 @@ import { JobRunStatusResponseDto } from './dto/platform-jobs-response.dto';
 type HeartbeatCaller = RequestContext | RequestOrigin;
 
 /** A heartbeat row plus which service it came from. */
+/** A backfill's days, both inclusive, and optionally one organization. */
+export type BackfillRange = {
+  from: string;
+  to: string;
+  organizationId?: string;
+};
+
 export type ServiceHeartbeats = {
   service: string;
   rows: Omit<JobRunStatusResponseDto, 'health'>[];
@@ -192,7 +199,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   /** The ticket rollup — now, or over an explicit range. */
   async runTicketRollup(
     context: RequestContext,
-    range?: { from: string; to: string },
+    range?: BackfillRange,
   ): Promise<{ tenants: number; rows: number }> {
     const response = await this.call(
       (metadata) => this.analyticsService.runRollup(range ?? {}, metadata),
@@ -208,7 +215,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   /** The AI rollup — now, or over an explicit range. */
   async runAiRollup(
     context: RequestContext,
-    range?: { from: string; to: string },
+    range?: BackfillRange,
   ): Promise<{ tenants: number; rows: number }> {
     const response = await this.call(
       (metadata) => this.ledgerService.runAiRollup(range ?? {}, metadata),

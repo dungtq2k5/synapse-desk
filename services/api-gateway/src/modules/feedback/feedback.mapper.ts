@@ -27,6 +27,8 @@ export function toFeedbackResponseDto(
     citationAccurate: feedback.citationAccurate ?? null,
     createdAt: requireProtoTimestamp(feedback.createdAt, 'createdAt'),
     updatedAt: requireProtoTimestamp(feedback.updatedAt, 'updatedAt'),
+    ticketId: feedback.ticketId ?? null,
+    ticketNumber: feedback.ticketNumber ?? null,
   };
 }
 

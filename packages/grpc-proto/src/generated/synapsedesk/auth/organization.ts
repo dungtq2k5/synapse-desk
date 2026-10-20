@@ -330,7 +330,14 @@ export interface OrganizationUsageResponse {
   aiModelTier: AiModelTier;
   planName: string;
   /** Absent for a grandfathered tenant, who has no invoice period at all. */
-  currentPeriodEnd?: Timestamp | undefined;
+  currentPeriodEnd?:
+    | Timestamp
+    | undefined;
+  /**
+   * When the AI allowance next resets: the invoice period's end, or a month
+   * after the cycle start for a tenant with no period.
+   */
+  cycleResetsAt: Timestamp | undefined;
 }
 
 export interface OnboardingStep {

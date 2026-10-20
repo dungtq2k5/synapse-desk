@@ -1,4 +1,6 @@
+import { faker } from '@faker-js/faker';
 import {
+  MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
@@ -10,6 +12,7 @@ import {
   authenticatedAgent,
   bootstrapE2eTest,
 } from '../utils';
+import { timestamp } from '../fixtures/wire';
 
 /**
  * The layering rule at the HTTP boundary.
@@ -236,5 +239,54 @@ describe('Tenant limit overrides at the HTTP boundary (e2e)', () => {
       );
       expect(res.body.data).not.toHaveProperty('inboundToken');
     });
+  });
+
+  describe('the analytics range limit', () => {
+    /** The organization auth sends, granted `maxAnalyticsRangeDays`. */
+    const stubOrganization = (
+      organizationId: string,
+      maxAnalyticsRangeDays: number,
+    ) =>
+      fx.stubs.organization.getCurrentOrganization.mockReturnValue(
+        of({
+          id: organizationId,
+          name: 'Acme',
+          slug: 'acme',
+          status: 1,
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          maxAgentSeats: 5,
+          maxStorageBytes: 1,
+          monthlyAiTokenBudget: 1,
+          aiModelTier: 1,
+          billingCycleStart: timestamp(),
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          maxDocumentBytes: 1,
+          maxAttachmentBytes: 1,
+          maxDocumentUploads: 1,
+          maxAnalyticsRangeDays,
+        }),
+      );
+
+    it.each([
+      ['a plan narrower than the platform', 30, 30],
+      ['a plan wider than the platform', 9_000, MAX_ANALYTICS_RANGE_DAYS],
+    ])(
+      '**`analyticsRangeDays` is readable by any member: %s**',
+      async (_case, granted, readable) => {
+        // A fresh tenant per case: the route is cached per tenant.
+        const organizationId = faker.string.uuid();
+        stubOrganization(organizationId, granted);
+
+        const res = await authenticatedAgent(fx.app, {
+          organizationId,
+          permissionCodes: [],
+        }).get(`${API}/organizations/current`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.analyticsRangeDays).toBe(readable);
+      },
+    );
   });
 });

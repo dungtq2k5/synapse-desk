@@ -102,6 +102,47 @@ describe('organizations', () => {
   );
 
   rowFor('Organizations')(
+    '**`analyticsRangeDays` is the plan’s range held to the platform’s 400**',
+    async () => {
+      // Tenants of their own: `get` is cached per tenant.
+      const cases = [
+        ['cccccccc-4444-4444-8444-cccccccccccc', 30, 30],
+        ['cccccccc-5555-4555-8555-cccccccccccc', 9_000, 400],
+      ] as const;
+
+      for (const [tenant, granted, readable] of cases) {
+        peers.auth
+          .on('OrganizationService/GetCurrentOrganization')
+          .reply(
+            wireOrganization({ id: tenant, maxAnalyticsRangeDays: granted }),
+          );
+        const cookie = sign(
+          {
+            sub: USER,
+            organizationId: tenant,
+            isSuperAdmin: false,
+            departmentIds: [],
+            permissionCodes: [],
+            isEmailVerified: true,
+          },
+          TEST_KEYS.access(),
+          { algorithm: 'RS256', expiresIn: '15m' },
+        );
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/organizations/current`,
+          { cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${cookie}` },
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { analyticsRangeDays: readable },
+        });
+      }
+    },
+  );
+
+  rowFor('Organizations')(
     '**a second `get` call never reaches the peer within the TTL**',
     async () => {
       // A tenant of its own: `get` has no query params to vary the cache key

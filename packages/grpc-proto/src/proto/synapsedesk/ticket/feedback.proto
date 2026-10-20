@@ -20,6 +20,10 @@ message FeedbackResponse {
   optional bool citation_accurate = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
+  // The rated message's ticket, so a dashboard row can open it. Absent only
+  // when the message is gone.
+  optional string ticket_id = 10;
+  optional int64 ticket_number = 11;
 }
 
 // An UPSERT, not an insert: `(ticket_message_id, user_id)` is unique, so a user

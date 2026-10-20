@@ -2,6 +2,8 @@ import {
   AiModelTier as ProtoAiModelTier,
   ExportKind as ProtoExportKind,
   ExportStatus as ProtoExportStatus,
+  toProtoTimestamp,
+  type UsageMeter,
 } from '@synapsedesk/grpc-proto';
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
@@ -559,6 +561,78 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
   });
 
   describe('ai-usage', () => {
+    const RESETS = new Date('2026-11-01T00:00:00.000Z');
+
+    /** Auth's usage read: this cycle's spend, the plan, the reset. */
+    const stubAllowance = (aiTokens: UsageMeter) =>
+      fx.stubs.organization.getOrganizationUsage.mockReturnValue(
+        of({
+          seats: { available: true, used: 1, limit: 5 },
+          storage: { available: false, unavailableReason: 'READ_FAILED' },
+          aiTokens,
+          billingCycleStart: timestamp(),
+          cycleResetsAt: toProtoTimestamp(RESETS),
+          aiModelTier: 1,
+          planName: 'Pro',
+        }),
+      );
+
+    const stubUsage = () =>
+      fx.stubs.ledger.getAiUsage.mockReturnValue(
+        of({
+          points: [],
+          byPurpose: [],
+          byModel: [],
+          totalCostMicros: 4_500,
+          totalGenerations: 9,
+          monthlyBudgetMicros: 1_000_000,
+          aiModelTier: 1,
+          draftAcceptance: wireRate(0, 0),
+          emptyRetrievalRate: wireRate(0, 0),
+          computedAt: timestamp(),
+        }),
+      );
+
+    beforeEach(() =>
+      stubAllowance({ available: true, used: 250_000, limit: 1_000_000 }),
+    );
+
+    it('**21b. Carries this cycle’s allowance — read live, not cached with a closed range**', async () => {
+      stubUsage();
+
+      const first = await agent().get(
+        `${API}/analytics/ai-usage?${CLOSED_RANGE}`,
+      );
+      expect(first.body.data).toMatchObject({
+        // The range's spend and the cycle's are different numbers.
+        totalCostMicros: 4_500,
+        cycleSpentMicros: 250_000,
+        planName: 'Pro',
+        cycleResetsAt: RESETS.toISOString(),
+      });
+
+      // A closed range is cached for a day; the allowance moves with every
+      // generation, so it's read again.
+      stubAllowance({ available: true, used: 900_000, limit: 1_000_000 });
+      const second = await agent().get(
+        `${API}/analytics/ai-usage?${CLOSED_RANGE}`,
+      );
+      expect(second.body.data.cycleSpentMicros).toBe(900_000);
+      expect(fx.stubs.ledger.getAiUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it('21c. An unreadable counter is null, not zero', async () => {
+      stubUsage();
+      stubAllowance({ available: false });
+
+      const res = await agent().get(
+        `${API}/analytics/ai-usage?from=2025-01-01&to=2025-01-31`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.cycleSpentMicros).toBeNull();
+    });
+
     it('21. Carries the per-purpose split and the budget beside the spend', async () => {
       // **The per-purpose split is the point**: it shows a tenant where the
       // budget actually goes, which is rarely where they assume. And a cost

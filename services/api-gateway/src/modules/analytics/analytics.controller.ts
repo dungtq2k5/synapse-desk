@@ -185,7 +185,13 @@ export class AnalyticsController {
   @ApiWrappedResponse(ExportResponseDto, {
     status: HttpStatus.ACCEPTED,
   })
-  @ApiFilterErrors(['400', '401', '403'])
+  @ApiFilterErrors(['400', '401', '403'], {
+    descriptions: {
+      '400':
+        "Among others: a range over 92 days, or over the organization's " +
+        '`analyticsRangeDays` (an audit-log export has only the 92-day cap).',
+    },
+  })
   // Its own limit, and the tightest in the file: this writes a file nothing
   // sweeps. `AI_THROTTLER_TIER` because the tier's storage is already wired,
   // not because an export spends model budget — it does not.

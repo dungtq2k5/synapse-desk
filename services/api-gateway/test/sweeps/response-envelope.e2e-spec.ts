@@ -121,6 +121,7 @@ describe('response envelope sweep (e2e)', () => {
             storage: { available: false, unavailableReason: 'n/a' },
             aiTokens: { available: false, unavailableReason: 'n/a' },
             billingCycleStart: timestamp(),
+            cycleResetsAt: timestamp(),
             aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
             planName: 'Free',
           }),

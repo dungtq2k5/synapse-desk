@@ -241,6 +241,35 @@ describe('AI feedback at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items).toHaveLength(1);
     });
 
+    it('2b. **each row names its ticket**; a row whose message is gone names none', async () => {
+      const ticketId = faker.string.uuid();
+      fx.stubs.feedback.listFeedback.mockReturnValue(
+        of({
+          items: [
+            wireFeedback({ ticketId, ticketNumber: 1042 }),
+            wireFeedback(),
+          ],
+          meta: wirePage([]).meta,
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['analytics.read'],
+      }).get(`${API}/feedback`);
+
+      expect(
+        res.body.data.items.map(
+          (item: { ticketId: string | null; ticketNumber: number | null }) => [
+            item.ticketId,
+            item.ticketNumber,
+          ],
+        ),
+      ).toEqual([
+        [ticketId, 1042],
+        [null, null],
+      ]);
+    });
+
     it('3. sends rating 0 when NO rating filter is given', async () => {
       // The proto zero value, which the service reads as "no filter".
       fx.stubs.feedback.listFeedback.mockReturnValue(

@@ -167,6 +167,19 @@ export class AiUsageResponseDto {
   computedAt!: Date | null;
   /** See `OverviewResponseDto.dataThrough`. */
   dataThrough!: string | null;
+  /**
+   * What the allowance gate has charged this billing cycle, in micros — the
+   * allowance's spend, read live. `totalCostMicros` is the chosen range's.
+   * Null when the counter couldn't be read: unknown, not zero.
+   */
+  cycleSpentMicros!: number | null;
+  /** The plan, as the usage page names it. */
+  planName!: string;
+  /**
+   * When the allowance resets: the invoice period's end, or a month after the
+   * cycle start for an organization with no period.
+   */
+  cycleResetsAt!: Date;
 }
 
 /**

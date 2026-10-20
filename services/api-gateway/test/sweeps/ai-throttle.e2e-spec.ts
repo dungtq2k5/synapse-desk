@@ -224,6 +224,7 @@ describe('AI route rate limiting (e2e)', () => {
         storage: { available: false, unavailableReason: 'n/a' },
         aiTokens: { available: false, unavailableReason: 'n/a' },
         billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+        cycleResetsAt: { seconds: 1_759_363_200, nanos: 0 },
         aiModelTier: 1,
         planName: 'Free',
       }),

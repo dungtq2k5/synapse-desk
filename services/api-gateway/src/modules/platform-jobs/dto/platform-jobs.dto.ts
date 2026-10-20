@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MAX_ADMIN_REASON_LENGTH } from '../../../common/config/dto.config';
-import { IsISO8601, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsISO8601,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 /**
  * A BACKFILL.
@@ -31,4 +38,12 @@ export class BackfillJobDto {
   // accepts `"   "` exactly as `@IsNotEmpty` does.
   @ApiProperty({ minLength: 1 })
   reason!: string;
+
+  /**
+   * One organization only. Absent, every tenant with activity in the range,
+   * as the schedule does.
+   */
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
 }

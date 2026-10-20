@@ -53445,7 +53445,7 @@
             }
           },
           "400": {
-            "description": "Validation failed, or the request is malformed.",
+            "description": "Among others: a range over 92 days, or over the organization's `analyticsRangeDays` (an audit-log export has only the 92-day cap).",
             "content": {
               "application/json": {
                 "schema": {
@@ -56881,6 +56881,49 @@
                           }
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Among others: `from` to `to` spans more than the organization's `analyticsRangeDays`, as every analytics read refuses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
                     }
                   }
                 }
@@ -69200,6 +69243,10 @@
             "format": "date-time",
             "type": "string"
           },
+          "analyticsRangeDays": {
+            "type": "number",
+            "description": "The longest analytics range, in days, one request may span: the plan's\ngrant, held to the platform's limit (400). A longer range is refused\nwith a 400."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -69221,6 +69268,7 @@
           "maxStorageBytes",
           "monthlyAiTokenBudget",
           "billingCycleStart",
+          "analyticsRangeDays",
           "createdAt",
           "updatedAt"
         ]
@@ -70935,6 +70983,11 @@
           },
           "to": {
             "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does.",
+            "format": "uuid"
           }
         },
         "required": ["reason", "from", "to"]
@@ -72400,6 +72453,20 @@
             "type": "string",
             "nullable": true,
             "description": "See `OverviewResponseDto.dataThrough`."
+          },
+          "cycleSpentMicros": {
+            "type": "number",
+            "nullable": true,
+            "description": "What the allowance gate has charged this billing cycle, in micros — the\nallowance's spend, read live. `totalCostMicros` is the chosen range's.\nNull when the counter couldn't be read: unknown, not zero."
+          },
+          "planName": {
+            "type": "string",
+            "description": "The plan, as the usage page names it."
+          },
+          "cycleResetsAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the allowance resets: the invoice period's end, or a month after the\ncycle start for an organization with no period."
           }
         },
         "required": [
@@ -72413,7 +72480,10 @@
           "draftAcceptance",
           "emptyRetrievalRate",
           "computedAt",
-          "dataThrough"
+          "dataThrough",
+          "cycleSpentMicros",
+          "planName",
+          "cycleResetsAt"
         ]
       },
       "AgentStatResponseDto": {
@@ -72744,6 +72814,16 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "ticketId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The rated answer's ticket, to open it from. Null only when the message is gone."
+          },
+          "ticketNumber": {
+            "type": "number",
+            "nullable": true,
+            "description": "That ticket's number, as \"Ticket #{n}\" shows it."
           }
         },
         "required": [
@@ -72755,7 +72835,9 @@
           "feedbackText",
           "citationAccurate",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "ticketId",
+          "ticketNumber"
         ]
       },
       "SubmitFeedbackDto": {

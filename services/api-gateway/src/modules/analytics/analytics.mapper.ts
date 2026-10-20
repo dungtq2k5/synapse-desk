@@ -7,6 +7,8 @@ import {
   fromProtoExportKind,
   fromProtoExportStatus,
   fromProtoTimestamp,
+  OrganizationUsageResponse,
+  requireProtoTimestamp,
   type ProtoTimestamp,
   AiUsageResponse,
   fromProtoAiModelTier,
@@ -211,9 +213,12 @@ export function toSatisfactionResponseDto(
 }
 
 /** Converts a `AiUsageResponse` off the wire into its REST DTO. */
+/** The allowance's fields, read live rather than cached with the range. */
+type AllowanceFields = 'cycleSpentMicros' | 'planName' | 'cycleResetsAt';
+
 export function toAiUsageResponseDto(
   response: AiUsageResponse,
-): AiUsageResponseDto {
+): Omit<AiUsageResponseDto, AllowanceFields> {
   return {
     points: response.points.map((point) => ({
       day: point.day,
@@ -230,5 +235,24 @@ export function toAiUsageResponseDto(
     emptyRetrievalRate: toRateResponseDto(response.emptyRetrievalRate),
     computedAt: fromProtoTimestamp(response.computedAt) ?? null,
     dataThrough: response.dataThrough ?? null,
+  };
+}
+
+/**
+ * The allowance this cycle, from auth's usage read: the spend the gate
+ * charged (null when the counter couldn't be read), the plan, and the reset.
+ */
+export function toAllowanceDto(
+  allowance: OrganizationUsageResponse,
+): Pick<AiUsageResponseDto, AllowanceFields> {
+  return {
+    cycleSpentMicros: allowance.aiTokens?.available
+      ? (allowance.aiTokens.used ?? null)
+      : null,
+    planName: allowance.planName,
+    cycleResetsAt: requireProtoTimestamp(
+      allowance.cycleResetsAt,
+      'cycleResetsAt',
+    ),
   };
 }

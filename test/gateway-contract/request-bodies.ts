@@ -187,6 +187,10 @@ export const fillPath = (path: string): string =>
     if (/^(id|\w+Id)$/u.test(name)) return ID;
     // The document types a few path variables as numbers (a ticket number).
     if (/number$/iu.test(name)) return '1';
+    // A job the platform routes know, so a body gets past the name to the peer.
+    if (name === 'name' && path.includes('/platform/jobs/')) {
+      return 'analytics-daily';
+    }
 
     return 'abc';
   });

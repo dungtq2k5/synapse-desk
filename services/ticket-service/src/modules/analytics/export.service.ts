@@ -19,6 +19,7 @@ import { safeTimezone, withHttpStatus } from '@synapsedesk/core';
 import {
   AuditPublisher,
   formatErrorMsg,
+  parseAnalyticsRange,
   requireActor,
   requireTenant,
 } from '@synapsedesk/nest-common';
@@ -82,6 +83,12 @@ export class ExportService {
     const requestedById = requireActor(context);
     const kind = this.validateKind(input.kind);
     this.assertSpan(input.from, input.to);
+    // An analytics export can't show more than the dashboard: the plan's range
+    // limit applies as it does to every analytics read. The audit log isn't an
+    // analytics surface, so only the 92-day cap bounds it.
+    if (kind !== ExportKind.AUDIT_LOG) {
+      await this.assertPlanSpan(input.from, input.to, context);
+    }
     const filters = this.parseFilters(kind, input.filters);
 
     // Resolved BEFORE the dedupe, because it is part of what makes two requests
@@ -331,6 +338,24 @@ export class ExportService {
         message: `An export may cover at most ${MAX_EXPORT_SPAN_DAYS} days; this range is ${days}`,
       });
     }
+  }
+
+  /**
+   * Refuses a range longer than the organization's analytics range, in the
+   * words every analytics read uses.
+   *
+   * @throws RpcException INVALID_ARGUMENT for a range over the plan's limit.
+   */
+  private async assertPlanSpan(
+    from: Date,
+    to: Date,
+    context: CallerContext,
+  ): Promise<void> {
+    parseAnalyticsRange(
+      from.toISOString().slice(0, 10),
+      to.toISOString().slice(0, 10),
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
   }
 
   /**

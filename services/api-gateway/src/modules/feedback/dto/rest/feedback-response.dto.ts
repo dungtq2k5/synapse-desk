@@ -18,4 +18,8 @@ export class FeedbackResponseDto {
   citationAccurate!: boolean | null;
   createdAt!: Date;
   updatedAt!: Date;
+  /** The rated answer's ticket, to open it from. Null only when the message is gone. */
+  ticketId!: string | null;
+  /** That ticket's number, as "Ticket #{n}" shows it. */
+  ticketNumber!: number | null;
 }

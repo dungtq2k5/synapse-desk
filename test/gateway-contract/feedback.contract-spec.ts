@@ -189,6 +189,43 @@ describe('feedback', () => {
   );
 
   rowFor('Feedback')(
+    '**each row names its ticket**, to open it from; a row whose message is gone names none',
+    async () => {
+      const TICKET = '55555555-5555-4555-8555-555555555555';
+      peers.ticket.on('FeedbackService/ListFeedback').reply({
+        items: [
+          { ...wireFeedback(1), ticketId: TICKET, ticketNumber: 1042 },
+          wireFeedback(-1),
+        ],
+        meta: {
+          totalItems: 2,
+          itemCount: 2,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/feedback`,
+        {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken(['analytics.read'])}`,
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          items: [
+            { ticketId: TICKET, ticketNumber: 1042 },
+            { ticketId: null, ticketNumber: null },
+          ],
+        },
+      });
+    },
+  );
+
+  rowFor('Feedback')(
     '**`1.0` is the thumb `1`**: a rating is compared as a number, not as text',
     async () => {
       // Raw text, because `JSON.stringify(1.0)` is `1`: a client in a language

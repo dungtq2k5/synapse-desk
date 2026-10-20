@@ -4,6 +4,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   toAiUsageResponseDto,
+  toAllowanceDto,
   toExportResponseDto,
   toAnalyticsRangeRequest,
   toDeflectionResponseDto,
@@ -117,10 +118,31 @@ export class AnalyticsService {
     );
   }
 
-  aiUsage(
+  /**
+   * The range's AI spend, cached like every chart, with this cycle's
+   * allowance read live beside it: a closed range is cached for a day, and
+   * the allowance moves with every generation.
+   */
+  async aiUsage(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
   ): Promise<AiUsageResponseDto> {
+    // Both settle before either's failure answers: a request is never left
+    // with a call still in flight behind it.
+    const [usage, allowance] = await Promise.allSettled([
+      this.cachedAiUsage(query, context),
+      this.client.allowance(context),
+    ]);
+    if (usage.status === 'rejected') throw usage.reason;
+    if (allowance.status === 'rejected') throw allowance.reason;
+
+    return { ...usage.value, ...toAllowanceDto(allowance.value) };
+  }
+
+  private cachedAiUsage(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ) {
     return this.cached('ai-usage', query, context, () =>
       this.client
         .aiUsage(

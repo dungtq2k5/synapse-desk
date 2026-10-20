@@ -796,6 +796,7 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('FAST'),
           planName: 'Pro',
           billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+          cycleResetsAt: { seconds: 1_782_678_400, nanos: 0 },
         }),
       );
       fx.stubs.document.getStorageUsage.mockReturnValue(
@@ -836,6 +837,7 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('FAST'),
           planName: 'Pro',
           billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+          cycleResetsAt: { seconds: 1_782_678_400, nanos: 0 },
         }),
       );
       fx.stubs.document.getStorageUsage.mockReturnValue(
@@ -867,6 +869,7 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('FAST'),
           planName: 'Pro',
           billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+          cycleResetsAt: { seconds: 1_782_678_400, nanos: 0 },
         }),
       );
       fx.stubs.document.getStorageUsage.mockReturnValue(
@@ -896,6 +899,7 @@ describe('Billing at the gateway (e2e)', () => {
           aiModelTier: toProtoAiModelTier('FAST'),
           planName: 'Pro',
           billingCycleStart: { seconds: 1_780_000_000, nanos: 0 },
+          cycleResetsAt: { seconds: 1_782_678_400, nanos: 0 },
         }),
       );
       fx.stubs.document.getStorageUsage.mockReturnValue(

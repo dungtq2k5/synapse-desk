@@ -10,6 +10,9 @@ import {
   TICKET_GRPC_CLIENT,
   USER_SERVICE_NAME,
   UserServiceClient,
+  ORGANIZATION_SERVICE_NAME,
+  OrganizationServiceClient,
+  OrganizationUsageResponse,
   AUTH_GRPC_CLIENT,
   AgentStatsResponse,
   AiUsageResponse,
@@ -64,6 +67,7 @@ export class AnalyticsGrpcClient
   private analyticsService!: AnalyticsServiceClient;
   private ledgerService!: AiLedgerServiceClient;
   private userService!: UserServiceClient;
+  private organizationService!: OrganizationServiceClient;
 
   constructor(
     @Inject(TICKET_GRPC_CLIENT) private readonly ticketClient: ClientGrpc,
@@ -83,6 +87,10 @@ export class AnalyticsGrpcClient
     );
     this.userService =
       this.authClient.getService<UserServiceClient>(USER_SERVICE_NAME);
+    this.organizationService =
+      this.authClient.getService<OrganizationServiceClient>(
+        ORGANIZATION_SERVICE_NAME,
+      );
   }
 
   // ------------------------------------------- the single-service endpoints
@@ -144,6 +152,19 @@ export class AnalyticsGrpcClient
     return this.call(
       (metadata) => this.ledgerService.getAiUsage(request, metadata),
       context,
+    );
+  }
+
+  /**
+   * The AI allowance this cycle — what the gate has charged, the plan and
+   * when it resets — from the same read as the usage page's meter.
+   */
+  allowance(context: RequestContext): Promise<OrganizationUsageResponse> {
+    return this.call(
+      (metadata) => this.organizationService.getOrganizationUsage({}, metadata),
+      context,
+      undefined,
+      'auth-service',
     );
   }
 

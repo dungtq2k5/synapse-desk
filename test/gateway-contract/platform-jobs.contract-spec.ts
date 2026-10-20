@@ -218,4 +218,36 @@ describe('platform-jobs', () => {
       });
     },
   );
+
+  rowFor('Platform Jobs')(
+    '**`backfill` can be one organization’s**, and that id reaches both peers',
+    async () => {
+      const ORGANIZATION = 'dddddddd-1111-4111-8111-dddddddddddd';
+      peers.ticket
+        .on('AnalyticsService/RunRollup')
+        .reply({ tenants: 1, ticketRows: 3, agentRows: 0 });
+      peers.ingestion
+        .on('AiLedgerService/RunAiRollup')
+        .reply({ tenants: 1, rows: 3 });
+
+      for (const job of ['analytics-daily', 'ledger-daily']) {
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/jobs/${job}/backfill`,
+          {
+            from: '2026-01-01',
+            to: '2026-01-31',
+            reason: 'one organization',
+            organizationId: ORGANIZATION,
+          },
+          superAdminHeaders(),
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const [rollup] = peers.ticket.calls('AnalyticsService/RunRollup');
+      const [ledger] = peers.ingestion.calls('AiLedgerService/RunAiRollup');
+      expect(rollup.request).toMatchObject({ organizationId: ORGANIZATION });
+      expect(ledger.request).toMatchObject({ organizationId: ORGANIZATION });
+    },
+  );
 });

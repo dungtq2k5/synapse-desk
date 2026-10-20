@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { SCHEDULED_JOBS, jobsOwnedBy } from '@synapsedesk/contracts';
@@ -371,6 +372,53 @@ describe('Platform job health (e2e)', () => {
         expect.objectContaining({ from: '2026-01-01', to: '2026-01-31' }),
         expect.anything(),
       );
+    });
+
+    it('**11b. a backfill can be one organization’s, on both jobs**', async () => {
+      const organizationId = faker.string.uuid();
+      fx.stubs.analytics.runRollup.mockReturnValue(
+        of({ tenants: 1, ticketRows: 3, agentRows: 0 }),
+      );
+      fx.stubs.ledger.runAiRollup.mockReturnValue(of({ tenants: 1, rows: 3 }));
+
+      for (const job of [
+        SCHEDULED_JOBS.ANALYTICS_DAILY,
+        SCHEDULED_JOBS.LEDGER_DAILY,
+      ]) {
+        await superAdmin()
+          .post(`${API}/platform/jobs/${job}/backfill`)
+          .send({
+            from: '2026-01-01',
+            to: '2026-01-31',
+            reason: 'a journey’s organization',
+            organizationId,
+          })
+          .expect(200);
+      }
+
+      for (const stub of [
+        fx.stubs.analytics.runRollup,
+        fx.stubs.ledger.runAiRollup,
+      ]) {
+        expect(stub).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId }),
+          expect.anything(),
+        );
+      }
+    });
+
+    it('11c. an organization that isn’t an id is a 400', async () => {
+      await superAdmin()
+        .post(`${API}/platform/jobs/${SCHEDULED_JOBS.ANALYTICS_DAILY}/backfill`)
+        .send({
+          from: '2026-01-01',
+          to: '2026-01-31',
+          reason: 'typo',
+          organizationId: 'acme',
+        })
+        .expect(400);
+
+      expect(fx.stubs.analytics.runRollup).not.toHaveBeenCalled();
     });
 
     it('12. a reversed range is rejected before it reaches a service', async () => {

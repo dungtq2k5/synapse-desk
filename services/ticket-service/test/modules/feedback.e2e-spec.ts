@@ -1,5 +1,6 @@
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
 import { faker } from '@faker-js/faker';
 import { toProtoTimestamp } from '@synapsedesk/grpc-proto';
 import {
@@ -15,6 +16,7 @@ import {
   createTicket,
   TenantFixture,
 } from '../factories';
+import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { FeedbackService } from '../../src/modules/feedback/feedback.service';
 
 describe('AI feedback (e2e)', () => {
@@ -80,6 +82,18 @@ describe('AI feedback (e2e)', () => {
       expect(result.rating).toBe(1);
       expect(result.userId).toBe(tenant.userId);
       expect(result.organizationId).toBe(tenant.organizationId);
+    });
+
+    it('1b. names the rated answer’s ticket', async () => {
+      const { ticket, reply } = await seedAiReply();
+
+      const result = await feedback.submitFeedback(
+        { ticketMessageId: reply.id, rating: -1 },
+        author(),
+      );
+
+      expect(result.ticketId).toBe(ticket.id);
+      expect(result.ticketNumber).toBe(Number(ticket.ticketNumber));
     });
 
     it('2. UPDATES on a second submission — never a second row', async () => {
@@ -618,6 +632,64 @@ describe('AI feedback (e2e)', () => {
       expect(items[0].feedbackText).toContain('WRONG policy');
       // The same `where` counted the same rows — three exist, one matched.
       expect(meta!.totalItems).toBe(1);
+    });
+
+    it('8. each row names its ticket, so a dashboard row can open it; a row whose message is gone names none', async () => {
+      const first = await seedAiReply();
+      const second = await seedAiReply();
+      const gone = await seedAiReply();
+      for (const { reply } of [first, second, gone]) {
+        await feedback.submitFeedback(
+          { ticketMessageId: reply.id, rating: 1 },
+          author(),
+        );
+      }
+      await fx.prisma.ticketMessage.delete({ where: { id: gone.reply.id } });
+
+      const { items } = await feedback.listFeedback(listRequest(), analyst());
+
+      const byMessage = new Map(
+        items.map((item) => [item.ticketMessageId, item]),
+      );
+      for (const { ticket, reply } of [first, second]) {
+        expect(byMessage.get(reply.id)).toMatchObject({
+          ticketId: ticket.id,
+          ticketNumber: Number(ticket.ticketNumber),
+        });
+      }
+      expect(byMessage.get(gone.reply.id)?.ticketId).toBeUndefined();
+      expect(byMessage.get(gone.reply.id)?.ticketNumber).toBeUndefined();
+    });
+
+    it('9. **refuses a range longer than the organization’s analytics range**, as every analytics read does', async () => {
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'getAnalyticsRangeDays')
+        .mockResolvedValue(30);
+      const day = (value: string) => toProtoTimestamp(new Date(value));
+
+      const refused = feedback.listFeedback(
+        listRequest({
+          from: day('2026-05-01T00:00:00.000Z'),
+          to: day('2026-05-31T23:59:59.000Z'),
+        }),
+        analyst(),
+      );
+      await expectRpc(refused, status.INVALID_ARGUMENT);
+      await refused.catch((error: unknown) =>
+        expect((error as RpcException).getError()).toMatchObject({
+          message: 'Range is 31 days; the maximum is 30',
+        }),
+      );
+      // Thirty days is the limit itself, and passes.
+      await expect(
+        feedback.listFeedback(
+          listRequest({
+            from: day('2026-05-01T00:00:00.000Z'),
+            to: day('2026-05-30T23:59:59.000Z'),
+          }),
+          analyst(),
+        ),
+      ).resolves.toMatchObject({ items: [] });
     });
   });
 });
