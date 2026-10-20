@@ -168,6 +168,13 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: services/api-gateway/pom.xml
+      # `cache: maven` keeps ~/.m2/repository only; without this, `mvnw`
+      # fetches the Maven zip from Maven Central on every run, and a failed
+      # fetch fails the job.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('services/api-gateway/.mvn/wrapper/maven-wrapper.properties') }}
       - run: npm ci --ignore-scripts
       - run: npm run build
 
@@ -224,6 +231,13 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: services/api-gateway/pom.xml
+      # `cache: maven` keeps ~/.m2/repository only; without this, `mvnw`
+      # fetches the Maven zip from Maven Central on every run, and a failed
+      # fetch fails the job.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('services/api-gateway/.mvn/wrapper/maven-wrapper.properties') }}
       # `openapi:check`'s compare step uses prettier and ajv.
       - run: npm ci --ignore-scripts
       - name: JWT keys
@@ -309,6 +323,13 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: services/api-gateway/pom.xml
+      # `cache: maven` keeps ~/.m2/repository only; without this, `mvnw`
+      # fetches the Maven zip from Maven Central on every run, and a failed
+      # fetch fails the job.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('services/api-gateway/.mvn/wrapper/maven-wrapper.properties') }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
