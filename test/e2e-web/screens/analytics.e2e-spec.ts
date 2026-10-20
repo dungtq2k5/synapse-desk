@@ -12,7 +12,7 @@ import {
   PREVIOUS,
   RANGE,
   series,
-} from './analytics-data';
+} from '../../../apps/web/src/test/analytics-data';
 import { look } from './look';
 import { failed, hang, ok, settings, type Overrides } from './settings-data';
 import {

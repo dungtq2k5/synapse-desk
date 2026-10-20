@@ -26,7 +26,7 @@ import {
   PREVIOUS,
   series,
   TO,
-} from '../../../../../test/e2e-web/screens/analytics-data';
+} from '@/test/analytics-data';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AgentsView } from './agents-view';
 import { AiUsageView } from './ai-usage-view';
