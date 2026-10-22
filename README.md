@@ -198,7 +198,7 @@ npm run dev
 
 `turbo run dev` starts all seven. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `packages/` during a session needs a rebuild to propagate.
 
-On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in.
+On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in. **A Super Admin must use two-step.** In development and tests, `SUPER_ADMIN_TOTP_SECRET` (a base32 secret, refused under production) enrolls it at boot, new or existing, so signing in by hand needs an authenticator holding that secret, and scripts compute the code with `otplib`. A code is accepted once per 30-second step. Without the setting, the Super Admin enrolls at their first sign-in.
 
 | Reach | At |
 | :--- | :--- |
