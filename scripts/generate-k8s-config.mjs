@@ -142,6 +142,10 @@ const EXCLUDED = new Map([
     'production calls the real Stripe; auth-service refuses to boot with another host under NODE_ENV=production',
   ],
   [
+    'SUPER_ADMIN_TOTP_SECRET',
+    'production enrolls the Super Admin at first sign-in; auth-service refuses to boot with a known secret under NODE_ENV=production',
+  ],
+  [
     'RAG_OFFLINE_MODEL',
     'production answers with the real model; rag-service refuses to boot with the offline one under APP_ENV=production',
   ],

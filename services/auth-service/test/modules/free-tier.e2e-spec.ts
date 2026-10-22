@@ -133,6 +133,7 @@ describe('The free tier (e2e)', () => {
         adminFullName: 'Admin',
       },
       superAdminContext(SUPER_ADMIN_ID),
+      requestOrigin(),
     );
 
     const organization = await fx.prisma.organization.findUniqueOrThrow({
@@ -162,6 +163,7 @@ describe('The free tier (e2e)', () => {
         monthlyAiTokenBudget: 88_000_000,
       },
       superAdminContext(SUPER_ADMIN_ID),
+      requestOrigin(),
     );
 
     const organization = await fx.prisma.organization.findUniqueOrThrow({

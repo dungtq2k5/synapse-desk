@@ -7,6 +7,7 @@ import {
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
+  EmailTemplateName,
   ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
@@ -21,6 +22,7 @@ import {
   E2eFixture,
   bootstrapE2eTest,
   pageRequest,
+  requestOrigin,
   superAdminContext,
 } from '../utils';
 import {
@@ -31,6 +33,7 @@ import {
 } from '../factories';
 import type Redis from 'ioredis';
 import { PlatformService } from '../../src/modules/platform/platform.service';
+import { AuthService } from '../../src/modules/auth/auth.service';
 import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
 import { AuthGenerationStore } from '../../src/modules/limit-alerts/generation.store';
 
@@ -69,6 +72,7 @@ describe('Platform (e2e)', () => {
           allowedEmailDomains: [],
         },
         ctx,
+        requestOrigin(),
       );
 
       const admin = await fx.prisma.user.findFirstOrThrow({
@@ -79,6 +83,63 @@ describe('Platform (e2e)', () => {
       expect(admin.roles.map((r) => r.name)).toEqual([
         SystemRoleName.ORG_ADMIN,
       ]);
+    });
+
+    it('4c. the admin is emailed a welcome link: 7 days, sets the password, verifies the address', async () => {
+      const result = await platform.createOrganization(
+        {
+          name: 'Contoso',
+          slug: 'contoso',
+          adminEmail: 'admin@contoso.test',
+          adminFullName: 'Contoso Admin',
+          allowedEmailDomains: [],
+        },
+        ctx,
+        requestOrigin(),
+      );
+
+      expect(fx.notifications.sendEmail).toHaveBeenCalledTimes(1);
+      const [command] = fx.notifications.sendEmail.mock.calls[0] as [
+        {
+          template: string;
+          to: string;
+          data: {
+            organizationName: string;
+            setPasswordUrl: string;
+            expiresInDays: number;
+          };
+        },
+      ];
+      expect(command).toMatchObject({
+        template: EmailTemplateName.ORGANIZATION_CREATED,
+        to: 'admin@contoso.test',
+        data: { organizationName: 'Contoso', expiresInDays: 7 },
+      });
+
+      // Day 6 works, day 8 doesn't: the row's horizon, read back.
+      const row = await fx.prisma.passwordResetToken.findFirstOrThrow({
+        where: { userId: result.admin!.id },
+      });
+      const DAY = 24 * 60 * 60 * 1000;
+      expect(row.expiresAt.getTime()).toBeGreaterThan(Date.now() + 6 * DAY);
+      expect(row.expiresAt.getTime()).toBeLessThan(Date.now() + 8 * DAY);
+
+      const token = new URL(command.data.setPasswordUrl).searchParams.get(
+        'token',
+      )!;
+      const auth = fx.moduleRef.get(AuthService);
+      await auth.resetPassword({ token, newPassword: 'Welcome-Passw0rd!' });
+
+      const admin = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: result.admin!.id },
+      });
+      expect(admin.isEmailVerified).toBe(true);
+      await expect(
+        auth.login(
+          { email: 'admin@contoso.test', password: 'Welcome-Passw0rd!' },
+          requestOrigin(),
+        ),
+      ).resolves.toMatchObject({ requiresTwoFactor: false });
     });
 
     it('4b. a duplicate slug rolls the WHOLE thing back — no orphan admin', async () => {
@@ -93,6 +154,7 @@ describe('Platform (e2e)', () => {
           allowedEmailDomains: [],
         },
         ctx,
+        requestOrigin(),
       );
 
       await expectRpc(
@@ -105,6 +167,7 @@ describe('Platform (e2e)', () => {
             allowedEmailDomains: [],
           },
           ctx,
+          requestOrigin(),
         ),
         status.ALREADY_EXISTS,
       );
@@ -133,6 +196,7 @@ describe('Platform (e2e)', () => {
           allowedEmailDomains: [],
         },
         ctx,
+        requestOrigin(),
       );
 
       const after = await fx.prisma.role.findUniqueOrThrow({
@@ -153,6 +217,7 @@ describe('Platform (e2e)', () => {
           allowedEmailDomains: [],
         },
         ctx,
+        requestOrigin(),
       );
 
       const org = result.organization!.organization!;
@@ -716,6 +781,7 @@ describe('Platform (e2e)', () => {
           allowedEmailDomains: [],
         },
         ctx,
+        requestOrigin(),
       );
       await platform.updateOrganization(
         { organizationId: t.org.id, maxAgentSeats: 42 },

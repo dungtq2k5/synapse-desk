@@ -8,11 +8,15 @@ import {
   createBackupCode,
   createLegacyBackupCode,
   createTrustedDeviceSession,
+  createUserWithPassword,
   seedTenantWithUser,
   TEST_PASSWORD,
 } from '../factories';
 import { TwoFactorAuthService } from '../../src/modules/auth/two-factor-auth.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
+import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
+import { decryptSecret, encryptSecret } from '../../src/common/utils/secrets';
+import { ConfigService } from '@nestjs/config';
 
 describe('Two-factor auth (e2e)', () => {
   let fx: E2eFixture;
@@ -621,6 +625,144 @@ describe('Two-factor auth (e2e)', () => {
         'fulfilled',
         'rejected',
       ]);
+    });
+  });
+
+  describe('a Super Admin must use two-step', () => {
+    const superAdmin = () =>
+      createUserWithPassword(fx.prisma, {
+        organizationId: null,
+        isSuperAdmin: true,
+      });
+
+    it('without two-step, sign-in sends them to enrollment', async () => {
+      const user = await superAdmin();
+
+      const login = await auth.login(
+        { email: user.email, password: TEST_PASSWORD },
+        requestOrigin(),
+      );
+
+      expect(login).toMatchObject({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: true,
+      });
+      expect(login.accessToken).toBeFalsy();
+    });
+
+    it('with two-step, a trusted device still gets the code prompt', async () => {
+      const user = await superAdmin();
+      await enrol(user.id);
+      const { deviceToken } = await createTrustedDeviceSession(
+        fx.prisma,
+        user.id,
+      );
+
+      const login = await auth.login(
+        { email: user.email, password: TEST_PASSWORD, deviceToken },
+        requestOrigin(),
+      );
+
+      expect(login).toMatchObject({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+      });
+    });
+
+    it('"remember this device" marks nothing trusted', async () => {
+      const user = await superAdmin();
+      const { secret } = await enrol(user.id);
+
+      const result = await twoFactor.authenticateTwoFactor(
+        {
+          twoFactorToken: await challenge(user.email),
+          code: generateSync({ secret }),
+          rememberDevice: true,
+        },
+        requestOrigin(),
+      );
+
+      expect(result.accessToken).toBeTruthy();
+      expect(result.deviceToken).toBeFalsy();
+      expect(
+        await fx.prisma.deviceSession.count({
+          where: { userId: user.id, isTrusted: true },
+        }),
+      ).toBe(0);
+    });
+
+    describe('SUPER_ADMIN_TOTP_SECRET', () => {
+      const SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+      const seeded = () =>
+        fx.prisma.user.findFirstOrThrow({
+          where: { email: process.env.SUPER_ADMIN_EMAIL, organizationId: null },
+        });
+      const masterKey = () => process.env.TWO_FACTOR_MASTER_KEY!;
+      const seedWithSecret = async () => {
+        const config = fx.moduleRef.get(ConfigService);
+        const get = config.get.bind(config);
+        const spy = jest
+          .spyOn(config, 'get')
+          .mockImplementation((key: string) =>
+            key === 'SUPER_ADMIN_TOTP_SECRET' ? SECRET : get(key),
+          );
+        try {
+          await fx.moduleRef.get(DatabaseSeeder).seedRows();
+        } finally {
+          spy.mockRestore();
+        }
+      };
+
+      afterEach(async () => {
+        await fx.prisma.user.update({
+          where: { id: (await seeded()).id },
+          data: { isTwoFactorEnabled: false, twoFactorSecret: null },
+        });
+      });
+
+      it('the seeder enrolls an existing Super Admin without two-step', async () => {
+        await seedWithSecret();
+
+        const row = await seeded();
+        expect(row.isTwoFactorEnabled).toBe(true);
+        expect(decryptSecret(row.twoFactorSecret!, masterKey())).toBe(SECRET);
+      });
+
+      it('the seeder leaves an enrolled secret alone', async () => {
+        const own = encryptSecret(
+          'KRUGS4ZANFZSA5DIMUQGC3TTO5SXE===',
+          masterKey(),
+        );
+        await fx.prisma.user.update({
+          where: { id: (await seeded()).id },
+          data: { isTwoFactorEnabled: true, twoFactorSecret: own },
+        });
+
+        await seedWithSecret();
+
+        expect((await seeded()).twoFactorSecret).toBe(own);
+      });
+    });
+
+    it('turning it off is refused, and two-step stays on', async () => {
+      const user = await superAdmin();
+      const { secret } = await enrol(user.id);
+
+      const refused = twoFactor.disableTwoFactor({
+        userId: user.id,
+        password: TEST_PASSWORD,
+        code: generateSync({ secret }),
+      });
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toMatchObject({
+        error: {
+          message: 'Super Admins must use two-factor authentication',
+        },
+      });
+      const row = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+      });
+      expect(row.isTwoFactorEnabled).toBe(true);
     });
   });
 

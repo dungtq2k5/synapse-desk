@@ -274,4 +274,16 @@ export const envValidationSchema = Joi.object({
             'applies it only when the Super Admin account is first created.',
         }),
     }),
+
+  // The Super Admin's two-step secret (base32), so the seed and the suites
+  // can compute a code: the seeder turns two-step on with it. Refused under
+  // NODE_ENV=production, where the Super Admin enrolls at first sign-in.
+  SUPER_ADMIN_TOTP_SECRET: Joi.string()
+    .pattern(/^[A-Z2-7]{16,}$/)
+    .optional()
+    .messages({
+      'string.pattern.base':
+        'SUPER_ADMIN_TOTP_SECRET must be base32 (A-Z, 2-7), at least 16 characters.',
+    })
+    .when('NODE_ENV', { is: 'production', then: Joi.forbidden() }),
 });

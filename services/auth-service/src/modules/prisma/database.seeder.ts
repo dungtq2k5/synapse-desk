@@ -12,6 +12,7 @@ import {
 } from '@synapsedesk/contracts';
 import { normalizeEmail } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { encryptSecret } from '../../common/utils/secrets';
 import { PrismaService } from './prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -49,6 +50,8 @@ type SeedSummary = {
   }[];
   systemUserCreated: boolean;
   superAdminCreated: boolean;
+  /** Two-step turned on from `SUPER_ADMIN_TOTP_SECRET` (dev and test). */
+  superAdminEnrolled: boolean;
   rolesCreated: string[];
   freePlanCreated: boolean;
 };
@@ -221,6 +224,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           ...permissions,
           systemUserCreated: systemUser.created,
           superAdminCreated: superAdmin.created,
+          superAdminEnrolled: superAdmin.enrolled,
           rolesCreated,
           freePlanCreated: freePlan.created,
         } satisfies SeedSummary;
@@ -273,6 +277,12 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           `'${this.configService.getOrThrow<string>('SUPER_ADMIN_EMAIL')}' from ` +
           'SUPER_ADMIN_PASSWORD — change this password immediately and remove ' +
           'it from the environment',
+      );
+    }
+    if (summary.superAdminEnrolled) {
+      this.logger.warn(
+        'Turned on two-step for the Super Admin from SUPER_ADMIN_TOTP_SECRET ' +
+          '(development and test only)',
       );
     }
     if (summary.rolesCreated.length) {
@@ -639,8 +649,35 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    *
    * Only created when absent. If the account already exists the .env password
    * is ignored, so redeploying never resurrects a rotated or leaked credential.
+   *
+   * With `SUPER_ADMIN_TOTP_SECRET` (refused in production), two-step is turned
+   * on with that secret, so scripts and suites can compute the code: for a new
+   * Super Admin, or an existing one without two-step. An enrolled secret is
+   * never replaced.
    */
   private async seedSuperAdmin(
+    tx: Prisma.TransactionClient,
+    passwordHash: string,
+  ): Promise<{ id: string; created: boolean; enrolled: boolean }> {
+    const { id, created } = await this.findOrCreateSuperAdmin(tx, passwordHash);
+    const secret = this.configService.get<string>('SUPER_ADMIN_TOTP_SECRET');
+    if (!secret) return { id, created, enrolled: false };
+
+    const { count } = await tx.user.updateMany({
+      where: { id, isTwoFactorEnabled: false },
+      data: {
+        isTwoFactorEnabled: true,
+        twoFactorSecret: encryptSecret(
+          secret,
+          this.configService.getOrThrow<string>('TWO_FACTOR_MASTER_KEY'),
+        ),
+        twoFactorLastTimeStep: null,
+      },
+    });
+    return { id, created, enrolled: count > 0 };
+  }
+
+  private async findOrCreateSuperAdmin(
     tx: Prisma.TransactionClient,
     passwordHash: string,
   ): Promise<{ id: string; created: boolean }> {

@@ -24,6 +24,7 @@ import {
   RoleResponse,
   SetOrganizationStatusRequest,
   unpackCallerContext,
+  unpackRequestOrigin,
   UpdatePlatformOrganizationRequest,
   ApplyPlanRequest,
   ApplyPlanResponse,
@@ -71,6 +72,7 @@ export class PlatformGrpcController implements PlatformServiceController {
     return this.platformService.createOrganization(
       request,
       unpackCallerContext(metadata),
+      unpackRequestOrigin(metadata),
     );
   }
 

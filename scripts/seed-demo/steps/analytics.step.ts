@@ -11,6 +11,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { generateSync } from 'otplib';
 import { REPO_ROOT } from '../paths';
 import { tenantsOf, type SeedStep } from '../registry';
 
@@ -30,34 +31,83 @@ function authEnv(key: string): string | undefined {
   return new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm').exec(text)?.[1]?.trim();
 }
 
-/** A signed-in caller of the gateway, its cookies kept between calls. */
-async function signIn(): Promise<
-  (path: string, body?: unknown) => Promise<void>
-> {
-  const cookies: string[] = [];
-  const call = async (path: string, body?: unknown) => {
+type Call = (path: string, body?: unknown) => Promise<unknown>;
+
+/**
+ * A caller of the gateway, its cookies kept between calls (a later
+ * `Set-Cookie` replaces an earlier one of the same name).
+ */
+function caller(): Call {
+  const cookies = new Map<string, string>();
+  return async (path, body) => {
     const response = await fetch(`${GATEWAY}/api/v1${path}`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'x-requested-with': 'XMLHttpRequest',
-        ...(cookies.length ? { cookie: cookies.join('; ') } : {}),
+        ...(cookies.size
+          ? {
+              cookie: [...cookies]
+                .map(([name, value]) => `${name}=${value}`)
+                .join('; '),
+            }
+          : {}),
       },
       body: JSON.stringify(body ?? {}),
     });
     for (const raw of response.headers.getSetCookie()) {
-      cookies.push(raw.split(';')[0]);
+      const [pair] = raw.split(';');
+      const at = pair.indexOf('=');
+      const value = pair.slice(at + 1);
+      // An emptied cookie is one the gateway cleared.
+      if (value) cookies.set(pair.slice(0, at), value);
+      else cookies.delete(pair.slice(0, at));
     }
     if (!response.ok) {
-      throw new Error(
-        `The gateway answered ${response.status} for POST ${path}: ${await response.text()}`,
-      );
+      throw new GatewayError(response.status, path, await response.text());
     }
+    return ((await response.json()) as { data?: unknown }).data;
   };
-  await call('/auth/login', {
+}
+
+class GatewayError extends Error {
+  constructor(
+    readonly status: number,
+    path: string,
+    body: string,
+  ) {
+    super(`The gateway answered ${status} for POST ${path}: ${body}`);
+  }
+}
+
+/**
+ * Signed in as the Super Admin, who must use two-step: the code comes from
+ * `SUPER_ADMIN_TOTP_SECRET`. A code is accepted once per 30-second step, so a
+ * refused one is retried with the next step's.
+ */
+async function signIn(): Promise<Call> {
+  const call = caller();
+  const login = (await call('/auth/login', {
     email: authEnv('SUPER_ADMIN_EMAIL'),
     password: authEnv('SUPER_ADMIN_PASSWORD'),
-  });
+  })) as { requiresTwoFactor?: boolean };
+  if (!login.requiresTwoFactor) return call;
+
+  const secret = authEnv('SUPER_ADMIN_TOTP_SECRET');
+  if (!secret) {
+    throw new Error(
+      'The Super Admin must use two-step: set SUPER_ADMIN_TOTP_SECRET in services/auth-service/.env and restart auth-service, which enrolls them with it.',
+    );
+  }
+  try {
+    await call('/auth/2fa/authenticate', { code: generateSync({ secret }) });
+  } catch (error) {
+    if (!(error instanceof GatewayError) || error.status !== 401) throw error;
+    await new Promise((resolve) =>
+      setTimeout(resolve, 30_000 - (Date.now() % 30_000) + 500),
+    );
+    await call('/auth/2fa/authenticate', { code: generateSync({ secret }) });
+  }
   return call;
 }
 
@@ -76,7 +126,7 @@ export const analyticsStep: SeedStep = {
     ];
     if (!context.apply) return lines;
 
-    let call: Awaited<ReturnType<typeof signIn>>;
+    let call: Call;
     try {
       call = await signIn();
     } catch (error) {

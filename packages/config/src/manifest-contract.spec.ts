@@ -403,6 +403,7 @@ describe('the manifest contract', () => {
       'INGESTION_OFFLINE_MODEL',
       'RAG_OFFLINE_MODEL',
       'STRIPE_API_BASE_URL',
+      'SUPER_ADMIN_TOTP_SECRET',
     ]);
 
     /** rag-service declares its variables in Python; its guard is pytest. */

@@ -159,6 +159,7 @@ erDiagram
     String user_agent "❓"
     Boolean is_used 
     DateTime expires_at 
+    Boolean verifies_email 
     DateTime created_at 
     DateTime updated_at 
     }

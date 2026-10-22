@@ -156,6 +156,8 @@ export class AuthService {
   private readonly REFRESH_TOKEN_TTL_DAYS: number;
   private readonly TRUSTED_DEVICE_TTL_DAYS: number;
   private readonly PASSWORD_RESET_TTL_MINUTES: number;
+  /** A welcome link lives as long as an invitation: read the next day, it works. */
+  private readonly WELCOME_LINK_TTL_DAYS: number;
   private readonly APP_WEB_URL: string;
 
   constructor(
@@ -201,6 +203,9 @@ export class AuthService {
     );
     this.PASSWORD_RESET_TTL_MINUTES = this.configService.getOrThrow<number>(
       'PASSWORD_RESET_TTL_MINUTES',
+    );
+    this.WELCOME_LINK_TTL_DAYS = this.configService.getOrThrow<number>(
+      'INVITATION_TTL_DAYS',
     );
     this.APP_WEB_URL = stripTrailingSlashes(
       this.configService.getOrThrow<string>('APP_WEB_URL'),
@@ -782,13 +787,18 @@ export class AuthService {
     // Collapsing them is what turns `enforce_two_factor` into a tenant-wide
     // lockout: everyone without a secret gets a code prompt for a code that
     // does not exist, and there is no other door.
+    //
+    // A Super Admin must use two-step, with no organization to require it, and
+    // gets no remembered device: every sign-in asks for a code.
     const requiresSetup =
-      user.organization?.enforceTwoFactor === true && !user.isTwoFactorEnabled;
+      (user.isSuperAdmin || user.organization?.enforceTwoFactor === true) &&
+      !user.isTwoFactorEnabled;
     const enforces2fa = user.isTwoFactorEnabled || requiresSetup;
 
     if (
       enforces2fa &&
-      !(await this.isTrustedDevice(user.id, client.deviceToken))
+      (user.isSuperAdmin ||
+        !(await this.isTrustedDevice(user.id, client.deviceToken)))
     ) {
       return {
         requiresTwoFactor: true,
@@ -1338,6 +1348,7 @@ export class AuthService {
   private async issueResetToken(
     userId: string,
     device: RequestOrigin,
+    welcome = false,
   ): Promise<string> {
     const token = generateSecureToken();
 
@@ -1356,12 +1367,30 @@ export class AuthService {
           tokenHash: hashToken(token),
           ipAddress: device.ip,
           userAgent: device.userAgent,
-          expiresAt: addMinutes(new Date(), this.PASSWORD_RESET_TTL_MINUTES),
+          expiresAt: welcome
+            ? addDays(new Date(), this.WELCOME_LINK_TTL_DAYS)
+            : addMinutes(new Date(), this.PASSWORD_RESET_TTL_MINUTES),
+          verifiesEmail: welcome,
         },
       });
     });
 
     return `${this.APP_WEB_URL}${WEB_ROUTES.resetPassword}?token=${encodeURIComponent(token)}`;
+  }
+
+  /**
+   * A new organization's first admin has no password: their welcome email's
+   * link sets one through the reset page, lives as long as an invitation
+   * (`INVITATION_TTL_DAYS`), and marks the address verified.
+   */
+  async issueWelcomeLink(
+    userId: string,
+    device: RequestOrigin,
+  ): Promise<{ url: string; expiresInDays: number }> {
+    return {
+      url: await this.issueResetToken(userId, device, true),
+      expiresInDays: this.WELCOME_LINK_TTL_DAYS,
+    };
   }
 
   /**
@@ -1408,7 +1437,10 @@ export class AuthService {
 
       await tx.user.update({
         where: { id: record.userId },
-        data: { passwordHash },
+        data: {
+          passwordHash,
+          ...(record.verifiesEmail ? { isEmailVerified: true } : {}),
+        },
       });
 
       // The point of the whole flow. A reset that leaves the attacker's
