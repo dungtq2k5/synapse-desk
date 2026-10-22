@@ -508,6 +508,12 @@ public class PlatformPlansService {
               .id(price.getId())
               .stripePriceId(price.getStripePriceId())
               .interval(price.getInterval())
+              .unitAmount(
+                price.hasUnitAmount()
+                  ? BigDecimal.valueOf(price.getUnitAmount())
+                  : null
+              )
+              .currency(price.hasCurrency() ? price.getCurrency() : null)
           )
           .toList()
       )

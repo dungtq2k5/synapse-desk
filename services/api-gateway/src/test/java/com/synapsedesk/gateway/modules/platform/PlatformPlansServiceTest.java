@@ -93,6 +93,47 @@ class PlatformPlansServiceTest {
   }
 
   @Test
+  void aPlansPricesCarryTheirAmountOrNullWhenNoneWasStored() {
+    com.google.protobuf.Timestamp now =
+      com.google.protobuf.Timestamp.newBuilder()
+        .setSeconds(1_756_684_800)
+        .build();
+    when(stub.getPlan(any())).thenReturn(
+      synapsedesk.auth.Platform.SubscriptionPlanResponse.newBuilder()
+        .setId("plan-1")
+        .setName("Pro")
+        .setCreatedAt(now)
+        .setUpdatedAt(now)
+        .addPrices(
+          synapsedesk.auth.Platform.SubscriptionPlanPriceResponse.newBuilder()
+            .setId("p1")
+            .setStripePriceId("price_monthly")
+            .setInterval("month")
+            .setUnitAmount(2_900)
+            .setCurrency("usd")
+        )
+        .addPrices(
+          synapsedesk.auth.Platform.SubscriptionPlanPriceResponse.newBuilder()
+            .setId("p2")
+            .setStripePriceId("price_old")
+            .setInterval("year")
+        )
+        .build()
+    );
+
+    var prices = service
+      .getPlan(context(), "plan-1")
+      .getBody()
+      .data()
+      .getPrices();
+
+    assertThat(prices.get(0).getUnitAmount()).isEqualByComparingTo("2900");
+    assertThat(prices.get(0).getCurrency()).isEqualTo("usd");
+    assertThat(prices.get(1).getUnitAmount()).isNull();
+    assertThat(prices.get(1).getCurrency()).isNull();
+  }
+
+  @Test
   void anUnreachableUsageLegDegradesTheProjectionRatherThanFailingTheCall() {
     when(stub.applyPlan(any())).thenReturn(
       ApplyPlanResponse.newBuilder()

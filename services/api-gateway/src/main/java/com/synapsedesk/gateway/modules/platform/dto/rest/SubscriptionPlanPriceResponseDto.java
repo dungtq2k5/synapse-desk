@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.modules.platform.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -16,6 +17,10 @@ public class SubscriptionPlanPriceResponseDto {
   private String stripePriceId;
 
   private String interval;
+
+  private BigDecimal unitAmount = null;
+
+  private String currency = null;
 
   public SubscriptionPlanPriceResponseDto() {
     super();
@@ -94,6 +99,44 @@ public class SubscriptionPlanPriceResponseDto {
     this.interval = interval;
   }
 
+  public SubscriptionPlanPriceResponseDto unitAmount(BigDecimal unitAmount) {
+    this.unitAmount = unitAmount;
+    return this;
+  }
+
+  /**
+   * Get unitAmount
+   * @return unitAmount
+   */
+  @JsonProperty("unitAmount")
+  public BigDecimal getUnitAmount() {
+    return unitAmount;
+  }
+
+  @JsonProperty("unitAmount")
+  public void setUnitAmount(BigDecimal unitAmount) {
+    this.unitAmount = unitAmount;
+  }
+
+  public SubscriptionPlanPriceResponseDto currency(String currency) {
+    this.currency = currency;
+    return this;
+  }
+
+  /**
+   * Get currency
+   * @return currency
+   */
+  @JsonProperty("currency")
+  public String getCurrency() {
+    return currency;
+  }
+
+  @JsonProperty("currency")
+  public void setCurrency(String currency) {
+    this.currency = currency;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -110,13 +153,21 @@ public class SubscriptionPlanPriceResponseDto {
         this.stripePriceId,
         subscriptionPlanPriceResponseDto.stripePriceId
       ) &&
-      Objects.equals(this.interval, subscriptionPlanPriceResponseDto.interval)
+      Objects.equals(
+        this.interval,
+        subscriptionPlanPriceResponseDto.interval
+      ) &&
+      Objects.equals(
+        this.unitAmount,
+        subscriptionPlanPriceResponseDto.unitAmount
+      ) &&
+      Objects.equals(this.currency, subscriptionPlanPriceResponseDto.currency)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, stripePriceId, interval);
+    return Objects.hash(id, stripePriceId, interval, unitAmount, currency);
   }
 
   @Override
@@ -128,6 +179,10 @@ public class SubscriptionPlanPriceResponseDto {
       .append(toIndentedString(stripePriceId))
       .append("\n");
     sb.append("    interval: ").append(toIndentedString(interval)).append("\n");
+    sb.append("    unitAmount: ")
+      .append(toIndentedString(unitAmount))
+      .append("\n");
+    sb.append("    currency: ").append(toIndentedString(currency)).append("\n");
     sb.append("}");
     return sb.toString();
   }

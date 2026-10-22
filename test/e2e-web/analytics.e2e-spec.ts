@@ -19,7 +19,7 @@ import {
   tenant,
   type Tenant,
 } from './screens/tenant';
-import { api, clearThrottles } from './support';
+import { api, clearThrottles, totp } from './support';
 
 /**
  * Analytics end to end: the journey's own organization, its rollups
@@ -49,7 +49,11 @@ let organizationId: string;
 let created: { now: number; before: number };
 let feedbackTicket: { id: string; number: bigint };
 
-/** The Super Admin from auth-service's own `.env`: the suite's first use. */
+/**
+ * The Super Admin from auth-service's own `.env`, who must use two-step: the
+ * code comes from `SUPER_ADMIN_TOTP_SECRET`. A code is accepted once per
+ * 30-second step, so a refused one is retried with the next step's.
+ */
 async function superAdmin(): Promise<APIRequestContext> {
   const env = readFileSync(
     join(REPO_ROOT, 'services/auth-service/.env'),
@@ -58,10 +62,31 @@ async function superAdmin(): Promise<APIRequestContext> {
   const read = (key: string) =>
     new RegExp(`^${key}\\s*=\\s*(.+)$`, 'm').exec(env)?.[1]?.trim();
   const session = await newRequest.newContext({ baseURL: WEB_URL });
-  await api(session, 'POST', '/auth/login', {
-    email: read('SUPER_ADMIN_EMAIL'),
-    password: read('SUPER_ADMIN_PASSWORD'),
-  });
+  const login = await api<{ requiresTwoFactor?: boolean }>(
+    session,
+    'POST',
+    '/auth/login',
+    {
+      email: read('SUPER_ADMIN_EMAIL'),
+      password: read('SUPER_ADMIN_PASSWORD'),
+    },
+  );
+  if (!login.requiresTwoFactor) return session;
+
+  const secret = read('SUPER_ADMIN_TOTP_SECRET');
+  if (!secret) throw new Error('SUPER_ADMIN_TOTP_SECRET is not set');
+  const answer = () =>
+    session.post('/api/v1/auth/2fa/authenticate', {
+      data: { code: totp(secret) },
+    });
+  let response = await answer();
+  if (response.status() === 401) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, 30_000 - (Date.now() % 30_000) + 500),
+    );
+    response = await answer();
+  }
+  expect(response.ok(), await response.text()).toBe(true);
   return session;
 }
 

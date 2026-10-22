@@ -818,6 +818,9 @@
     "AuditLogResponseDto.userId": {
       "description": "null for system and cron actors, which have no user acting for them."
     },
+    "AuthenticateTwoFactorDto.rememberDevice": {
+      "description": "Skip the code on this device for a while. Ignored for a Super Admin."
+    },
     "BackfillJobDto.reason": {
       "description": "**Mandatory.** A backfill rewrites numbers somebody may already have acted\non, and \"why\" is the only part of that a reader cannot reconstruct\nafterwards from the rows themselves."
     },
@@ -1221,6 +1224,15 @@
     "PlanSubscriberProjectionResponseDto.skippedPinned": {
       "description": "Off-catalogue by deliberate policy; this apply does not touch them."
     },
+    "PlatformOrganizationDetailResponseDto.usage": {
+      "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads."
+    },
+    "PlatformOrganizationUsageResponseDto.aiTokens": {
+      "description": "This cycle's AI spend against the monthly allowance, in micros."
+    },
+    "PlatformOrganizationUsageResponseDto.seats": {
+      "description": "Members plus pending invitations: the count the seat limit refuses on."
+    },
     "PlatformUserResponseDto.organizationId": {
       "description": "Always present on a tenant user; null only for a platform Super Admin."
     },
@@ -1311,11 +1323,17 @@
     "SubmitFeedbackDto.rating": {
       "description": "A thumb: `1` for up, `-1` for down."
     },
+    "SubscriptionPlanPriceResponseDto.currency": {
+      "description": "Stripe's lowercase currency code, e.g. `usd`."
+    },
     "SubscriptionPlanPriceResponseDto.interval": {
       "description": "The billing period this price charges for — `month` or `year` in practice.\n\nNot narrowed to those two: the value is whatever Stripe sent, and Stripe's\nown vocabulary includes `day` and `week`."
     },
     "SubscriptionPlanPriceResponseDto.stripePriceId": {
       "description": "Stripe's id. `month` and `year` on one plan are the reason this is a list."
+    },
+    "SubscriptionPlanPriceResponseDto.unitAmount": {
+      "description": "What Stripe charges, in the currency's smallest unit (cents for `usd`).\nRead from Stripe when the plan is created; null for a price stored before\namounts were."
     },
     "SubscriptionPlanResponseDto.maxAnalyticsRangeDays": {
       "description": "Days of history analytics may look back over. Narrowing it is retroactive."
@@ -1369,7 +1387,7 @@
       "description": "The user signed in when two-step was enabled through the sign-in challenge; null when it was enabled from a session."
     },
     "TwoFactorRequiredResponseDto.requiresTwoFactorSetup": {
-      "description": "True when the tenant REQUIRES 2FA and this account has not enrolled.\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
+      "description": "True when two-step is REQUIRED and this account has not enrolled: its\norganization requires it, or the account is a Super Admin (who always\nmust, and whose device is never remembered).\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
     },
     "UnavailableBlockResponseDto.source": {
       "description": "Which leg failed, by service name."

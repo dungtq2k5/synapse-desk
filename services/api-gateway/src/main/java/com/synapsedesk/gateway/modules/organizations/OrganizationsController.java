@@ -68,7 +68,6 @@ import synapsedesk.auth.Organization.OrganizationUsageResponse;
 import synapsedesk.auth.Organization.RevokeInboundTokenRequest;
 import synapsedesk.auth.Organization.UpdateOrganizationRequest;
 import synapsedesk.auth.Organization.UpdateOrganizationSettingsRequest;
-import synapsedesk.auth.Organization.UsageMeter;
 import synapsedesk.auth.OrganizationServiceGrpc;
 import synapsedesk.ingestion.Document.DocumentIdRequest;
 import synapsedesk.ingestion.Document.StorageUsageResponse;
@@ -388,9 +387,9 @@ public class OrganizationsController {
     UsageMeterResponseDto storage = storageLeg(context);
 
     OrganizationUsageResponseDto data = new OrganizationUsageResponseDto(
-      toUsageMeterResponseDto(response.getSeats()),
+      UsageMeters.toDto(response.getSeats()),
       storage,
-      toUsageMeterResponseDto(response.getAiTokens()),
+      UsageMeters.toDto(response.getAiTokens()),
       toOffsetDateTime(response.getBillingCycleStart()),
       toAiModelTierEnum(response.getAiModelTier()),
       response.getPlanName(),
@@ -418,13 +417,7 @@ public class OrganizationsController {
         .limit(BigDecimal.valueOf(storage.getLimitBytes()))
         .unavailableReason(null);
     } catch (StatusRuntimeException failure) {
-      return new UsageMeterResponseDto()
-        .available(false)
-        .used(null)
-        .limit(null)
-        .unavailableReason(
-          UsageMeterResponseDto.UnavailableReasonEnum.READ_FAILED
-        );
+      return UsageMeters.readFailed();
     }
   }
 
@@ -632,38 +625,6 @@ public class OrganizationsController {
       response.getCanComplete(),
       toOnboardingStatusEnum(response.getStatus())
     );
-  }
-
-  private static UsageMeterResponseDto toUsageMeterResponseDto(
-    UsageMeter meter
-  ) {
-    return new UsageMeterResponseDto()
-      .available(meter.getAvailable())
-      .used(
-        meter.getAvailable() && meter.hasUsed()
-          ? BigDecimal.valueOf(meter.getUsed())
-          : null
-      )
-      .limit(
-        meter.getAvailable() && meter.hasLimit()
-          ? BigDecimal.valueOf(meter.getLimit())
-          : null
-      )
-      .unavailableReason(
-        meter.getAvailable() ? null : toUnavailableReason(meter)
-      );
-  }
-
-  /**
-   * A meter's reason off the wire, as one of the codes. Anything else (an older
-   * peer's sentence, or none) is {@code READ_FAILED}: the meter didn't answer.
-   */
-  private static UsageMeterResponseDto.UnavailableReasonEnum toUnavailableReason(
-    UsageMeter meter
-  ) {
-    return "NOT_AVAILABLE".equals(meter.getUnavailableReason())
-      ? UsageMeterResponseDto.UnavailableReasonEnum.NOT_AVAILABLE
-      : UsageMeterResponseDto.UnavailableReasonEnum.READ_FAILED;
   }
 
   private static OrganizationResponseDto.StatusEnum toStatusEnum(

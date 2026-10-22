@@ -26,6 +26,7 @@ import com.synapsedesk.gateway.modules.platform.dto.rest.OrganizationSortField;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OrganizationStatusFilter;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlanSortField;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformMetricsResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformUserResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ResetBillingCycleDto;
@@ -184,7 +185,7 @@ public class PlatformController {
   )
   @ApiErrors({ "400", "401", "404" })
   public ResponseEntity<
-    ApiResponse<PlatformOrganizationResponseDto>
+    ApiResponse<PlatformOrganizationDetailResponseDto>
   > platformControllerGetOrganizationV1(@PathVariable("id") String id) {
     return organizations.getOrganization(context(), id);
   }
@@ -474,7 +475,19 @@ public class PlatformController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "503" },
+    descriptions = {
+      @ApiErrors.Description(
+        status = "400",
+        value = "The body is invalid, or Stripe has no such price, or the price has no single amount."
+      ),
+      @ApiErrors.Description(
+        status = "503",
+        value = "Stripe couldn't be reached to read the prices' amounts. Nothing was created; try again shortly."
+      ),
+    }
+  )
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<
     ApiResponse<SubscriptionPlanResponseDto>

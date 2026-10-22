@@ -293,10 +293,16 @@ public class TwoFactorAuthController {
   )
   @ApiErrors(
     value = { "400", "401", "403" },
-    descriptions = @ApiErrors.Description(
-      status = "403",
-      value = ApiErrors.WRONG_PASSWORD_OR_CODE
-    )
+    descriptions = {
+      @ApiErrors.Description(
+        status = "400",
+        value = "Two-step is off already, or must stay on: the organization requires it, or the account is a Super Admin. Or the body is invalid."
+      ),
+      @ApiErrors.Description(
+        status = "403",
+        value = ApiErrors.WRONG_PASSWORD_OR_CODE
+      ),
+    }
   )
   public ResponseEntity<ApiResponse<Void>> twoFactorAuthControllerDisableV1(
     @Valid @RequestBody DisableTwoFactorDto disableTwoFactorDto

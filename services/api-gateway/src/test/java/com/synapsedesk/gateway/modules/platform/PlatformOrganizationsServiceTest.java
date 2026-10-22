@@ -12,8 +12,13 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
+import com.synapsedesk.gateway.modules.organizations.dto.rest.UsageMeterResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizationDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationUsageResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlatformOrganizationDto;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,11 +28,16 @@ import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.Gender;
 import synapsedesk.auth.Common.OrgStatus;
 import synapsedesk.auth.Organization.OrganizationResponse;
+import synapsedesk.auth.Organization.OrganizationUsageResponse;
+import synapsedesk.auth.Organization.UsageMeter;
 import synapsedesk.auth.Platform.CreatePlatformOrganizationRequest;
 import synapsedesk.auth.Platform.CreatePlatformOrganizationResponse;
 import synapsedesk.auth.Platform.PlatformOrganizationResponse;
 import synapsedesk.auth.Platform.UpdatePlatformOrganizationRequest;
 import synapsedesk.auth.PlatformServiceGrpc;
+import synapsedesk.ingestion.IngestionPlatformServiceGrpc;
+import synapsedesk.ingestion.Platform.PlatformUsageResponse;
+import synapsedesk.ingestion.Platform.TenantUsage;
 
 /**
  * `PlatformApi`'s organizations group (group 1 of 3). Sharpest properties:
@@ -42,6 +52,10 @@ class PlatformOrganizationsServiceTest {
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub = mock(
     PlatformServiceGrpc.PlatformServiceBlockingStub.class
   );
+  private final IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub =
+    mock(
+      IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub.class
+    );
   private final SuperAdminCheck superAdminCheck = mock(SuperAdminCheck.class);
   private final OrganizationStatusService statuses = mock(
     OrganizationStatusService.class
@@ -65,7 +79,14 @@ class PlatformOrganizationsServiceTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    service = new PlatformOrganizationsService(stub, superAdminCheck, statuses);
+    when(usageStub.withDeadlineAfter(anyLong(), any())).thenReturn(usageStub);
+    when(usageStub.withInterceptors(any())).thenReturn(usageStub);
+    service = new PlatformOrganizationsService(
+      stub,
+      usageStub,
+      superAdminCheck,
+      statuses
+    );
   }
 
   @Test
@@ -82,6 +103,80 @@ class PlatformOrganizationsServiceTest {
 
     verify(superAdminCheck).require(any());
     verifyNoMoreInteractions(stub);
+  }
+
+  @Test
+  void anOrganizationCarriesSeatsAndTheAllowanceFromAuthAndStorageFromIngestion() {
+    when(stub.getOrganization(any())).thenReturn(
+      PlatformOrganizationResponse.newBuilder()
+        .setOrganization(wireOrganization("org-1"))
+        .setUserCount(3)
+        .build()
+    );
+    when(stub.getOrganizationUsage(any())).thenReturn(
+      OrganizationUsageResponse.newBuilder()
+        .setSeats(
+          UsageMeter.newBuilder().setAvailable(true).setUsed(4).setLimit(5)
+        )
+        .setAiTokens(
+          UsageMeter.newBuilder().setAvailable(true).setUsed(250).setLimit(1000)
+        )
+        .build()
+    );
+    when(usageStub.getPlatformUsage(any())).thenReturn(
+      PlatformUsageResponse.newBuilder()
+        .addUsage(
+          TenantUsage.newBuilder()
+            .setOrganizationId("org-1")
+            .setUsedBytes(400)
+            .setDocumentCount(12)
+        )
+        .build()
+    );
+
+    PlatformOrganizationUsageResponseDto usage = service
+      .getOrganization(context(), "org-1")
+      .getBody()
+      .data()
+      .getUsage();
+
+    assertThat(usage.getSeats().getUsed()).isEqualByComparingTo("4");
+    assertThat(usage.getStorage().getUsed()).isEqualByComparingTo("400");
+    assertThat(usage.getStorage().getLimit()).isEqualByComparingTo("1000");
+    assertThat(usage.getAiTokens().getUsed()).isEqualByComparingTo("250");
+    assertThat(usage.getAiTokens().getLimit()).isEqualByComparingTo("1000");
+  }
+
+  @Test
+  void aUsageLegThatFailsIsReadFailedAndTheOrganizationStillAnswers() {
+    when(stub.getOrganization(any())).thenReturn(
+      PlatformOrganizationResponse.newBuilder()
+        .setOrganization(wireOrganization("org-1"))
+        .build()
+    );
+    when(stub.getOrganizationUsage(any())).thenThrow(
+      new StatusRuntimeException(Status.UNAVAILABLE)
+    );
+    when(usageStub.getPlatformUsage(any())).thenThrow(
+      new StatusRuntimeException(Status.UNAVAILABLE)
+    );
+
+    PlatformOrganizationDetailResponseDto body = service
+      .getOrganization(context(), "org-1")
+      .getBody()
+      .data();
+
+    assertThat(body.getOrganization().getName()).isEqualTo("Acme");
+    for (UsageMeterResponseDto meter : List.of(
+      body.getUsage().getSeats(),
+      body.getUsage().getStorage(),
+      body.getUsage().getAiTokens()
+    )) {
+      assertThat(meter.getAvailable()).isFalse();
+      assertThat(meter.getUnavailableReason()).isEqualTo(
+        UsageMeterResponseDto.UnavailableReasonEnum.READ_FAILED
+      );
+    }
   }
 
   @Test

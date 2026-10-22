@@ -16686,7 +16686,7 @@
             }
           },
           "400": {
-            "description": "Validation failed, or the request is malformed.",
+            "description": "The body is invalid, or Stripe has no such price, or the price has no single amount.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16871,6 +16871,49 @@
                     "statusCode": {
                       "type": "number",
                       "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Stripe couldn't be reached to read the prices' amounts. Nothing was created; try again shortly.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 503
                     },
                     "path": {
                       "type": "string",
@@ -39165,7 +39208,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePlatformOrganizationResponseDto"
+                  "$ref": "#/components/schemas/ApiResponsePlatformOrganizationDetailResponseDto"
                 }
               }
             }
@@ -60739,7 +60782,7 @@
             }
           },
           "400": {
-            "description": "Validation failed, or the request is malformed.",
+            "description": "Two-step is off already, or must stay on: the organization requires it, or the account is a Super Admin. Or the body is invalid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -64261,9 +64304,23 @@
           "interval": {
             "type": "string",
             "description": "The billing period this price charges for — `month` or `year` in practice.\n\nNot narrowed to those two: the value is whatever Stripe sent, and Stripe's\nown vocabulary includes `day` and `week`."
+          },
+          "unitAmount": {
+            "type": ["number", "null"],
+            "description": "What Stripe charges, in the currency's smallest unit (cents for `usd`).\nRead from Stripe when the plan is created; null for a price stored before\namounts were."
+          },
+          "currency": {
+            "type": ["string", "null"],
+            "description": "Stripe's lowercase currency code, e.g. `usd`."
           }
         },
-        "required": ["id", "interval", "stripePriceId"]
+        "required": [
+          "currency",
+          "id",
+          "interval",
+          "stripePriceId",
+          "unitAmount"
+        ]
       },
       "SubscriptionPlanResponseDto": {
         "type": "object",
@@ -66261,7 +66318,7 @@
           },
           "requiresTwoFactorSetup": {
             "type": "boolean",
-            "description": "True when the tenant REQUIRES 2FA and this account has not enrolled.\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
+            "description": "True when two-step is REQUIRED and this account has not enrolled: its\norganization requires it, or the account is a Super Admin (who always\nmust, and whose device is never remembered).\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
           }
         },
         "required": ["requiresTwoFactor", "requiresTwoFactorSetup"]
@@ -66484,7 +66541,8 @@
           },
           "rememberDevice": {
             "type": ["boolean", "null"],
-            "default": false
+            "default": false,
+            "description": "Skip the code on this device for a while. Ignored for a Super Admin."
           },
           "code": {
             "type": ["string", "null"],
@@ -68313,6 +68371,101 @@
         },
         "required": ["items", "meta"]
       },
+      "ApiResponsePlatformOrganizationDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformOrganizationDetailResponseDto"
+          }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
+      },
+      "PlatformOrganizationDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationResponseDto"
+          },
+          "userCount": {
+            "type": "number"
+          },
+          "pendingInvitationCount": {
+            "type": "number"
+          },
+          "departmentCount": {
+            "type": "number"
+          },
+          "deletedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/PlatformOrganizationUsageResponseDto",
+            "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads."
+          }
+        },
+        "required": [
+          "deletedAt",
+          "departmentCount",
+          "organization",
+          "pendingInvitationCount",
+          "usage",
+          "userCount"
+        ]
+      },
+      "PlatformOrganizationUsageResponseDto": {
+        "type": "object",
+        "properties": {
+          "seats": {
+            "$ref": "#/components/schemas/UsageMeterResponseDto",
+            "description": "Members plus pending invitations: the count the seat limit refuses on."
+          },
+          "storage": {
+            "$ref": "#/components/schemas/UsageMeterResponseDto"
+          },
+          "aiTokens": {
+            "$ref": "#/components/schemas/UsageMeterResponseDto",
+            "description": "This cycle's AI spend against the monthly allowance, in micros."
+          }
+        },
+        "required": ["aiTokens", "seats", "storage"]
+      },
+      "UsageMeterResponseDto": {
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "used": {
+            "type": ["number", "null"]
+          },
+          "limit": {
+            "type": ["number", "null"]
+          },
+          "unavailableReason": {
+            "type": ["string", "null"],
+            "description": "Why there's no number, when `available` is false: `READ_FAILED` (it\ncouldn't be read just now; try again) or `NOT_AVAILABLE` (this\norganization has no such meter). Null when available.",
+            "enum": ["NOT_AVAILABLE", "READ_FAILED", null]
+          }
+        },
+        "required": ["available", "limit", "unavailableReason", "used"]
+      },
       "ApiResponsePlatformMetricsResponseDto": {
         "type": "object",
         "properties": {
@@ -69127,26 +69280,6 @@
           "seats",
           "storage"
         ]
-      },
-      "UsageMeterResponseDto": {
-        "type": "object",
-        "properties": {
-          "available": {
-            "type": "boolean"
-          },
-          "used": {
-            "type": ["number", "null"]
-          },
-          "limit": {
-            "type": ["number", "null"]
-          },
-          "unavailableReason": {
-            "type": ["string", "null"],
-            "description": "Why there's no number, when `available` is false: `READ_FAILED` (it\ncouldn't be read just now; try again) or `NOT_AVAILABLE` (this\norganization has no such meter). Null when available.",
-            "enum": ["NOT_AVAILABLE", "READ_FAILED", null]
-          }
-        },
-        "required": ["available", "limit", "unavailableReason", "used"]
       },
       "ApiResponseOnboardingResponseDto": {
         "type": "object",

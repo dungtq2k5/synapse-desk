@@ -9,15 +9,20 @@ import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.modules.auth.UserMapper;
 import com.synapsedesk.gateway.modules.organizations.AnalyticsRange;
+import com.synapsedesk.gateway.modules.organizations.UsageMeters;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OffboardResponseDto;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OrganizationResponseDto;
+import com.synapsedesk.gateway.modules.organizations.dto.rest.UsageMeterResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OffboardOrganizationDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationUsageResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ResetBillingCycleDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlatformOrganizationDto;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -27,6 +32,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -35,6 +43,7 @@ import synapsedesk.auth.Common.OrgStatus;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.Organization.OrganizationResponse;
+import synapsedesk.auth.Organization.OrganizationUsageResponse;
 import synapsedesk.auth.Platform.CreatePlatformOrganizationRequest;
 import synapsedesk.auth.Platform.CreatePlatformOrganizationResponse;
 import synapsedesk.auth.Platform.ListPlatformOrganizationsRequest;
@@ -47,6 +56,9 @@ import synapsedesk.auth.Platform.ResetBillingCycleRequest;
 import synapsedesk.auth.Platform.SetOrganizationStatusRequest;
 import synapsedesk.auth.Platform.UpdatePlatformOrganizationRequest;
 import synapsedesk.auth.PlatformServiceGrpc;
+import synapsedesk.ingestion.IngestionPlatformServiceGrpc;
+import synapsedesk.ingestion.Platform.PlatformUsageRequest;
+import synapsedesk.ingestion.Platform.TenantUsage;
 
 /**
  * `PlatformApi`'s organizations group (8 of 20 operations) — the first of
@@ -79,16 +91,23 @@ public class PlatformOrganizationsService {
   private static final int MAX_ALLOWED_EMAIL_DOMAINS = 50;
   private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z0-9-]+$");
 
+  private static final Logger LOG = LoggerFactory.getLogger(
+    PlatformOrganizationsService.class
+  );
+
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
+  private final IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub;
   private final SuperAdminCheck superAdminCheck;
   private final OrganizationStatusService statuses;
 
   public PlatformOrganizationsService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
+    IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub,
     SuperAdminCheck superAdminCheck,
     OrganizationStatusService statuses
   ) {
     this.stub = stub;
+    this.usageStub = usageStub;
     this.superAdminCheck = superAdminCheck;
     this.statuses = statuses;
   }
@@ -197,18 +216,97 @@ public class PlatformOrganizationsService {
     );
   }
 
+  /**
+   * The organization and its meters: the organization must answer; a usage
+   * leg that doesn't is {@code READ_FAILED} on its meters. Seats and the AI
+   * allowance come from auth-service, storage's bytes from ingestion against
+   * the organization's own limit.
+   */
   public ResponseEntity<
-    ApiResponse<PlatformOrganizationResponseDto>
+    ApiResponse<PlatformOrganizationDetailResponseDto>
   > getOrganization(RequestContext context, String id) {
     superAdminCheck.require(context);
 
+    PlatformOrganizationIdRequest request =
+      PlatformOrganizationIdRequest.newBuilder().setOrganizationId(id).build();
     PlatformOrganizationResponse response = withMetadata(
       context
-    ).getOrganization(
-      PlatformOrganizationIdRequest.newBuilder().setOrganizationId(id).build()
-    );
+    ).getOrganization(request);
+    OrganizationUsageResponse usage = usageOf(context, request);
+    TenantUsage storage = storageOf(context, id);
 
-    return ok200(toPlatformOrganizationResponseDto(response), "OK");
+    PlatformOrganizationResponseDto organization =
+      toPlatformOrganizationResponseDto(response);
+    return ok200(
+      new PlatformOrganizationDetailResponseDto()
+        .organization(organization.getOrganization())
+        .userCount(organization.getUserCount())
+        .pendingInvitationCount(organization.getPendingInvitationCount())
+        .departmentCount(organization.getDepartmentCount())
+        .deletedAt(organization.getDeletedAt())
+        .usage(
+          new PlatformOrganizationUsageResponseDto()
+            .seats(
+              usage == null
+                ? UsageMeters.readFailed()
+                : UsageMeters.toDto(usage.getSeats())
+            )
+            .storage(
+              storage == null
+                ? UsageMeters.readFailed()
+                : new UsageMeterResponseDto()
+                    .available(true)
+                    .used(BigDecimal.valueOf(storage.getUsedBytes()))
+                    .limit(
+                      BigDecimal.valueOf(
+                        response.getOrganization().getMaxStorageBytes()
+                      )
+                    )
+                    .unavailableReason(null)
+            )
+            .aiTokens(
+              usage == null
+                ? UsageMeters.readFailed()
+                : UsageMeters.toDto(usage.getAiTokens())
+            )
+        ),
+      "OK"
+    );
+  }
+
+  /** auth-service's seats and allowance, or {@code null} when it didn't answer. */
+  private @Nullable OrganizationUsageResponse usageOf(
+    RequestContext context,
+    PlatformOrganizationIdRequest request
+  ) {
+    try {
+      return withMetadata(context).getOrganizationUsage(request);
+    } catch (StatusRuntimeException e) {
+      LOG.warn("Usage leg 'auth-service' unavailable: {}", e.getMessage());
+      return null;
+    }
+  }
+
+  /** ingestion-service's bytes, or {@code null} when it didn't answer. */
+  private @Nullable TenantUsage storageOf(RequestContext context, String id) {
+    try {
+      return usageStub
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+        )
+        .getPlatformUsage(
+          PlatformUsageRequest.newBuilder().addOrganizationIds(id).build()
+        )
+        .getUsageList()
+        .stream()
+        .filter(row -> row.getOrganizationId().equals(id))
+        .findFirst()
+        .orElse(null);
+    } catch (StatusRuntimeException e) {
+      LOG.warn("Usage leg 'ingestion-service' unavailable: {}", e.getMessage());
+      return null;
+    }
   }
 
   public ResponseEntity<
@@ -345,9 +443,10 @@ public class PlatformOrganizationsService {
     );
   }
 
-  private static ResponseEntity<
-    ApiResponse<PlatformOrganizationResponseDto>
-  > ok200(PlatformOrganizationResponseDto data, String message) {
+  private static <T> ResponseEntity<ApiResponse<T>> ok200(
+    T data,
+    String message
+  ) {
     return ResponseEntity.ok(ApiResponse.of(200, message, data));
   }
 
