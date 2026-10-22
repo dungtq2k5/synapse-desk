@@ -30,6 +30,14 @@ import { JobRunStatusResponseDto } from './dto/platform-jobs-response.dto';
  */
 type HeartbeatCaller = RequestContext | RequestOrigin;
 
+/**
+ * A run or a backfill recomputes for every organization (or a range of days)
+ * before it answers, so it gets minutes, not the shared deadline's seconds: a
+ * busy platform's rollup outlasts five, and the answer is the counts the
+ * console shows.
+ */
+const RUN_DEADLINE_MS = 300_000;
+
 /** A heartbeat row plus which service it came from. */
 /** A backfill's days, both inclusive, and optionally one organization. */
 export type BackfillRange = {
@@ -206,6 +214,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       (metadata) =>
         this.analyticsService.runRollup({ ...range, reason }, metadata),
       context,
+      RUN_DEADLINE_MS,
     );
 
     return {
@@ -224,7 +233,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       (metadata) =>
         this.ledgerService.runAiRollup({ ...range, reason }, metadata),
       context,
-      undefined,
+      RUN_DEADLINE_MS,
       'ingestion-service',
     );
 
