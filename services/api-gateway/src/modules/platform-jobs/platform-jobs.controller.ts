@@ -20,7 +20,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
-import { BackfillJobDto } from './dto/platform-jobs.dto';
+import { BackfillJobDto, RunJobDto } from './dto/platform-jobs.dto';
 import {
   JobHealthResponseDto,
   JobRunResultResponseDto,
@@ -65,15 +65,16 @@ export class PlatformJobsController {
    */
   @ApiOperation({ summary: 'Runs a rollup now' })
   @ApiWrappedResponse(JobRunResultResponseDto)
-  @ApiFilterErrors(['401', '404'])
+  @ApiFilterErrors(['400', '401', '404'])
   @Post(':name/run')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Job run complete')
   run(
     @Param('name') name: string,
+    @Body() dto: RunJobDto,
     @CurrentUser() context: RequestContext,
   ): Promise<JobRunResultResponseDto> {
-    return this.jobs.run(name, context);
+    return this.jobs.run(name, dto, context);
   }
 
   /**

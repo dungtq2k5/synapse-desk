@@ -185,6 +185,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     await this.ensureGlobalRoleNameIndex();
     await this.applyPartialIndexes();
     await this.applyCheckConstraints();
+    await this.applyTriggers();
   }
 
   /** The row half: permissions, the system user, the bootstrap Super Admin,
@@ -440,6 +441,33 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
             CHECK (("organization_id" IS NULL) = "is_super_admin");
         END IF;
       END $$;
+    `);
+  }
+
+  /**
+   * Stamps `organizations.status_changed_at` whenever `status` actually
+   * changes, whoever writes it: the Stripe webhook rewrites `status` on every
+   * event, so stamping in each writer would need the old value at all of them.
+   *
+   * From the seed for the same reason as the CHECKs: `db push` neither
+   * creates nor keeps a hand-written trigger.
+   */
+  private async applyTriggers(): Promise<void> {
+    await this.prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE FUNCTION organizations_stamp_status_change()
+      RETURNS trigger AS $$
+      BEGIN
+        IF NEW.status IS DISTINCT FROM OLD.status THEN
+          NEW.status_changed_at := now();
+        END IF;
+        RETURN NEW;
+      END
+      $$ LANGUAGE plpgsql;
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE OR REPLACE TRIGGER organizations_status_changed_at
+        BEFORE UPDATE OF status ON organizations
+        FOR EACH ROW EXECUTE FUNCTION organizations_stamp_status_change();
     `);
   }
 

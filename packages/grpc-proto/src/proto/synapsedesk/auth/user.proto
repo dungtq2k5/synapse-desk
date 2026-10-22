@@ -26,6 +26,9 @@ message CurrentUserResponse {
   // (this read is `AUTH`), so a client can tell past due and frozen from one
   // call. UNSPECIFIED for a Super Admin, who has no organization.
   OrgStatus organization_status = 5;
+  // A platform Super Admin, who has no organization: the client sends them to
+  // the platform console.
+  bool is_super_admin = 6;
 }
 
 // ---------------------------------------------------------------------------

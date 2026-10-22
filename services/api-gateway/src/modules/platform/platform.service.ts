@@ -15,6 +15,7 @@ import {
   toPlatformOrganizationPageDto,
   toPlatformOrganizationDetailResponseDto,
   toPlatformOrganizationResponseDto,
+  toPlatformOrganizationStatusResponseDto,
   toPlatformUserPageDto,
   toApplyPlanResponseDto,
   toCreatePlanRequest,
@@ -44,6 +45,7 @@ import {
   PlatformMetricsResponseDto,
   PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
+  PlatformOrganizationStatusResponseDto,
   PlatformUserResponseDto,
   ApplyPlanResponseDto,
   DeletePlanResponseDto,
@@ -146,8 +148,8 @@ export class PlatformService {
     organizationId: string,
     dto: SetOrganizationStatusDto,
     context: RequestContext,
-  ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationResponseDto(
+  ): Promise<PlatformOrganizationStatusResponseDto> {
+    return toPlatformOrganizationStatusResponseDto(
       await this.platformGrpcClient.setStatus(
         {
           organizationId,

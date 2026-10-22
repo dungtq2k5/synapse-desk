@@ -27,6 +27,7 @@ import { AuditLogsService } from './audit-logs.service';
 import {
   AuditActionsResponseDto,
   AuditLogResponseDto,
+  PlatformAuditLogResponseDto,
 } from './dto/rest/audit-log-response.dto';
 import {
   CreateAuditLogExportDto,
@@ -151,15 +152,17 @@ export class AuditLogsController {
 export class PlatformAuditLogsController {
   constructor(private readonly auditLogs: AuditLogsService) {}
 
-  @ApiOperation({ summary: 'Tenant-scoped immutable trail' })
-  @ApiWrappedResponse(Paginated(AuditLogResponseDto))
+  @ApiOperation({
+    summary: "The platform's own trail, with who acted and on what, by name",
+  })
+  @ApiWrappedResponse(Paginated(PlatformAuditLogResponseDto))
   @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListAuditLogsQueryDto,
-  ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
-    return this.auditLogs.list(query, context, true);
+  ): Promise<PaginationResponseDto<PlatformAuditLogResponseDto>> {
+    return this.auditLogs.listPlatform(query, context);
   }
 
   @ApiOperation({ summary: 'Distinct action values, for filter dropdowns' })

@@ -225,6 +225,88 @@ describe('platform', () => {
     );
 
     rowFor('Platform')(
+      '**`setStatus` says how many sessions it ended**',
+      async () => {
+        peers.auth
+          .on('PlatformService/SetOrganizationStatus')
+          .reply(wirePlatformOrganization('org-1', { revokedSessionCount: 4 }));
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/status`,
+          { status: 'FROZEN', reason: 'suspected fraud' },
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { revokedSessionCount: 4 },
+        });
+      },
+    );
+
+    rowFor('Platform')(
+      '**an organization carries its plan, whether Stripe grants it, and when its status changed**',
+      async () => {
+        peers.auth.on('PlatformService/GetOrganization').reply(
+          wirePlatformOrganization('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', {
+            planName: 'Pro',
+            billedThroughStripe: true,
+            statusChangedAt: { seconds: 1_756_684_800, nanos: 0 },
+          }),
+        );
+        peers.auth
+          .on('PlatformService/GetOrganizationUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'busy');
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'busy');
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: {
+            planName: 'Pro',
+            billedThroughStripe: true,
+            statusChangedAt: '2025-09-01T00:00:00.000Z',
+          },
+        });
+      },
+    );
+
+    rowFor('Platform')(
+      "**a taken address is a 409 with auth's sentence**",
+      async () => {
+        peers.auth
+          .on('PlatformService/CreateOrganization')
+          .fail(
+            GrpcStatus.ALREADY_EXISTS,
+            'That address is already taken by another organization.',
+          );
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations`,
+          {
+            name: 'Acme',
+            slug: 'acme',
+            adminEmail: 'admin@acme.test',
+            adminFullName: 'Admin Person',
+            allowedEmailDomains: [],
+          },
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(409);
+        expect(response.body).toMatchObject({
+          error: 'That address is already taken by another organization!',
+        });
+      },
+    );
+
+    rowFor('Platform')(
       '**`resetBillingCycle` answers the full break-glass warning as its message**',
       async () => {
         peers.auth
@@ -758,6 +840,69 @@ describe('platform', () => {
             ]),
             subscribers: [
               { overLimit: [expect.stringContaining('maxStorageBytes')] },
+            ],
+          },
+        });
+        // The same limit as data, the shape a plan change's refusal uses.
+        expect(
+          (
+            response.body as {
+              data: { subscribers: { overLimitItems: unknown }[] };
+            }
+          ).data.subscribers[0].overLimitItems,
+        ).toEqual([
+          {
+            dimension: 'STORAGE',
+            inUse: 20_000_000_000,
+            allowed: 10_000_000_000,
+          },
+        ]);
+      },
+    );
+
+    rowFor('Platform')(
+      "**apply carries auth's over-limit seats as data**",
+      async () => {
+        peers.auth.on('PlatformService/ApplyPlan').reply({
+          subscribers: [
+            {
+              organizationId: 'org-1',
+              organizationName: 'Acme',
+              changes: {},
+              after: {},
+              overLimit: ['maxAgentSeats: 12 in use, plan grants 10'],
+              overLimitItems: [
+                { dimension: 'SEATS', inUse: '12', allowed: '10' },
+              ],
+              skippedPinned: false,
+              budgetDeferred: false,
+            },
+          ],
+          dryRun: true,
+          changedCount: 0,
+          skippedPinnedCount: 0,
+          overLimitCount: 1,
+          evaluatedDimensions: ['seats'],
+        });
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .reply({ usage: [] });
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb/apply?dryRun=true`,
+          undefined,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: {
+            subscribers: [
+              {
+                overLimitItems: [
+                  { dimension: 'SEATS', inUse: 12, allowed: 10 },
+                ],
+              },
             ],
           },
         });

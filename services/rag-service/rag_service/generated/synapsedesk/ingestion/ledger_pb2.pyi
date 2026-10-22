@@ -274,13 +274,15 @@ class AiJobHealthResponse(_message.Message):
     def __init__(self, items: _Optional[_Iterable[_Union[AiJobRunStatus, _Mapping]]] = ...) -> None: ...
 
 class RunAiRollupRequest(_message.Message):
-    __slots__ = ("to", "organization_id")
+    __slots__ = ("to", "organization_id", "reason")
     FROM_FIELD_NUMBER: _ClassVar[int]
     TO_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATION_ID_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
     to: str
     organization_id: str
-    def __init__(self, to: _Optional[str] = ..., organization_id: _Optional[str] = ..., **kwargs) -> None: ...
+    reason: str
+    def __init__(self, to: _Optional[str] = ..., organization_id: _Optional[str] = ..., reason: _Optional[str] = ..., **kwargs) -> None: ...
 
 class RunAiRollupResponse(_message.Message):
     __slots__ = ("tenants", "rows")

@@ -41,6 +41,11 @@ export class DunningTenantResponseDto {
    * dunning age would be a confidently wrong number.
    */
   readonly updatedAt!: Date;
+  /**
+   * When it went past due: its status's last change. Null for an
+   * organization whose status changed before that was recorded.
+   */
+  readonly pastDueSince!: Date | null;
 }
 
 export class FinanceDunningResponseDto {

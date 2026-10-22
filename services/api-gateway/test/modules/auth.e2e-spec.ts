@@ -127,6 +127,20 @@ describe('auth at the HTTP boundary (e2e)', () => {
       expect(cookies[REFRESH_COOKIE]).toBeUndefined();
     });
 
+    it('9a. the challenge says whether this device may be remembered', async () => {
+      fx.stubs.auth.login.mockReturnValue(of(wireLoginTwoFactor(false, false)));
+
+      const res = await anonymousAgent(fx.app)
+        .post(`${API}/auth/login`)
+        .send({ email: 'super@login.test', password: 'Passw0rd!' });
+
+      expect(res.body.data).toEqual({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+        canRememberDevice: false,
+      });
+    });
+
     it('9b. an ENROLMENT challenge tells the client to open setup, not to prompt', async () => {
       // The same cookie means "enter your code" in one case and "enrol now" in
       // the other, and only the server knows which. Collapsing them is what turns

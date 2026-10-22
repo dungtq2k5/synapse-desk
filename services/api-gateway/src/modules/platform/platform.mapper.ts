@@ -25,6 +25,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   DEFAULT_AI_MODEL_TIER,
+  type OverLimitDimension,
   UsageUnavailableReason,
 } from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
@@ -45,6 +46,7 @@ import {
   PlatformMetricsResponseDto,
   PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
+  PlatformOrganizationStatusResponseDto,
   PlatformUserResponseDto,
   SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
@@ -98,6 +100,19 @@ export function toPlatformOrganizationResponseDto(
     pendingInvitationCount: row.pendingInvitationCount,
     departmentCount: row.departmentCount,
     deletedAt: fromProtoTimestamp(row.deletedAt) ?? null,
+    planName: row.planName ?? null,
+    billedThroughStripe: row.billedThroughStripe,
+    statusChangedAt: fromProtoTimestamp(row.statusChangedAt) ?? null,
+  };
+}
+
+/** A status change: the organization, and the sessions it ended. */
+export function toPlatformOrganizationStatusResponseDto(
+  row: PlatformOrganizationResponse,
+): PlatformOrganizationStatusResponseDto {
+  return {
+    ...toPlatformOrganizationResponseDto(row),
+    revokedSessionCount: row.revokedSessionCount ?? 0,
   };
 }
 
@@ -256,6 +271,11 @@ export function toApplyPlanResponseDto(
       changes: row.changes,
       after: row.after,
       overLimit: row.overLimit,
+      overLimitItems: row.overLimitItems.map((item) => ({
+        dimension: item.dimension as OverLimitDimension,
+        inUse: item.inUse,
+        allowed: item.allowed,
+      })),
       skippedPinned: row.skippedPinned,
       budgetDeferred: row.budgetDeferred,
     })),

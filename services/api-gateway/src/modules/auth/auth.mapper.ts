@@ -33,6 +33,8 @@ export type LoginResult =
        * for a code that does not exist.
        */
       requiresTwoFactorSetup: boolean;
+      /** False for a Super Admin, who is asked for a code every time. */
+      canRememberDevice: boolean;
       twoFactorToken: string;
     }
   | {
@@ -65,6 +67,7 @@ export function toLoginResult(response: ProtoLoginResponse): LoginResult {
       requiresTenantSelection: false,
       requiresTwoFactor: true,
       requiresTwoFactorSetup: response.requiresTwoFactorSetup,
+      canRememberDevice: response.canRememberDevice,
       twoFactorToken: response.twoFactorToken ?? '',
     };
   }

@@ -10,7 +10,7 @@ import {
 } from '@synapsedesk/contracts';
 import { checkStaleness, JobHeartbeat } from '@synapsedesk/core';
 import { BackfillRange, PlatformJobsClient } from './platform-jobs.client';
-import { BackfillJobDto } from './dto/platform-jobs.dto';
+import { BackfillJobDto, RunJobDto } from './dto/platform-jobs.dto';
 import {
   JobHealthResponseDto,
   JobRunResultResponseDto,
@@ -172,9 +172,10 @@ export class PlatformJobsService {
    */
   async run(
     jobName: string,
+    dto: RunJobDto,
     context: RequestContext,
   ): Promise<JobRunResultResponseDto> {
-    return this.dispatch(jobName, context);
+    return this.dispatch(jobName, context, dto.reason);
   }
 
   /**
@@ -201,7 +202,7 @@ export class PlatformJobsService {
       `BACKFILL ${jobName} ${dto.from}..${dto.to}${dto.organizationId ? ` (${dto.organizationId})` : ''} by ${context.sub}: ${dto.reason}`,
     );
 
-    return this.dispatch(jobName, context, {
+    return this.dispatch(jobName, context, dto.reason, {
       from: dto.from,
       to: dto.to,
       organizationId: dto.organizationId,
@@ -211,16 +212,21 @@ export class PlatformJobsService {
   private async dispatch(
     jobName: string,
     context: RequestContext,
+    reason: string,
     range?: BackfillRange,
   ): Promise<JobRunResultResponseDto> {
     switch (jobName) {
       case SCHEDULED_JOBS.ANALYTICS_DAILY: {
-        const outcome = await this.client.runTicketRollup(context, range);
+        const outcome = await this.client.runTicketRollup(
+          context,
+          reason,
+          range,
+        );
 
         return { service: 'ticket-service', jobName, ...outcome };
       }
       case SCHEDULED_JOBS.LEDGER_DAILY: {
-        const outcome = await this.client.runAiRollup(context, range);
+        const outcome = await this.client.runAiRollup(context, reason, range);
 
         return { service: 'ingestion-service', jobName, ...outcome };
       }

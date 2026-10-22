@@ -1,6 +1,8 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  AuditAction,
+  AuditResourceType,
   repeatJobId,
   jobsOwnedBy,
   DocumentFlagType,
@@ -11,7 +13,12 @@ import {
   SCHEDULER_QUEUE,
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
-import { JobHealthService, JobRunRecorder } from '@synapsedesk/nest-common';
+import {
+  AuditPublisher,
+  JobHealthService,
+  JobRunRecorder,
+} from '@synapsedesk/nest-common';
+import { packRequestContext } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.registrar';
@@ -308,8 +315,62 @@ describe('The scheduler (e2e)', () => {
   });
 
   describe('the daily sequence BY HAND (`/platform/jobs/ledger-daily/run`)', () => {
+    const SUPER_ADMIN = 'aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa';
+    const caller = () =>
+      packRequestContext({
+        sub: SUPER_ADMIN,
+        organizationId: null,
+        isSuperAdmin: true,
+        departmentIds: [],
+        permissionCodes: [],
+        isEmailVerified: true,
+        ip: '203.0.113.7',
+        userAgent: 'jest',
+      });
     const runByHand = () =>
-      fx.moduleRef.get(AiLedgerGrpcController).runAiRollup({});
+      fx.moduleRef
+        .get(AiLedgerGrpcController)
+        .runAiRollup({ reason: 'Nightly run missed' }, caller());
+
+    it('7d. a run by hand records who, why and what it counted', async () => {
+      const record = jest.spyOn(fx.moduleRef.get(AuditPublisher), 'record');
+
+      const answer = await runByHand();
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: SUPER_ADMIN }),
+        {
+          action: AuditAction.PLATFORM_JOB_RUN,
+          resourceType: AuditResourceType.JOB,
+          resourceId: null,
+          organizationId: null,
+          metadata: {
+            jobName: SCHEDULED_JOBS.LEDGER_DAILY,
+            reason: 'Nightly run missed',
+            tenants: answer.tenants,
+            rows: answer.rows,
+          },
+        },
+      );
+      record.mockRestore();
+    });
+
+    it('7e. a backfill records the range', async () => {
+      const record = jest.spyOn(fx.moduleRef.get(AuditPublisher), 'record');
+
+      await fx.moduleRef
+        .get(AiLedgerGrpcController)
+        .runAiRollup(
+          { from: '2026-10-01', to: '2026-10-02', reason: 'Fix it' },
+          caller(),
+        );
+
+      expect(record.mock.calls[0][1]).toMatchObject({
+        action: AuditAction.PLATFORM_JOB_BACKFILLED,
+        metadata: { from: '2026-10-01', to: '2026-10-02', reason: 'Fix it' },
+      });
+      record.mockRestore();
+    });
 
     it('**7b. runs the whole sequence, seeding the projection cursor a fresh database lacks**', async () => {
       // The schedule's run refuses without a cursor (seeding it resets every

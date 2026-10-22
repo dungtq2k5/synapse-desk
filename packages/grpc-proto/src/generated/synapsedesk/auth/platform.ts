@@ -9,6 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
+import { OverLimit } from "./billing";
 import { AiModelTier, OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
 import { OrganizationResponse, OrganizationUsageResponse } from "./organization";
 import { RoleResponse } from "./role";
@@ -21,7 +22,30 @@ export interface PlatformOrganizationResponse {
   userCount: number;
   pendingInvitationCount: number;
   departmentCount: number;
-  deletedAt?: Timestamp | undefined;
+  deletedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * How many sessions a status change ended: set only by SetOrganizationStatus
+   * (a freeze ends every session; another status ends none).
+   */
+  revokedSessionCount?:
+    | number
+    | undefined;
+  /** The catalogue plan the organization is on, absent when none is assigned. */
+  planName?:
+    | string
+    | undefined;
+  /**
+   * Whether a Stripe subscription grants it: a limit edited by hand then lasts
+   * until Stripe's next event. False for a plan assigned by hand (or Free).
+   */
+  billedThroughStripe: boolean;
+  /**
+   * When the status last changed. Absent for an organization older than the
+   * record of it.
+   */
+  statusChangedAt?: Timestamp | undefined;
 }
 
 export interface ListPlatformOrganizationsRequest {
@@ -269,7 +293,14 @@ export interface DunningTenant {
    * age on a finance page, which is a confidently wrong number of exactly the
    * kind section 3a refuses for failed-payment amounts.
    */
-  updatedAt: Timestamp | undefined;
+  updatedAt:
+    | Timestamp
+    | undefined;
+  /**
+   * When it went past due: its status's last change. Absent for an
+   * organization older than the record of it.
+   */
+  pastDueSince?: Timestamp | undefined;
 }
 
 /**
@@ -546,6 +577,12 @@ export interface PlanSubscriberProjection {
    * part-spent budget mid-cycle is retroactive in effect.
    */
   budgetDeferred: boolean;
+  /**
+   * `over_limit` as data, one per limit it breaks (`SEATS` from here; the
+   * gateway adds `STORAGE` and `DOCUMENTS`), the shape a plan change's
+   * refusal uses. The strings stay one release beside it.
+   */
+  overLimitItems: OverLimit[];
 }
 
 export interface PlanSubscriberProjection_ChangesEntry {
@@ -593,6 +630,38 @@ export interface ApplyPlanResponse {
 
 export interface DeletePlanResponse {
   deleted: boolean;
+}
+
+/**
+ * Names for the platform audit log's ids: the people who acted, and the
+ * organizations and plans acted on. Deleted ones are named too; an id with no
+ * row is left out, so the page shows the id.
+ */
+export interface ResolveAuditNamesRequest {
+  userIds: string[];
+  organizationIds: string[];
+  planIds: string[];
+}
+
+export interface ResolveAuditNamesResponse {
+  users: { [key: string]: string };
+  organizations: { [key: string]: string };
+  plans: { [key: string]: string };
+}
+
+export interface ResolveAuditNamesResponse_UsersEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveAuditNamesResponse_OrganizationsEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveAuditNamesResponse_PlansEntry {
+  key: string;
+  value: string;
 }
 
 export interface PlatformServiceClient {
@@ -680,6 +749,8 @@ export interface PlatformServiceClient {
   listBillingEvents(request: ListBillingEventsRequest, metadata?: Metadata): Observable<ListBillingEventsResponse>;
 
   getAuthJobHealth(request: AuthJobHealthRequest, metadata?: Metadata): Observable<AuthJobHealthResponse>;
+
+  resolveAuditNames(request: ResolveAuditNamesRequest, metadata?: Metadata): Observable<ResolveAuditNamesResponse>;
 }
 
 export interface PlatformServiceController {
@@ -815,6 +886,11 @@ export interface PlatformServiceController {
     request: AuthJobHealthRequest,
     metadata?: Metadata,
   ): Promise<AuthJobHealthResponse> | Observable<AuthJobHealthResponse> | AuthJobHealthResponse;
+
+  resolveAuditNames(
+    request: ResolveAuditNamesRequest,
+    metadata?: Metadata,
+  ): Promise<ResolveAuditNamesResponse> | Observable<ResolveAuditNamesResponse> | ResolveAuditNamesResponse;
 }
 
 export function PlatformServiceControllerMethods() {
@@ -842,6 +918,7 @@ export function PlatformServiceControllerMethods() {
       "getFinanceSnapshot",
       "listBillingEvents",
       "getAuthJobHealth",
+      "resolveAuditNames",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

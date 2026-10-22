@@ -101,7 +101,12 @@ export class FinanceService {
         this.liveSubscribersByPlan(),
         this.prisma.organization.findMany({
           where: { deletedAt: null, status: OrgStatus.SUSPENDED_PAST_DUE },
-          select: { id: true, name: true, updatedAt: true },
+          select: {
+            id: true,
+            name: true,
+            updatedAt: true,
+            statusChangedAt: true,
+          },
           orderBy: { updatedAt: 'asc' },
         }),
         this.snapshots.read(),
@@ -121,6 +126,9 @@ export class FinanceService {
           id: tenant.id,
           name: tenant.name,
           updatedAt: toProtoTimestamp(tenant.updatedAt),
+          pastDueSince: tenant.statusChangedAt
+            ? toProtoTimestamp(tenant.statusChangedAt)
+            : undefined,
         })),
       },
       revenue: this.toRevenue(snapshot),

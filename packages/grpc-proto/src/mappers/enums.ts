@@ -730,6 +730,10 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_INBOUND_ADDRESS_ROTATED,
     [AuditAction.INBOUND_ADDRESS_DISABLED]:
       ProtoAuditAction.AUDIT_ACTION_INBOUND_ADDRESS_DISABLED,
+    [AuditAction.PLATFORM_JOB_RUN]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_JOB_RUN,
+    [AuditAction.PLATFORM_JOB_BACKFILLED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_JOB_BACKFILLED,
   },
   ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED,
 );
@@ -755,6 +759,7 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_INVITATION,
     [AuditResourceType.WEBHOOK_ENDPOINT]:
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_WEBHOOK_ENDPOINT,
+    [AuditResourceType.JOB]: ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_JOB,
   },
   ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
 );

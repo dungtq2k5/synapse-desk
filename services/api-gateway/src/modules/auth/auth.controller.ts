@@ -206,6 +206,7 @@ export class AuthController {
       return {
         requiresTwoFactor: true,
         requiresTwoFactorSetup: result.requiresTwoFactorSetup,
+        canRememberDevice: result.canRememberDevice,
       };
     }
 

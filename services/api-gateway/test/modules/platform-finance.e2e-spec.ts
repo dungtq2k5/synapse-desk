@@ -32,7 +32,12 @@ describe('Platform finance (e2e)', () => {
     dunning: {
       pastDue: 1,
       tenants: [
-        { id: 'org-1', name: 'Acme', updatedAt: timestamp(new Date()) },
+        {
+          id: 'org-1',
+          name: 'Acme',
+          updatedAt: timestamp(new Date()),
+          pastDueSince: timestamp(new Date('2026-09-01T00:00:00Z')),
+        },
       ],
     },
     revenue,
@@ -92,6 +97,9 @@ describe('Platform finance (e2e)', () => {
     // The three local sections are untouched by the degrade.
     expect(response.body.data.tenants.total).toBe(3);
     expect(response.body.data.dunning.pastDue).toBe(1);
+    expect(response.body.data.dunning.tenants[0].pastDueSince).toBe(
+      '2026-09-01T00:00:00.000Z',
+    );
   });
 
   it('3. an available revenue section carries the number and its age', async () => {

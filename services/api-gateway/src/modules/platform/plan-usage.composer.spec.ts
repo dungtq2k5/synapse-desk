@@ -49,6 +49,7 @@ describe('enrichWithUsage', () => {
         changes,
         after,
         overLimit: [],
+        overLimitItems: [],
         skippedPinned,
         budgetDeferred: false,
       },
@@ -78,10 +79,24 @@ describe('enrichWithUsage', () => {
     expect(result.subscribers[0].overLimit).toEqual([
       'maxStorageBytes: 8000 used, plan grants 5000',
     ]);
+    expect(result.subscribers[0].overLimitItems).toEqual([
+      { dimension: 'STORAGE', inUse: 8000, allowed: 5000 },
+    ]);
     expect(result.overLimitCount).toBe(1);
     expect(result.evaluatedDimensions).toEqual(
       expect.arrayContaining(['seats', 'storage', 'documents']),
     );
+  });
+
+  it('1b. Folds an over-documents subscriber in as data too', () => {
+    const result = enrichWithUsage(
+      projection({ maxDocumentUploads: 30 }),
+      usage,
+    );
+
+    expect(result.subscribers[0].overLimitItems).toEqual([
+      { dimension: 'DOCUMENTS', inUse: 40, allowed: 30 },
+    ]);
   });
 
   it('2. **Reads `after`, never `changes`**', () => {

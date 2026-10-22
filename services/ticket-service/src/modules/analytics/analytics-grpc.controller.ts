@@ -1,4 +1,5 @@
-import { JobHealthService } from '@synapsedesk/nest-common';
+import { AuditPublisher, JobHealthService } from '@synapsedesk/nest-common';
+import { SCHEDULED_JOBS } from '@synapsedesk/contracts';
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
@@ -41,6 +42,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
     private readonly rollup: TicketRollupJob,
     private readonly exports: ExportFacade,
     private readonly jobHealth: JobHealthService,
+    private readonly audit: AuditPublisher,
   ) {}
 
   getOverview(
@@ -102,7 +104,10 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
    * recovery path has to be reachable: the
    * alternative to a shipped backfill is a metric that stays wrong forever.
    */
-  async runRollup(request: RunRollupRequest): Promise<RunRollupResponse> {
+  async runRollup(
+    request: RunRollupRequest,
+    metadata?: Metadata,
+  ): Promise<RunRollupResponse> {
     const outcome =
       request.from && request.to
         ? await this.rollup.backfill(
@@ -111,6 +116,16 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
             request.organizationId,
           )
         : await this.rollup.run();
+
+    this.audit.recordJobRun(unpackCallerContext(metadata), {
+      jobName: SCHEDULED_JOBS.ANALYTICS_DAILY,
+      reason: request.reason,
+      from: request.from,
+      to: request.to,
+      organizationId: request.organizationId,
+      tenants: outcome.tenants,
+      rows: outcome.ticketRows + outcome.agentRows,
+    });
 
     return {
       tenants: outcome.tenants,

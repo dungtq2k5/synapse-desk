@@ -10,6 +10,18 @@ import {
 } from 'class-validator';
 
 /**
+ * A run by hand. It does work across every organization, so it says why, as
+ * a backfill does; the reason goes into the audit entry.
+ */
+export class RunJobDto {
+  @IsString()
+  @IsNotEmpty({ message: 'a run must say why' })
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
+  @ApiProperty({ minLength: 1 })
+  reason!: string;
+}
+
+/**
  * A BACKFILL.
  *
  * Ranged and mandatory-reason. The range is what keeps it safe to expose: the

@@ -145,6 +145,7 @@ export function wireLoginSuccess(user: UserResponse = wireUser()) {
     requiresTenantSelection: false,
     requiresTwoFactor: false,
     requiresTwoFactorSetup: false,
+    canRememberDevice: false,
     accessToken: 'access-token-fixture',
     refreshToken: 'refresh-token-fixture',
     tenants: [],
@@ -171,6 +172,7 @@ export function wireLoginTenantSelection(
     requiresTenantSelection: true,
     requiresTwoFactor: false,
     requiresTwoFactorSetup: false,
+    canRememberDevice: false,
     tenantSelectionToken: 'tenant-selection-token-fixture',
     tenants,
     user: undefined,
@@ -178,11 +180,15 @@ export function wireLoginTenantSelection(
 }
 
 /** Password accepted, second factor outstanding. */
-export function wireLoginTwoFactor(requiresTwoFactorSetup = false) {
+export function wireLoginTwoFactor(
+  requiresTwoFactorSetup = false,
+  canRememberDevice = true,
+) {
   return {
     requiresTenantSelection: false,
     requiresTwoFactor: true,
     requiresTwoFactorSetup,
+    canRememberDevice,
     twoFactorToken: 'two-factor-token-fixture',
     tenants: [],
     user: undefined,

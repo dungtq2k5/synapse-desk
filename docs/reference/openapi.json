@@ -32390,6 +32390,49 @@
               }
             }
           },
+          "409": {
+            "description": "The address (`slug`) or the domain is already taken; the sentence says which.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
           "415": {
             "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
             "content": {
@@ -33497,7 +33540,7 @@
                       "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
-                      "$ref": "#/components/schemas/PlatformOrganizationResponseDto"
+                      "$ref": "#/components/schemas/PlatformOrganizationStatusResponseDto"
                     }
                   }
                 }
@@ -37785,6 +37828,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunJobDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -37813,6 +37866,49 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/JobRunResultResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
                     }
                   }
                 }
@@ -37883,6 +37979,49 @@
                     "statusCode": {
                       "type": "number",
                       "example": 404
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
                     },
                     "path": {
                       "type": "string",
@@ -57235,6 +57374,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -57287,6 +57428,7 @@
                 "DOCUMENT_FLAG",
                 "EXPORT",
                 "INVITATION",
+                "JOB",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
@@ -58503,6 +58645,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -58555,6 +58699,7 @@
                 "DOCUMENT_FLAG",
                 "EXPORT",
                 "INVITATION",
+                "JOB",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
@@ -58624,7 +58769,7 @@
                         "items": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/components/schemas/AuditLogResponseDto"
+                            "$ref": "#/components/schemas/PlatformAuditLogResponseDto"
                           }
                         },
                         "meta": {
@@ -58793,7 +58938,7 @@
             }
           }
         },
-        "summary": "Tenant-scoped immutable trail",
+        "summary": "The platform's own trail, with who acted and on what, by name",
         "tags": ["PlatformAuditLogs"]
       }
     },
@@ -67712,9 +67857,17 @@
           "requiresTwoFactorSetup": {
             "type": "boolean",
             "description": "True when two-step is REQUIRED and this account has not enrolled: its\norganization requires it, or the account is a Super Admin (who always\nmust, and whose device is never remembered).\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
+          },
+          "canRememberDevice": {
+            "type": "boolean",
+            "description": "Whether \"remember this device\" can skip the next code: false for a Super\nAdmin, who is asked every time, so the page hides the option."
           }
         },
-        "required": ["requiresTwoFactor", "requiresTwoFactorSetup"]
+        "required": [
+          "requiresTwoFactor",
+          "requiresTwoFactorSetup",
+          "canRememberDevice"
+        ]
       },
       "TenantOptionResponseDto": {
         "type": "object",
@@ -68444,6 +68597,10 @@
               "PENDING_ONBOARDING",
               "SUSPENDED_PAST_DUE"
             ]
+          },
+          "isSuperAdmin": {
+            "type": "boolean",
+            "description": "A platform Super Admin, who has no organization and uses the console."
           }
         },
         "required": [
@@ -68451,7 +68608,8 @@
           "permissionCodes",
           "departmentIds",
           "hasPassword",
-          "organizationStatus"
+          "organizationStatus",
+          "isSuperAdmin"
         ]
       },
       "UpdateOwnProfileDto": {
@@ -70082,6 +70240,21 @@
             "format": "date-time",
             "type": "string",
             "nullable": true
+          },
+          "planName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
           }
         },
         "required": [
@@ -70089,7 +70262,10 @@
           "userCount",
           "pendingInvitationCount",
           "departmentCount",
-          "deletedAt"
+          "deletedAt",
+          "planName",
+          "billedThroughStripe",
+          "statusChangedAt"
         ]
       },
       "CreatePlatformOrganizationResponseDto": {
@@ -70198,6 +70374,21 @@
             "type": "string",
             "nullable": true
           },
+          "planName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+          },
           "usage": {
             "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads.",
             "allOf": [
@@ -70213,6 +70404,9 @@
           "pendingInvitationCount",
           "departmentCount",
           "deletedAt",
+          "planName",
+          "billedThroughStripe",
+          "statusChangedAt",
           "usage"
         ]
       },
@@ -70247,6 +70441,58 @@
             "minimum": 0
           }
         }
+      },
+      "PlatformOrganizationStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationResponseDto"
+          },
+          "userCount": {
+            "type": "number"
+          },
+          "pendingInvitationCount": {
+            "type": "number"
+          },
+          "departmentCount": {
+            "type": "number"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "planName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+          },
+          "revokedSessionCount": {
+            "type": "number",
+            "description": "Sessions the change ended: every one on a freeze, none otherwise."
+          }
+        },
+        "required": [
+          "organization",
+          "userCount",
+          "pendingInvitationCount",
+          "departmentCount",
+          "deletedAt",
+          "planName",
+          "billedThroughStripe",
+          "statusChangedAt",
+          "revokedSessionCount"
+        ]
       },
       "SetOrganizationStatusDto": {
         "type": "object",
@@ -70668,6 +70914,23 @@
         },
         "required": ["deleted"]
       },
+      "OverLimitItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "enum": ["DOCUMENTS", "SEATS", "STORAGE"],
+            "type": "string"
+          },
+          "inUse": {
+            "type": "number",
+            "description": "Seats, bytes or documents, by dimension."
+          },
+          "allowed": {
+            "type": "number"
+          }
+        },
+        "required": ["dimension", "inUse", "allowed"]
+      },
       "PlanSubscriberProjectionResponseDto": {
         "type": "object",
         "properties": {
@@ -70698,6 +70961,13 @@
               "type": "string"
             }
           },
+          "overLimitItems": {
+            "description": "The same limits as data, one per limit it breaks: what's in use against\nwhat the new plan allows. The strings above stay one release.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverLimitItemResponseDto"
+            }
+          },
           "skippedPinned": {
             "type": "boolean",
             "description": "Off-catalogue by deliberate policy; this apply does not touch them."
@@ -70713,6 +70983,7 @@
           "changes",
           "after",
           "overLimit",
+          "overLimitItems",
           "skippedPinned",
           "budgetDeferred"
         ]
@@ -70851,9 +71122,15 @@
             "format": "date-time",
             "type": "string",
             "description": "When the tenant row last changed — **not when it went past due**.\n\n`organizations` has no status-change timestamp, so this is the closest\navailable fact and a rename or a quota edit moves it. Rendering it as a\ndunning age would be a confidently wrong number."
+          },
+          "pastDueSince": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When it went past due: its status's last change. Null for an\norganization whose status changed before that was recorded."
           }
         },
-        "required": ["id", "name", "updatedAt"]
+        "required": ["id", "name", "updatedAt", "pastDueSince"]
       },
       "FinanceDunningResponseDto": {
         "type": "object",
@@ -71101,6 +71378,17 @@
           }
         },
         "required": ["service", "jobName", "tenants", "rows"]
+      },
+      "RunJobDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1
+          }
+        },
+        "required": ["reason"]
       },
       "BackfillJobDto": {
         "type": "object",
@@ -73010,6 +73298,7 @@
             "description": "null for system and cron actors, which have no user acting for them."
           },
           "action": {
+            "type": "string",
             "nullable": true,
             "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
@@ -73036,6 +73325,8 @@
               "PASSWORD_CHANGED",
               "PLATFORM_BILLING_CYCLE_RESET",
               "PLATFORM_GLOBAL_ROLE_CREATED",
+              "PLATFORM_JOB_BACKFILLED",
+              "PLATFORM_JOB_RUN",
               "PLATFORM_ORGANIZATION_CREATED",
               "PLATFORM_ORGANIZATION_OFFBOARDED",
               "PLATFORM_ORGANIZATION_RESTORED",
@@ -73065,23 +73356,23 @@
               "WEBHOOK_ENDPOINT_DELETED",
               "WEBHOOK_ENDPOINT_UPDATED",
               "WEBHOOK_SECRET_ROTATED"
-            ],
-            "type": "string"
+            ]
           },
           "resourceType": {
+            "type": "string",
             "nullable": true,
             "enum": [
               "DEPARTMENT",
               "DOCUMENT_FLAG",
               "EXPORT",
               "INVITATION",
+              "JOB",
               "ORGANIZATION",
               "ROLE",
               "SUBSCRIPTION_PLAN",
               "USER",
               "WEBHOOK_ENDPOINT"
-            ],
-            "type": "string"
+            ]
           },
           "resourceId": {
             "type": "string",
@@ -73166,6 +73457,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -73200,6 +73493,146 @@
           }
         },
         "required": ["actions"]
+      },
+      "PlatformAuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null for a PLATFORM act — the event belongs to the platform, not a tenant."
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null for system and cron actors, which have no user acting for them."
+          },
+          "action": {
+            "nullable": true,
+            "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
+            "enum": [
+              "DATA_EXPORT_REQUESTED",
+              "DEPARTMENT_CREATED",
+              "DEPARTMENT_DELETED",
+              "DEPARTMENT_MEMBERS_ADDED",
+              "DEPARTMENT_MEMBER_REMOVED",
+              "DEPARTMENT_RESTORED",
+              "DEPARTMENT_UPDATED",
+              "DOCUMENT_FLAG_DELETED",
+              "DOCUMENT_FLAG_DISMISSED",
+              "DOCUMENT_FLAG_RESOLVED",
+              "INBOUND_ADDRESS_DISABLED",
+              "INBOUND_ADDRESS_ENABLED",
+              "INBOUND_ADDRESS_ROTATED",
+              "INVITATION_RESENT",
+              "INVITATION_REVOKED",
+              "INVITATION_SENT",
+              "ORGANIZATION_OFFBOARD_REQUESTED",
+              "ORGANIZATION_ONBOARDING_COMPLETED",
+              "ORGANIZATION_SETTINGS_UPDATED",
+              "ORGANIZATION_UPDATED",
+              "PASSWORD_CHANGED",
+              "PLATFORM_BILLING_CYCLE_RESET",
+              "PLATFORM_GLOBAL_ROLE_CREATED",
+              "PLATFORM_JOB_BACKFILLED",
+              "PLATFORM_JOB_RUN",
+              "PLATFORM_ORGANIZATION_CREATED",
+              "PLATFORM_ORGANIZATION_OFFBOARDED",
+              "PLATFORM_ORGANIZATION_RESTORED",
+              "PLATFORM_ORGANIZATION_STATUS_CHANGED",
+              "PLATFORM_ORGANIZATION_UPDATED",
+              "PLATFORM_PLAN_APPLIED",
+              "PLATFORM_PLAN_CREATED",
+              "PLATFORM_PLAN_DELETED",
+              "PLATFORM_PLAN_UPDATED",
+              "ROLE_CREATED",
+              "ROLE_DELETED",
+              "ROLE_PERMISSIONS_UPDATED",
+              "ROLE_UPDATED",
+              "USER_AVATAR_UPDATED",
+              "USER_CREATED",
+              "USER_DELETED",
+              "USER_DEPARTMENTS_UPDATED",
+              "USER_LOCKED",
+              "USER_LOGOUT_ALL",
+              "USER_RESTORED",
+              "USER_ROLES_UPDATED",
+              "USER_SESSIONS_REVOKED",
+              "USER_TWO_FACTOR_RESET",
+              "USER_UNLOCKED",
+              "USER_UPDATED",
+              "WEBHOOK_ENDPOINT_CREATED",
+              "WEBHOOK_ENDPOINT_DELETED",
+              "WEBHOOK_ENDPOINT_UPDATED",
+              "WEBHOOK_SECRET_ROTATED"
+            ],
+            "type": "string"
+          },
+          "resourceType": {
+            "nullable": true,
+            "enum": [
+              "DEPARTMENT",
+              "DOCUMENT_FLAG",
+              "EXPORT",
+              "INVITATION",
+              "JOB",
+              "ORGANIZATION",
+              "ROLE",
+              "SUBSCRIPTION_PLAN",
+              "USER",
+              "WEBHOOK_ENDPOINT"
+            ],
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Parsed back into an object for the client.\n\nIt crosses gRPC as a JSON string because the shape differs per action; a\ntyped proto message could only be a `map<string, string>`, which would\nflatten every nested value in the before/after diff."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The Super Admin who acted; null when it can't be read (or no one did)."
+          },
+          "resourceName": {
+            "type": "string",
+            "nullable": true,
+            "description": "The organization or plan acted on; null for anything else, or when it can't be read."
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "userId",
+          "action",
+          "resourceType",
+          "resourceId",
+          "ipAddress",
+          "userAgent",
+          "metadata",
+          "createdAt",
+          "actorName",
+          "resourceName"
+        ]
       },
       "NotificationResponseDto": {
         "type": "object",

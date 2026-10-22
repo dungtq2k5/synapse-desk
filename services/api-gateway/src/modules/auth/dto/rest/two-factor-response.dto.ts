@@ -25,6 +25,12 @@ export class TwoFactorRequiredResponseDto {
    * `enforce_two_factor` becomes a tenant-wide lockout.
    */
   readonly requiresTwoFactorSetup!: boolean;
+
+  /**
+   * Whether "remember this device" can skip the next code: false for a Super
+   * Admin, who is asked every time, so the page hides the option.
+   */
+  readonly canRememberDevice!: boolean;
 }
 
 export class GenerateTwoFactorResponseDto {

@@ -265,6 +265,7 @@ describe('Billing at the gateway (e2e)', () => {
           departmentIds: [],
           hasPassword: true,
           organizationStatus: toProtoOrgStatus(OrgStatus.FROZEN),
+          isSuperAdmin: false,
         }),
       );
 
@@ -274,6 +275,7 @@ describe('Billing at the gateway (e2e)', () => {
 
       expect(me.status).toBe(200);
       expect(me.body.data.organizationStatus).toBe(OrgStatus.FROZEN);
+      expect(me.body.data.isSuperAdmin).toBe(false);
     });
 
     it('Reaches billing while the tenant is SUSPENDED_PAST_DUE', async () => {

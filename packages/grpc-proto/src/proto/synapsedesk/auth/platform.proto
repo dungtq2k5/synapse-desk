@@ -3,6 +3,7 @@ syntax = "proto3";
 package synapsedesk.auth;
 
 import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/billing.proto";
 import "synapsedesk/auth/common.proto";
 import "synapsedesk/auth/organization.proto";
 import "synapsedesk/auth/role.proto";
@@ -24,6 +25,20 @@ message PlatformOrganizationResponse {
   int32 department_count = 4;
 
   optional google.protobuf.Timestamp deleted_at = 5;
+
+  // How many sessions a status change ended: set only by SetOrganizationStatus
+  // (a freeze ends every session; another status ends none).
+  optional int32 revoked_session_count = 6;
+
+  // The catalogue plan the organization is on, absent when none is assigned.
+  optional string plan_name = 7;
+  // Whether a Stripe subscription grants it: a limit edited by hand then lasts
+  // until Stripe's next event. False for a plan assigned by hand (or Free).
+  bool billed_through_stripe = 8;
+
+  // When the status last changed. Absent for an organization older than the
+  // record of it.
+  optional google.protobuf.Timestamp status_changed_at = 9;
 }
 
 message ListPlatformOrganizationsRequest {
@@ -240,6 +255,10 @@ message DunningTenant {
   // age on a finance page, which is a confidently wrong number of exactly the
   // kind section 3a refuses for failed-payment amounts.
   google.protobuf.Timestamp updated_at = 3;
+
+  // When it went past due: its status's last change. Absent for an
+  // organization older than the record of it.
+  optional google.protobuf.Timestamp past_due_since = 4;
 }
 
 // **`FROZEN` is deliberately absent from this message.** Two unrelated things
@@ -492,6 +511,11 @@ message PlanSubscriberProjection {
   // Held back to the next cycle roll rather than applied now: lowering a
   // part-spent budget mid-cycle is retroactive in effect.
   bool budget_deferred = 6;
+
+  // `over_limit` as data, one per limit it breaks (`SEATS` from here; the
+  // gateway adds `STORAGE` and `DOCUMENTS`), the shape a plan change's
+  // refusal uses. The strings stay one release beside it.
+  repeated OverLimit over_limit_items = 8;
 }
 
 message ApplyPlanRequest {
@@ -526,6 +550,21 @@ message ApplyPlanResponse {
 }
 
 message DeletePlanResponse { bool deleted = 1; }
+
+// Names for the platform audit log's ids: the people who acted, and the
+// organizations and plans acted on. Deleted ones are named too; an id with no
+// row is left out, so the page shows the id.
+message ResolveAuditNamesRequest {
+  repeated string user_ids = 1;
+  repeated string organization_ids = 2;
+  repeated string plan_ids = 3;
+}
+
+message ResolveAuditNamesResponse {
+  map<string, string> users = 1;
+  map<string, string> organizations = 2;
+  map<string, string> plans = 3;
+}
 
 service PlatformService {
   rpc ListOrganizations(ListPlatformOrganizationsRequest) returns (ListPlatformOrganizationsResponse);
@@ -563,4 +602,5 @@ service PlatformService {
   rpc GetFinanceSnapshot(GetFinanceSnapshotRequest) returns (FinanceSnapshotResponse);
   rpc ListBillingEvents(ListBillingEventsRequest) returns (ListBillingEventsResponse);
   rpc GetAuthJobHealth(AuthJobHealthRequest) returns (AuthJobHealthResponse);
+  rpc ResolveAuditNames(ResolveAuditNamesRequest) returns (ResolveAuditNamesResponse);
 }

@@ -37,6 +37,7 @@ describe('e2e bootstrap', () => {
         departmentIds: [],
         hasPassword: true,
         organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
+        isSuperAdmin: false,
       }),
     );
 

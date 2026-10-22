@@ -3,7 +3,8 @@ import {
   AuditAction as ProtoAuditAction,
   AuditResourceType as ProtoAuditResourceType,
 } from '@synapsedesk/grpc-proto';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
   API,
@@ -13,7 +14,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { timestamp, wirePage } from '../fixtures/wire';
+import { grpcError, timestamp, wirePage } from '../fixtures/wire';
 
 /**
  * The audit trail at the HTTP boundary.
@@ -284,6 +285,89 @@ describe('Audit logs at the HTTP boundary (e2e)', () => {
       expect(res.status).toBe(200);
       const [request] = fx.stubs.audit.listAuditLogs.mock.calls[0];
       expect(request.platformScope).toBe(true);
+    });
+
+    it('2b. names who acted and the organization or plan acted on', async () => {
+      const actor = faker.string.uuid();
+      const organization = faker.string.uuid();
+      const plan = faker.string.uuid();
+      fx.stubs.audit.listAuditLogs.mockReturnValue(
+        of({
+          items: [
+            wireLog({
+              organizationId: undefined,
+              userId: actor,
+              action:
+                ProtoAuditAction.AUDIT_ACTION_PLATFORM_ORGANIZATION_STATUS_CHANGED,
+              resourceType:
+                ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_ORGANIZATION,
+              resourceId: organization,
+            }),
+            wireLog({
+              organizationId: undefined,
+              userId: actor,
+              action: ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_APPLIED,
+              resourceType:
+                ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN,
+              resourceId: plan,
+            }),
+          ],
+          meta: wirePage([]).meta,
+        }),
+      );
+      fx.stubs.platform.resolveAuditNames.mockReturnValue(
+        of({
+          users: { [actor]: 'Platform Admin' },
+          organizations: { [organization]: 'Northwind Health' },
+          plans: { [plan]: 'Pro' },
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        isSuperAdmin: true,
+        organizationId: null,
+      }).get(`${API}/platform/audit-logs`);
+
+      expect(res.status).toBe(200);
+      expect(
+        res.body.data.items.map(
+          (entry: { actorName: string; resourceName: string }) => [
+            entry.actorName,
+            entry.resourceName,
+          ],
+        ),
+      ).toEqual([
+        ['Platform Admin', 'Northwind Health'],
+        ['Platform Admin', 'Pro'],
+      ]);
+      expect(fx.stubs.platform.resolveAuditNames.mock.calls[0][0]).toEqual({
+        userIds: [actor],
+        organizationIds: [organization],
+        planIds: [plan],
+      });
+    });
+
+    it("2c. names that can't be read are null, and the trail still reads", async () => {
+      fx.stubs.audit.listAuditLogs.mockReturnValue(
+        of({
+          items: [wireLog({ organizationId: undefined })],
+          meta: wirePage([]).meta,
+        }),
+      );
+      fx.stubs.platform.resolveAuditNames.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'down')),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        isSuperAdmin: true,
+        organizationId: null,
+      }).get(`${API}/platform/audit-logs`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.items[0]).toMatchObject({
+        actorName: null,
+        resourceName: null,
+      });
     });
 
     it('3. exposes the actions list under the platform scope too', async () => {

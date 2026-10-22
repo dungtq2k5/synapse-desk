@@ -6,6 +6,10 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 
+/** `UNSUPPORTED_PRICING`'s value before it was spelled "normalize". */
+const LEGACY_UNSUPPORTED_PRICING =
+  'an active subscription uses pricing this estimate cannot normalise';
+
 /**
  * The Redis the revenue snapshot lives in.
  *
@@ -165,6 +169,20 @@ export class BillingSnapshotStore {
         return { ok: false, why: RevenueUnavailableReason.SNAPSHOT_UNREADABLE };
       }
 
+      // A snapshot written before the value's spelling changed answers with
+      // today's value until the next run replaces it.
+      if (
+        !parsed.available &&
+        (parsed.reason as string) === LEGACY_UNSUPPORTED_PRICING
+      ) {
+        return {
+          ok: true,
+          snapshot: {
+            ...parsed,
+            reason: RevenueUnavailableReason.UNSUPPORTED_PRICING,
+          },
+        };
+      }
       return { ok: true, snapshot: parsed };
     } catch (error) {
       this.logger.warn(

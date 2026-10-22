@@ -16,6 +16,8 @@ import {
   PlatformMetricsResponse,
   OrganizationUsageResponse,
   PlatformOrganizationResponse,
+  ResolveAuditNamesRequest,
+  ResolveAuditNamesResponse,
   PlatformServiceClient,
   RoleResponse,
   SetOrganizationStatusRequest,
@@ -69,6 +71,17 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return this.call(
       (metadata) =>
         this.platformGrpcService.getOrganization({ organizationId }, metadata),
+      context,
+    );
+  }
+
+  resolveAuditNames(
+    request: ResolveAuditNamesRequest,
+    context: RequestContext,
+  ): Promise<ResolveAuditNamesResponse> {
+    return this.call(
+      (metadata) =>
+        this.platformGrpcService.resolveAuditNames(request, metadata),
       context,
     );
   }

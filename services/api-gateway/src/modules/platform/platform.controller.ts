@@ -49,6 +49,7 @@ import {
   PlatformMetricsResponseDto,
   PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
+  PlatformOrganizationStatusResponseDto,
   PlatformUserResponseDto,
   ApplyPlanResponseDto,
   DeletePlanResponseDto,
@@ -98,7 +99,12 @@ export class PlatformController {
   @ApiWrappedResponse(CreatePlatformOrganizationResponseDto, {
     status: HttpStatus.CREATED,
   })
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '409'], {
+    descriptions: {
+      '409':
+        'The address (`slug`) or the domain is already taken; the sentence says which.',
+    },
+  })
   @Post('organizations')
   createOrganization(
     @CurrentUser() context: RequestContext,
@@ -150,7 +156,7 @@ export class PlatformController {
    * wrong right now.
    */
   @ApiOperation({ summary: 'Set status' })
-  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiWrappedResponse(PlatformOrganizationStatusResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post('organizations/:id/status')
   @HttpCode(HttpStatus.OK)
@@ -159,7 +165,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() setOrganizationStatusDto: SetOrganizationStatusDto,
-  ): Promise<PlatformOrganizationResponseDto> {
+  ): Promise<PlatformOrganizationStatusResponseDto> {
     const result = await this.platform.setStatus(
       id,
       setOrganizationStatusDto,

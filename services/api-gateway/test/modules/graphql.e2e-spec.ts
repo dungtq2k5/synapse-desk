@@ -183,6 +183,7 @@ describe('The GraphQL surface (e2e)', () => {
           departmentIds: [],
           hasPassword: true,
           organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
+          isSuperAdmin: false,
         }),
       );
 
@@ -1046,6 +1047,7 @@ describe('The GraphQL surface (e2e)', () => {
           departmentIds: [departmentId],
           hasPassword: true,
           organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
+          isSuperAdmin: false,
         }),
       );
       fx.stubs.department.listDepartmentsByIds.mockReturnValue(

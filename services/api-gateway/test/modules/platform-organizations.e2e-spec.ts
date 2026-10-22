@@ -47,6 +47,9 @@ describe('Platform organizations (e2e)', () => {
     userCount: 18,
     pendingInvitationCount: 2,
     departmentCount: 4,
+    planName: 'Pro',
+    billedThroughStripe: true,
+    statusChangedAt: timestamp(new Date('2026-09-01T00:00:00Z')),
   });
 
   const wireUsage = () => ({
@@ -132,6 +135,59 @@ describe('Platform organizations (e2e)', () => {
       aiTokens: failed,
     });
     expect(response.body.data.organization.name).toBe('Northwind Health');
+  });
+
+  it('names the plan, whether Stripe grants it, and when the status changed', async () => {
+    const response = await superAdmin()
+      .get(`${API}/platform/organizations/${organizationId}`)
+      .expect(200);
+
+    expect(response.body.data).toMatchObject({
+      planName: 'Pro',
+      billedThroughStripe: true,
+      statusChangedAt: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it('a status change answers how many sessions it ended', async () => {
+    fx.stubs.platform.setOrganizationStatus.mockReturnValue(
+      of({ ...wireOrganization(), revokedSessionCount: 7 }),
+    );
+
+    const response = await superAdmin()
+      .post(`${API}/platform/organizations/${organizationId}/status`)
+      .send({ status: 'FROZEN', reason: 'abuse' })
+      .expect(200);
+
+    expect(response.body.data.revokedSessionCount).toBe(7);
+    expect(response.body.data.organization.name).toBe('Northwind Health');
+  });
+
+  it('a taken address is a 409 with the server’s sentence', async () => {
+    fx.stubs.platform.createOrganization.mockReturnValue(
+      throwError(() =>
+        grpcError(
+          GrpcStatus.ALREADY_EXISTS,
+          'That address is already taken by another organization.',
+        ),
+      ),
+    );
+
+    const response = await superAdmin()
+      .post(`${API}/platform/organizations`)
+      .send({
+        name: 'Contoso',
+        slug: 'contoso',
+        adminEmail: 'admin@contoso.test',
+        adminFullName: 'Admin',
+        allowedEmailDomains: [],
+      })
+      .expect(409);
+
+    // The gateway's "!" stays (the console's review, answer 10).
+    expect(response.body.error).toBe(
+      'That address is already taken by another organization!',
+    );
   });
 
   it('an unknown organization is still a 404', async () => {

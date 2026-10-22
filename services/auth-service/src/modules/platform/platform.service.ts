@@ -17,6 +17,8 @@ import {
   PlatformMetricsResponse,
   OrganizationUsageResponse,
   PlatformOrganizationIdRequest,
+  ResolveAuditNamesRequest,
+  ResolveAuditNamesResponse,
   PlatformOrganizationResponse,
   ResetBillingCycleRequest,
   RoleResponse,
@@ -71,10 +73,12 @@ const ORGANIZATION_COUNTS = {
   _count: {
     select: { users: true, departments: true, invitations: true },
   },
+  plan: { select: { name: true } },
 } satisfies Prisma.OrganizationInclude;
 
 type OrganizationRow = Organization & {
   _count: { users: number; departments: number; invitations: number };
+  plan: { name: string } | null;
 };
 
 /**
@@ -152,6 +156,38 @@ export class PlatformService {
     return toPlatformOrganizationResponse(
       await this.load(request.organizationId),
     );
+  }
+
+  /**
+   * Names for the platform audit log's ids, deleted rows included: the trail
+   * outlives what it names. An id with no row is left out.
+   */
+  async resolveAuditNames(
+    request: ResolveAuditNamesRequest,
+    context: CallerContext,
+  ): Promise<ResolveAuditNamesResponse> {
+    requireActor(context);
+    const [users, organizations, plans] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: request.userIds } },
+        select: { id: true, fullName: true },
+      }),
+      this.prisma.organization.findMany({
+        where: { id: { in: request.organizationIds } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.subscriptionPlan.findMany({
+        where: { id: { in: request.planIds } },
+        select: { id: true, name: true },
+      }),
+    ]);
+    return {
+      users: Object.fromEntries(users.map((row) => [row.id, row.fullName])),
+      organizations: Object.fromEntries(
+        organizations.map((row) => [row.id, row.name]),
+      ),
+      plans: Object.fromEntries(plans.map((row) => [row.id, row.name])),
+    };
   }
 
   /** An organization's seats and AI allowance, by id. */
@@ -262,13 +298,9 @@ export class PlatformService {
         admin: toUserResponse(created.admin),
       };
     } catch (error) {
-      if (isUniqueConstraintViolation(error)) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'That slug, domain or admin address is already taken',
-        });
-      }
-      throw error;
+      // The address or the domain, named from the index it hit. The admin is
+      // created inside the new organization, so their email can't collide.
+      throw organizationConflict(error) ?? error;
     }
   }
 
@@ -434,7 +466,10 @@ export class PlatformService {
       metadata: { from, to, reason: request.reason, revokedSessionCount },
     });
 
-    return toPlatformOrganizationResponse(organization);
+    return {
+      ...toPlatformOrganizationResponse(organization),
+      revokedSessionCount,
+    };
   }
 
   /**
@@ -899,5 +934,10 @@ function toPlatformOrganizationResponse(
     pendingInvitationCount: row._count.invitations,
     departmentCount: row._count.departments,
     deletedAt: toProtoTimestamp(row.deletedAt),
+    planName: row.plan?.name ?? undefined,
+    billedThroughStripe: row.stripeSubscriptionId !== null,
+    statusChangedAt: row.statusChangedAt
+      ? toProtoTimestamp(row.statusChangedAt)
+      : undefined,
   };
 }

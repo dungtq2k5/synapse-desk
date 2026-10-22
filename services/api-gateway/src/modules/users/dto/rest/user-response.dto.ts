@@ -158,4 +158,8 @@ export class CurrentUserResponseDto {
   @IsNullable()
   @IsEnum(OrgStatus)
   readonly organizationStatus!: OrgStatus | null;
+
+  /** A platform Super Admin, who has no organization and uses the console. */
+  @IsBoolean()
+  readonly isSuperAdmin!: boolean;
 }

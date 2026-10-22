@@ -1,5 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { ExportKind, RequestContext } from '@synapsedesk/contracts';
+import { Injectable, Logger } from '@nestjs/common';
+import {
+  AuditResourceType,
+  ExportKind,
+  RequestContext,
+} from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { PlatformGrpcClient } from '../platform/platform-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import {
@@ -10,6 +16,7 @@ import {
 import {
   AuditActionsResponseDto,
   AuditLogResponseDto,
+  PlatformAuditLogResponseDto,
 } from './dto/rest/audit-log-response.dto';
 import {
   CreateAuditLogExportDto,
@@ -21,8 +28,11 @@ import { ExportResponseDto } from '../analytics/dto/rest/analytics-response.dto'
 /** The gateway's audit-trail surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
 export class AuditLogsService {
+  private readonly logger = new Logger(AuditLogsService.name);
+
   constructor(
     private readonly auditLogsGrpcClient: AuditLogsGrpcClient,
+    private readonly platform: PlatformGrpcClient,
     // The export lifecycle is shared, so the RPC is too — this module owns the
     // ROUTE, not a second copy of the machinery.
     private readonly analytics: AnalyticsService,
@@ -40,6 +50,62 @@ export class AuditLogsService {
         context,
       ),
     );
+  }
+
+  /**
+   * The platform's own trail, with names for its people, organizations and
+   * plans, read in one call to auth. A failed lookup leaves the names null:
+   * the trail still reads, by id.
+   */
+  async listPlatform(
+    query: ListAuditLogsQueryDto,
+    context: RequestContext,
+  ): Promise<PaginationResponseDto<PlatformAuditLogResponseDto>> {
+    const page = await this.list(query, context, true);
+    const ids = (type: AuditResourceType) => [
+      ...new Set(
+        page.items
+          .filter((entry) => entry.resourceType === type && entry.resourceId)
+          .map((entry) => entry.resourceId!),
+      ),
+    ];
+    const names = await this.platform
+      .resolveAuditNames(
+        {
+          userIds: [
+            ...new Set(
+              page.items.flatMap((entry) =>
+                entry.userId ? [entry.userId] : [],
+              ),
+            ),
+          ],
+          organizationIds: ids(AuditResourceType.ORGANIZATION),
+          planIds: ids(AuditResourceType.SUBSCRIPTION_PLAN),
+        },
+        context,
+      )
+      .catch((error: unknown) => {
+        this.logger.warn(`Audit names unavailable: ${formatErrorMsg(error)}`);
+        return null;
+      });
+    const resourceName = (entry: AuditLogResponseDto) => {
+      if (!names || !entry.resourceId) return null;
+      if (entry.resourceType === AuditResourceType.ORGANIZATION) {
+        return names.organizations[entry.resourceId] ?? null;
+      }
+      if (entry.resourceType === AuditResourceType.SUBSCRIPTION_PLAN) {
+        return names.plans[entry.resourceId] ?? null;
+      }
+      return null;
+    };
+    return {
+      ...page,
+      items: page.items.map((entry) => ({
+        ...entry,
+        actorName: (entry.userId && names?.users[entry.userId]) || null,
+        resourceName: resourceName(entry),
+      })),
+    };
   }
 
   /** The actions that actually occurred, for the filter dropdown. */

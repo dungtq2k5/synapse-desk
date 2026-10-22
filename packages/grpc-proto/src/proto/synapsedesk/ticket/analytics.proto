@@ -205,6 +205,9 @@ message RunRollupRequest {
   optional string to = 2;
   // A backfill for one organization only; absent, every tenant with activity.
   optional string organization_id = 3;
+  // Why a Super Admin ran it: recorded with the audit entry this service
+  // writes (the caller comes from the request's metadata).
+  string reason = 4;
 }
 
 message RunRollupResponse {

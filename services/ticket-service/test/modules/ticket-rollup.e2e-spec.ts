@@ -1,10 +1,15 @@
 import {
+  AuditAction,
+  AuditResourceType,
   SCHEDULED_JOBS,
   TicketPriority,
   TicketSource,
   TicketStatus,
 } from '@synapsedesk/contracts';
+import { AuditPublisher } from '@synapsedesk/nest-common';
+import { packRequestContext } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
+import { AnalyticsGrpcController } from '../../src/modules/analytics/analytics-grpc.controller';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
 import { AnalyticsService } from '../../src/modules/analytics/analytics.service';
@@ -812,6 +817,70 @@ describe('The ticket rollup (e2e)', () => {
 
       expect(overview.ticketsCreated).toBe(0);
       expect(overview.dataThrough).toBeUndefined();
+    });
+  });
+
+  describe('a run by hand is audited', () => {
+    const SUPER_ADMIN = 'aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa';
+    const caller = () =>
+      packRequestContext({
+        sub: SUPER_ADMIN,
+        organizationId: null,
+        isSuperAdmin: true,
+        departmentIds: [],
+        permissionCodes: [],
+        isEmailVerified: true,
+        ip: '203.0.113.7',
+        userAgent: 'jest',
+      });
+
+    it('a run records who, why and what it counted', async () => {
+      const record = jest.spyOn(fx.moduleRef.get(AuditPublisher), 'record');
+      const answer = await fx.moduleRef
+        .get(AnalyticsGrpcController)
+        .runRollup({ reason: 'Nightly run missed' }, caller());
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: SUPER_ADMIN }),
+        {
+          action: AuditAction.PLATFORM_JOB_RUN,
+          resourceType: AuditResourceType.JOB,
+          resourceId: null,
+          organizationId: null,
+          metadata: {
+            jobName: SCHEDULED_JOBS.ANALYTICS_DAILY,
+            reason: 'Nightly run missed',
+            tenants: answer.tenants,
+            rows: answer.ticketRows + answer.agentRows,
+          },
+        },
+      );
+      record.mockRestore();
+    });
+
+    it('a backfill records the range and the organization', async () => {
+      const record = jest.spyOn(fx.moduleRef.get(AuditPublisher), 'record');
+      await fx.moduleRef.get(AnalyticsGrpcController).runRollup(
+        {
+          from: '2026-10-01',
+          to: '2026-10-02',
+          organizationId: tenant.organizationId,
+          reason: 'Fix the rollup',
+        },
+        caller(),
+      );
+
+      expect(record.mock.calls[0][1]).toMatchObject({
+        action: AuditAction.PLATFORM_JOB_BACKFILLED,
+        metadata: {
+          jobName: SCHEDULED_JOBS.ANALYTICS_DAILY,
+          reason: 'Fix the rollup',
+          from: '2026-10-01',
+          to: '2026-10-02',
+          organizationId: tenant.organizationId,
+        },
+      });
+      record.mockRestore();
     });
   });
 });

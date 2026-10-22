@@ -280,6 +280,7 @@ describe('Platform plans (e2e)', () => {
           ),
           after,
           overLimit: [],
+          overLimitItems: [],
           skippedPinned: false,
           budgetDeferred: false,
         },
@@ -315,6 +316,9 @@ describe('Platform plans (e2e)', () => {
       expect(response.body.data.subscribers[0].overLimit[0]).toMatch(
         /maxStorageBytes/,
       );
+      expect(response.body.data.subscribers[0].overLimitItems).toEqual([
+        { dimension: 'STORAGE', inUse: 900, allowed: 500 },
+      ]);
     });
 
     it('3b. **A DEAD ingestion leg drops its dimensions instead of reporting zero**', async () => {

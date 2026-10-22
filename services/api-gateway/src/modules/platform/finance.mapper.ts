@@ -41,6 +41,7 @@ export function toFinanceSnapshotResponseDto(
         id: tenant.id,
         name: tenant.name,
         updatedAt: requireProtoTimestamp(tenant.updatedAt, 'updatedAt'),
+        pastDueSince: fromProtoTimestamp(tenant.pastDueSince) ?? null,
       })),
     },
     revenue: toFinanceRevenueResponseDto(response.revenue),

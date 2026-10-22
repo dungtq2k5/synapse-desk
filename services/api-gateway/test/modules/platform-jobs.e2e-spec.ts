@@ -314,9 +314,14 @@ describe('Platform job health (e2e)', () => {
 
       const response = await superAdmin()
         .post(`${API}/platform/jobs/${SCHEDULED_JOBS.ANALYTICS_DAILY}/run`)
+        .send({ reason: 'Nightly run missed' })
         .expect(200);
 
       expect(fx.stubs.analytics.runRollup).toHaveBeenCalledTimes(1);
+      // The reason goes down to the service, which audits the run.
+      expect(fx.stubs.analytics.runRollup.mock.calls[0][0]).toEqual({
+        reason: 'Nightly run missed',
+      });
       expect(response.body.data).toMatchObject({
         service: 'ticket-service',
         tenants: 3,
@@ -329,6 +334,7 @@ describe('Platform job health (e2e)', () => {
 
       await superAdmin()
         .post(`${API}/platform/jobs/${SCHEDULED_JOBS.LEDGER_DAILY}/run`)
+        .send({ reason: 'Nightly run missed' })
         .expect(200);
 
       expect(fx.stubs.ledger.runAiRollup).toHaveBeenCalledTimes(1);
@@ -339,7 +345,19 @@ describe('Platform job health (e2e)', () => {
       // A typo that returned 200 with zeros is indistinguishable from a job
       // that ran and found nothing — the confusion this whole surface exists to
       // remove.
-      await superAdmin().post(`${API}/platform/jobs/not-a-job/run`).expect(400);
+      await superAdmin()
+        .post(`${API}/platform/jobs/not-a-job/run`)
+        .send({ reason: 'Try' })
+        .expect(400);
+    });
+
+    it('9b. **a run REQUIRES a reason**, and nothing is run without one', async () => {
+      await superAdmin()
+        .post(`${API}/platform/jobs/${SCHEDULED_JOBS.ANALYTICS_DAILY}/run`)
+        .send({})
+        .expect(400);
+
+      expect(fx.stubs.analytics.runRollup).not.toHaveBeenCalled();
     });
 
     it('10. **a backfill REQUIRES a reason**', async () => {
@@ -369,7 +387,11 @@ describe('Platform job health (e2e)', () => {
         .expect(200);
 
       expect(fx.stubs.analytics.runRollup).toHaveBeenCalledWith(
-        expect.objectContaining({ from: '2026-01-01', to: '2026-01-31' }),
+        expect.objectContaining({
+          from: '2026-01-01',
+          to: '2026-01-31',
+          reason: 'deflection denominator fix',
+        }),
         expect.anything(),
       );
     });
@@ -437,6 +459,7 @@ describe('Platform job health (e2e)', () => {
 
       await tenantAdmin
         .post(`${API}/platform/jobs/${SCHEDULED_JOBS.ANALYTICS_DAILY}/run`)
+        .send({ reason: 'Try' })
         .expect(403);
     });
   });

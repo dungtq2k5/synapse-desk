@@ -301,6 +301,7 @@ describe('PermissionGuard on real routes (e2e)', () => {
         departmentIds: [],
         hasPassword: true,
         organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
+        isSuperAdmin: false,
       }),
     );
 

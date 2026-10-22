@@ -29,6 +29,14 @@ export class AuditLogResponseDto {
   createdAt!: Date;
 }
 
+/** A platform entry, with the names the page shows beside the ids. */
+export class PlatformAuditLogResponseDto extends AuditLogResponseDto {
+  /** The Super Admin who acted; null when it can't be read (or no one did). */
+  actorName!: string | null;
+  /** The organization or plan acted on; null for anything else, or when it can't be read. */
+  resourceName!: string | null;
+}
+
 /** The distinct actions present in the log, for a filter dropdown. */
 export class AuditActionsResponseDto {
   readonly actions!: AuditAction[];

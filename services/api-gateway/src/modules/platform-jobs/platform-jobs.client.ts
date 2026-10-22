@@ -199,10 +199,12 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   /** The ticket rollup — now, or over an explicit range. */
   async runTicketRollup(
     context: RequestContext,
+    reason: string,
     range?: BackfillRange,
   ): Promise<{ tenants: number; rows: number }> {
     const response = await this.call(
-      (metadata) => this.analyticsService.runRollup(range ?? {}, metadata),
+      (metadata) =>
+        this.analyticsService.runRollup({ ...range, reason }, metadata),
       context,
     );
 
@@ -215,10 +217,12 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   /** The AI rollup — now, or over an explicit range. */
   async runAiRollup(
     context: RequestContext,
+    reason: string,
     range?: BackfillRange,
   ): Promise<{ tenants: number; rows: number }> {
     const response = await this.call(
-      (metadata) => this.ledgerService.runAiRollup(range ?? {}, metadata),
+      (metadata) =>
+        this.ledgerService.runAiRollup({ ...range, reason }, metadata),
       context,
       undefined,
       'ingestion-service',

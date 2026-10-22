@@ -476,7 +476,7 @@ export enum RevenueUnavailableReason {
    * priced total beside a count of what could not be priced — honest and still
    * useful. The offending subscription id is logged, for the same reason.
    */
-  UNSUPPORTED_PRICING = 'an active subscription uses pricing this estimate cannot normalise',
+  UNSUPPORTED_PRICING = 'an active subscription uses pricing this estimate cannot normalize',
 }
 
 /**

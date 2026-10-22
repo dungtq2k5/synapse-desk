@@ -5,6 +5,11 @@ import {
   UsageMeterResponseDto,
 } from '../../../organizations/dto/rest/organization-response.dto';
 import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  OVER_LIMIT_DIMENSIONS,
+  type OverLimitDimension,
+} from '@synapsedesk/contracts';
 
 export class PlatformOrganizationResponseDto {
   readonly organization!: OrganizationResponseDto;
@@ -12,6 +17,32 @@ export class PlatformOrganizationResponseDto {
   readonly pendingInvitationCount!: number;
   readonly departmentCount!: number;
   readonly deletedAt!: Date | null;
+  /** The catalogue plan it's on, or null when none is assigned. */
+  readonly planName!: string | null;
+  /**
+   * Whether a Stripe subscription grants the plan: a limit edited by hand
+   * then lasts until Stripe's next event. False for a plan assigned by hand.
+   */
+  readonly billedThroughStripe!: boolean;
+  /**
+   * When the status last changed ("Frozen since"). Null for an organization
+   * whose status changed before that was recorded.
+   */
+  readonly statusChangedAt!: Date | null;
+}
+
+export class PlatformOrganizationStatusResponseDto extends PlatformOrganizationResponseDto {
+  /** Sessions the change ended: every one on a freeze, none otherwise. */
+  readonly revokedSessionCount!: number;
+}
+
+/** One limit a plan breaks: what's in use against what it allows. */
+export class OverLimitItemResponseDto {
+  @ApiProperty({ enum: OVER_LIMIT_DIMENSIONS })
+  readonly dimension!: OverLimitDimension;
+  /** Seats, bytes or documents, by dimension. */
+  readonly inUse!: number;
+  readonly allowed!: number;
 }
 
 /** An organization's meters, as its own usage page reads them. */
@@ -136,6 +167,11 @@ export class PlanSubscriberProjectionResponseDto {
    * tenants keep everything they have and are refused their next addition.
    */
   readonly overLimit!: string[];
+  /**
+   * The same limits as data, one per limit it breaks: what's in use against
+   * what the new plan allows. The strings above stay one release.
+   */
+  readonly overLimitItems!: OverLimitItemResponseDto[];
   /** Off-catalogue by deliberate policy; this apply does not touch them. */
   readonly skippedPinned!: boolean;
   /** Held to the next cycle roll: lowering a part-spent budget is retroactive. */

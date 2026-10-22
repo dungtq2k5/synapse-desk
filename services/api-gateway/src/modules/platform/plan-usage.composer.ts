@@ -44,6 +44,7 @@ export function enrichWithUsage(
     if (!used) return row;
 
     const overLimit = [...row.overLimit];
+    const overLimitItems = [...row.overLimitItems];
 
     // The grants come off the projection's own `after` map, which carries the
     // target value of every NUMERIC column this apply would write. Reading the
@@ -54,6 +55,11 @@ export function enrichWithUsage(
       overLimit.push(
         `maxStorageBytes: ${used.usedBytes} used, plan grants ${storageLimit}`,
       );
+      overLimitItems.push({
+        dimension: 'STORAGE',
+        inUse: Number(used.usedBytes),
+        allowed: storageLimit,
+      });
     }
 
     const documentLimit = afterValue(row.after, 'maxDocumentUploads');
@@ -64,9 +70,14 @@ export function enrichWithUsage(
       overLimit.push(
         `maxDocumentUploads: ${used.documentCount} held, plan grants ${documentLimit}`,
       );
+      overLimitItems.push({
+        dimension: 'DOCUMENTS',
+        inUse: used.documentCount,
+        allowed: documentLimit,
+      });
     }
 
-    return { ...row, overLimit };
+    return { ...row, overLimit, overLimitItems };
   });
 
   return {
