@@ -83,7 +83,13 @@ public class PlatformJobsController {
     PlatformJobsController.class
   );
 
-  private static final long DEADLINE_SECONDS = JobHeartbeats.DEADLINE_SECONDS;
+  /**
+   * A run or a backfill recomputes for every organization (or a range of
+   * days) before it answers, so it gets minutes, not the heartbeat's
+   * seconds: a busy platform's rollup outlasts five, and the answer is the
+   * counts the console shows.
+   */
+  private static final long RUN_DEADLINE_SECONDS = 300;
 
   private static final String ANALYTICS_DAILY = "analytics-daily";
   private static final String LEDGER_DAILY = "ledger-daily";
@@ -313,7 +319,7 @@ public class PlatformJobsController {
     RequestContext context
   ) {
     return analyticsStub
-      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withDeadlineAfter(RUN_DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
       );
@@ -323,7 +329,7 @@ public class PlatformJobsController {
     RequestContext context
   ) {
     return ledgerStub
-      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withDeadlineAfter(RUN_DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
       );
