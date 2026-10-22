@@ -28,6 +28,7 @@ import com.synapsedesk.gateway.modules.platform.dto.rest.PlanSortField;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformMetricsResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationStatusResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformUserResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ResetBillingCycleDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto;
@@ -166,7 +167,13 @@ public class PlatformController {
     produces = { "application/json" },
     consumes = { "application/json" }
   )
-  @ApiErrors({ "400", "401" })
+  @ApiErrors(
+    value = { "400", "401", "409" },
+    descriptions = @ApiErrors.Description(
+      status = "409",
+      value = "The address (`slug`) or the domain is already taken; the sentence says which."
+    )
+  )
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<
     ApiResponse<CreatePlatformOrganizationResponseDto>
@@ -216,7 +223,7 @@ public class PlatformController {
   )
   @ApiErrors({ "400", "401", "404" })
   public ResponseEntity<
-    ApiResponse<PlatformOrganizationResponseDto>
+    ApiResponse<PlatformOrganizationStatusResponseDto>
   > platformControllerSetStatusV1(
     @PathVariable("id") String id,
     @Valid @RequestBody SetOrganizationStatusDto setOrganizationStatusDto

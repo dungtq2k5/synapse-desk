@@ -354,6 +354,61 @@ class PlatformOrganizationsServiceTest {
   }
 
   @Test
+  void aStatusChangeSaysHowManySessionsItEnded() {
+    when(stub.setOrganizationStatus(any())).thenReturn(
+      reply().toBuilder().setRevokedSessionCount(4).build()
+    );
+    var dto =
+      new com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto();
+    dto.setStatus(
+      com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto.StatusEnum.FROZEN
+    );
+    dto.setReason("suspected fraud");
+
+    var data = service.setStatus(context(), "org-9", dto).getBody().data();
+
+    assertThat(data.getRevokedSessionCount()).isEqualByComparingTo("4");
+    assertThat(data.getOrganization().getId()).isEqualTo("org-9");
+  }
+
+  @Test
+  void anOrganizationCarriesItsPlanWhetherStripeBillsItAndWhenItsStatusChanged() {
+    when(stub.getOrganization(any())).thenReturn(
+      reply()
+        .toBuilder()
+        .setPlanName("Pro")
+        .setBilledThroughStripe(true)
+        .setStatusChangedAt(
+          com.google.protobuf.Timestamp.newBuilder().setSeconds(1_756_684_800)
+        )
+        .build()
+    );
+    when(stub.getOrganizationUsage(any())).thenThrow(
+      io.grpc.Status.UNAVAILABLE.asRuntimeException()
+    );
+    when(usageStub.getPlatformUsage(any())).thenThrow(
+      io.grpc.Status.UNAVAILABLE.asRuntimeException()
+    );
+
+    var data = service.getOrganization(context(), "org-9").getBody().data();
+
+    assertThat(data.getPlanName()).isEqualTo("Pro");
+    assertThat(data.getBilledThroughStripe()).isTrue();
+    assertThat(data.getStatusChangedAt()).hasToString("2025-09-01T00:00Z");
+  }
+
+  @Test
+  void anOrganizationWithNoPlanOrStatusDateSaysNull() {
+    when(stub.restoreOrganization(any())).thenReturn(reply());
+
+    var data = service.restore(context(), "org-9").getBody().data();
+
+    assertThat(data.getPlanName()).isNull();
+    assertThat(data.getBilledThroughStripe()).isFalse();
+    assertThat(data.getStatusChangedAt()).isNull();
+  }
+
+  @Test
   void offboardingDropsItsCachedStatus() {
     when(stub.offboardOrganization(any())).thenReturn(
       synapsedesk.auth.Platform.OffboardOrganizationResponse.getDefaultInstance()

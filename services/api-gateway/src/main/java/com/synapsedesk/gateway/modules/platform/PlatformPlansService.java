@@ -10,6 +10,7 @@ import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.DeletePlanResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlanSubscriberProjectionResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SubscriptionPlanPriceResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SubscriptionPlanResponseDto;
@@ -379,6 +380,9 @@ public class PlatformPlansService {
       }
 
       List<String> overLimit = new ArrayList<>(row.getOverLimit());
+      List<OverLimitItemResponseDto> overLimitItems = new ArrayList<>(
+        row.getOverLimitItems()
+      );
       Long storageLimit = afterValue(row.getAfter(), "maxStorageBytes");
       if (
         storageLimit != null && exceedsLimit(used.getUsedBytes(), storageLimit)
@@ -388,6 +392,13 @@ public class PlatformPlansService {
             used.getUsedBytes() +
             " used, plan grants " +
             storageLimit
+        );
+        overLimitItems.add(
+          overLimitItem(
+            OverLimitItemResponseDto.DimensionEnum.STORAGE,
+            used.getUsedBytes(),
+            storageLimit
+          )
         );
       }
       Long documentLimit = afterValue(row.getAfter(), "maxDocumentUploads");
@@ -401,6 +412,13 @@ public class PlatformPlansService {
             " held, plan grants " +
             documentLimit
         );
+        overLimitItems.add(
+          overLimitItem(
+            OverLimitItemResponseDto.DimensionEnum.DOCUMENTS,
+            used.getDocumentCount(),
+            documentLimit
+          )
+        );
       }
 
       subscribers.add(
@@ -410,6 +428,7 @@ public class PlatformPlansService {
           .changes(row.getChanges())
           .after(row.getAfter())
           .overLimit(overLimit)
+          .overLimitItems(overLimitItems)
           .skippedPinned(row.getSkippedPinned())
           .budgetDeferred(row.getBudgetDeferred())
       );
@@ -434,6 +453,17 @@ public class PlatformPlansService {
         )
       )
       .evaluatedDimensions(new ArrayList<>(evaluatedDimensions));
+  }
+
+  private static OverLimitItemResponseDto overLimitItem(
+    OverLimitItemResponseDto.DimensionEnum dimension,
+    long inUse,
+    long allowed
+  ) {
+    return new OverLimitItemResponseDto()
+      .dimension(dimension)
+      .inUse(BigDecimal.valueOf(inUse))
+      .allowed(BigDecimal.valueOf(allowed));
   }
 
   /** The target grant for one column, or `null` when the column is not changing — a map read, never a parsed display string. */
@@ -551,6 +581,21 @@ public class PlatformPlansService {
                   )
               )
               .overLimit(row.getOverLimitList())
+              .overLimitItems(
+                row
+                  .getOverLimitItemsList()
+                  .stream()
+                  .map(item ->
+                    overLimitItem(
+                      OverLimitItemResponseDto.DimensionEnum.fromValue(
+                        item.getDimension()
+                      ),
+                      item.getInUse(),
+                      item.getAllowed()
+                    )
+                  )
+                  .toList()
+              )
               .skippedPinned(row.getSkippedPinned())
               .budgetDeferred(row.getBudgetDeferred())
           )

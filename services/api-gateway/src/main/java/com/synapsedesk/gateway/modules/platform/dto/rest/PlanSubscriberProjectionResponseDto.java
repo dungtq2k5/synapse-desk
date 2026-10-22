@@ -27,6 +27,8 @@ public class PlanSubscriberProjectionResponseDto {
 
   private List<String> overLimit = new ArrayList<>();
 
+  private List<OverLimitItemResponseDto> overLimitItems = new ArrayList<>();
+
   private Boolean skippedPinned;
 
   private Boolean budgetDeferred;
@@ -197,6 +199,29 @@ public class PlanSubscriberProjectionResponseDto {
     this.overLimit = overLimit;
   }
 
+  public PlanSubscriberProjectionResponseDto overLimitItems(
+    List<OverLimitItemResponseDto> overLimitItems
+  ) {
+    this.overLimitItems = overLimitItems;
+    return this;
+  }
+
+  /**
+   * Get overLimitItems
+   * @return overLimitItems
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("overLimitItems")
+  public List<OverLimitItemResponseDto> getOverLimitItems() {
+    return overLimitItems;
+  }
+
+  @JsonProperty("overLimitItems")
+  public void setOverLimitItems(List<OverLimitItemResponseDto> overLimitItems) {
+    this.overLimitItems = overLimitItems;
+  }
+
   public PlanSubscriberProjectionResponseDto skippedPinned(
     Boolean skippedPinned
   ) {
@@ -276,6 +301,10 @@ public class PlanSubscriberProjectionResponseDto {
       Objects.equals(
         this.budgetDeferred,
         planSubscriberProjectionResponseDto.budgetDeferred
+      ) &&
+      Objects.equals(
+        this.overLimitItems,
+        planSubscriberProjectionResponseDto.overLimitItems
       )
     );
   }
@@ -289,7 +318,8 @@ public class PlanSubscriberProjectionResponseDto {
       after,
       overLimit,
       skippedPinned,
-      budgetDeferred
+      budgetDeferred,
+      overLimitItems
     );
   }
 
@@ -313,6 +343,9 @@ public class PlanSubscriberProjectionResponseDto {
       .append("\n");
     sb.append("    budgetDeferred: ")
       .append(toIndentedString(budgetDeferred))
+      .append("\n");
+    sb.append("    overLimitItems: ")
+      .append(toIndentedString(overLimitItems))
       .append("\n");
     sb.append("}");
     return sb.toString();

@@ -146,6 +146,47 @@ class PlatformUsersRolesFinanceServiceTest {
   }
 
   @Test
+  void aPastDueOrganizationSaysSinceWhenAndNullWhenItWasNeverRecorded() {
+    Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
+    when(stub.getFinanceSnapshot(any())).thenReturn(
+      FinanceSnapshotResponse.newBuilder()
+        .setTenants(FinanceTenantCounts.newBuilder().setTotal(2))
+        .setDunning(
+          FinanceDunning.newBuilder()
+            .setPastDue(2)
+            .addTenants(
+              synapsedesk.auth.Platform.DunningTenant.newBuilder()
+                .setId("org-1")
+                .setName("Bluebird")
+                .setUpdatedAt(now)
+                .setPastDueSince(now)
+            )
+            .addTenants(
+              synapsedesk.auth.Platform.DunningTenant.newBuilder()
+                .setId("org-2")
+                .setName("Harbor")
+                .setUpdatedAt(now)
+            )
+        )
+        .setRevenue(FinanceRevenue.newBuilder().setAvailable(false))
+        .setGeneratedAt(now)
+        .build()
+    );
+
+    var tenants = service
+      .getFinanceSnapshot(context())
+      .getBody()
+      .data()
+      .getDunning()
+      .getTenants();
+
+    assertThat(tenants.get(0).getPastDueSince()).hasToString(
+      "2025-09-01T00:00Z"
+    );
+    assertThat(tenants.get(1).getPastDueSince()).isNull();
+  }
+
+  @Test
   void listBillingEventsRefusesAnImpossibleDateOrAReversedRangeBeforeThePeer() {
     for (String[] range : new String[][] {
       { "2026-02-30", "2026-03-31" },

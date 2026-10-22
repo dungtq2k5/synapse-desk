@@ -257,7 +257,7 @@
       "summary": "Full permission catalogue, grouped by target prefix — drives the role editor UI"
     },
     "GET /api/v1/platform/audit-logs": {
-      "summary": "Tenant-scoped immutable trail"
+      "summary": "The platform's own trail, with who acted and on what, by name"
     },
     "GET /api/v1/platform/audit-logs/actions": {
       "summary": "Distinct action values, for filter dropdowns"
@@ -914,6 +914,9 @@
     "CreateWebhookEndpointDto.eventTypes": {
       "description": "At least one — an endpoint subscribed to nothing is refused at creation,\nnever created silently useless, and an empty list never means \"all\"."
     },
+    "CurrentUserResponseDto.isSuperAdmin": {
+      "description": "A platform Super Admin, who has no organization and uses the console."
+    },
     "CurrentUserResponseDto.permissionCodes": {
       "description": "Every permission code the caller holds, granted through their roles."
     },
@@ -973,6 +976,9 @@
     },
     "DraftCitationResponseDto.pageNumber": {
       "description": "The page this citation points at, or `null` when the source document has no\npages — a pasted text file, an HTML article. Never faked as 1."
+    },
+    "DunningTenantResponseDto.pastDueSince": {
+      "description": "When it went past due: its status's last change. Null for an\norganization whose status changed before that was recorded."
     },
     "DunningTenantResponseDto.updatedAt": {
       "description": "When the tenant row last changed — **not when it went past due**.\n\n`organizations` has no status-change timestamp, so this is the closest\navailable fact and a rename or a quota edit moves it. Rendering it as a\ndunning age would be a confidently wrong number."
@@ -1221,8 +1227,20 @@
     "PlanSubscriberProjectionResponseDto.overLimit": {
       "description": "Limits this tenant is ALREADY past under the new plan.\n\nReported, never enforced: a limit gates admission, never tenure. These\ntenants keep everything they have and are refused their next addition."
     },
+    "PlanSubscriberProjectionResponseDto.overLimitItems": {
+      "description": "The same limits as data, one per limit it breaks: what's in use against\nwhat the new plan allows. The strings above stay one release."
+    },
     "PlanSubscriberProjectionResponseDto.skippedPinned": {
       "description": "Off-catalogue by deliberate policy; this apply does not touch them."
+    },
+    "PlatformOrganizationDetailResponseDto.billedThroughStripe": {
+      "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+    },
+    "PlatformOrganizationDetailResponseDto.planName": {
+      "description": "The catalogue plan it's on, or null when none is assigned."
+    },
+    "PlatformOrganizationDetailResponseDto.statusChangedAt": {
+      "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
     },
     "PlatformOrganizationDetailResponseDto.usage": {
       "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads."
@@ -1385,6 +1403,9 @@
     },
     "TwoFactorEnabledResponseDto.user": {
       "description": "The user signed in when two-step was enabled through the sign-in challenge; null when it was enabled from a session."
+    },
+    "TwoFactorRequiredResponseDto.canRememberDevice": {
+      "description": "Whether \"remember this device\" can skip the next code: false for a Super\nAdmin, who is asked every time, so the page hides the option."
     },
     "TwoFactorRequiredResponseDto.requiresTwoFactorSetup": {
       "description": "True when two-step is REQUIRED and this account has not enrolled: its\norganization requires it, or the account is a Super Admin (who always\nmust, and whose device is never remembered).\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
@@ -1571,6 +1592,48 @@
     },
     "BackfillJobDto.organizationId": {
       "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does."
+    },
+    "OverLimitItemResponseDto.inUse": {
+      "description": "Seats, bytes or documents, by dimension."
+    },
+    "PlatformAuditLogResponseDto.action": {
+      "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain."
+    },
+    "PlatformAuditLogResponseDto.actorName": {
+      "description": "The Super Admin who acted; null when it can't be read (or no one did)."
+    },
+    "PlatformAuditLogResponseDto.metadata": {
+      "description": "Parsed back into an object for the client.\n\nIt crosses gRPC as a JSON string because the shape differs per action; a\ntyped proto message could only be a `map<string, string>`, which would\nflatten every nested value in the before/after diff."
+    },
+    "PlatformAuditLogResponseDto.organizationId": {
+      "description": "null for a PLATFORM act — the event belongs to the platform, not a tenant."
+    },
+    "PlatformAuditLogResponseDto.resourceName": {
+      "description": "The organization or plan acted on; null for anything else, or when it can't be read."
+    },
+    "PlatformAuditLogResponseDto.userId": {
+      "description": "null for system and cron actors, which have no user acting for them."
+    },
+    "PlatformOrganizationResponseDto.billedThroughStripe": {
+      "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+    },
+    "PlatformOrganizationResponseDto.planName": {
+      "description": "The catalogue plan it's on, or null when none is assigned."
+    },
+    "PlatformOrganizationResponseDto.statusChangedAt": {
+      "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+    },
+    "PlatformOrganizationStatusResponseDto.billedThroughStripe": {
+      "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+    },
+    "PlatformOrganizationStatusResponseDto.planName": {
+      "description": "The catalogue plan it's on, or null when none is assigned."
+    },
+    "PlatformOrganizationStatusResponseDto.revokedSessionCount": {
+      "description": "Sessions the change ended: every one on a freeze, none otherwise."
+    },
+    "PlatformOrganizationStatusResponseDto.statusChangedAt": {
+      "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
     }
   }
 }

@@ -14,6 +14,7 @@ public enum AuditResourceTypeFilter {
   DOCUMENT_FLAG,
   EXPORT,
   INVITATION,
+  JOB,
   ORGANIZATION,
   ROLE,
   SUBSCRIPTION_PLAN,

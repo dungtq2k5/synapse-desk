@@ -17,6 +17,7 @@ import com.synapsedesk.gateway.modules.platformjobs.dto.rest.BackfillJobDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.JobHealthResponseDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.JobRunResultResponseDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.JobRunStatusResponseDto;
+import com.synapsedesk.gateway.modules.platformjobs.dto.rest.RunJobDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -139,16 +140,27 @@ public class PlatformJobsController {
 
   @PostMapping(
     value = "/platform/jobs/{name}/run",
-    produces = { "application/json" }
+    produces = { "application/json" },
+    consumes = { "application/json" }
   )
-  @ApiErrors({ "401", "404" })
+  @ApiErrors({ "400", "401", "404" })
   public ResponseEntity<
     ApiResponse<JobRunResultResponseDto>
-  > platformJobsControllerRunV1(@PathVariable("name") String name) {
+  > platformJobsControllerRunV1(
+    @PathVariable("name") String name,
+    @Valid @RequestBody RunJobDto runJobDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    JobRunResultResponseDto data = dispatch(name, context, null, null, null);
+    JobRunResultResponseDto data = dispatch(
+      name,
+      context,
+      runJobDto.getReason(),
+      null,
+      null,
+      null
+    );
 
     return ResponseEntity.ok(ApiResponse.of(200, "Job run complete", data));
   }
@@ -189,6 +201,7 @@ public class PlatformJobsController {
     JobRunResultResponseDto data = dispatch(
       name,
       context,
+      backfillJobDto.getReason(),
       backfillJobDto.getFrom(),
       backfillJobDto.getTo(),
       organizationId
@@ -200,12 +213,16 @@ public class PlatformJobsController {
   private JobRunResultResponseDto dispatch(
     String jobName,
     RequestContext context,
+    String reason,
     String from,
     String to,
     @Nullable UUID organizationId
   ) {
     if (ANALYTICS_DAILY.equals(jobName)) {
-      RunRollupRequest.Builder wire = RunRollupRequest.newBuilder();
+      // The reason goes down to the service, which audits the run.
+      RunRollupRequest.Builder wire = RunRollupRequest.newBuilder().setReason(
+        reason
+      );
       if (from != null) {
         wire.setFrom(from);
       }
@@ -231,7 +248,8 @@ public class PlatformJobsController {
     }
 
     if (LEDGER_DAILY.equals(jobName)) {
-      RunAiRollupRequest.Builder wire = RunAiRollupRequest.newBuilder();
+      RunAiRollupRequest.Builder wire =
+        RunAiRollupRequest.newBuilder().setReason(reason);
       if (from != null) {
         wire.setFrom(from);
       }

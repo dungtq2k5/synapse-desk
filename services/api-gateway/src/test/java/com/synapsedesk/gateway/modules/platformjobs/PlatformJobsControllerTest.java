@@ -15,6 +15,7 @@ import com.synapsedesk.gateway.common.metrics.JobHeartbeats;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.BackfillJobDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.JobHealthResponseDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.JobRunStatusResponseDto;
+import com.synapsedesk.gateway.modules.platformjobs.dto.rest.RunJobDto;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.time.Instant;
@@ -280,7 +281,10 @@ class PlatformJobsControllerTest {
   @Test
   void runRefusesAnUntriggerableJobNameWith400() {
     assertThatThrownBy(() ->
-      controller.platformJobsControllerRunV1("not-a-real-job")
+      controller.platformJobsControllerRunV1(
+        "not-a-real-job",
+        new RunJobDto().reason("Try")
+      )
     )
       .isInstanceOf(
         org.springframework.web.server.ResponseStatusException.class
@@ -298,12 +302,45 @@ class PlatformJobsControllerTest {
         .build()
     );
 
-    var response = controller.platformJobsControllerRunV1("analytics-daily");
+    var response = controller.platformJobsControllerRunV1(
+      "analytics-daily",
+      new RunJobDto().reason("Nightly run missed")
+    );
 
     assertThat(response.getBody().message()).isEqualTo("Job run complete");
     assertThat(response.getBody().data().getRows()).isEqualTo(
       java.math.BigDecimal.valueOf(8)
     );
+    // The reason goes down to the service, which audits the run.
+    var sent = org.mockito.ArgumentCaptor.forClass(
+      synapsedesk.ticket.Analytics.RunRollupRequest.class
+    );
+    org.mockito.Mockito.verify(analyticsStub).runRollup(sent.capture());
+    assertThat(sent.getValue().getReason()).isEqualTo("Nightly run missed");
+  }
+
+  @Test
+  void runDispatchesLedgerDailyWithItsReason() {
+    when(ledgerStub.runAiRollup(any())).thenReturn(
+      synapsedesk.ingestion.Ledger.RunAiRollupResponse.newBuilder()
+        .setTenants(1)
+        .setRows(4)
+        .build()
+    );
+
+    var response = controller.platformJobsControllerRunV1(
+      "ledger-daily",
+      new RunJobDto().reason("Catch up")
+    );
+
+    assertThat(response.getBody().data().getRows()).isEqualTo(
+      java.math.BigDecimal.valueOf(4)
+    );
+    var sent = org.mockito.ArgumentCaptor.forClass(
+      synapsedesk.ingestion.Ledger.RunAiRollupRequest.class
+    );
+    org.mockito.Mockito.verify(ledgerStub).runAiRollup(sent.capture());
+    assertThat(sent.getValue().getReason()).isEqualTo("Catch up");
   }
 
   @Test

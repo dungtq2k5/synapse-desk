@@ -15,6 +15,7 @@ import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanPriceDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -197,6 +198,64 @@ class PlatformPlansServiceTest {
       line.startsWith("maxStorageBytes")
     );
     assertThat(data.getOverLimitCount()).isEqualTo(java.math.BigDecimal.ONE);
+  }
+
+  @Test
+  void overLimitItemsCarryAuthsSeatsAndTheGatewaysStorageAndDocumentsAsData() {
+    when(stub.applyPlan(any())).thenReturn(
+      ApplyPlanResponse.newBuilder()
+        .addSubscribers(
+          PlanSubscriberProjection.newBuilder()
+            .setOrganizationId("org-1")
+            .setOrganizationName("Acme")
+            .putAfter("maxStorageBytes", 10_000_000_000L)
+            .putAfter("maxDocumentUploads", 30)
+            .addOverLimit("maxAgentSeats: 12 in use, plan grants 10")
+            .addOverLimitItems(
+              synapsedesk.auth.Billing.OverLimit.newBuilder()
+                .setDimension("SEATS")
+                .setInUse(12)
+                .setAllowed(10)
+            )
+            .build()
+        )
+        .setDryRun(true)
+        .addEvaluatedDimensions("seats")
+        .build()
+    );
+    when(usageStub.getPlatformUsage(any())).thenReturn(
+      PlatformUsageResponse.newBuilder()
+        .addUsage(
+          TenantUsage.newBuilder()
+            .setOrganizationId("org-1")
+            .setUsedBytes(20_000_000_000L)
+            .setDocumentCount(40)
+        )
+        .build()
+    );
+
+    var items = service
+      .applyPlan(context(), "plan-1", true)
+      .getBody()
+      .data()
+      .getSubscribers()
+      .get(0)
+      .getOverLimitItems();
+
+    assertThat(items).containsExactly(
+      new OverLimitItemResponseDto()
+        .dimension(OverLimitItemResponseDto.DimensionEnum.SEATS)
+        .inUse(java.math.BigDecimal.valueOf(12))
+        .allowed(java.math.BigDecimal.valueOf(10)),
+      new OverLimitItemResponseDto()
+        .dimension(OverLimitItemResponseDto.DimensionEnum.STORAGE)
+        .inUse(java.math.BigDecimal.valueOf(20_000_000_000L))
+        .allowed(java.math.BigDecimal.valueOf(10_000_000_000L)),
+      new OverLimitItemResponseDto()
+        .dimension(OverLimitItemResponseDto.DimensionEnum.DOCUMENTS)
+        .inUse(java.math.BigDecimal.valueOf(40))
+        .allowed(java.math.BigDecimal.valueOf(30))
+    );
   }
 
   @Test

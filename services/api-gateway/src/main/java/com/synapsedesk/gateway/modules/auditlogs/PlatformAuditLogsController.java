@@ -18,6 +18,7 @@ import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditActionFilter;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditActionsResponseDto;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditLogResponseDto;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditResourceTypeFilter;
+import com.synapsedesk.gateway.modules.auditlogs.dto.rest.PlatformAuditLogResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,9 +26,13 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -35,6 +40,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import synapsedesk.auth.Platform.ResolveAuditNamesRequest;
+import synapsedesk.auth.Platform.ResolveAuditNamesResponse;
+import synapsedesk.auth.PlatformServiceGrpc;
 import synapsedesk.ticket.Audit.ListAuditActionsRequest;
 import synapsedesk.ticket.Audit.ListAuditActionsResponse;
 import synapsedesk.ticket.Audit.ListAuditLogsResponse;
@@ -71,19 +79,25 @@ import tools.jackson.databind.ObjectMapper;
 public class PlatformAuditLogsController {
 
   private static final long DEADLINE_SECONDS = 5;
+  private static final Logger LOG = LoggerFactory.getLogger(
+    PlatformAuditLogsController.class
+  );
 
   private final AuditServiceGrpc.AuditServiceBlockingStub stub;
+  private final PlatformServiceGrpc.PlatformServiceBlockingStub platform;
   private final CurrentUser currentUser;
   private final SuperAdminCheck superAdminCheck;
   private final ObjectMapper json;
 
   public PlatformAuditLogsController(
     AuditServiceGrpc.AuditServiceBlockingStub stub,
+    PlatformServiceGrpc.PlatformServiceBlockingStub platform,
     CurrentUser currentUser,
     SuperAdminCheck superAdminCheck,
     ObjectMapper json
   ) {
     this.stub = stub;
+    this.platform = platform;
     this.currentUser = currentUser;
     this.superAdminCheck = superAdminCheck;
     this.json = json;
@@ -92,7 +106,7 @@ public class PlatformAuditLogsController {
   @GetMapping(value = "/platform/audit-logs", produces = { "application/json" })
   @ApiErrors({ "401" })
   public ResponseEntity<
-    ApiResponse<PagedData<AuditLogResponseDto>>
+    ApiResponse<PagedData<PlatformAuditLogResponseDto>>
   > platformAuditLogsControllerListV1(
     @DecimalMin(value = "1") @Valid @RequestParam(
       value = "page",
@@ -159,16 +173,98 @@ public class PlatformAuditLogsController {
       )
     );
 
-    PagedData<AuditLogResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(log -> AuditLogsController.toAuditLogResponseDto(log, json))
-        .toList(),
-      PageMeta.from(response.getMeta())
+    List<PlatformAuditLogResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(log ->
+        PlatformAuditLogResponseDto.of(
+          AuditLogsController.toAuditLogResponseDto(log, json)
+        )
+      )
+      .toList();
+    name(items, context);
+
+    return ResponseEntity.ok(
+      ApiResponse.of(
+        200,
+        "OK",
+        new PagedData<>(items, PageMeta.from(response.getMeta()))
+      )
+    );
+  }
+
+  /**
+   * Names for the page's people, organizations and plans, read in one call to
+   * auth. A failed lookup leaves the names null: the trail still reads, by id.
+   */
+  private void name(
+    List<PlatformAuditLogResponseDto> items,
+    RequestContext context
+  ) {
+    ResolveAuditNamesRequest.Builder wire =
+      ResolveAuditNamesRequest.newBuilder();
+    wire.addAllUserIds(
+      new LinkedHashSet<>(
+        items
+          .stream()
+          .map(AuditLogResponseDto::getUserId)
+          .filter(java.util.Objects::nonNull)
+          .toList()
+      )
+    );
+    wire.addAllOrganizationIds(
+      resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.ORGANIZATION)
+    );
+    wire.addAllPlanIds(
+      resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.SUBSCRIPTION_PLAN)
     );
 
-    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
+    ResolveAuditNamesResponse names;
+    try {
+      names = platform
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+        )
+        .resolveAuditNames(wire.build());
+    } catch (RuntimeException unavailable) {
+      LOG.warn("Audit names unavailable: {}", unavailable.getMessage());
+      return;
+    }
+
+    for (PlatformAuditLogResponseDto entry : items) {
+      if (entry.getUserId() != null) {
+        entry.setActorName(names.getUsersMap().get(entry.getUserId()));
+      }
+      if (entry.getResourceId() == null) continue;
+      if (
+        entry.getResourceType() ==
+        AuditLogResponseDto.ResourceTypeEnum.ORGANIZATION
+      ) {
+        entry.setResourceName(
+          names.getOrganizationsMap().get(entry.getResourceId())
+        );
+      } else if (
+        entry.getResourceType() ==
+        AuditLogResponseDto.ResourceTypeEnum.SUBSCRIPTION_PLAN
+      ) {
+        entry.setResourceName(names.getPlansMap().get(entry.getResourceId()));
+      }
+    }
+  }
+
+  private static LinkedHashSet<String> resourceIds(
+    List<PlatformAuditLogResponseDto> items,
+    AuditLogResponseDto.ResourceTypeEnum type
+  ) {
+    return new LinkedHashSet<>(
+      items
+        .stream()
+        .filter(entry -> entry.getResourceType() == type)
+        .map(AuditLogResponseDto::getResourceId)
+        .filter(java.util.Objects::nonNull)
+        .toList()
+    );
   }
 
   @GetMapping(

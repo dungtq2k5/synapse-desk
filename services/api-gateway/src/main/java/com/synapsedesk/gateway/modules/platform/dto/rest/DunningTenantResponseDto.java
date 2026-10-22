@@ -21,6 +21,9 @@ public class DunningTenantResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime updatedAt;
 
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime pastDueSince = null;
+
   public DunningTenantResponseDto() {
     super();
   }
@@ -99,6 +102,25 @@ public class DunningTenantResponseDto {
     this.updatedAt = updatedAt;
   }
 
+  public DunningTenantResponseDto pastDueSince(OffsetDateTime pastDueSince) {
+    this.pastDueSince = pastDueSince;
+    return this;
+  }
+
+  /**
+   * Get pastDueSince
+   * @return pastDueSince
+   */
+  @JsonProperty("pastDueSince")
+  public OffsetDateTime getPastDueSince() {
+    return pastDueSince;
+  }
+
+  @JsonProperty("pastDueSince")
+  public void setPastDueSince(OffsetDateTime pastDueSince) {
+    this.pastDueSince = pastDueSince;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -112,13 +134,14 @@ public class DunningTenantResponseDto {
     return (
       Objects.equals(this.id, dunningTenantResponseDto.id) &&
       Objects.equals(this.name, dunningTenantResponseDto.name) &&
-      Objects.equals(this.updatedAt, dunningTenantResponseDto.updatedAt)
+      Objects.equals(this.updatedAt, dunningTenantResponseDto.updatedAt) &&
+      Objects.equals(this.pastDueSince, dunningTenantResponseDto.pastDueSince)
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, updatedAt);
+    return Objects.hash(id, name, updatedAt, pastDueSince);
   }
 
   @Override
@@ -129,6 +152,9 @@ public class DunningTenantResponseDto {
     sb.append("    name: ").append(toIndentedString(name)).append("\n");
     sb.append("    updatedAt: ")
       .append(toIndentedString(updatedAt))
+      .append("\n");
+    sb.append("    pastDueSince: ")
+      .append(toIndentedString(pastDueSince))
       .append("\n");
     sb.append("}");
     return sb.toString();

@@ -427,9 +427,13 @@ public class AuthController {
     if (response.getRequiresTwoFactor()) {
       cookies.setTwoFactorToken(httpResponse, response.getTwoFactorToken());
 
-      return new TwoFactorRequiredResponseDto()
-        .requiresTwoFactor(true)
-        .requiresTwoFactorSetup(response.getRequiresTwoFactorSetup());
+      return (
+        new TwoFactorRequiredResponseDto()
+          .requiresTwoFactor(true)
+          .requiresTwoFactorSetup(response.getRequiresTwoFactorSetup())
+          // False for a Super Admin, who is asked for a code every time.
+          .canRememberDevice(response.getCanRememberDevice())
+      );
     }
 
     cookies.setAccessToken(httpResponse, response.getAccessToken());

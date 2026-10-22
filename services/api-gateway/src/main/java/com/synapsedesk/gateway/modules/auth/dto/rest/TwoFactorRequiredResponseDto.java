@@ -15,6 +15,8 @@ public class TwoFactorRequiredResponseDto {
 
   private Boolean requiresTwoFactorSetup;
 
+  private Boolean canRememberDevice;
+
   public TwoFactorRequiredResponseDto() {
     super();
   }
@@ -74,6 +76,28 @@ public class TwoFactorRequiredResponseDto {
     this.requiresTwoFactorSetup = requiresTwoFactorSetup;
   }
 
+  public TwoFactorRequiredResponseDto canRememberDevice(
+    Boolean canRememberDevice
+  ) {
+    this.canRememberDevice = canRememberDevice;
+    return this;
+  }
+
+  /**
+   * Get canRememberDevice
+   * @return canRememberDevice
+   */
+  @NotNull
+  @JsonProperty("canRememberDevice")
+  public Boolean getCanRememberDevice() {
+    return canRememberDevice;
+  }
+
+  @JsonProperty("canRememberDevice")
+  public void setCanRememberDevice(Boolean canRememberDevice) {
+    this.canRememberDevice = canRememberDevice;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -92,13 +116,21 @@ public class TwoFactorRequiredResponseDto {
       Objects.equals(
         this.requiresTwoFactorSetup,
         twoFactorRequiredResponseDto.requiresTwoFactorSetup
+      ) &&
+      Objects.equals(
+        this.canRememberDevice,
+        twoFactorRequiredResponseDto.canRememberDevice
       )
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(requiresTwoFactor, requiresTwoFactorSetup);
+    return Objects.hash(
+      requiresTwoFactor,
+      requiresTwoFactorSetup,
+      canRememberDevice
+    );
   }
 
   @Override
@@ -110,6 +142,9 @@ public class TwoFactorRequiredResponseDto {
       .append("\n");
     sb.append("    requiresTwoFactorSetup: ")
       .append(toIndentedString(requiresTwoFactorSetup))
+      .append("\n");
+    sb.append("    canRememberDevice: ")
+      .append(toIndentedString(canRememberDevice))
       .append("\n");
     sb.append("}");
     return sb.toString();

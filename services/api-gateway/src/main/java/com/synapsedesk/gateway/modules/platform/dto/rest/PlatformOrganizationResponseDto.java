@@ -27,6 +27,13 @@ public class PlatformOrganizationResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime deletedAt = null;
 
+  private String planName = null;
+
+  private Boolean billedThroughStripe;
+
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime statusChangedAt = null;
+
   public PlatformOrganizationResponseDto() {
     super();
   }
@@ -158,6 +165,68 @@ public class PlatformOrganizationResponseDto {
     this.deletedAt = deletedAt;
   }
 
+  public PlatformOrganizationResponseDto planName(String planName) {
+    this.planName = planName;
+    return this;
+  }
+
+  /**
+   * Get planName
+   * @return planName
+   */
+  @JsonProperty("planName")
+  public String getPlanName() {
+    return planName;
+  }
+
+  @JsonProperty("planName")
+  public void setPlanName(String planName) {
+    this.planName = planName;
+  }
+
+  public PlatformOrganizationResponseDto billedThroughStripe(
+    Boolean billedThroughStripe
+  ) {
+    this.billedThroughStripe = billedThroughStripe;
+    return this;
+  }
+
+  /**
+   * Get billedThroughStripe
+   * @return billedThroughStripe
+   */
+  @NotNull
+  @JsonProperty("billedThroughStripe")
+  public Boolean getBilledThroughStripe() {
+    return billedThroughStripe;
+  }
+
+  @JsonProperty("billedThroughStripe")
+  public void setBilledThroughStripe(Boolean billedThroughStripe) {
+    this.billedThroughStripe = billedThroughStripe;
+  }
+
+  public PlatformOrganizationResponseDto statusChangedAt(
+    OffsetDateTime statusChangedAt
+  ) {
+    this.statusChangedAt = statusChangedAt;
+    return this;
+  }
+
+  /**
+   * Get statusChangedAt
+   * @return statusChangedAt
+   */
+  @JsonProperty("statusChangedAt")
+  public OffsetDateTime getStatusChangedAt() {
+    return statusChangedAt;
+  }
+
+  @JsonProperty("statusChangedAt")
+  public void setStatusChangedAt(OffsetDateTime statusChangedAt) {
+    this.statusChangedAt = statusChangedAt;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -185,7 +254,19 @@ public class PlatformOrganizationResponseDto {
         this.departmentCount,
         platformOrganizationResponseDto.departmentCount
       ) &&
-      Objects.equals(this.deletedAt, platformOrganizationResponseDto.deletedAt)
+      Objects.equals(
+        this.deletedAt,
+        platformOrganizationResponseDto.deletedAt
+      ) &&
+      Objects.equals(this.planName, platformOrganizationResponseDto.planName) &&
+      Objects.equals(
+        this.billedThroughStripe,
+        platformOrganizationResponseDto.billedThroughStripe
+      ) &&
+      Objects.equals(
+        this.statusChangedAt,
+        platformOrganizationResponseDto.statusChangedAt
+      )
     );
   }
 
@@ -196,7 +277,10 @@ public class PlatformOrganizationResponseDto {
       userCount,
       pendingInvitationCount,
       departmentCount,
-      deletedAt
+      deletedAt,
+      planName,
+      billedThroughStripe,
+      statusChangedAt
     );
   }
 
@@ -218,6 +302,13 @@ public class PlatformOrganizationResponseDto {
       .append("\n");
     sb.append("    deletedAt: ")
       .append(toIndentedString(deletedAt))
+      .append("\n");
+    sb.append("    planName: ").append(toIndentedString(planName)).append("\n");
+    sb.append("    billedThroughStripe: ")
+      .append(toIndentedString(billedThroughStripe))
+      .append("\n");
+    sb.append("    statusChangedAt: ")
+      .append(toIndentedString(statusChangedAt))
       .append("\n");
     sb.append("}");
     return sb.toString();

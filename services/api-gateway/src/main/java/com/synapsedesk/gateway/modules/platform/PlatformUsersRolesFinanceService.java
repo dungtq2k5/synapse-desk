@@ -389,6 +389,11 @@ public class PlatformUsersRolesFinanceService {
                   .id(tenant.getId())
                   .name(tenant.getName())
                   .updatedAt(toOffsetDateTime(tenant.getUpdatedAt()))
+                  .pastDueSince(
+                    tenant.hasPastDueSince()
+                      ? toOffsetDateTime(tenant.getPastDueSince())
+                      : null
+                  )
               )
               .toList()
           )

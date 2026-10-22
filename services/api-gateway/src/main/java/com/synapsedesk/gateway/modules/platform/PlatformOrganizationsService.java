@@ -18,6 +18,7 @@ import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlatformOrganizat
 import com.synapsedesk.gateway.modules.platform.dto.rest.OffboardOrganizationDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationStatusResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationUsageResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ResetBillingCycleDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto;
@@ -244,6 +245,9 @@ public class PlatformOrganizationsService {
         .pendingInvitationCount(organization.getPendingInvitationCount())
         .departmentCount(organization.getDepartmentCount())
         .deletedAt(organization.getDeletedAt())
+        .planName(organization.getPlanName())
+        .billedThroughStripe(organization.getBilledThroughStripe())
+        .statusChangedAt(organization.getStatusChangedAt())
         .usage(
           new PlatformOrganizationUsageResponseDto()
             .seats(
@@ -351,11 +355,9 @@ public class PlatformOrganizationsService {
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
-  public ResponseEntity<ApiResponse<PlatformOrganizationResponseDto>> setStatus(
-    RequestContext context,
-    String id,
-    SetOrganizationStatusDto dto
-  ) {
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationStatusResponseDto>
+  > setStatus(RequestContext context, String id, SetOrganizationStatusDto dto) {
     superAdminCheck.require(context);
 
     PlatformOrganizationResponse response = withMetadata(
@@ -369,7 +371,24 @@ public class PlatformOrganizationsService {
     );
 
     statuses.invalidate(id);
-    return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
+    PlatformOrganizationResponseDto organization =
+      toPlatformOrganizationResponseDto(response);
+    return ok200(
+      new PlatformOrganizationStatusResponseDto()
+        .organization(organization.getOrganization())
+        .userCount(organization.getUserCount())
+        .pendingInvitationCount(organization.getPendingInvitationCount())
+        .departmentCount(organization.getDepartmentCount())
+        .deletedAt(organization.getDeletedAt())
+        .planName(organization.getPlanName())
+        .billedThroughStripe(organization.getBilledThroughStripe())
+        .statusChangedAt(organization.getStatusChangedAt())
+        // Every session on a freeze, none otherwise.
+        .revokedSessionCount(
+          BigDecimal.valueOf(response.getRevokedSessionCount())
+        ),
+      "Status updated"
+    );
   }
 
   public ResponseEntity<
@@ -498,6 +517,13 @@ public class PlatformOrganizationsService {
       .departmentCount(BigDecimal.valueOf(row.getDepartmentCount()))
       .deletedAt(
         row.hasDeletedAt() ? toOffsetDateTime(row.getDeletedAt()) : null
+      )
+      .planName(row.hasPlanName() ? row.getPlanName() : null)
+      .billedThroughStripe(row.getBilledThroughStripe())
+      .statusChangedAt(
+        row.hasStatusChangedAt()
+          ? toOffsetDateTime(row.getStatusChangedAt())
+          : null
       );
   }
 

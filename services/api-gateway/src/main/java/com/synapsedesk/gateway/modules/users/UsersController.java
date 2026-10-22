@@ -122,7 +122,8 @@ public class UsersController {
         CurrentUserResponseDto.OrganizationStatusEnum.fromValue(
           response.getOrganizationStatus().name().replace("ORG_STATUS_", "")
         )
-      );
+      )
+      .isSuperAdmin(response.getIsSuperAdmin());
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }

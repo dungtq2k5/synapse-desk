@@ -17546,6 +17546,49 @@
               }
             }
           },
+          "409": {
+            "description": "The address (`slug`) or the domain is already taken; the sentence says which.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
           "415": {
             "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
             "content": {
@@ -17714,7 +17757,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePlatformOrganizationResponseDto"
+                  "$ref": "#/components/schemas/ApiResponsePlatformOrganizationStatusResponseDto"
                 }
               }
             }
@@ -18551,6 +18594,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunJobDto"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Success.",
@@ -18558,6 +18611,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseJobRunResultResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
                 }
               }
             }
@@ -18619,6 +18715,49 @@
                     "statusCode": {
                       "type": "number",
                       "example": 404
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
                     },
                     "path": {
                       "type": "string",
@@ -48768,7 +48907,7 @@
     "/api/v1/platform/audit-logs": {
       "get": {
         "tags": ["PlatformAuditLogs"],
-        "summary": "Tenant-scoped immutable trail",
+        "summary": "The platform's own trail, with who acted and on what, by name",
         "operationId": "PlatformAuditLogsController_list_v1",
         "parameters": [
           {
@@ -48842,6 +48981,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -48894,6 +49035,7 @@
                 "DOCUMENT_FLAG",
                 "EXPORT",
                 "INVITATION",
+                "JOB",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
@@ -48936,7 +49078,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePagedDataAuditLogResponseDto"
+                  "$ref": "#/components/schemas/ApiResponsePagedDataPlatformAuditLogResponseDto"
                 }
               }
             }
@@ -55709,6 +55851,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -55761,6 +55905,7 @@
                 "DOCUMENT_FLAG",
                 "EXPORT",
                 "INVITATION",
+                "JOB",
                 "ORGANIZATION",
                 "ROLE",
                 "SUBSCRIPTION_PLAN",
@@ -64470,6 +64615,23 @@
           "subscribers"
         ]
       },
+      "OverLimitItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": ["DOCUMENTS", "SEATS", "STORAGE"]
+          },
+          "inUse": {
+            "type": "number",
+            "description": "Seats, bytes or documents, by dimension."
+          },
+          "allowed": {
+            "type": "number"
+          }
+        },
+        "required": ["allowed", "dimension", "inUse"]
+      },
       "PlanSubscriberProjectionResponseDto": {
         "type": "object",
         "properties": {
@@ -64500,6 +64662,13 @@
               "type": "string"
             }
           },
+          "overLimitItems": {
+            "type": "array",
+            "description": "The same limits as data, one per limit it breaks: what's in use against\nwhat the new plan allows. The strings above stay one release.",
+            "items": {
+              "$ref": "#/components/schemas/OverLimitItemResponseDto"
+            }
+          },
           "skippedPinned": {
             "type": "boolean",
             "description": "Off-catalogue by deliberate policy; this apply does not touch them."
@@ -64516,6 +64685,7 @@
           "organizationId",
           "organizationName",
           "overLimit",
+          "overLimitItems",
           "skippedPinned"
         ]
       },
@@ -64703,13 +64873,29 @@
           "deletedAt": {
             "type": ["string", "null"],
             "format": "date-time"
+          },
+          "planName": {
+            "type": ["string", "null"],
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
           }
         },
         "required": [
+          "billedThroughStripe",
           "deletedAt",
           "departmentCount",
           "organization",
           "pendingInvitationCount",
+          "planName",
+          "statusChangedAt",
           "userCount"
         ]
       },
@@ -64733,6 +64919,80 @@
           }
         },
         "required": ["reason", "status"]
+      },
+      "ApiResponsePlatformOrganizationStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PlatformOrganizationStatusResponseDto"
+          }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
+      },
+      "PlatformOrganizationStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/OrganizationResponseDto"
+          },
+          "userCount": {
+            "type": "number"
+          },
+          "pendingInvitationCount": {
+            "type": "number"
+          },
+          "departmentCount": {
+            "type": "number"
+          },
+          "deletedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "planName": {
+            "type": ["string", "null"],
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+          },
+          "revokedSessionCount": {
+            "type": "number",
+            "description": "Sessions the change ended: every one on a freeze, none otherwise."
+          }
+        },
+        "required": [
+          "billedThroughStripe",
+          "deletedAt",
+          "departmentCount",
+          "organization",
+          "pendingInvitationCount",
+          "planName",
+          "revokedSessionCount",
+          "statusChangedAt",
+          "userCount"
+        ]
       },
       "ApiResponsePlatformOrganizationResponseDto": {
         "type": "object",
@@ -64760,6 +65020,17 @@
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
       "ResetBillingCycleDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1
+          }
+        },
+        "required": ["reason"]
+      },
+      "RunJobDto": {
         "type": "object",
         "properties": {
           "reason": {
@@ -66319,9 +66590,17 @@
           "requiresTwoFactorSetup": {
             "type": "boolean",
             "description": "True when two-step is REQUIRED and this account has not enrolled: its\norganization requires it, or the account is a Super Admin (who always\nmust, and whose device is never remembered).\n\nThe client must branch on it: `false` means prompt for a code, `true` means\nopen the enrolment screen and call `POST /auth/2fa/setup` — which accepts\nthe challenge cookie precisely for this case. Showing a code box here would\nask for a code that does not exist yet, which is how a tenant-wide\n`enforce_two_factor` becomes a tenant-wide lockout."
+          },
+          "canRememberDevice": {
+            "type": "boolean",
+            "description": "Whether \"remember this device\" can skip the next code: false for a Super\nAdmin, who is asked every time, so the page hides the option."
           }
         },
-        "required": ["requiresTwoFactor", "requiresTwoFactorSetup"]
+        "required": [
+          "canRememberDevice",
+          "requiresTwoFactor",
+          "requiresTwoFactorSetup"
+        ]
       },
       "TenantOptionResponseDto": {
         "type": "object",
@@ -67804,11 +68083,16 @@
               "SUSPENDED_PAST_DUE",
               null
             ]
+          },
+          "isSuperAdmin": {
+            "type": "boolean",
+            "description": "A platform Super Admin, who has no organization and uses the console."
           }
         },
         "required": [
           "departmentIds",
           "hasPassword",
+          "isSuperAdmin",
           "organizationStatus",
           "permissionCodes",
           "user"
@@ -68415,16 +68699,32 @@
             "type": ["string", "null"],
             "format": "date-time"
           },
+          "planName": {
+            "type": ["string", "null"],
+            "description": "The catalogue plan it's on, or null when none is assigned."
+          },
+          "billedThroughStripe": {
+            "type": "boolean",
+            "description": "Whether a Stripe subscription grants the plan: a limit edited by hand\nthen lasts until Stripe's next event. False for a plan assigned by hand."
+          },
+          "statusChangedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+          },
           "usage": {
             "$ref": "#/components/schemas/PlatformOrganizationUsageResponseDto",
             "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads."
           }
         },
         "required": [
+          "billedThroughStripe",
           "deletedAt",
           "departmentCount",
           "organization",
           "pendingInvitationCount",
+          "planName",
+          "statusChangedAt",
           "usage",
           "userCount"
         ]
@@ -68674,9 +68974,14 @@
             "type": "string",
             "format": "date-time",
             "description": "When the tenant row last changed — **not when it went past due**.\n\n`organizations` has no status-change timestamp, so this is the closest\navailable fact and a rename or a quota edit moves it. Rendering it as a\ndunning age would be a confidently wrong number."
+          },
+          "pastDueSince": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "When it went past due: its status's last change. Null for an\norganization whose status changed before that was recorded."
           }
         },
-        "required": ["id", "name", "updatedAt"]
+        "required": ["id", "name", "pastDueSince", "updatedAt"]
       },
       "FinanceDunningResponseDto": {
         "type": "object",
@@ -68867,7 +69172,7 @@
         },
         "required": ["currentlyOffboarded", "observedEventTypes", "points"]
       },
-      "ApiResponsePagedDataAuditLogResponseDto": {
+      "ApiResponsePagedDataPlatformAuditLogResponseDto": {
         "type": "object",
         "properties": {
           "success": {
@@ -68887,12 +69192,27 @@
             "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
-            "$ref": "#/components/schemas/PagedDataAuditLogResponseDto"
+            "$ref": "#/components/schemas/PagedDataPlatformAuditLogResponseDto"
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
-      "AuditLogResponseDto": {
+      "PagedDataPlatformAuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformAuditLogResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "PlatformAuditLogResponseDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -68933,6 +69253,8 @@
               "PASSWORD_CHANGED",
               "PLATFORM_BILLING_CYCLE_RESET",
               "PLATFORM_GLOBAL_ROLE_CREATED",
+              "PLATFORM_JOB_BACKFILLED",
+              "PLATFORM_JOB_RUN",
               "PLATFORM_ORGANIZATION_CREATED",
               "PLATFORM_ORGANIZATION_OFFBOARDED",
               "PLATFORM_ORGANIZATION_RESTORED",
@@ -68972,6 +69294,7 @@
               "DOCUMENT_FLAG",
               "EXPORT",
               "INVITATION",
+              "JOB",
               "ORGANIZATION",
               "ROLE",
               "SUBSCRIPTION_PLAN",
@@ -68997,35 +69320,30 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "actorName": {
+            "type": ["string", "null"],
+            "description": "The Super Admin who acted; null when it can't be read (or no one did)."
+          },
+          "resourceName": {
+            "type": ["string", "null"],
+            "description": "The organization or plan acted on; null for anything else, or when it can't be read."
           }
         },
         "required": [
           "action",
+          "actorName",
           "createdAt",
           "id",
           "ipAddress",
           "metadata",
           "organizationId",
           "resourceId",
+          "resourceName",
           "resourceType",
           "userAgent",
           "userId"
         ]
-      },
-      "PagedDataAuditLogResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AuditLogResponseDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMeta"
-          }
-        },
-        "required": ["items", "meta"]
       },
       "ApiResponseAuditActionsResponseDto": {
         "type": "object",
@@ -69083,6 +69401,8 @@
                 "PASSWORD_CHANGED",
                 "PLATFORM_BILLING_CYCLE_RESET",
                 "PLATFORM_GLOBAL_ROLE_CREATED",
+                "PLATFORM_JOB_BACKFILLED",
+                "PLATFORM_JOB_RUN",
                 "PLATFORM_ORGANIZATION_CREATED",
                 "PLATFORM_ORGANIZATION_OFFBOARDED",
                 "PLATFORM_ORGANIZATION_RESTORED",
@@ -70631,6 +70951,169 @@
           }
         },
         "required": ["expiresAt", "remaining", "used"]
+      },
+      "ApiResponsePagedDataAuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/PagedDataAuditLogResponseDto"
+          }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
+      },
+      "AuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": ["string", "null"],
+            "description": "null for a PLATFORM act — the event belongs to the platform, not a tenant."
+          },
+          "userId": {
+            "type": ["string", "null"],
+            "description": "null for system and cron actors, which have no user acting for them."
+          },
+          "action": {
+            "type": ["string", "null"],
+            "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
+            "enum": [
+              "DATA_EXPORT_REQUESTED",
+              "DEPARTMENT_CREATED",
+              "DEPARTMENT_DELETED",
+              "DEPARTMENT_MEMBERS_ADDED",
+              "DEPARTMENT_MEMBER_REMOVED",
+              "DEPARTMENT_RESTORED",
+              "DEPARTMENT_UPDATED",
+              "DOCUMENT_FLAG_DELETED",
+              "DOCUMENT_FLAG_DISMISSED",
+              "DOCUMENT_FLAG_RESOLVED",
+              "INBOUND_ADDRESS_DISABLED",
+              "INBOUND_ADDRESS_ENABLED",
+              "INBOUND_ADDRESS_ROTATED",
+              "INVITATION_RESENT",
+              "INVITATION_REVOKED",
+              "INVITATION_SENT",
+              "ORGANIZATION_OFFBOARD_REQUESTED",
+              "ORGANIZATION_ONBOARDING_COMPLETED",
+              "ORGANIZATION_SETTINGS_UPDATED",
+              "ORGANIZATION_UPDATED",
+              "PASSWORD_CHANGED",
+              "PLATFORM_BILLING_CYCLE_RESET",
+              "PLATFORM_GLOBAL_ROLE_CREATED",
+              "PLATFORM_JOB_BACKFILLED",
+              "PLATFORM_JOB_RUN",
+              "PLATFORM_ORGANIZATION_CREATED",
+              "PLATFORM_ORGANIZATION_OFFBOARDED",
+              "PLATFORM_ORGANIZATION_RESTORED",
+              "PLATFORM_ORGANIZATION_STATUS_CHANGED",
+              "PLATFORM_ORGANIZATION_UPDATED",
+              "PLATFORM_PLAN_APPLIED",
+              "PLATFORM_PLAN_CREATED",
+              "PLATFORM_PLAN_DELETED",
+              "PLATFORM_PLAN_UPDATED",
+              "ROLE_CREATED",
+              "ROLE_DELETED",
+              "ROLE_PERMISSIONS_UPDATED",
+              "ROLE_UPDATED",
+              "USER_AVATAR_UPDATED",
+              "USER_CREATED",
+              "USER_DELETED",
+              "USER_DEPARTMENTS_UPDATED",
+              "USER_LOCKED",
+              "USER_LOGOUT_ALL",
+              "USER_RESTORED",
+              "USER_ROLES_UPDATED",
+              "USER_SESSIONS_REVOKED",
+              "USER_TWO_FACTOR_RESET",
+              "USER_UNLOCKED",
+              "USER_UPDATED",
+              "WEBHOOK_ENDPOINT_CREATED",
+              "WEBHOOK_ENDPOINT_DELETED",
+              "WEBHOOK_ENDPOINT_UPDATED",
+              "WEBHOOK_SECRET_ROTATED",
+              null
+            ]
+          },
+          "resourceType": {
+            "type": ["string", "null"],
+            "enum": [
+              "DEPARTMENT",
+              "DOCUMENT_FLAG",
+              "EXPORT",
+              "INVITATION",
+              "JOB",
+              "ORGANIZATION",
+              "ROLE",
+              "SUBSCRIPTION_PLAN",
+              "USER",
+              "WEBHOOK_ENDPOINT",
+              null
+            ]
+          },
+          "resourceId": {
+            "type": ["string", "null"]
+          },
+          "ipAddress": {
+            "type": ["string", "null"]
+          },
+          "userAgent": {
+            "type": ["string", "null"]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Parsed back into an object for the client.\n\nIt crosses gRPC as a JSON string because the shape differs per action; a\ntyped proto message could only be a `map<string, string>`, which would\nflatten every nested value in the before/after diff."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "action",
+          "createdAt",
+          "id",
+          "ipAddress",
+          "metadata",
+          "organizationId",
+          "resourceId",
+          "resourceType",
+          "userAgent",
+          "userId"
+        ]
+      },
+      "PagedDataAuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMeta"
+          }
+        },
+        "required": ["items", "meta"]
       },
       "ApiResponseVolumeResponseDto": {
         "type": "object",
