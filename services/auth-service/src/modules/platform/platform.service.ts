@@ -15,6 +15,7 @@ import {
   OffboardOrganizationRequest,
   OffboardOrganizationResponse,
   PlatformMetricsResponse,
+  OrganizationUsageResponse,
   PlatformOrganizationIdRequest,
   PlatformOrganizationResponse,
   ResetBillingCycleRequest,
@@ -57,6 +58,7 @@ import { AuthGenerationStore } from '../limit-alerts/generation.store';
 import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import { SessionsService } from '../sessions/sessions.service';
 import { AuthService } from '../auth/auth.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';
@@ -100,6 +102,7 @@ export class PlatformService {
     @Inject(LIMIT_ALERT_REDIS) private readonly limitAlertRedis: Redis,
     private readonly authService: AuthService,
     private readonly notifications: NotificationPublisher,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   // ---------------------------------------------------------------- Tenants
@@ -149,6 +152,25 @@ export class PlatformService {
     return toPlatformOrganizationResponse(
       await this.load(request.organizationId),
     );
+  }
+
+  /** An organization's seats and AI allowance, by id. */
+  async getOrganizationUsage(
+    request: PlatformOrganizationIdRequest,
+    context: CallerContext,
+  ): Promise<OrganizationUsageResponse> {
+    requireActor(context);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: request.organizationId },
+      include: { plan: { select: { name: true } } },
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No workspace with that id',
+      });
+    }
+    return this.organizations.usageOf(organization);
   }
 
   /**

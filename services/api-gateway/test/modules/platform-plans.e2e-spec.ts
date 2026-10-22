@@ -102,6 +102,45 @@ describe('Platform plans (e2e)', () => {
     expect(sent.clearStripeProductId).toBe(false);
   });
 
+  it('a plan’s prices carry what Stripe charges, or null before amounts were stored', async () => {
+    fx.stubs.platform.getPlan.mockReturnValue(
+      of({
+        ...wirePlan(),
+        prices: [
+          {
+            id: 'p1',
+            stripePriceId: 'price_monthly',
+            interval: 'month',
+            unitAmount: 2_900,
+            currency: 'usd',
+          },
+          { id: 'p2', stripePriceId: 'price_old', interval: 'year' },
+        ],
+      }),
+    );
+
+    const response = await superAdmin()
+      .get(`${API}/platform/plans/${planId}`)
+      .expect(200);
+
+    expect(response.body.data.prices).toEqual([
+      {
+        id: 'p1',
+        stripePriceId: 'price_monthly',
+        interval: 'month',
+        unitAmount: 2_900,
+        currency: 'usd',
+      },
+      {
+        id: 'p2',
+        stripePriceId: 'price_old',
+        interval: 'year',
+        unitAmount: null,
+        currency: null,
+      },
+    ]);
+  });
+
   it('1b. …and a PATCH that DOES name a grant still sends it', async () => {
     // The complement. Test 1 alone passes for a mapper that drops every field
     // on the floor, which would be a worse bug wearing the same green.

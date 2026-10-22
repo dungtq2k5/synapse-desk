@@ -14,7 +14,9 @@ export class TwoFactorRequiredResponseDto {
   readonly requiresTwoFactor!: true;
 
   /**
-   * True when the tenant REQUIRES 2FA and this account has not enrolled.
+   * True when two-step is REQUIRED and this account has not enrolled: its
+   * organization requires it, or the account is a Super Admin (who always
+   * must, and whose device is never remembered).
    *
    * The client must branch on it: `false` means prompt for a code, `true` means
    * open the enrolment screen and call `POST /auth/2fa/setup` — which accepts

@@ -270,6 +270,97 @@ describe('platform', () => {
     );
 
     rowFor('Platform')(
+      '**`getOrganization` carries its usage: seats and the allowance from auth, storage from ingestion**',
+      async () => {
+        peers.auth
+          .on('PlatformService/GetOrganization')
+          .reply(
+            wirePlatformOrganization('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'),
+          );
+        peers.auth.on('PlatformService/GetOrganizationUsage').reply({
+          seats: { available: true, used: 4, limit: 5 },
+          storage: { available: false, unavailableReason: 'READ_FAILED' },
+          aiTokens: { available: true, used: '250000', limit: '1000000' },
+          billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+          cycleResetsAt: { seconds: 1_759_276_800, nanos: 0 },
+          aiModelTier: 'AI_MODEL_TIER_FAST',
+          planName: 'Free',
+        });
+        peers.ingestion.on('IngestionPlatformService/GetPlatformUsage').reply({
+          usage: [
+            {
+              organizationId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+              usedBytes: '400000',
+              documentCount: 12,
+            },
+          ],
+        });
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(
+          (response.body as { data: { usage: unknown } }).data.usage,
+        ).toEqual({
+          seats: {
+            available: true,
+            used: 4,
+            limit: 5,
+            unavailableReason: null,
+          },
+          storage: {
+            available: true,
+            used: 400_000,
+            limit: 1_000_000,
+            unavailableReason: null,
+          },
+          aiTokens: {
+            available: true,
+            used: 250_000,
+            limit: 1_000_000,
+            unavailableReason: null,
+          },
+        });
+      },
+    );
+
+    rowFor('Platform')(
+      '**…and a usage leg that fails is `READ_FAILED` on its meters, the page still answering**',
+      async () => {
+        peers.auth
+          .on('PlatformService/GetOrganization')
+          .reply(
+            wirePlatformOrganization('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'),
+          );
+        peers.auth
+          .on('PlatformService/GetOrganizationUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'auth-service is busy');
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'ingestion-service is down');
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`,
+          superAdminHeaders(),
+        );
+
+        const failed = {
+          available: false,
+          used: null,
+          limit: null,
+          unavailableReason: 'READ_FAILED',
+        };
+        expect(response.status).toBe(200);
+        expect(
+          (response.body as { data: { usage: unknown } }).data.usage,
+        ).toEqual({ seats: failed, storage: failed, aiTokens: failed });
+      },
+    );
+
+    rowFor('Platform')(
       '**`restore` answers "Workspace restored"**',
       async () => {
         peers.auth
@@ -554,6 +645,51 @@ describe('platform', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({ data: { id: 'plan-1' } });
+      },
+    );
+
+    rowFor('Platform')(
+      '**a plan’s prices carry their amount and currency, null when none was stored**',
+      async () => {
+        peers.auth.on('PlatformService/GetPlan').reply(
+          wirePlan('plan-1', {
+            prices: [
+              {
+                id: 'p1',
+                stripePriceId: 'price_monthly',
+                interval: 'month',
+                unitAmount: '2900',
+                currency: 'usd',
+              },
+              { id: 'p2', stripePriceId: 'price_old', interval: 'year' },
+            ],
+          }),
+        );
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(
+          (response.body as { data: { prices: unknown } }).data.prices,
+        ).toEqual([
+          {
+            id: 'p1',
+            stripePriceId: 'price_monthly',
+            interval: 'month',
+            unitAmount: 2_900,
+            currency: 'usd',
+          },
+          {
+            id: 'p2',
+            stripePriceId: 'price_old',
+            interval: 'year',
+            unitAmount: null,
+            currency: null,
+          },
+        ]);
       },
     );
 

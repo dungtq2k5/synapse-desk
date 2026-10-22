@@ -49,6 +49,8 @@ export function toSubscriptionPlanResponse(
       id: price.id,
       stripePriceId: price.stripePriceId,
       interval: price.interval,
+      unitAmount: price.unitAmount ?? undefined,
+      currency: price.currency ?? undefined,
     })),
     subscriberCount: plan._count.organizations,
     createdAt: toProtoTimestamp(plan.createdAt),

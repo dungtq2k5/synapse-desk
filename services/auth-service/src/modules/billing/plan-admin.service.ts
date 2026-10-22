@@ -8,7 +8,13 @@ import {
   PLAN_SORTABLE_FIELDS,
   type PlanLimitDimension,
 } from '@synapsedesk/contracts';
-import { AuditPublisher, requireActor } from '@synapsedesk/nest-common';
+import Stripe from 'stripe';
+import { withHttpStatus } from '@synapsedesk/core';
+import {
+  AuditPublisher,
+  formatErrorMsg,
+  requireActor,
+} from '@synapsedesk/nest-common';
 import {
   emptyPage,
   fromProtoAiModelTier,
@@ -28,6 +34,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { BillingEventPublisher } from './billing-event.publisher';
+import { StripeService } from './stripe.service';
 import {
   PLAN_INCLUDE,
   toSubscriptionPlanResponse,
@@ -86,6 +93,7 @@ export class PlanAdminService {
     private readonly audit: AuditPublisher,
     private readonly billingEvents: BillingEventPublisher,
     private readonly organizations: OrganizationsService,
+    private readonly stripe: StripeService,
   ) {}
 
   // ---------------------------------------------------------------- Read
@@ -155,6 +163,8 @@ export class PlanAdminService {
       });
     }
 
+    const amounts = await this.amountsOf(request.prices ?? []);
+
     const plan = await this.prisma.subscriptionPlan.create({
       data: {
         name,
@@ -169,9 +179,10 @@ export class PlanAdminService {
         maxAnalyticsRangeDays: request.maxAnalyticsRangeDays,
         isActive: request.isActive,
         prices: {
-          create: (request.prices ?? []).map((price) => ({
+          create: (request.prices ?? []).map((price, index) => ({
             stripePriceId: price.stripePriceId,
             interval: price.interval,
+            ...amounts[index],
           })),
         },
       },
@@ -189,6 +200,55 @@ export class PlanAdminService {
     });
 
     return toSubscriptionPlanResponse(plan);
+  }
+
+  /**
+   * Each price's amount and currency, read from Stripe: what Stripe charges,
+   * never typed by hand. Stripe unreachable refuses the create (503), so the
+   * catalog never holds a price with no amount; a negotiated plan has no
+   * prices and reads nothing.
+   */
+  private async amountsOf(
+    prices: { stripePriceId: string }[],
+  ): Promise<{ unitAmount: number; currency: string }[]> {
+    if (prices.length === 0) return [];
+    const api = this.stripe.api;
+    return Promise.all(
+      prices.map(async ({ stripePriceId }) => {
+        let price: Stripe.Price;
+        try {
+          price = await api.prices.retrieve(stripePriceId);
+        } catch (error) {
+          if (
+            error instanceof Stripe.errors.StripeInvalidRequestError &&
+            error.statusCode === 404
+          ) {
+            throw new RpcException({
+              code: status.INVALID_ARGUMENT,
+              message: `Stripe has no price ${stripePriceId}`,
+            });
+          }
+          this.logger.warn(
+            `Stripe price ${stripePriceId} unreadable: ${formatErrorMsg(error)}`,
+          );
+          throw new RpcException({
+            code: status.UNAVAILABLE,
+            message: withHttpStatus(
+              503,
+              'Stripe could not be reached just now. Try again shortly.',
+            ),
+          });
+        }
+        // A tiered or metered price has no single amount to show.
+        if (price.unit_amount === null) {
+          throw new RpcException({
+            code: status.INVALID_ARGUMENT,
+            message: `Stripe price ${stripePriceId} has no single amount`,
+          });
+        }
+        return { unitAmount: price.unit_amount, currency: price.currency };
+      }),
+    );
   }
 
   /**

@@ -213,7 +213,11 @@ export class TwoFactorAuthController {
   @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403'], {
-    descriptions: { '403': WRONG_PASSWORD_OR_CODE },
+    descriptions: {
+      '400':
+        'Two-step is off already, or must stay on: the organization requires it, or the account is a Super Admin. Or the body is invalid.',
+      '403': WRONG_PASSWORD_OR_CODE,
+    },
   })
   @Delete()
   @HttpCode(HttpStatus.OK)

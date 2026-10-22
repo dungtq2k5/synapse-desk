@@ -14,6 +14,7 @@ import {
   OffboardOrganizationResponse,
   PLATFORM_SERVICE_NAME,
   PlatformMetricsResponse,
+  OrganizationUsageResponse,
   PlatformOrganizationResponse,
   PlatformServiceClient,
   RoleResponse,
@@ -68,6 +69,20 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return this.call(
       (metadata) =>
         this.platformGrpcService.getOrganization({ organizationId }, metadata),
+      context,
+    );
+  }
+
+  getOrganizationUsage(
+    organizationId: string,
+    context: RequestContext,
+  ): Promise<OrganizationUsageResponse> {
+    return this.call(
+      (metadata) =>
+        this.platformGrpcService.getOrganizationUsage(
+          { organizationId },
+          metadata,
+        ),
       context,
     );
   }

@@ -68,6 +68,19 @@ export const FAKE_CATALOG = [
   })),
 }));
 
+/** A catalog price as Stripe answers one. */
+function priceJson(price: (typeof FAKE_CATALOG)[number]['prices'][number]) {
+  return {
+    id: price.id,
+    object: 'price',
+    active: true,
+    product: price.product,
+    currency: 'usd',
+    unit_amount: price.unitAmount,
+    recurring: { interval: price.interval },
+  };
+}
+
 /** How the next plan change for an organization goes. */
 export type ChangeOutcome =
   'declined' | 'authentication' | 'credit' | 'charge' | 'unknown';
@@ -336,17 +349,13 @@ export async function startFakeStripe(
             has_more: false,
             data: FAKE_CATALOG.flatMap((plan) => plan.prices)
               .filter((price) => price.product === params.product)
-              .map((price) => ({
-                id: price.id,
-                object: 'price',
-                active: true,
-                product: price.product,
-                currency: 'usd',
-                unit_amount: price.unitAmount,
-                recurring: { interval: price.interval },
-              })),
+              .map(priceJson),
           },
         ];
+      case 'GET prices/:id': {
+        const price = priceById(key);
+        return price ? [200, priceJson(price)] : notFound('price', key);
+      }
       default:
         return notFound('route', `${method} ${path}`);
     }

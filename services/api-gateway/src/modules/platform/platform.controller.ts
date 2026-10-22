@@ -47,6 +47,7 @@ import {
   CreatePlatformOrganizationResponseDto,
   OffboardResponseDto,
   PlatformMetricsResponseDto,
+  PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
   ApplyPlanResponseDto,
@@ -110,13 +111,13 @@ export class PlatformController {
   }
 
   @ApiOperation({ summary: 'Tenant detail + usage rollups' })
-  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiWrappedResponse(PlatformOrganizationDetailResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Get('organizations/:id')
   getOrganization(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<PlatformOrganizationResponseDto> {
+  ): Promise<PlatformOrganizationDetailResponseDto> {
     return this.platform.getOrganization(id, context);
   }
 
@@ -291,7 +292,14 @@ export class PlatformController {
   @ApiWrappedResponse(SubscriptionPlanResponseDto, {
     status: HttpStatus.CREATED,
   })
-  @ApiFilterErrors(['400', '401'])
+  @ApiFilterErrors(['400', '401', '503'], {
+    descriptions: {
+      '400':
+        'The body is invalid, or Stripe has no such price, or the price has no single amount.',
+      '503':
+        "Stripe couldn't be reached to read the prices' amounts. Nothing was created; try again shortly.",
+    },
+  })
   @Post('plans')
   createPlan(
     @CurrentUser() context: RequestContext,

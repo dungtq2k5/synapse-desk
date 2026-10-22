@@ -1,6 +1,9 @@
 /** What the platform (Super Admin) routes return. */
 
-import { OrganizationResponseDto } from '../../../organizations/dto/rest/organization-response.dto';
+import {
+  OrganizationResponseDto,
+  UsageMeterResponseDto,
+} from '../../../organizations/dto/rest/organization-response.dto';
 import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
 
 export class PlatformOrganizationResponseDto {
@@ -9,6 +12,20 @@ export class PlatformOrganizationResponseDto {
   readonly pendingInvitationCount!: number;
   readonly departmentCount!: number;
   readonly deletedAt!: Date | null;
+}
+
+/** An organization's meters, as its own usage page reads them. */
+export class PlatformOrganizationUsageResponseDto {
+  /** Members plus pending invitations: the count the seat limit refuses on. */
+  readonly seats!: UsageMeterResponseDto;
+  readonly storage!: UsageMeterResponseDto;
+  /** This cycle's AI spend against the monthly allowance, in micros. */
+  readonly aiTokens!: UsageMeterResponseDto;
+}
+
+export class PlatformOrganizationDetailResponseDto extends PlatformOrganizationResponseDto {
+  /** Each meter is `READ_FAILED` when its service didn't answer; the page still loads. */
+  readonly usage!: PlatformOrganizationUsageResponseDto;
 }
 
 export class PlatformUserResponseDto {
@@ -58,6 +75,14 @@ export class SubscriptionPlanPriceResponseDto {
   // in the database. Same asymmetry the enum bridges keep: the `to*` direction
   // is deliberately wide because the caller is handing over a column.
   readonly interval!: string;
+  /**
+   * What Stripe charges, in the currency's smallest unit (cents for `usd`).
+   * Read from Stripe when the plan is created; null for a price stored before
+   * amounts were.
+   */
+  readonly unitAmount!: number | null;
+  /** Stripe's lowercase currency code, e.g. `usd`. */
+  readonly currency!: string | null;
 }
 
 export class SubscriptionPlanResponseDto {

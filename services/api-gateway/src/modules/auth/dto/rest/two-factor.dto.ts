@@ -44,6 +44,7 @@ export class AuthenticateTwoFactorDto {
   @ApiPropertyOptional({ minLength: 1 })
   readonly backupCode?: string;
 
+  /** Skip the code on this device for a while. Ignored for a Super Admin. */
   @IsOptional()
   @IsBoolean()
   @ApiPropertyOptional()

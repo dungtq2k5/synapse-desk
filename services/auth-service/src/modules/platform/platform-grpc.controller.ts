@@ -16,6 +16,7 @@ import {
   OffboardOrganizationRequest,
   OffboardOrganizationResponse,
   PlatformMetricsResponse,
+  OrganizationUsageResponse,
   PlatformOrganizationIdRequest,
   PlatformOrganizationResponse,
   PlatformServiceController,
@@ -80,6 +81,16 @@ export class PlatformGrpcController implements PlatformServiceController {
     request: PlatformOrganizationIdRequest,
   ): Promise<PlatformOrganizationResponse> {
     return this.platformService.getOrganization(request);
+  }
+
+  getOrganizationUsage(
+    request: PlatformOrganizationIdRequest,
+    metadata?: Metadata,
+  ): Promise<OrganizationUsageResponse> {
+    return this.platformService.getOrganizationUsage(
+      request,
+      unpackCallerContext(metadata),
+    );
   }
 
   updateOrganization(

@@ -12,6 +12,7 @@ import {
   OrgStatus,
   SystemRoleName,
   limitAlertStateKey,
+  quotaCounterKey,
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import {
@@ -28,6 +29,7 @@ import {
 import {
   addMember,
   createDeviceSession,
+  createInvitation,
   createOrganization,
   seedTenantWithUser,
 } from '../factories';
@@ -58,6 +60,48 @@ describe('Platform (e2e)', () => {
   afterAll(() => fx.close());
 
   // ------------------------------------------------------- tenant creation
+
+  describe('getOrganizationUsage', () => {
+    it('reads an organization’s seats and AI allowance by id', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 10, monthlyAiTokenBudget: 10_000_000n },
+      });
+      // A pending invitation holds a seat, as the seat meter counts it.
+      await createInvitation(fx.prisma, t.org.id);
+      const org = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+      const redis = fx.moduleRef.get<Redis>(LIMIT_ALERT_REDIS);
+      const key = quotaCounterKey(org.id, org.billingCycleStart);
+      await redis.set(key, '2500000');
+
+      try {
+        const usage = await platform.getOrganizationUsage(
+          { organizationId: org.id },
+          ctx,
+        );
+
+        expect(usage.seats).toEqual({ available: true, used: 2, limit: 10 });
+        expect(usage.aiTokens).toEqual({
+          available: true,
+          used: 2_500_000,
+          limit: 10_000_000,
+        });
+      } finally {
+        await redis.del(key);
+      }
+    });
+
+    it('an unknown organization is NOT_FOUND', async () => {
+      await expectRpc(
+        platform.getOrganizationUsage(
+          { organizationId: '00000000-0000-4000-8000-000000000000' },
+          ctx,
+        ),
+        status.NOT_FOUND,
+      );
+    });
+  });
 
   describe('createOrganization', () => {
     it('4. the tenant and its first Org Admin are created in ONE transaction', async () => {

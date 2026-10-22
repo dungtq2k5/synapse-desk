@@ -354,6 +354,11 @@ message SubscriptionPlanPriceResponse {
   // `month` | `year`. A string, not an enum -- Stripe's own vocabulary, and a
   // new interval must not need a proto change.
   string interval = 3;
+  // What Stripe charges, in the currency's smallest unit, and its lowercase
+  // currency code. Read from Stripe when the plan is created; absent for a
+  // price seeded before amounts were stored.
+  optional int64 unit_amount = 4;
+  optional string currency = 5;
 }
 
 message SubscriptionPlanResponse {
@@ -526,6 +531,9 @@ service PlatformService {
   rpc ListOrganizations(ListPlatformOrganizationsRequest) returns (ListPlatformOrganizationsResponse);
   rpc CreateOrganization(CreatePlatformOrganizationRequest) returns (CreatePlatformOrganizationResponse);
   rpc GetOrganization(PlatformOrganizationIdRequest) returns (PlatformOrganizationResponse);
+  // The organization's seats and AI allowance, as its own usage page reads
+  // them. Storage is ingestion's: the gateway adds it.
+  rpc GetOrganizationUsage(PlatformOrganizationIdRequest) returns (synapsedesk.auth.OrganizationUsageResponse);
   rpc UpdateOrganization(UpdatePlatformOrganizationRequest) returns (PlatformOrganizationResponse);
   rpc SetOrganizationStatus(SetOrganizationStatusRequest) returns (PlatformOrganizationResponse);
   rpc ResetBillingCycle(ResetBillingCycleRequest) returns (PlatformOrganizationResponse);

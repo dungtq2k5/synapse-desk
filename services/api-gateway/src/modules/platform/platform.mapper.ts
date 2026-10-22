@@ -18,10 +18,15 @@ import {
   type CreatePlanRequest,
   type ListPlansRequest,
   type ListPlansResponse,
+  type OrganizationUsageResponse,
   type SubscriptionPlanResponse,
+  type TenantUsage,
   type UpdatePlanRequest,
 } from '@synapsedesk/grpc-proto';
-import { DEFAULT_AI_MODEL_TIER } from '@synapsedesk/contracts';
+import {
+  DEFAULT_AI_MODEL_TIER,
+  UsageUnavailableReason,
+} from '@synapsedesk/contracts';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { toUserResponseDto } from '../users/user.mapper';
@@ -38,11 +43,51 @@ import {
   ApplyPlanResponseDto,
   CreatePlatformOrganizationResponseDto,
   PlatformMetricsResponseDto,
+  PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
   SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
-import { toOrganizationResponseDto } from '../organizations/organization.mapper';
+import {
+  toOrganizationResponseDto,
+  toUsageMeterResponseDto,
+} from '../organizations/organization.mapper';
+import type { UsageMeterResponseDto } from '../organizations/dto/rest/organization-response.dto';
+
+const READ_FAILED: UsageMeterResponseDto = {
+  available: false,
+  used: null,
+  limit: null,
+  unavailableReason: UsageUnavailableReason.READ_FAILED,
+};
+
+/**
+ * An organization with its meters: seats and the AI allowance from auth,
+ * storage's bytes from ingestion against the organization's own limit. A leg
+ * that didn't answer is `READ_FAILED` on its meters.
+ */
+export function toPlatformOrganizationDetailResponseDto(
+  response: PlatformOrganizationResponse,
+  usage: OrganizationUsageResponse | null,
+  storage: TenantUsage | null,
+): PlatformOrganizationDetailResponseDto {
+  const organization = toPlatformOrganizationResponseDto(response);
+  return {
+    ...organization,
+    usage: {
+      seats: usage ? toUsageMeterResponseDto(usage.seats) : READ_FAILED,
+      storage: storage
+        ? {
+            available: true,
+            used: Number(storage.usedBytes),
+            limit: organization.organization.maxStorageBytes,
+            unavailableReason: null,
+          }
+        : READ_FAILED,
+      aiTokens: usage ? toUsageMeterResponseDto(usage.aiTokens) : READ_FAILED,
+    },
+  };
+}
 
 export function toPlatformOrganizationResponseDto(
   row: PlatformOrganizationResponse,
@@ -179,6 +224,8 @@ export function toSubscriptionPlanResponseDto(
       id: price.id,
       stripePriceId: price.stripePriceId,
       interval: price.interval,
+      unitAmount: price.unitAmount ?? null,
+      currency: price.currency ?? null,
     })),
     subscriberCount: plan.subscriberCount,
     createdAt: requireProtoTimestamp(plan.createdAt, 'createdAt'),

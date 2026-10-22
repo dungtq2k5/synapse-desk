@@ -8,6 +8,7 @@ import { BillingModule } from '../billing/billing.module';
 import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 import { FinanceModule } from '../finance/finance.module';
 import { AuthModule } from '../auth/auth.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PlatformService } from './platform.service';
 import { PlatformGrpcController } from './platform-grpc.controller';
@@ -37,6 +38,8 @@ import { PlatformGrpcController } from './platform-grpc.controller';
     // The welcome email: its set-password link, and the publisher.
     AuthModule,
     NotificationsModule,
+    // The usage meters, read by organization id.
+    OrganizationsModule,
   ],
   controllers: [PlatformGrpcController],
   providers: [PlatformService],

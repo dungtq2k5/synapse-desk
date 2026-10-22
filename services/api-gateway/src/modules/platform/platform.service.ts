@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/contracts';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { PlatformGrpcClient } from './platform-grpc.client';
@@ -12,6 +13,7 @@ import {
   toListPlatformUsersRequest,
   toPlatformMetricsResponseDto,
   toPlatformOrganizationPageDto,
+  toPlatformOrganizationDetailResponseDto,
   toPlatformOrganizationResponseDto,
   toPlatformUserPageDto,
   toApplyPlanResponseDto,
@@ -40,6 +42,7 @@ import {
   CreatePlatformOrganizationResponseDto,
   OffboardResponseDto,
   PlatformMetricsResponseDto,
+  PlatformOrganizationDetailResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
   ApplyPlanResponseDto,
@@ -58,6 +61,8 @@ import {
 /** The platform-admin surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     private readonly platformGrpcClient: PlatformGrpcClient,
     private readonly usageClient: PlatformUsageClient,
@@ -75,12 +80,30 @@ export class PlatformService {
     );
   }
 
+  /**
+   * The organization and its meters, read side by side: the organization must
+   * answer; a usage leg that doesn't is `READ_FAILED` on its meters.
+   */
   async getOrganization(
     organizationId: string,
     context: RequestContext,
-  ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationResponseDto(
-      await this.platformGrpcClient.getOrganization(organizationId, context),
+  ): Promise<PlatformOrganizationDetailResponseDto> {
+    const [organization, usage, storage] = await Promise.all([
+      this.platformGrpcClient.getOrganization(organizationId, context),
+      this.platformGrpcClient
+        .getOrganizationUsage(organizationId, context)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Usage leg 'auth-service' unavailable: ${formatErrorMsg(error)}`,
+          );
+          return null;
+        }),
+      this.usageClient.usageFor([organizationId], context),
+    ]);
+    return toPlatformOrganizationDetailResponseDto(
+      organization,
+      usage,
+      'value' in storage ? (storage.value.get(organizationId) ?? null) : null,
     );
   }
 

@@ -518,7 +518,13 @@ export class OrganizationsService {
   async getOrganizationUsage(
     context: CallerContext,
   ): Promise<OrganizationUsageResponse> {
-    const organization = await this.load(context);
+    return this.usageOf(await this.load(context));
+  }
+
+  /** The meters for one organization: its own usage page, or the platform's. */
+  async usageOf(
+    organization: Organization & { plan: { name: string } | null },
+  ): Promise<OrganizationUsageResponse> {
     const seatsUsed = await this.seatsInUse(this.prisma, organization.id);
 
     return {
