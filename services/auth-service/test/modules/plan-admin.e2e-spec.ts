@@ -21,6 +21,9 @@ import { PlanAdminService } from '../../src/modules/billing/plan-admin.service';
 import { BillingEventPublisher } from '../../src/modules/billing/billing-event.publisher';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
+import { StripeService } from '../../src/modules/billing/stripe.service';
+import { faultInjector } from '@synapsedesk/testing/fault';
+import Stripe from 'stripe';
 
 /**
  * The catalogue as a Super Admin drives it, and the admission rule as behaviour.
@@ -767,6 +770,98 @@ describe('The plan catalogue (e2e)', () => {
         where: { id: plan.id },
       });
       expect(row.stripeProductId).toBeNull();
+    });
+  });
+
+  describe('prices carry what Stripe charges', () => {
+    const faults = faultInjector();
+    const PRICES = [
+      { stripePriceId: 'price_monthly', interval: 'month' },
+      { stripePriceId: 'price_yearly', interval: 'year' },
+    ];
+    const AMOUNTS: Record<
+      string,
+      { unit_amount: number | null; currency: string }
+    > = {
+      price_monthly: { unit_amount: 2_900, currency: 'usd' },
+      price_yearly: { unit_amount: 29_000, currency: 'usd' },
+      price_tiered: { unit_amount: null, currency: 'usd' },
+    };
+    /** Stripe as the fake answers it, or failing with `error`. */
+    const stripeAnswers = (error?: Error) =>
+      faults
+        .spy(fx.moduleRef.get(StripeService), 'api', 'get')
+        .mockReturnValue({
+          prices: {
+            retrieve: (id: string) => {
+              if (error) return Promise.reject(error);
+              const amount = AMOUNTS[id];
+              return amount
+                ? Promise.resolve({ id, ...amount })
+                : Promise.reject(
+                    new Stripe.errors.StripeInvalidRequestError({
+                      type: 'invalid_request_error',
+                      message: `No such price: '${id}'`,
+                      statusCode: 404,
+                    } as never),
+                  );
+            },
+          },
+        });
+
+    it('reads each amount from Stripe, and the plan answers with them', async () => {
+      stripeAnswers();
+
+      const created = await buildPlan({ prices: PRICES });
+      const read = await plans.getPlan(created.id, context());
+
+      for (const plan of [created, read]) {
+        expect(
+          plan.prices.map((price) => [
+            price.stripePriceId,
+            price.unitAmount,
+            price.currency,
+          ]),
+        ).toEqual([
+          ['price_monthly', 2_900, 'usd'],
+          ['price_yearly', 29_000, 'usd'],
+        ]);
+      }
+    });
+
+    it('Stripe unreachable refuses the create, and nothing is written', async () => {
+      stripeAnswers(
+        new Stripe.errors.StripeConnectionError({ message: 'down' }),
+      );
+      const before = await fx.prisma.subscriptionPlan.count();
+
+      await expectRpc(buildPlan({ prices: PRICES }), status.UNAVAILABLE);
+      expect(await fx.prisma.subscriptionPlan.count()).toBe(before);
+    });
+
+    it('a price Stripe doesn’t know, or with no single amount, is refused', async () => {
+      stripeAnswers();
+
+      await expectRpc(
+        buildPlan({
+          prices: [{ stripePriceId: 'price_nope', interval: 'month' }],
+        }),
+        status.INVALID_ARGUMENT,
+      );
+      await expectRpc(
+        buildPlan({
+          prices: [{ stripePriceId: 'price_tiered', interval: 'month' }],
+        }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('a negotiated plan (no prices) reads nothing from Stripe', async () => {
+      const api = stripeAnswers();
+
+      await buildPlan({ prices: [] });
+
+      expect(api).not.toHaveBeenCalled();
     });
   });
 });

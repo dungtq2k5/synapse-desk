@@ -454,6 +454,7 @@ describe('the manifest contract', () => {
       'INGESTION_OFFLINE_MODEL',
       'RAG_OFFLINE_MODEL',
       'STRIPE_API_BASE_URL',
+      'SUPER_ADMIN_TOTP_SECRET',
     ]);
 
     /** The gateway binds its variables in Spring, rag-service in Python; each has its own guard. */

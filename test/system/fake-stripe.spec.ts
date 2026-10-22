@@ -114,6 +114,15 @@ describe('the fake Stripe (unit)', () => {
     ]);
   });
 
+  it('reads one price by id, and refuses an unknown one', async () => {
+    const price = await stripe.prices.retrieve('price_fake_starter_yearly');
+    expect([price.unit_amount, price.currency]).toEqual([29_000, 'usd']);
+
+    await expect(stripe.prices.retrieve('price_nope')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  });
+
   it('a paid Checkout confirms by a signed subscription.created, with the period', async () => {
     const { subscription } = await subscribed('org-checkout');
     const event = await waitForEvent('customer.subscription.created');

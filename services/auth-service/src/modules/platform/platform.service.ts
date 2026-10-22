@@ -15,6 +15,7 @@ import {
   OffboardOrganizationRequest,
   OffboardOrganizationResponse,
   PlatformMetricsResponse,
+  OrganizationUsageResponse,
   PlatformOrganizationIdRequest,
   PlatformOrganizationResponse,
   ResetBillingCycleRequest,
@@ -31,7 +32,9 @@ import {
 import {
   AuditAction,
   AuditResourceType,
+  EmailTemplateName,
   InvitationStatus,
+  RequestOrigin,
   ORG_STATUS_TRANSITIONS,
   ORGANIZATION_SORTABLE_FIELDS,
   OrgStatus,
@@ -54,6 +57,9 @@ import Redis from 'ioredis';
 import { AuthGenerationStore } from '../limit-alerts/generation.store';
 import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import { SessionsService } from '../sessions/sessions.service';
+import { AuthService } from '../auth/auth.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';
 import { toUserResponse } from '../users/user.mapper';
@@ -94,6 +100,9 @@ export class PlatformService {
     private readonly rolesService: RolesService,
     private readonly generations: AuthGenerationStore,
     @Inject(LIMIT_ALERT_REDIS) private readonly limitAlertRedis: Redis,
+    private readonly authService: AuthService,
+    private readonly notifications: NotificationPublisher,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   // ---------------------------------------------------------------- Tenants
@@ -145,6 +154,25 @@ export class PlatformService {
     );
   }
 
+  /** An organization's seats and AI allowance, by id. */
+  async getOrganizationUsage(
+    request: PlatformOrganizationIdRequest,
+    context: CallerContext,
+  ): Promise<OrganizationUsageResponse> {
+    requireActor(context);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: request.organizationId },
+      include: { plan: { select: { name: true } } },
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No workspace with that id',
+      });
+    }
+    return this.organizations.usageOf(organization);
+  }
+
   /**
    * Tenant AND its first Org Admin, in ONE transaction.
    *
@@ -155,6 +183,7 @@ export class PlatformService {
   async createOrganization(
     request: CreatePlatformOrganizationRequest,
     context: CallerContext,
+    origin: RequestOrigin,
   ): Promise<CreatePlatformOrganizationResponse> {
     const adminEmail = normalizeEmail(request.adminEmail);
     const slug = request.slug.trim().toLowerCase();
@@ -223,6 +252,8 @@ export class PlatformService {
         metadata: { slug, adminEmail },
       });
 
+      await this.welcome(created.organization.name, created.admin, origin);
+
       const withCounts = await this.load(created.organization.id);
 
       return {
@@ -238,6 +269,36 @@ export class PlatformService {
         });
       }
       throw error;
+    }
+  }
+
+  /**
+   * The new admin's welcome email, with the link that sets their password.
+   *
+   * After the commit, and never fatal: the organization exists either way,
+   * and "Forgot password" reaches the same page if this email is lost.
+   */
+  private async welcome(
+    organizationName: string,
+    admin: { id: string; email: string; fullName: string },
+    origin: RequestOrigin,
+  ): Promise<void> {
+    try {
+      const link = await this.authService.issueWelcomeLink(admin.id, origin);
+      this.notifications.sendEmail({
+        template: EmailTemplateName.ORGANIZATION_CREATED,
+        to: admin.email,
+        data: {
+          fullName: admin.fullName,
+          organizationName,
+          setPasswordUrl: link.url,
+          expiresInDays: link.expiresInDays,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `The welcome email for ${organizationName} was not sent: ${formatErrorMsg(error)}`,
+      );
     }
   }
 

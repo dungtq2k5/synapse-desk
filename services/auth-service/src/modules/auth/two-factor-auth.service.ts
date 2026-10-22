@@ -311,9 +311,12 @@ export class TwoFactorAuthService {
       ...origin,
     });
 
-    const deviceToken = request.rememberDevice
-      ? await this.authService.trustDevice(user.id, session.sessionId)
-      : undefined;
+    // A Super Admin's device is never remembered (`completeLogin` asks every
+    // time), so none is marked trusted.
+    const deviceToken =
+      request.rememberDevice && !user.isSuperAdmin
+        ? await this.authService.trustDevice(user.id, session.sessionId)
+        : undefined;
 
     return {
       accessToken: session.accessToken,
@@ -343,6 +346,7 @@ export class TwoFactorAuthService {
         twoFactorSecret: true,
         twoFactorLastTimeStep: true,
         passwordHash: true,
+        isSuperAdmin: true,
         organization: { select: { enforceTwoFactor: true } },
       },
     });
@@ -356,6 +360,12 @@ export class TwoFactorAuthService {
       throw new RpcException({
         code: status.FAILED_PRECONDITION,
         message: 'Two-factor authentication is not enabled',
+      });
+    }
+    if (user.isSuperAdmin) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: 'Super Admins must use two-factor authentication',
       });
     }
     // A tenant that mandates 2FA outranks the individual's preference.

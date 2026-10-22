@@ -10,7 +10,7 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { AiModelTier, OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
-import { OrganizationResponse } from "./organization";
+import { OrganizationResponse, OrganizationUsageResponse } from "./organization";
 import { RoleResponse } from "./role";
 
 export interface PlatformOrganizationResponse {
@@ -401,6 +401,13 @@ export interface SubscriptionPlanPriceResponse {
    * new interval must not need a proto change.
    */
   interval: string;
+  /**
+   * What Stripe charges, in the currency's smallest unit, and its lowercase
+   * currency code. Read from Stripe when the plan is created; absent for a
+   * price seeded before amounts were stored.
+   */
+  unitAmount?: number | undefined;
+  currency?: string | undefined;
 }
 
 export interface SubscriptionPlanResponse {
@@ -604,6 +611,16 @@ export interface PlatformServiceClient {
     metadata?: Metadata,
   ): Observable<PlatformOrganizationResponse>;
 
+  /**
+   * The organization's seats and AI allowance, as its own usage page reads
+   * them. Storage is ingestion's: the gateway adds it.
+   */
+
+  getOrganizationUsage(
+    request: PlatformOrganizationIdRequest,
+    metadata?: Metadata,
+  ): Observable<OrganizationUsageResponse>;
+
   updateOrganization(
     request: UpdatePlatformOrganizationRequest,
     metadata?: Metadata,
@@ -686,6 +703,16 @@ export interface PlatformServiceController {
     request: PlatformOrganizationIdRequest,
     metadata?: Metadata,
   ): Promise<PlatformOrganizationResponse> | Observable<PlatformOrganizationResponse> | PlatformOrganizationResponse;
+
+  /**
+   * The organization's seats and AI allowance, as its own usage page reads
+   * them. Storage is ingestion's: the gateway adds it.
+   */
+
+  getOrganizationUsage(
+    request: PlatformOrganizationIdRequest,
+    metadata?: Metadata,
+  ): Promise<OrganizationUsageResponse> | Observable<OrganizationUsageResponse> | OrganizationUsageResponse;
 
   updateOrganization(
     request: UpdatePlatformOrganizationRequest,
@@ -796,6 +823,7 @@ export function PlatformServiceControllerMethods() {
       "listOrganizations",
       "createOrganization",
       "getOrganization",
+      "getOrganizationUsage",
       "updateOrganization",
       "setOrganizationStatus",
       "resetBillingCycle",

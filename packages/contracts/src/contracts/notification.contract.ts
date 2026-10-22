@@ -34,6 +34,8 @@ export enum EmailTemplateName {
   INBOUND_REJECTED = 'INBOUND_REJECTED',
   EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
   PASSWORD_RESET = 'PASSWORD_RESET',
+  /** A new organization's first admin: set a password to sign in. */
+  ORGANIZATION_CREATED = 'ORGANIZATION_CREATED',
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
   INVITATION = 'INVITATION',
   SECURITY_ALERT = 'SECURITY_ALERT',
@@ -91,6 +93,16 @@ export type EmailContent =
         fullName: string;
         organizationName: string | null;
         origin: NotificationOrigin;
+      };
+    }
+  | {
+      template: EmailTemplateName.ORGANIZATION_CREATED;
+      to: string;
+      data: {
+        fullName: string;
+        organizationName: string;
+        setPasswordUrl: string;
+        expiresInDays: number;
       };
     }
   | {

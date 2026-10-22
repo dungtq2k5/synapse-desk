@@ -40,6 +40,8 @@ export function renderEmail(
       return emailVerification(command.data, branding);
     case EmailTemplateName.PASSWORD_RESET:
       return passwordReset(command.data, branding);
+    case EmailTemplateName.ORGANIZATION_CREATED:
+      return organizationCreated(command.data, branding);
     case EmailTemplateName.PASSWORD_CHANGED:
       return passwordChanged(command.data, branding);
     case EmailTemplateName.INVITATION:
@@ -249,6 +251,30 @@ function passwordReset(
         .join('\n') +
       `\n\nEach link expires in ${data.expiresInMinutes} minutes and is single use.` +
       textOrigin(data.origin, 'password reset request'),
+  };
+}
+
+/**
+ * To a new organization's first admin, who has no password yet: the link sets
+ * one through the reset page, then they sign in.
+ */
+function organizationCreated(
+  data: Data<EmailTemplateName.ORGANIZATION_CREATED>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  const days = `${data.expiresInDays} ${data.expiresInDays === 1 ? 'day' : 'days'}`;
+  return {
+    subject: `${data.organizationName} is ready on ${branding.appName}`,
+    html: layout(
+      branding,
+      `Welcome to ${esc(data.organizationName)}`,
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)}, ${esc(branding.appName)} created <strong>${esc(data.organizationName)}</strong> for you. Set your password to sign in.</p>
+       ${button(data.setPasswordUrl, 'Set your password')}
+       <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">This link works once and expires in ${days}. After that, use "Forgot password" on the sign-in page.</p>`,
+    ),
+    text:
+      `Hi ${data.fullName}, ${branding.appName} created ${data.organizationName} for you. Set your password to sign in:\n` +
+      `${data.setPasswordUrl}\n\nThis link works once and expires in ${days}.`,
   };
 }
 

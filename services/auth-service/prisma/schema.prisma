@@ -618,6 +618,12 @@ model PasswordResetToken {
 
   isUsed    Boolean  @default(false) @map("is_used")
   expiresAt DateTime @map("expires_at") @db.Timestamptz
+
+  // A new organization's welcome link: following it proves the address, so
+  // setting the password through it also marks the address verified. An
+  // ordinary reset leaves verification alone.
+  verifiesEmail Boolean @default(false) @map("verifies_email")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
