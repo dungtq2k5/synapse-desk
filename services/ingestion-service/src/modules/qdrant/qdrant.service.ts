@@ -37,6 +37,11 @@ export type ChunkPoint = {
  * `organization_id`: the filter excludes nothing it cannot see, so a payload
  * omission is a cross-tenant disclosure with no failing query anywhere.
  */
+
+/** How long a collection another service just created may take to load. */
+export const READ_ATTEMPTS = 20;
+export const READ_DELAY_MS = 500;
+
 @Injectable()
 export class QdrantService implements OnApplicationBootstrap {
   private readonly logger = new Logger(QdrantService.name);
@@ -288,6 +293,31 @@ export class QdrantService implements OnApplicationBootstrap {
   }
 
   /**
+   * The collection's info, once it has loaded. A collection rag-service
+   * created a moment ago already exists but answers 500 ("0 of 0 read
+   * operations failed") until its shards load, so a 5xx is waited out for up
+   * to {@link READ_ATTEMPTS} × {@link READ_DELAY_MS} rather than failing the
+   * boot.
+   */
+  private async readCollection(): ReturnType<QdrantClient['getCollection']> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.client.getCollection(QDRANT_COLLECTION);
+      } catch (error) {
+        const code = (error as { status?: unknown } | null)?.status;
+        if (
+          typeof code !== 'number' ||
+          code < 500 ||
+          attempt >= READ_ATTEMPTS
+        ) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, READ_DELAY_MS));
+      }
+    }
+  }
+
+  /**
    * Refuses to serve a collection built for a different vector size.
    *
    * The dimension is the only part Qdrant itself enforces, and it does so at
@@ -296,7 +326,7 @@ export class QdrantService implements OnApplicationBootstrap {
    * config change.
    */
   private async assertDimensionMatches(): Promise<void> {
-    const info = await this.client.getCollection(QDRANT_COLLECTION);
+    const info = await this.readCollection();
     const vectors = info.config?.params?.vectors;
     const size =
       typeof vectors === 'object' && vectors !== null && 'size' in vectors

@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { EMBEDDING_DIMENSION, QDRANT_COLLECTION } from '@synapsedesk/contracts';
-import { QdrantService } from './qdrant.service';
+import { QdrantService, READ_ATTEMPTS, READ_DELAY_MS } from './qdrant.service';
 
 jest.mock('@qdrant/js-client-rest');
 
@@ -70,5 +70,41 @@ describe('QdrantService.ensureCollection (unit)', () => {
 
     await expect(service.ensureCollection()).rejects.toThrow('Bad Request');
     expect(client.createPayloadIndex).not.toHaveBeenCalled();
+  });
+
+  describe('a collection still loading', () => {
+    /** Qdrant's answer while the other service's collection loads. */
+    const loading = Object.assign(new Error('Internal Server Error'), {
+      status: 500,
+    });
+
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('is waited for, then checked like any other', async () => {
+      client.collectionExists.mockResolvedValue({ exists: true });
+      client.getCollection
+        .mockRejectedValueOnce(loading)
+        .mockRejectedValueOnce(loading);
+
+      const done = service.ensureCollection();
+      await jest.advanceTimersByTimeAsync(2 * READ_DELAY_MS);
+
+      await expect(done).resolves.toBeUndefined();
+      expect(client.getCollection).toHaveBeenCalledTimes(3);
+      expect(client.createPayloadIndex).toHaveBeenCalledTimes(5);
+    });
+
+    it('that never loads still fails the boot', async () => {
+      client.collectionExists.mockResolvedValue({ exists: true });
+      client.getCollection.mockRejectedValue(loading);
+
+      const done = service.ensureCollection();
+      const settled = expect(done).rejects.toThrow('Internal Server Error');
+      await jest.advanceTimersByTimeAsync(READ_ATTEMPTS * READ_DELAY_MS);
+
+      await settled;
+      expect(client.getCollection).toHaveBeenCalledTimes(READ_ATTEMPTS);
+    });
   });
 });
