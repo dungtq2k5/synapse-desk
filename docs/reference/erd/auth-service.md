@@ -7,6 +7,7 @@ erDiagram
     String slug 
     String domain "❓"
     String status 
+    DateTime status_changed_at "❓"
     Boolean enforce_two_factor 
     String allowed_email_domains 
     String inbound_token "❓"

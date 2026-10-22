@@ -37,6 +37,11 @@ export interface CurrentUserResponse {
    * call. UNSPECIFIED for a Super Admin, who has no organization.
    */
   organizationStatus: OrgStatus;
+  /**
+   * A platform Super Admin, who has no organization: the client sends them to
+   * the platform console.
+   */
+  isSuperAdmin: boolean;
 }
 
 /**

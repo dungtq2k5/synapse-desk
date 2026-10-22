@@ -78,6 +78,11 @@ message LoginResponse {
   // indistinguishable on the wire and the client shows a code box for a code
   // that does not exist yet.
   bool requires_two_factor_setup = 9;
+
+  // Whether "remember this device" can skip the next code. False for a Super
+  // Admin, who is asked every time, so the client hides the option. Only
+  // meaningful alongside requires_two_factor.
+  bool can_remember_device = 10;
 }
 
 // Second leg of a multi-tenant login. The token is what authorizes it: the

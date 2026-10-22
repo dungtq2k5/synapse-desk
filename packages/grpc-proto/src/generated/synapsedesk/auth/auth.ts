@@ -89,6 +89,12 @@ export interface LoginResponse {
    * that does not exist yet.
    */
   requiresTwoFactorSetup: boolean;
+  /**
+   * Whether "remember this device" can skip the next code. False for a Super
+   * Admin, who is asked every time, so the client hides the option. Only
+   * meaningful alongside requires_two_factor.
+   */
+  canRememberDevice: boolean;
 }
 
 /**

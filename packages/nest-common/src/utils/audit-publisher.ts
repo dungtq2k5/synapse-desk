@@ -103,6 +103,46 @@ export class AuditPublisher {
   }
 
   /**
+   * A scheduled job a Super Admin ran by hand (`from`/`to` absent) or over a
+   * range: the platform's entry, recorded by the service that ran it, with the
+   * reason and what it counted.
+   *
+   * @example
+   * audit.recordJobRun(context, { jobName: 'analytics-daily', reason: 'Fix', tenants: 3, rows: 90 });
+   */
+  recordJobRun(
+    context: CallerContext,
+    run: {
+      jobName: string;
+      reason: string;
+      from?: string;
+      to?: string;
+      organizationId?: string;
+      tenants: number;
+      rows: number;
+    },
+  ): void {
+    const backfill = run.from !== undefined && run.to !== undefined;
+    this.record(context, {
+      action: backfill
+        ? AuditAction.PLATFORM_JOB_BACKFILLED
+        : AuditAction.PLATFORM_JOB_RUN,
+      resourceType: AuditResourceType.JOB,
+      // A job has no row of its own; its name is in the metadata.
+      resourceId: null,
+      organizationId: null,
+      metadata: {
+        jobName: run.jobName,
+        reason: run.reason,
+        ...(backfill ? { from: run.from, to: run.to } : {}),
+        ...(run.organizationId ? { organizationId: run.organizationId } : {}),
+        tenants: run.tenants,
+        rows: run.rows,
+      },
+    });
+  }
+
+  /**
    * Derives actor, tenant and origin from the verified caller context, so a
    * call site cannot record the wrong actor by passing the wrong id.
    */

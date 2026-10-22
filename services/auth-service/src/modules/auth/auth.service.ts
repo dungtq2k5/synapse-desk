@@ -616,6 +616,7 @@ export class AuthService {
       return {
         requiresTwoFactor: false,
         requiresTwoFactorSetup: false,
+        canRememberDevice: false,
         requiresTenantSelection: true,
         tenantSelectionToken: this.generateTenantSelectionToken(
           matched.map((candidate) => candidate.id),
@@ -803,6 +804,7 @@ export class AuthService {
       return {
         requiresTwoFactor: true,
         requiresTwoFactorSetup: requiresSetup,
+        canRememberDevice: !user.isSuperAdmin,
         requiresTenantSelection: false,
         twoFactorToken: this.generate2faToken(user.id),
         tenants: [],
@@ -818,6 +820,7 @@ export class AuthService {
     return {
       requiresTwoFactor: false,
       requiresTwoFactorSetup: false,
+      canRememberDevice: false,
       requiresTenantSelection: false,
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
@@ -866,6 +869,7 @@ export class AuthService {
       return {
         requiresTwoFactor: false,
         requiresTwoFactorSetup: false,
+        canRememberDevice: false,
         requiresTenantSelection: true,
         tenantSelectionToken: this.generateTenantSelectionToken(
           candidates.map((candidate) => candidate.id),

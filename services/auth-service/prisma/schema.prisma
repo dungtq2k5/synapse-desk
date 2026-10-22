@@ -38,9 +38,13 @@ model Organization {
   domain String? @unique @db.VarChar(255)
 
   // Tenant state & governance
-  status              String   @db.VarChar(50)
-  enforceTwoFactor    Boolean  @default(false) @map("enforce_two_factor")
-  allowedEmailDomains String[] @map("allowed_email_domains") @db.VarChar(255)
+  status              String    @db.VarChar(50)
+  // When `status` last changed: stamped by a trigger the seeder applies, so
+  // every writer (the Stripe webhook, the platform, onboarding) moves it.
+  // NULL on a row older than the column: unknown, never guessed.
+  statusChangedAt     DateTime? @default(now()) @map("status_changed_at") @db.Timestamptz
+  enforceTwoFactor    Boolean   @default(false) @map("enforce_two_factor")
+  allowedEmailDomains String[]  @map("allowed_email_domains") @db.VarChar(255)
 
   /// The tenant's inbound-mail address token.
   ///

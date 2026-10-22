@@ -15,6 +15,7 @@ import {
 import { TwoFactorAuthService } from '../../src/modules/auth/two-factor-auth.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
+import { UsersService } from '../../src/modules/users/users.service';
 import { decryptSecret, encryptSecret } from '../../src/common/utils/secrets';
 import { ConfigService } from '@nestjs/config';
 
@@ -666,7 +667,33 @@ describe('Two-factor auth (e2e)', () => {
       expect(login).toMatchObject({
         requiresTwoFactor: true,
         requiresTwoFactorSetup: false,
+        // So the page hides the box the server would ignore.
+        canRememberDevice: false,
       });
+    });
+
+    it('anyone else may have their device remembered', async () => {
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+
+      const login = await auth.login(
+        { email: user.email, password: TEST_PASSWORD },
+        requestOrigin(),
+      );
+
+      expect(login).toMatchObject({
+        requiresTwoFactor: true,
+        canRememberDevice: true,
+      });
+    });
+
+    it('/users/me says who is a Super Admin', async () => {
+      const admin = await superAdmin();
+      const { user } = await seedTenantWithUser(fx.prisma);
+      const users = fx.moduleRef.get(UsersService);
+
+      expect((await users.getCurrentUser(admin.id)).isSuperAdmin).toBe(true);
+      expect((await users.getCurrentUser(user.id)).isSuperAdmin).toBe(false);
     });
 
     it('"remember this device" marks nothing trusted', async () => {

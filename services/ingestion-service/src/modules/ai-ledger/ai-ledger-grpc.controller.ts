@@ -26,8 +26,9 @@ import {
 import {
   AiGenerationPurpose,
   AiGenerationStatus,
+  SCHEDULED_JOBS,
 } from '@synapsedesk/contracts';
-import { JobHealthService } from '@synapsedesk/nest-common';
+import { AuditPublisher, JobHealthService } from '@synapsedesk/nest-common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
@@ -56,6 +57,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
     private readonly rollup: AiGenerationRollupJob,
     private readonly jobHealth: JobHealthService,
     private readonly modules: ModuleRef,
+    private readonly audit: AuditPublisher,
   ) {}
 
   /**
@@ -157,7 +159,26 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    * reachable at all: once retention has eaten the raw rows, a backfill is the
    * only way a mistake in this job can ever be corrected.
    */
-  async runAiRollup(request: RunAiRollupRequest): Promise<RunAiRollupResponse> {
+  async runAiRollup(
+    request: RunAiRollupRequest,
+    metadata?: Metadata,
+  ): Promise<RunAiRollupResponse> {
+    const outcome = await this.runOrBackfill(request);
+    this.audit.recordJobRun(unpackCallerContext(metadata), {
+      jobName: SCHEDULED_JOBS.LEDGER_DAILY,
+      reason: request.reason,
+      from: request.from,
+      to: request.to,
+      organizationId: request.organizationId,
+      tenants: outcome.tenants,
+      rows: outcome.rows,
+    });
+    return outcome;
+  }
+
+  private async runOrBackfill(
+    request: RunAiRollupRequest,
+  ): Promise<RunAiRollupResponse> {
     if (request.from && request.to) {
       // A backfill is the rollup's alone: the projection ADDS and can't
       // recompute a range, and flags are a judgement on today's counters.

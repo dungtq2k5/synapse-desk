@@ -489,6 +489,9 @@ describe('The plan catalogue (e2e)', () => {
       expect(row?.overLimit).toEqual([
         `maxAgentSeats: ${seatsInUse} in use, plan grants ${seatsInUse - 1}`,
       ]);
+      expect(row?.overLimitItems).toEqual([
+        { dimension: 'SEATS', inUse: seatsInUse, allowed: seatsInUse - 1 },
+      ]);
       // Not vacuous: a locked user really is in that count.
       expect(locked.isLocked).toBe(false);
       expect(seatsInUse).toBe(6);

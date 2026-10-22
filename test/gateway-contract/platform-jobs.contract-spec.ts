@@ -145,11 +145,16 @@ describe('platform-jobs', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/platform/jobs/analytics-daily/run`,
-        undefined,
+        { reason: 'Nightly run missed' },
         superAdminHeaders(),
       );
 
       expect(response.status).toBe(200);
+      // The reason goes down to the service, which audits the run.
+      const [call] = peers.ticket.calls('AnalyticsService/RunRollup');
+      expect(call.request).toEqual(
+        expect.objectContaining({ reason: 'Nightly run missed' }),
+      );
       expect(response.body).toMatchObject({
         message: 'Job run complete',
         data: {
@@ -167,11 +172,25 @@ describe('platform-jobs', () => {
     async () => {
       const response = await new Session(gateway.baseUrl).post(
         `${API}/platform/jobs/webhook-retention/run`,
-        undefined,
+        { reason: 'Try' },
         superAdminHeaders(),
       );
 
       expect(response.status).toBe(400);
+    },
+  );
+
+  rowFor('Platform Jobs')(
+    '**`run` refuses a run with no reason**, and dispatches nothing',
+    async () => {
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/platform/jobs/analytics-daily/run`,
+        {},
+        superAdminHeaders(),
+      );
+
+      expect(response.status).toBe(400);
+      expect(peers.ticket.calls('AnalyticsService/RunRollup')).toEqual([]);
     },
   );
 

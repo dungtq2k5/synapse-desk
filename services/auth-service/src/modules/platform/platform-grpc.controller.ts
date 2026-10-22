@@ -18,6 +18,8 @@ import {
   PlatformMetricsResponse,
   OrganizationUsageResponse,
   PlatformOrganizationIdRequest,
+  ResolveAuditNamesRequest,
+  ResolveAuditNamesResponse,
   PlatformOrganizationResponse,
   PlatformServiceController,
   PlatformServiceControllerMethods,
@@ -247,6 +249,16 @@ export class PlatformGrpcController implements PlatformServiceController {
    * Every row, unjudged: the staleness decision needs the list of jobs this
    * build EXPECTS, because a job that has never run has no row to return.
    */
+  resolveAuditNames(
+    request: ResolveAuditNamesRequest,
+    metadata?: Metadata,
+  ): Promise<ResolveAuditNamesResponse> {
+    return this.platformService.resolveAuditNames(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
   async getAuthJobHealth(): Promise<AuthJobHealthResponse> {
     const rows = await this.jobHealth.list();
 

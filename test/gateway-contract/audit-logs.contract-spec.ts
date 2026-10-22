@@ -283,6 +283,54 @@ describe('audit-logs', () => {
   );
 
   rowFor('PlatformAuditLogs')(
+    '**`list` names who acted and on what, from auth**',
+    async () => {
+      const ORG = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      peers.ticket.on('AuditService/ListAuditLogs').reply({
+        items: [
+          wireLog('log-3', {
+            organizationId: undefined,
+            action: 'AUDIT_ACTION_PLATFORM_ORGANIZATION_CREATED',
+            resourceType: 'AUDIT_RESOURCE_TYPE_ORGANIZATION',
+            resourceId: ORG,
+          }),
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+      peers.auth.on('PlatformService/ResolveAuditNames').reply({
+        users: { [USER]: 'Sam Super' },
+        organizations: { [ORG]: 'Acme' },
+        plans: {},
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/platform/audit-logs`,
+        superAdminHeaders(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          items: [
+            { id: 'log-3', actorName: 'Sam Super', resourceName: 'Acme' },
+          ],
+        },
+      });
+      const [call] = peers.auth.calls('PlatformService/ResolveAuditNames');
+      expect(call.request).toMatchObject({
+        userIds: [USER],
+        organizationIds: [ORG],
+      });
+    },
+  );
+
+  rowFor('PlatformAuditLogs')(
     '**`listActions` refuses anyone who is not a super admin**',
     async () => {
       const response = await new Session(gateway.baseUrl).get(

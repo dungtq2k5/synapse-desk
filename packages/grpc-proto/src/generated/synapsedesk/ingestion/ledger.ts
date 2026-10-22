@@ -381,7 +381,14 @@ export interface RunAiRollupRequest {
     | string
     | undefined;
   /** A backfill for one organization only; absent, every tenant with activity. */
-  organizationId?: string | undefined;
+  organizationId?:
+    | string
+    | undefined;
+  /**
+   * Why a Super Admin ran it: recorded with the audit entry this service
+   * writes (the caller comes from the request's metadata).
+   */
+  reason: string;
 }
 
 export interface RunAiRollupResponse {

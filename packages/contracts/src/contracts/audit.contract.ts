@@ -133,6 +133,11 @@ export enum AuditAction {
   INBOUND_ADDRESS_ENABLED = 'INBOUND_ADDRESS_ENABLED',
   INBOUND_ADDRESS_ROTATED = 'INBOUND_ADDRESS_ROTATED',
   INBOUND_ADDRESS_DISABLED = 'INBOUND_ADDRESS_DISABLED',
+
+  // A scheduled job run by hand, or over a range, by a Super Admin: recorded
+  // by the service that runs it, with the reason and what it counted.
+  PLATFORM_JOB_RUN = 'PLATFORM_JOB_RUN',
+  PLATFORM_JOB_BACKFILLED = 'PLATFORM_JOB_BACKFILLED',
 }
 
 /**
@@ -161,6 +166,11 @@ export enum AuditResourceType {
   SUBSCRIPTION_PLAN = 'SUBSCRIPTION_PLAN',
   INVITATION = 'INVITATION',
   WEBHOOK_ENDPOINT = 'WEBHOOK_ENDPOINT',
+  /**
+   * A scheduled job. It has no row of its own, so the entry's id is null and
+   * the job's name is in the metadata (`jobName`).
+   */
+  JOB = 'JOB',
 }
 
 /**

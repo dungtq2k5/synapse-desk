@@ -149,7 +149,9 @@ export const analyticsStep: SeedStep = {
         });
       }
     }
-    await call('/platform/jobs/ledger-daily/run');
+    await call('/platform/jobs/ledger-daily/run', {
+      reason: 'Demo seed history',
+    });
     lines.push('done');
     return lines;
   },

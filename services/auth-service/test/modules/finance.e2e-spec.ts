@@ -454,10 +454,31 @@ describe('Finance (e2e)', () => {
       expect(snapshot.tenants?.total).toBe(1);
       expect(snapshot.plans).toHaveLength(1);
       expect(snapshot.dunning?.pastDue).toBe(1);
+      // Its status began when it was created, and that's when it's past due
+      // since.
+      expect(snapshot.dunning?.tenants[0].pastDueSince).toBeDefined();
 
       // The caveats travel even when there is no number, or a client learns
       // they are optional.
       expect(snapshot.revenue?.excludes).toEqual([...REVENUE_EXCLUSIONS]);
+    });
+
+    it('4c. a snapshot stored before "normalize" answers with today\'s value', async () => {
+      await store.write({
+        available: false,
+        reason:
+          'an active subscription uses pricing this estimate cannot normalise',
+        computedAt: new Date().toISOString(),
+      } as never);
+
+      const snapshot = await finance.getSnapshot();
+
+      expect(snapshot.revenue?.unavailableReason).toBe(
+        RevenueUnavailableReason.UNSUPPORTED_PRICING,
+      );
+      expect(RevenueUnavailableReason.UNSUPPORTED_PRICING).toMatch(
+        /normalize$/,
+      );
     });
 
     it('4a. **an unreachable store is NOT reported as "not computed yet"**', async () => {

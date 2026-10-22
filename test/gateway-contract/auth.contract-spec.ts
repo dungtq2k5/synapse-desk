@@ -162,6 +162,54 @@ describe('authentication', () => {
     },
   );
 
+  rowFor('Users')('**`/users/me` says who is a Super Admin**', async () => {
+    peers.auth.on('UserService/GetCurrentUser').reply({
+      user: wireUser(),
+      permissionCodes: [],
+      departmentIds: [],
+      hasPassword: true,
+      isSuperAdmin: true,
+    });
+
+    const response = await new Session(gateway.baseUrl).get(`${API}/users/me`, {
+      cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ data: { isSuperAdmin: true } });
+  });
+
+  rowFor('Auth')(
+    '**the two-step challenge says whether the device may be remembered**',
+    async () => {
+      peers.auth.on('AuthService/Login').reply({
+        requiresTwoFactor: true,
+        twoFactorToken: 'two-factor-token',
+        requiresTwoFactorSetup: false,
+        canRememberDevice: false,
+      });
+
+      // Its own account: the login tier allows five per (address, account),
+      // and every suite on this Redis shares Ada's.
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/login`,
+        {
+          email: 'remember@example.com',
+          password: 'correct horse battery staple',
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          requiresTwoFactor: true,
+          requiresTwoFactorSetup: false,
+          canRememberDevice: false,
+        },
+      });
+    },
+  );
+
   rowFor('Auth')(
     '**tenant selection is checked BEFORE 2FA**, when a peer response carries both',
     async () => {

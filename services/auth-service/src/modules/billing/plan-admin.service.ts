@@ -27,6 +27,7 @@ import type {
   CreatePlanRequest,
   ListPlansRequest,
   ListPlansResponse,
+  OverLimit,
   PlanSubscriberProjection,
   SubscriptionPlanResponse,
   UpdatePlanRequest,
@@ -498,6 +499,7 @@ export class PlanAdminService {
         changes: {},
         after: {},
         overLimit: [],
+        overLimitItems: [],
         skippedPinned: true,
         budgetDeferred: false,
       };
@@ -579,7 +581,7 @@ export class PlanAdminService {
       organizationName: subscriber.name,
       changes,
       after,
-      overLimit: await this.overLimit(subscriber, plan),
+      ...(await this.overLimit(subscriber, plan)),
       skippedPinned: false,
       budgetDeferred,
     };
@@ -605,21 +607,23 @@ export class PlanAdminService {
   private async overLimit(
     subscriber: SubscriberRow,
     plan: PlanRow,
-  ): Promise<string[]> {
-    const over: string[] = [];
-
+  ): Promise<{ overLimit: string[]; overLimitItems: OverLimit[] }> {
     const seatsInUse = await this.organizations.seatsInUse(
       this.prisma,
       subscriber.id,
     );
 
-    if (seatsInUse > plan.maxAgentSeats) {
-      over.push(
-        `maxAgentSeats: ${seatsInUse} in use, plan grants ${plan.maxAgentSeats}`,
-      );
+    if (seatsInUse <= plan.maxAgentSeats) {
+      return { overLimit: [], overLimitItems: [] };
     }
-
-    return over;
+    return {
+      overLimit: [
+        `maxAgentSeats: ${seatsInUse} in use, plan grants ${plan.maxAgentSeats}`,
+      ],
+      overLimitItems: [
+        { dimension: 'SEATS', inUse: seatsInUse, allowed: plan.maxAgentSeats },
+      ],
+    };
   }
 
   /** The write half. Never called on a dry run, never on a pinned tenant. */

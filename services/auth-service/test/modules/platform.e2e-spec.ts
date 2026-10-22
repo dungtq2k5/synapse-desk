@@ -1,5 +1,8 @@
 import { expectRpc } from '@synapsedesk/testing/rpc';
-import { DOMAIN_TAKEN_MESSAGE } from '../../src/modules/organizations/organizations.service';
+import {
+  DOMAIN_TAKEN_MESSAGE,
+  SLUG_TAKEN_MESSAGE,
+} from '../../src/modules/organizations/organizations.service';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import {
@@ -60,6 +63,70 @@ describe('Platform (e2e)', () => {
   afterAll(() => fx.close());
 
   // ------------------------------------------------------- tenant creation
+
+  describe('resolveAuditNames', () => {
+    it('names people, organizations and plans, deleted ones too, and skips unknown ids', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.organization.update({
+        where: { id: t.org.id },
+        data: { deletedAt: new Date() },
+      });
+      const plan = await fx.prisma.subscriptionPlan.findFirstOrThrow({
+        where: { deletedAt: null },
+      });
+      const unknown = '00000000-0000-4000-8000-000000000000';
+
+      const names = await platform.resolveAuditNames(
+        {
+          userIds: [t.user.id, unknown],
+          organizationIds: [t.org.id],
+          planIds: [plan.id],
+        },
+        ctx,
+      );
+
+      expect(names).toEqual({
+        users: { [t.user.id]: t.user.fullName },
+        organizations: { [t.org.id]: t.org.name },
+        plans: { [plan.id]: plan.name },
+      });
+    });
+  });
+
+  describe('getOrganization', () => {
+    it('names the plan, and whether Stripe grants it', async () => {
+      const plan = await fx.prisma.subscriptionPlan.findFirstOrThrow({
+        where: { deletedAt: null },
+      });
+      const stripe = await seedTenantWithUser(fx.prisma, {
+        organization: {
+          plan: { connect: { id: plan.id } },
+          stripeSubscriptionId: `sub_${Date.now()}`,
+        },
+      });
+      const assigned = await seedTenantWithUser(fx.prisma, {
+        organization: { plan: { connect: { id: plan.id } } },
+      });
+      const none = await seedTenantWithUser(fx.prisma);
+
+      const read = (id: string) =>
+        platform.getOrganization({ organizationId: id });
+
+      expect(await read(stripe.org.id)).toMatchObject({
+        planName: plan.name,
+        billedThroughStripe: true,
+      });
+      expect(await read(assigned.org.id)).toMatchObject({
+        planName: plan.name,
+        billedThroughStripe: false,
+      });
+      const bare = await read(none.org.id);
+      expect(bare.planName).toBeUndefined();
+      expect(bare.billedThroughStripe).toBe(false);
+      // A new organization's status starts when it's created.
+      expect(bare.statusChangedAt).toBeDefined();
+    });
+  });
 
   describe('getOrganizationUsage', () => {
     it('reads an organization’s seats and AI allowance by id', async () => {
@@ -184,6 +251,42 @@ describe('Platform (e2e)', () => {
           requestOrigin(),
         ),
       ).resolves.toMatchObject({ requiresTwoFactor: false });
+    });
+
+    it('4d. a taken address or domain is named in the refusal', async () => {
+      await platform.createOrganization(
+        {
+          name: 'Contoso',
+          slug: 'contoso',
+          domain: 'contoso.test',
+          adminEmail: 'first@contoso.test',
+          adminFullName: 'First',
+          allowedEmailDomains: [],
+        },
+        ctx,
+        requestOrigin(),
+      );
+      const again = (over: { slug: string; domain?: string }) =>
+        platform.createOrganization(
+          {
+            name: 'Contoso Again',
+            adminEmail: 'second@contoso.test',
+            adminFullName: 'Second',
+            allowedEmailDomains: [],
+            ...over,
+          },
+          ctx,
+          requestOrigin(),
+        );
+
+      await expect(again({ slug: 'contoso' })).rejects.toMatchObject({
+        error: { code: status.ALREADY_EXISTS, message: SLUG_TAKEN_MESSAGE },
+      });
+      await expect(
+        again({ slug: 'contoso-2', domain: 'contoso.test' }),
+      ).rejects.toMatchObject({
+        error: { code: status.ALREADY_EXISTS, message: DOMAIN_TAKEN_MESSAGE },
+      });
     });
 
     it('4b. a duplicate slug rolls the WHOLE thing back — no orphan admin', async () => {
@@ -366,6 +469,62 @@ describe('Platform (e2e)', () => {
           where: { userId: { in: [t.user.id, other.id] } },
         }),
       ).toBe(0);
+    });
+
+    it('2c2. the change answers how many sessions it ended, and when the status changed', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { status: OrgStatus.ACTIVE },
+      });
+      const other = await addMember(fx.prisma, t.org.id);
+      await createDeviceSession(fx.prisma, t.user.id);
+      await createDeviceSession(fx.prisma, other.id);
+      const before = new Date(Date.now() - 1000);
+      await fx.prisma.organization.update({
+        where: { id: t.org.id },
+        data: { statusChangedAt: before },
+      });
+
+      const result = await platform.setOrganizationStatus(
+        {
+          organizationId: t.org.id,
+          status: toProtoOrgStatus(OrgStatus.FROZEN),
+          reason: 'abuse',
+        },
+        ctx,
+      );
+
+      expect(result.revokedSessionCount).toBe(2);
+      const changed = (
+        await fx.prisma.organization.findUniqueOrThrow({
+          where: { id: t.org.id },
+        })
+      ).statusChangedAt!;
+      expect(changed.getTime()).toBeGreaterThan(before.getTime());
+      expect(result.statusChangedAt?.seconds).toBe(
+        Math.floor(changed.getTime() / 1000),
+      );
+    });
+
+    it('2c3. a write that leaves the status alone leaves its date alone', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { status: OrgStatus.SUSPENDED_PAST_DUE },
+      });
+      const since = new Date('2026-09-01T00:00:00Z');
+      await fx.prisma.organization.update({
+        where: { id: t.org.id },
+        data: { statusChangedAt: since },
+      });
+
+      // As the Stripe webhook does: rewrite the same status with other fields.
+      await fx.prisma.organization.update({
+        where: { id: t.org.id },
+        data: { status: OrgStatus.SUSPENDED_PAST_DUE, name: 'Renamed' },
+      });
+
+      const row = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: t.org.id },
+      });
+      expect(row.statusChangedAt).toEqual(since);
     });
 
     it('2d. unfreezing does NOT touch sessions', async () => {
