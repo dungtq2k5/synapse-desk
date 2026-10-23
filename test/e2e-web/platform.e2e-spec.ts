@@ -385,7 +385,7 @@ test('run a job and backfill a range, each with a reason: both are in the audit 
   await page.goto('/platform/audit-log');
   const ran = page.getByRole('row').filter({ hasText: 'Ran a job' }).first();
   await expect(ran).toContainText('Ana Ruiz');
-  await expect(ran).toContainText(/Job · \d+ organizations?, [\d,]+ rows?/);
+  await expect(ran).toContainText(/Job · [\d,]+ organizations?, [\d,]+ rows?/);
   await expect(ran).toContainText('Checking the rollup after an import.');
   const backfilled = page
     .getByRole('row')
