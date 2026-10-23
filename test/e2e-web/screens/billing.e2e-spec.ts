@@ -542,15 +542,22 @@ test.describe('past due and frozen', () => {
     await expect(
       page.getByRole('status', { name: 'Payment overdue' }),
     ).toBeVisible();
-    // What the browser fetcher raises for a refused write.
-    await page.evaluate(() =>
-      window.dispatchEvent(
-        new CustomEvent('synapsedesk:organization-status', {
-          detail: 'SUSPENDED_PAST_DUE',
-        }),
-      ),
-    );
-    await expect(page.getByText(/is read-only$/)).toBeVisible();
+    // What the browser fetcher raises for a refused write. The banner is
+    // drawn on the server, so it can show before the shell hydrates and
+    // listens: an event before then is gone, so raise it until the toast
+    // answers (one toast id, so a second only replaces the first).
+    await expect(async () => {
+      await page.evaluate(() =>
+        window.dispatchEvent(
+          new CustomEvent('synapsedesk:organization-status', {
+            detail: 'SUSPENDED_PAST_DUE',
+          }),
+        ),
+      );
+      await expect(page.getByText(/is read-only$/)).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
     await look(page, 'past-due-refused', { viewportOnly: true });
   });
 
