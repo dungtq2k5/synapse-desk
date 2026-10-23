@@ -66,6 +66,11 @@ export type Actor = { id: string; email: string };
 export async function seededActors(): Promise<{
   admin: Actor;
   colleague: Actor;
+  /**
+   * A seeded user with no role: an end user, who never sees an internal note.
+   * Not `colleague`: a fresh seed makes the users after the admin agents.
+   */
+  requester: Actor;
 }> {
   const [tenant] = manifest().tenants;
   if (!tenant) throw new Error('The demo manifest lists no tenants');
@@ -93,6 +98,15 @@ export async function seededActors(): Promise<{
     });
 
     const [admin, colleague] = users;
+    const requester = await prisma.user.findFirst({
+      where: {
+        organizationId: tenant.organizationId,
+        deletedAt: null,
+        roles: { none: {} },
+      },
+      select: { id: true, email: true },
+      orderBy: { email: 'asc' },
+    });
 
     if (!admin || !colleague) {
       throw new Error(
@@ -101,7 +115,11 @@ export async function seededActors(): Promise<{
       );
     }
 
-    return { admin, colleague };
+    if (!requester) {
+      throw new Error(`Tenant ${tenant.slug} has no user without a role.`);
+    }
+
+    return { admin, colleague, requester };
   } finally {
     await prisma.$disconnect();
   }

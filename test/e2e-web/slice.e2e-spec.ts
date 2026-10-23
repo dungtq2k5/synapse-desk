@@ -52,11 +52,11 @@ async function ownTicket(page: Page, authorId: string): Promise<string> {
 test('a reply arrives live in the requester’s browser, and a note never does', async ({
   browser,
 }) => {
-  const { admin, colleague } = await seededActors();
-  const requester = await personAt(browser, colleague.email);
+  const { admin, requester: person } = await seededActors();
+  const requester = await personAt(browser, person.email);
   const agent = await personAt(browser, admin.email);
   const stamp = Date.now();
-  const ticketId = await ownTicket(requester.page, colleague.id);
+  const ticketId = await ownTicket(requester.page, person.id);
   // Only the author or the assignee posts, so the agent takes it first; a
   // re-run finds it already theirs (409).
   // A department is required, and ticket-service only checks it exists: the
