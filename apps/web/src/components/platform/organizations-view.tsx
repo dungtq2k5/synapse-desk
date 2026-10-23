@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { dayDate } from '@/lib/format';
-import { consoleStatus, STATUS_WORDS } from '@/lib/platform';
+import { consoleStatus, count, STATUS_WORDS } from '@/lib/platform';
 import { ConsoleStatusBadge } from './badges';
 import { ConsolePage } from './console-page';
 import { ChoiceFilter, SearchBox, SwitchFilter, Toolbar } from './toolbar';
@@ -195,8 +195,8 @@ export function OrganizationsView() {
                 <p className="text-muted-foreground">
                   {[
                     row.planName,
-                    `${row.userCount.toLocaleString('en-US')} people`,
-                    `${row.organization.maxAgentSeats.toLocaleString('en-US')} seats`,
+                    count(row.userCount, 'person', 'people'),
+                    count(row.organization.maxAgentSeats, 'seat'),
                   ]
                     .filter(Boolean)
                     .join(' · ')}

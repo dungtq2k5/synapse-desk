@@ -10,6 +10,7 @@ import {
   StatusDialog,
 } from './organization-dialogs';
 import { OrganizationEdit } from './organization-edit';
+import { OrganizationView } from './organization-view';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -163,6 +164,49 @@ describe('editing an organization', () => {
   });
 });
 
+describe('an organization’s page', () => {
+  const METER = { available: true, used: 1, limit: 2, unavailableReason: null };
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'lists plans among its actions; names Stripe in Break glass only beside a subscription (%s)',
+    async (stripe, named) => {
+      stubApi({
+        [`GET /api/v1/platform/organizations/${ORG}`]: ok({
+          ...DETAIL,
+          billedThroughStripe: stripe,
+          usage: { seats: METER, storage: METER, aiTokens: METER },
+        }),
+        'GET /api/v1/platform/audit-logs': ok({
+          items: [],
+          meta: {
+            currentPage: 1,
+            itemsPerPage: 5,
+            totalItems: 0,
+            totalPages: 0,
+            itemCount: 0,
+          },
+        }),
+      });
+      renderSettings(<OrganizationView organizationId={ORG} />);
+      expect(
+        await screen.findByText(
+          'Changes made from this console: status, edits, plans, cycle resets, offboarding.',
+          { exact: false },
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByText(/^Starts a fresh AI allowance today\./)[0],
+      ).toHaveTextContent(
+        named
+          ? 'Starts a fresh AI allowance today. The cycle stops matching Stripe’s invoice period until Stripe’s next event.'
+          : /^Starts a fresh AI allowance today\.$/,
+      );
+    },
+  );
+});
+
 describe('the organization’s dialogs', () => {
   it('a status change asks for a reason, then says how many were signed out', async () => {
     const calls = stubApi({
@@ -240,6 +284,7 @@ describe('the organization’s dialogs', () => {
       <ResetCycleDialog
         organization={SUBJECT}
         allowance="$10.00"
+        stripe
         open
         onOpenChange={() => undefined}
         onReset={onReset}
@@ -259,6 +304,34 @@ describe('the organization’s dialogs', () => {
     await user.click(screen.getByRole('button', { name: 'Reset the cycle' }));
     await waitFor(() => expect(onReset).toHaveBeenCalled());
   });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'resetting names Stripe’s invoice only beside a subscription (%s)',
+    (stripe, named) => {
+      renderSettings(
+        <ResetCycleDialog
+          organization={SUBJECT}
+          allowance="$10.00"
+          stripe={stripe}
+          open
+          onOpenChange={() => undefined}
+          onReset={jest.fn()}
+        />,
+      );
+      expect(
+        screen.getByText(
+          'Its AI allowance starts again today, with a fresh $10.00.',
+          { exact: false },
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Stripe’s invoice period/) !== null).toBe(
+        named,
+      );
+    },
+  );
 
   it('offboarding needs a reason and the name typed', async () => {
     const calls = stubApi({

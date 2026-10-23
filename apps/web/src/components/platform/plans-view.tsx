@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { aiMoney, money } from '@/lib/billing';
+import { count } from '@/lib/platform';
 import { fileSize } from '@/lib/format';
 import { PlanBadges } from './badges';
 import { ConsolePage } from './console-page';
@@ -179,10 +180,10 @@ export function PlansView() {
                 <PlanName plan={plan} />
                 <Prices plan={plan} />
                 <p className="text-muted-foreground">
-                  {`${plan.maxAgentSeats.toLocaleString('en-US')} seats · ${fileSize(plan.maxStorageBytes)} · ${aiMoney(plan.monthlyAiTokenBudget, 'en-US')} · ${tier(plan.aiModelTier)}`}
+                  {`${count(plan.maxAgentSeats, 'seat')} · ${fileSize(plan.maxStorageBytes)} · ${aiMoney(plan.monthlyAiTokenBudget, 'en-US')} · ${tier(plan.aiModelTier)}`}
                 </p>
                 <p className="text-muted-foreground">
-                  {`${plan.subscriberCount.toLocaleString('en-US')} subscribers`}
+                  {count(plan.subscriberCount, 'subscriber')}
                 </p>
               </li>
             ))}

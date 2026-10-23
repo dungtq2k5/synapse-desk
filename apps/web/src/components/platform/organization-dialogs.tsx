@@ -166,6 +166,7 @@ export function StatusDialog({
 export function ResetCycleDialog({
   organization,
   allowance,
+  stripe,
   open,
   onOpenChange,
   onReset,
@@ -173,6 +174,8 @@ export function ResetCycleDialog({
   organization: Subject;
   /** "$10.00": the fresh allowance. */
   allowance: string;
+  /** A Stripe subscription: the reset puts the cycle out of step with it. */
+  stripe: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onReset: () => void;
@@ -210,7 +213,7 @@ export function ResetCycleDialog({
         onOpenChange(next);
       }}
       title={`Reset ${organization.name}’s billing cycle?`}
-      description={`Its AI allowance starts again today, with a fresh ${allowance}. Its cycle stops matching Stripe’s invoice period, and the allowance and the invoice disagree until Stripe’s next event for it.`}
+      description={`Its AI allowance starts again today, with a fresh ${allowance}.${stripe ? ' Its cycle stops matching Stripe’s invoice period, and the allowance and the invoice disagree until Stripe’s next event for it.' : ''}`}
       confirmLabel="Reset the cycle"
       onConfirm={confirm}
     >
@@ -300,7 +303,7 @@ export function OffboardDialog({
         <CircleAlertIcon aria-hidden />
         <AlertTitle>What happens</AlertTitle>
         <AlertDescription>
-          {`Its ${organization.people.toLocaleString('en-US')} people are signed out now and can’t sign in. Its data is kept, and its address and domain stay reserved, so it can be restored from this console.`}
+          {`Its ${count(organization.people, 'person', 'people')} ${organization.people === 1 ? 'is' : 'are'} signed out now and can’t sign in. Its data is kept, and its address and domain stay reserved, so it can be restored from this console.`}
         </AlertDescription>
       </Alert>
       <ReasonField
@@ -352,7 +355,7 @@ export function RestoreDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Restore ${organization.name}?`}
-      description={`It comes back as it was, with its ${organization.people.toLocaleString('en-US')} people, plan and data. Nobody’s sessions come back: everyone signs in again.`}
+      description={`It comes back as it was, with its ${count(organization.people, 'person', 'people')}, plan and data. Nobody’s sessions come back: everyone signs in again.`}
       confirmLabel={`Restore ${organization.name}`}
       destructive={false}
       onConfirm={async () => {

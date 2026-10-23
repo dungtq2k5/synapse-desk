@@ -41,6 +41,7 @@ import { absoluteTime, dayDate, fileSize } from '@/lib/format';
 import {
   consequence,
   consoleStatus,
+  count,
   organizationAct,
   reasonOf,
   STATUS_WORDS,
@@ -281,6 +282,7 @@ export function OrganizationView({
       {!offboarded && (
         <BreakGlass
           people={data.userCount}
+          stripe={data.billedThroughStripe}
           onReset={() => setDialog('reset')}
           onOffboard={() => setDialog('offboard')}
         />
@@ -296,6 +298,7 @@ export function OrganizationView({
       <ResetCycleDialog
         organization={subject}
         allowance={aiMoney(organization.monthlyAiTokenBudget, 'en-US')}
+        stripe={data.billedThroughStripe}
         open={dialog === 'reset'}
         onOpenChange={(open) => setDialog(open ? 'reset' : null)}
         onReset={() => {
@@ -522,7 +525,7 @@ function PlatformActions({
   return (
     <ConsoleCard
       title="Platform actions on it"
-      lead="Changes made from this console: status, edits, cycle resets, offboarding. Its own audit log stays its own."
+      lead="Changes made from this console: status, edits, plans, cycle resets, offboarding. Its own audit log stays its own."
     >
       {failed ? (
         <LoadError what="the platform’s actions" onRetry={onRetry} />
@@ -592,10 +595,13 @@ function PlatformActions({
 /** The two actions that reach every person in it, each with a reason. */
 function BreakGlass({
   people,
+  stripe,
   onReset,
   onOffboard,
 }: {
   people: number;
+  /** A Stripe subscription: the reset puts the cycle out of step with it. */
+  stripe: boolean;
   onReset: () => void;
   onOffboard: () => void;
 }) {
@@ -617,8 +623,9 @@ function BreakGlass({
         <div className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Reset the billing cycle</span>
           <span className="text-muted-foreground">
-            Starts a fresh AI allowance today. The cycle stops matching Stripe’s
-            invoice period until Stripe’s next event.
+            {stripe
+              ? 'Starts a fresh AI allowance today. The cycle stops matching Stripe’s invoice period until Stripe’s next event.'
+              : 'Starts a fresh AI allowance today.'}
           </span>
         </div>
         <Button variant="outline" className="w-fit shrink-0" onClick={onReset}>
@@ -630,7 +637,7 @@ function BreakGlass({
         <div className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Offboard the organization</span>
           <span className="text-muted-foreground">
-            {`Signs out its ${people.toLocaleString('en-US')} people and closes it. Its data is kept, so it can be restored.`}
+            {`Signs out its ${count(people, 'person', 'people')} and closes it. Its data is kept, so it can be restored.`}
           </span>
         </div>
         <Button

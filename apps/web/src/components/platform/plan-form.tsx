@@ -54,6 +54,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toastError } from '@/lib/toast';
+import { count } from '@/lib/platform';
 import { PlanBadges } from './badges';
 import { ConsoleCard, ConsolePage } from './console-page';
 import { bytesOf, gbOf, microsOf, UnitInput, usdOf, wholeOf } from './fields';
@@ -377,7 +378,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           />
         ),
         description: [
-          `${plan.subscriberCount.toLocaleString('en-US')} subscribers`,
+          count(plan.subscriberCount, 'subscriber'),
           plan.stripeProductId && `Stripe product ${plan.stripeProductId}`,
         ]
           .filter(Boolean)
@@ -424,7 +425,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           <>
             <AlertTitle>Saving changes the catalog only</AlertTitle>
             <AlertDescription>
-              {`${plan.name}’s ${plan.subscriberCount.toLocaleString('en-US')} subscribers keep what they have until you apply it. After saving, preview what applying would change.`}
+              {`${plan.name}’s ${count(plan.subscriberCount, 'subscriber')} ${plan.subscriberCount === 1 ? 'keeps what it has' : 'keep what they have'} until you apply it. After saving, preview what applying would change.`}
               {!plan.stripeProductId && plan.name !== 'Free' && (
                 <p className="mt-1">
                   Nobody buys it: organizations get it when you assign it, from
@@ -722,7 +723,11 @@ function RetireDialog({
         open={open}
         onOpenChange={onOpenChange}
         title={`${plan.name} can’t be retired`}
-        description={`${subscribers} organizations are on it. Deactivate it instead: it stops being offered, and those ${subscribers} keep it as they have it.`}
+        description={
+          plan.subscriberCount === 1
+            ? '1 organization is on it. Deactivate it instead: it stops being offered, and that organization keeps it as it has it.'
+            : `${subscribers} organizations are on it. Deactivate it instead: it stops being offered, and those ${subscribers} keep it as they have it.`
+        }
         confirmLabel={`Deactivate ${plan.name}`}
         destructive={false}
         onConfirm={async () => {

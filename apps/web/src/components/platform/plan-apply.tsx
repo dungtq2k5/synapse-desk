@@ -165,7 +165,7 @@ export function PlanApply({ planId }: { planId: string }) {
           <InfoIcon aria-hidden />
           <AlertTitle>Nothing has changed yet</AlertTitle>
           <AlertDescription>
-            {`This is a preview of applying ${name}’s catalog row to its ${subscribers.toLocaleString('en-US')} subscribers. ${checked}`}
+            {`This is a preview of applying ${name}’s catalog row to its ${count(subscribers, 'subscriber')}. ${checked}`}
           </AlertDescription>
         </Alert>
       )}

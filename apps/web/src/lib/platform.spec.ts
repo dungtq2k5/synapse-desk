@@ -309,6 +309,8 @@ describe('applying a plan', () => {
   it('counts with the noun’s plural', () => {
     expect(count(1, 'session')).toBe('1 session');
     expect(count(1200, 'row')).toBe('1,200 rows');
+    expect(count(1, 'person', 'people')).toBe('1 person');
+    expect(count(48, 'person', 'people')).toBe('48 people');
   });
 });
 

@@ -320,12 +320,14 @@ export function jobDetails(
 }
 
 /**
- * A number and its noun, plural unless one.
+ * A number and its noun, plural unless one; `plural` for a noun that doesn't
+ * take an s.
  *
  * @example count(1, 'session') // '1 session'
+ * @example count(48, 'person', 'people') // '48 people'
  */
-export function count(n: number, noun: string): string {
-  return `${n.toLocaleString('en-US')} ${n === 1 ? noun : `${noun}s`}`;
+export function count(n: number, noun: string, plural = `${noun}s`): string {
+  return `${n.toLocaleString('en-US')} ${n === 1 ? noun : plural}`;
 }
 
 const GIB = 1024 ** 3;

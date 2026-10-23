@@ -352,7 +352,7 @@ function PlanMix({
           rows={finance.plans.map((plan) => ({
             label: plan.planName,
             value: plan.subscribers,
-            text: `${plan.subscribers.toLocaleString('en-US')} · ${plan.seatsAllocated.toLocaleString('en-US')} seats`,
+            text: `${plan.subscribers.toLocaleString('en-US')} · ${count(plan.seatsAllocated, 'seat')}`,
           }))}
         />
       )}
@@ -432,7 +432,7 @@ function BillingEvents() {
     0,
   );
   const total = (type: string) => totals[type] ?? 0;
-  const summary = `In the last ${days.length} days: ${total(EVENTS[0][0])} new subscriptions, ${total(EVENTS[1][0])} changes, ${total(EVENTS[2][0])} cancellations and ${total(EVENTS[3][0])} failed payments. ${offboarded} organizations offboarded in this range are currently offboarded.`;
+  const summary = `In the last ${days.length} days: ${count(total(EVENTS[0][0]), 'new subscription')}, ${count(total(EVENTS[1][0]), 'change')}, ${count(total(EVENTS[2][0]), 'cancellation')} and ${count(total(EVENTS[3][0]), 'failed payment')}. ${count(offboarded, 'organization')} offboarded in this range ${offboarded === 1 ? 'is' : 'are'} currently offboarded.`;
 
   return (
     <ConsoleCard

@@ -230,7 +230,9 @@ function NewGlobalRoleDialog({
             <TriangleAlertIcon aria-hidden />
             <AlertTitle>Every organization gets it</AlertTitle>
             <AlertDescription>
-              {`${organizations === undefined ? 'All' : `All ${organizations.toLocaleString('en-US')}`} organizations see it in their roles list, and their admins can give it to anyone. It can’t be limited to some organizations.`}
+              {organizations === 1
+                ? 'The one organization sees it in its roles list, and its admins can give it to anyone. It can’t be limited to some organizations.'
+                : `${organizations === undefined ? 'All' : `All ${organizations.toLocaleString('en-US')}`} organizations see it in their roles list, and their admins can give it to anyone. It can’t be limited to some organizations.`}
             </AlertDescription>
           </Alert>
           <Field id="global-role-name" label="Name" error={error} announce>

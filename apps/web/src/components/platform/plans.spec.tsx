@@ -196,6 +196,26 @@ describe('a plan’s page', () => {
     expect(await screen.findByText('Pro can’t be retired')).toBeInTheDocument();
   });
 
+  it.each([
+    [
+      1,
+      'Pro’s 1 subscriber keeps what it has until you apply it.',
+      '1 organization is on it.',
+    ],
+    [
+      2,
+      'Pro’s 2 subscribers keep what they have until you apply it.',
+      '2 organizations are on it.',
+    ],
+  ])('%i subscriber(s): the words agree', async (n, kept, onIt) => {
+    stubApi({ [`GET ${URL_PLAN}`]: ok({ ...PLAN, subscriberCount: n }) });
+    renderSettings(<PlanEdit planId="plan-pro" />);
+    const user = userEvent.setup();
+    expect(await screen.findByText(kept, { exact: false })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Retire' }));
+    expect(screen.getByText(onIt, { exact: false })).toBeInTheDocument();
+  });
+
   it('says a plan that isn’t there isn’t available', async () => {
     stubApi({ [`GET ${URL_PLAN}`]: fail(404, 'Not found!') });
     renderSettings(<PlanEdit planId="plan-pro" />);
