@@ -87,11 +87,23 @@ export async function look(
   if (initial) await page.setViewportSize(initial);
 }
 
-/** No `serious` or `critical` axe violation on the page as it is now. */
+/**
+ * A Radix menu, dialog or listbox still playing its exit: it keeps the rest of
+ * the page `aria-hidden` until it unmounts, so axe run now reports the page's
+ * own controls as hidden and focusable.
+ */
+const CLOSING_LAYER =
+  ':is([role="menu"], [role="dialog"], [role="alertdialog"], [role="listbox"])[data-state="closed"]';
+
+/**
+ * No `serious` or `critical` axe violation on the page as it is now, once any
+ * layer that is closing has gone.
+ */
 export async function accessible(
   page: Page,
   disabled: string[] = [],
 ): Promise<void> {
+  await expect(page.locator(CLOSING_LAYER)).toHaveCount(0);
   const { violations } = await new AxeBuilder({ page })
     .disableRules(disabled)
     .analyze();
