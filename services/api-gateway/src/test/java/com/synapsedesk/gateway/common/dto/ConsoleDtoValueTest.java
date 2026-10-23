@@ -5,12 +5,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditLogResponseDto;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.PlatformAuditLogResponseDto;
 import com.synapsedesk.gateway.modules.auth.dto.rest.TwoFactorRequiredResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.DunningTenantResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlanSubscriberProjectionResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDetailResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationStatusResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.ReleasePlanDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.modules.platformjobs.dto.rest.RunJobDto;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -43,7 +46,10 @@ class ConsoleDtoValueTest {
       PlatformOrganizationDetailResponseDto.class,
       PlatformOrganizationStatusResponseDto.class,
       DunningTenantResponseDto.class,
-      PlatformAuditLogResponseDto.class
+      PlatformAuditLogResponseDto.class,
+      AssignPlanDto.class,
+      ReleasePlanDto.class,
+      UpdatePlatformOrganizationDto.class
     );
   }
 

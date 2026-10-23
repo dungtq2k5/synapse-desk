@@ -425,6 +425,12 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
             <AlertTitle>Saving changes the catalog only</AlertTitle>
             <AlertDescription>
               {`${plan.name}’s ${plan.subscriberCount.toLocaleString('en-US')} subscribers keep what they have until you apply it. After saving, preview what applying would change.`}
+              {!plan.stripeProductId && plan.name !== 'Free' && (
+                <p className="mt-1">
+                  Nobody buys it: organizations get it when you assign it, from
+                  an organization’s Plan and limits.
+                </p>
+              )}
             </AlertDescription>
           </>
         ) : (

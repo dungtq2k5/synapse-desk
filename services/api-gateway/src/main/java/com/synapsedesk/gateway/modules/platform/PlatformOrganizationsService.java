@@ -248,6 +248,8 @@ public class PlatformOrganizationsService {
         .planName(organization.getPlanName())
         .billedThroughStripe(organization.getBilledThroughStripe())
         .statusChangedAt(organization.getStatusChangedAt())
+        .entitlementsPinned(organization.getEntitlementsPinned())
+        .planAssigned(organization.getPlanAssigned())
         .usage(
           new PlatformOrganizationUsageResponseDto()
             .seats(
@@ -346,6 +348,9 @@ public class PlatformOrganizationsService {
     if (updatedMonthlyAiTokenBudget != null) {
       wire.setMonthlyAiTokenBudget(updatedMonthlyAiTokenBudget.longValue());
     }
+    if (dto.getEntitlementsPinned() != null) {
+      wire.setEntitlementsPinned(dto.getEntitlementsPinned());
+    }
 
     PlatformOrganizationResponse response = withMetadata(
       context
@@ -383,6 +388,8 @@ public class PlatformOrganizationsService {
         .planName(organization.getPlanName())
         .billedThroughStripe(organization.getBilledThroughStripe())
         .statusChangedAt(organization.getStatusChangedAt())
+        .entitlementsPinned(organization.getEntitlementsPinned())
+        .planAssigned(organization.getPlanAssigned())
         // Every session on a freeze, none otherwise.
         .revokedSessionCount(
           BigDecimal.valueOf(response.getRevokedSessionCount())
@@ -524,7 +531,9 @@ public class PlatformOrganizationsService {
         row.hasStatusChangedAt()
           ? toOffsetDateTime(row.getStatusChangedAt())
           : null
-      );
+      )
+      .entitlementsPinned(row.getEntitlementsPinned())
+      .planAssigned(row.getPlanAssigned());
   }
 
   private static OrganizationResponseDto toOrganizationResponseDto(

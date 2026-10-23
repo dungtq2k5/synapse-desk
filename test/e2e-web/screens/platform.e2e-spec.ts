@@ -4,6 +4,8 @@ import { superAdmin, superAdminSession } from '../super-admin';
 import { look } from './look';
 import {
   APPLY,
+  ASSIGN,
+  RELEASE,
   AUDIT,
   detail,
   EVENTS,
@@ -57,6 +59,7 @@ const ANSWERS: Overrides = {
   'GET /platform/organizations/org-cedar': ok(detail('org-cedar')),
   'GET /platform/organizations/org-bluebird': ok(detail('org-bluebird')),
   'GET /platform/organizations/org-lumen': ok(detail('org-lumen')),
+  'GET /platform/organizations/org-quarry': ok(detail('org-quarry')),
   'GET /platform/audit-logs': (route: Route) =>
     route.fulfill(
       ok(
@@ -337,6 +340,45 @@ test.describe('An organization', () => {
     );
     await expect(page.getByText('Pro grants 25.')).toBeVisible();
     await look(page, 'platform-organization-edit');
+  });
+
+  test('assigned: a negotiated plan, with Release', async ({ page }) => {
+    await open(page, '/platform/organizations/org-quarry', 'Quarry Labs', {
+      'GET /platform/audit-logs': ok(paged([], 0, 5)),
+    });
+    await expect(page.getByText('Quarry agreement (assigned)')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Release to self-service' }),
+    ).toBeVisible();
+    await look(page, 'platform-organization-assigned');
+  });
+
+  test('assign a plan: what it changes, and a reason', async ({ page }) => {
+    await open(page, '/platform/organizations/org-cedar', 'Cedar Clinic', {
+      'GET /platform/audit-logs': ok(paged([], 0, 5)),
+      'POST /platform/organizations/org-cedar/plan': ok(ASSIGN),
+    });
+    await page.getByRole('button', { name: 'Assign a plan' }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByRole('combobox', { name: 'Plan' }).click();
+    await page.getByRole('option', { name: 'Quarry agreement' }).click();
+    await expect(dialog.getByText('Seats 10 → 60')).toBeVisible();
+    await dialog.getByLabel('Reason').fill('Signed a three-year agreement.');
+    await look(page, 'platform-organization-assign-dialog');
+  });
+
+  test('release: back to the free tier, over a limit', async ({ page }) => {
+    await open(page, '/platform/organizations/org-quarry', 'Quarry Labs', {
+      'GET /platform/audit-logs': ok(paged([], 0, 5)),
+      'DELETE /platform/organizations/org-quarry/plan': ok(RELEASE),
+    });
+    await page.getByRole('button', { name: 'Release to self-service' }).click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(
+      dialog.getByText('Quarry Labs will be over a limit after this'),
+    ).toBeVisible();
+    await dialog.getByLabel('Reason').fill('The agreement ended.');
+    await look(page, 'platform-organization-release-dialog');
   });
 
   test('reset the billing cycle: break glass, with a reason', async ({

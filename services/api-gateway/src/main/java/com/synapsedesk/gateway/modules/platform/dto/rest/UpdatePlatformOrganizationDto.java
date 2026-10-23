@@ -25,6 +25,8 @@ public class UpdatePlatformOrganizationDto {
 
   private @Nullable BigDecimal monthlyAiTokenBudget;
 
+  private @Nullable Boolean entitlementsPinned;
+
   public UpdatePlatformOrganizationDto name(@Nullable String name) {
     this.name = name;
     return this;
@@ -159,6 +161,27 @@ public class UpdatePlatformOrganizationDto {
     this.monthlyAiTokenBudget = monthlyAiTokenBudget;
   }
 
+  public UpdatePlatformOrganizationDto entitlementsPinned(
+    @Nullable Boolean entitlementsPinned
+  ) {
+    this.entitlementsPinned = entitlementsPinned;
+    return this;
+  }
+
+  /**
+   * Get entitlementsPinned
+   * @return entitlementsPinned
+   */
+  @JsonProperty("entitlementsPinned")
+  public @Nullable Boolean getEntitlementsPinned() {
+    return entitlementsPinned;
+  }
+
+  @JsonProperty("entitlementsPinned")
+  public void setEntitlementsPinned(@Nullable Boolean entitlementsPinned) {
+    this.entitlementsPinned = entitlementsPinned;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -184,6 +207,10 @@ public class UpdatePlatformOrganizationDto {
       Objects.equals(
         this.monthlyAiTokenBudget,
         updatePlatformOrganizationDto.monthlyAiTokenBudget
+      ) &&
+      Objects.equals(
+        this.entitlementsPinned,
+        updatePlatformOrganizationDto.entitlementsPinned
       )
     );
   }
@@ -196,7 +223,8 @@ public class UpdatePlatformOrganizationDto {
       domain,
       maxAgentSeats,
       maxStorageBytes,
-      monthlyAiTokenBudget
+      monthlyAiTokenBudget,
+      entitlementsPinned
     );
   }
 
@@ -215,6 +243,9 @@ public class UpdatePlatformOrganizationDto {
       .append("\n");
     sb.append("    monthlyAiTokenBudget: ")
       .append(toIndentedString(monthlyAiTokenBudget))
+      .append("\n");
+    sb.append("    entitlementsPinned: ")
+      .append(toIndentedString(entitlementsPinned))
       .append("\n");
     sb.append("}");
     return sb.toString();

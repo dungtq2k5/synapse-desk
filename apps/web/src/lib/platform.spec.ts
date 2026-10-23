@@ -311,3 +311,46 @@ describe('applying a plan', () => {
     expect(count(1200, 'row')).toBe('1,200 rows');
   });
 });
+
+describe('assigning and releasing a plan', () => {
+  it('words the two actions in the trail and on the organization’s page', () => {
+    expect(platformActionWords('PLATFORM_PLAN_ASSIGNED')).toBe(
+      'Assigned a plan',
+    );
+    expect(platformActionWords('PLATFORM_PLAN_RELEASED')).toBe(
+      'Released to self-service',
+    );
+    expect(
+      organizationAct('PLATFORM_PLAN_ASSIGNED', {
+        planName: 'Quarry agreement',
+      }),
+    ).toBe('Assigned it Quarry agreement');
+    expect(organizationAct('PLATFORM_PLAN_RELEASED', {})).toBe(
+      'Released it to self-service',
+    );
+    expect(
+      aboutOf({
+        action: 'PLATFORM_PLAN_ASSIGNED',
+        resourceType: 'ORGANIZATION',
+        resourceId: 'org-1',
+        resourceName: 'Quarry Labs',
+        metadata: { planName: 'Quarry agreement' },
+      }).details,
+    ).toBe('Plan: Quarry agreement');
+  });
+
+  it('says when an edit pinned or unpinned the limits', () => {
+    expect(
+      changedFields({
+        before: { entitlementsPinned: false },
+        after: { entitlementsPinned: true },
+      }),
+    ).toBe('limits pinned');
+    expect(
+      changedFields({
+        before: { maxAgentSeats: 25, entitlementsPinned: true },
+        after: { maxAgentSeats: 30, entitlementsPinned: false },
+      }),
+    ).toBe('seats 25 → 30, limits unpinned');
+  });
+});

@@ -229,17 +229,19 @@ test('offboard and restore an organization: its address and domain are still its
   );
 });
 
-test('create a plan with a Stripe price, then apply it: the preview names who’d be over a limit', async ({
+test('create a negotiated plan, assign it, apply an edit, release: each preview names who’d be over a limit', async ({
   page,
 }) => {
   const found = await tenant('platform-apply');
   const organization = await organizationOf(found);
   const admin = await superAdmin('plans');
   await freeSparePrice();
+  await offAnyPlan(organization.id);
   await consoleSignIn(page, admin);
 
   await page.goto('/platform/plans/new');
-  await page.getByLabel('Name').fill(`Team ${Date.now()}`);
+  const name = `Team ${Date.now()}`;
+  await page.getByLabel('Name').fill(name);
   for (const [label, value] of [
     ['Seats', '1'],
     ['Document storage (GB)', '5'],
@@ -261,9 +263,25 @@ test('create a plan with a Stripe price, then apply it: the preview names who’
   await expect(page.getByRole('cell', { name: '$49.00' })).toBeVisible();
   const planId = page.url().split('/').pop()!;
 
-  // An organization on it, as a subscription would leave it: the console has
-  // no assign action.
-  await onPlan(organization.id, planId);
+  // Assigned from the organization's page: one seat is fewer than it uses.
+  await page.goto(`/platform/organizations/${organization.id}`);
+  await page.getByRole('button', { name: 'Assign a plan' }).click();
+  const assign = page.getByRole('alertdialog');
+  await assign.getByRole('combobox', { name: 'Plan' }).click();
+  await page.getByRole('option', { name, exact: true }).click();
+  await expect(
+    assign.getByText(`${organization.name} will be over a limit after this`),
+  ).toBeVisible();
+  await assign.getByLabel('Reason').fill('Signed a negotiated agreement.');
+  await assign.getByRole('button', { name: `Assign ${name}` }).click();
+  const limits = page.getByRole('region', { name: 'Plan and limits' });
+  await expect(limits).toContainText(`${name} (assigned)`);
+
+  // The plan edited and applied: the preview names it, and its limits follow.
+  await page.goto(`/platform/plans/${planId}`);
+  await page.getByLabel('Document storage (GB)', { exact: true }).fill('6');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(`${name} is saved`)).toBeVisible();
   await page.getByRole('link', { name: 'Preview applying' }).click();
   await expect(page.getByText('Nothing has changed yet')).toBeVisible();
   await expect(page.getByText(/will be over a limit after this/)).toBeVisible();
@@ -273,15 +291,31 @@ test('create a plan with a Stripe price, then apply it: the preview names who’
   await expect(
     page.getByRole('table').getByText(/^Seats: \d+ in use, the plan grants 1$/),
   ).toBeVisible();
-
   await page
-    .getByRole('button', { name: /^Apply Team \d+ to 1 organization$/ })
+    .getByRole('button', { name: `Apply ${name} to 1 organization` })
     .click();
   await page
     .getByRole('alertdialog')
-    .getByRole('button', { name: /^Apply Team \d+ to 1 organization$/ })
+    .getByRole('button', { name: `Apply ${name} to 1 organization` })
     .click();
   await expect(page.getByText(/is applied$/)).toBeVisible();
+  await page.goto(`/platform/organizations/${organization.id}`);
+  await expect(
+    limits.locator('dt:text-is("Document storage") + dd'),
+  ).toHaveText('6 GB');
+
+  // Released to self-service: the free tier, and Assign is offered again.
+  await page.getByRole('button', { name: 'Release to self-service' }).click();
+  const release = page.getByRole('alertdialog');
+  await expect(release.getByText('What changes')).toBeVisible();
+  await release.getByLabel('Reason').fill('The agreement ended.');
+  await release
+    .getByRole('button', { name: `Release ${organization.name}` })
+    .click();
+  await expect(limits).toContainText('Free');
+  await expect(
+    page.getByRole('button', { name: 'Assign a plan' }),
+  ).toBeVisible();
 });
 
 /**
@@ -301,14 +335,18 @@ async function freeSparePrice(): Promise<void> {
   }
 }
 
-async function onPlan(organizationId: string, planId: string): Promise<void> {
+/**
+ * The organization back on no plan, whichever an earlier run left it on: a
+ * failed run doesn't reach its release.
+ */
+async function offAnyPlan(organizationId: string): Promise<void> {
   const prisma = new AuthPrisma({
     adapter: new PrismaPg({ connectionString: databaseUrl('auth-service') }),
   });
   try {
     await prisma.organization.update({
       where: { id: organizationId },
-      data: { planId },
+      data: { planId: null },
     });
   } finally {
     await prisma.$disconnect();

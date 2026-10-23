@@ -8,10 +8,12 @@ import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.DeletePlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlanSubscriberProjectionResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.ReleasePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SubscriptionPlanPriceResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SubscriptionPlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.UpdatePlanDto;
@@ -37,6 +39,7 @@ import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.Platform.ApplyPlanRequest;
 import synapsedesk.auth.Platform.ApplyPlanResponse;
+import synapsedesk.auth.Platform.AssignPlanRequest;
 import synapsedesk.auth.Platform.CreatePlanPriceInput;
 import synapsedesk.auth.Platform.CreatePlanRequest;
 import synapsedesk.auth.Platform.DeletePlanResponse;
@@ -44,6 +47,7 @@ import synapsedesk.auth.Platform.ListPlansRequest;
 import synapsedesk.auth.Platform.ListPlansResponse;
 import synapsedesk.auth.Platform.PlanIdRequest;
 import synapsedesk.auth.Platform.PlanSubscriberProjection;
+import synapsedesk.auth.Platform.ReleasePlanRequest;
 import synapsedesk.auth.Platform.SubscriptionPlanResponse;
 import synapsedesk.auth.Platform.UpdatePlanRequest;
 import synapsedesk.auth.PlatformServiceGrpc;
@@ -53,8 +57,9 @@ import synapsedesk.ingestion.Platform.PlatformUsageResponse;
 import synapsedesk.ingestion.Platform.TenantUsage;
 
 /**
- * `PlatformApi`'s plan-catalogue group (6 of 20 operations) — the third and
- * final sub-pass across this interface.
+ * `PlatformApi`'s plan-catalog group, and assigning and releasing an
+ * organization's negotiated plan — the third and final sub-pass across this
+ * interface.
  *
  * <p><b>{@code applyPlan}'s usage leg degrades, never refuses.</b> An
  * unreachable ingestion-service answers the un-enriched projection, not an
@@ -310,6 +315,58 @@ public class PlatformPlansService {
         .build()
     );
 
+    return composed(response, context);
+  }
+
+  /**
+   * One organization onto a negotiated plan, or its preview, in apply's shape
+   * and composed the same way: storage and documents from ingestion. Auth
+   * requires the reason on the real call; a dry run may leave it out.
+   */
+  public ResponseEntity<ApiResponse<ApplyPlanResponseDto>> assignPlan(
+    RequestContext context,
+    String organizationId,
+    AssignPlanDto dto,
+    Boolean dryRun
+  ) {
+    superAdminCheck.require(context);
+
+    ApplyPlanResponse response = withMetadata(context).assignPlan(
+      AssignPlanRequest.newBuilder()
+        .setOrganizationId(organizationId)
+        .setPlanId(dto.getPlanId().toString())
+        .setReason(dto.getReason() == null ? "" : dto.getReason())
+        .setDryRun(dryRun != null && dryRun)
+        .build()
+    );
+
+    return composed(response, context);
+  }
+
+  /** An assigned organization back to self-service, or its preview. */
+  public ResponseEntity<ApiResponse<ApplyPlanResponseDto>> releasePlan(
+    RequestContext context,
+    String organizationId,
+    ReleasePlanDto dto,
+    Boolean dryRun
+  ) {
+    superAdminCheck.require(context);
+
+    ApplyPlanResponse response = withMetadata(context).releasePlan(
+      ReleasePlanRequest.newBuilder()
+        .setOrganizationId(organizationId)
+        .setReason(dto.getReason() == null ? "" : dto.getReason())
+        .setDryRun(dryRun != null && dryRun)
+        .build()
+    );
+
+    return composed(response, context);
+  }
+
+  private ResponseEntity<ApiResponse<ApplyPlanResponseDto>> composed(
+    ApplyPlanResponse response,
+    RequestContext context
+  ) {
     ApplyPlanResponseDto projection = toApplyPlanResponseDto(response);
 
     List<String> organizationIds = response

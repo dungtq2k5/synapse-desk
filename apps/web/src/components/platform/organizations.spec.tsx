@@ -46,6 +46,8 @@ const DETAIL = {
   deletedAt: null,
   planName: 'Pro',
   billedThroughStripe: true,
+  entitlementsPinned: false,
+  planAssigned: false,
   statusChangedAt: null,
   usage: {},
 };
@@ -91,6 +93,23 @@ describe('editing an organization', () => {
     );
     expect(calls.find((call) => call.method === 'PATCH')?.body).toEqual({
       maxAgentSeats: 30,
+    });
+  });
+
+  it('pins the limits only when the switch changed', async () => {
+    const calls = stubApi(routes());
+    renderSettings(<OrganizationEdit organizationId={ORG} />);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole('switch', {
+        name: 'Keep these limits when Stripe’s events arrive',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(calls.find((call) => call.method === 'PATCH')?.body).toEqual({
+      entitlementsPinned: true,
     });
   });
 

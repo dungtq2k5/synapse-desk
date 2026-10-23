@@ -41,6 +41,8 @@ type Org = {
   ai?: number;
   analytics?: number;
   since?: string;
+  /** A Super Admin pinned its limits. */
+  pinned?: boolean;
 };
 
 const ORGS: Org[] = [
@@ -197,6 +199,8 @@ export function organization(
     deletedAt: org.left ? at(org.left) : null,
     planName: org.plan,
     billedThroughStripe: org.stripe,
+    entitlementsPinned: org.pinned ?? false,
+    planAssigned: !org.stripe && !!org.plan && org.plan !== 'Free',
     statusChangedAt: org.since ? at(org.since) : null,
   };
 }
@@ -990,3 +994,35 @@ export const NORTHWIND_ACTS: PlatformAuditLogResponseDto[] = [
     { slug: 'northwind-health' },
   ),
 ];
+
+/** Assigning Quarry agreement to Cedar Clinic: within every limit. */
+export const ASSIGN: ApplyPlanResponseDto = {
+  subscribers: [
+    subscriber('org-cedar', 'Cedar Clinic', {
+      maxAgentSeats: '10 -> 60',
+      maxStorageBytes: `${10 * GIB} -> ${200 * GIB}`,
+    }),
+  ],
+  dryRun: true,
+  changedCount: 1,
+  skippedPinnedCount: 0,
+  overLimitCount: 0,
+  evaluatedDimensions: ['seats', 'storage', 'documents'],
+};
+
+/** Releasing Quarry Labs to the free tier: its people outnumber the seats. */
+export const RELEASE: ApplyPlanResponseDto = {
+  subscribers: [
+    subscriber(
+      'org-quarry',
+      'Quarry Labs',
+      { maxAgentSeats: '60 -> 3' },
+      { overLimitItems: [{ dimension: 'SEATS', inUse: 48, allowed: 3 }] },
+    ),
+  ],
+  dryRun: true,
+  changedCount: 1,
+  skippedPinnedCount: 0,
+  overLimitCount: 1,
+  evaluatedDimensions: ['seats', 'storage', 'documents'],
+};

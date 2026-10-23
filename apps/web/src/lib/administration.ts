@@ -200,6 +200,10 @@ export const AUDIT_ACTION_WORDS: Record<AuditAction, string> = {
     'SynapseDesk changed the organization’s plan',
   [AuditAction.PLATFORM_JOB_RUN]: 'SynapseDesk ran a job',
   [AuditAction.PLATFORM_JOB_BACKFILLED]: 'SynapseDesk recomputed a job’s range',
+  [AuditAction.PLATFORM_PLAN_ASSIGNED]:
+    'SynapseDesk put the organization on a negotiated plan',
+  [AuditAction.PLATFORM_PLAN_RELEASED]:
+    'SynapseDesk released the organization to self-service',
   [AuditAction.INVITATION_SENT]: 'Invited a person',
   [AuditAction.INVITATION_RESENT]: 'Resent an invitation',
   [AuditAction.INVITATION_REVOKED]: 'Revoked an invitation',

@@ -10,11 +10,14 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronRightIcon,
+  HandshakeIcon,
   HardDriveIcon,
   PencilIcon,
+  PinIcon,
   RotateCcwIcon,
   SparklesIcon,
   TriangleAlertIcon,
+  UndoIcon,
   UserSearchIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -52,8 +55,10 @@ import {
   RestoreDialog,
   StatusDialog,
 } from './organization-dialogs';
+import { AssignPlanDialog, ReleasePlanDialog } from './plan-assignment-dialogs';
 
-type Dialog = 'status' | 'reset' | 'offboard' | 'restore' | null;
+type Dialog =
+  'status' | 'reset' | 'offboard' | 'restore' | 'assign' | 'release' | null;
 
 const linkClass =
   'inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline';
@@ -230,7 +235,12 @@ export function OrganizationView({
             ]}
           />
         </ConsoleCard>
-        <PlanAndLimits data={data} offboarded={offboarded} />
+        <PlanAndLimits
+          data={data}
+          offboarded={offboarded}
+          onAssign={() => setDialog('assign')}
+          onRelease={() => setDialog('release')}
+        />
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <Usage data={data} onRetry={() => void detail.refetch()} />
@@ -302,6 +312,19 @@ export function OrganizationView({
           refresh();
         }}
       />
+      <AssignPlanDialog
+        organization={subject}
+        open={dialog === 'assign'}
+        onOpenChange={(open) => setDialog(open ? 'assign' : null)}
+        onAssigned={refresh}
+      />
+      <ReleasePlanDialog
+        organization={subject}
+        planName={data.planName ?? 'its plan'}
+        open={dialog === 'release'}
+        onOpenChange={(open) => setDialog(open ? 'release' : null)}
+        onReleased={refresh}
+      />
       <RestoreDialog
         organization={subject}
         open={dialog === 'restore'}
@@ -334,14 +357,19 @@ export function statusLine(
 function PlanAndLimits({
   data,
   offboarded,
+  onAssign,
+  onRelease,
 }: {
   data: PlatformOrganizationDetailResponseDto;
   offboarded: boolean;
+  onAssign: () => void;
+  onRelease: () => void;
 }) {
   const organization = data.organization;
-  const plan = data.planName
-    ? `${data.planName} (${data.billedThroughStripe ? 'Stripe' : 'assigned'})`
-    : 'Free (assigned)';
+  const plan = planLabel(data);
+  // A Stripe subscription's plan is chosen in Billing, never assigned here.
+  const canAssign = !data.billedThroughStripe && !data.planAssigned;
+  const canRelease = !data.billedThroughStripe && data.planAssigned;
   return (
     <ConsoleCard title="Plan and limits">
       <Facts
@@ -357,26 +385,65 @@ function PlanAndLimits({
           ['Billing cycle started', dayDate(organization.billingCycleStart)],
         ]}
       />
-      {data.billedThroughStripe && (
+      {data.entitlementsPinned ? (
+        <p className="flex items-start gap-2 text-sm text-warning-subtle-foreground">
+          <PinIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+          Pinned: Stripe’s events and applying its plan leave these as they are.
+        </p>
+      ) : data.billedThroughStripe ? (
         <p className="flex items-start gap-2 text-sm text-warning-subtle-foreground">
           <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
           Stripe sets these. A change here lasts until its next Stripe event.
         </p>
-      )}
+      ) : data.planAssigned ? (
+        <p className="text-sm text-muted-foreground">
+          Assigned by the platform: checkout is closed to it until it’s
+          released.
+        </p>
+      ) : null}
       {!offboarded && (
-        <Link
-          href={`/platform/organizations/${organization.id}/edit#limits`}
-          className={cn(
-            buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'self-start md:self-end',
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          {canAssign && (
+            <Button variant="outline" size="sm" onClick={onAssign}>
+              <HandshakeIcon aria-hidden />
+              Assign a plan
+            </Button>
           )}
-        >
-          <PencilIcon aria-hidden />
-          Edit limits
-        </Link>
+          {canRelease && (
+            <Button variant="outline" size="sm" onClick={onRelease}>
+              <UndoIcon aria-hidden />
+              Release to self-service
+            </Button>
+          )}
+          <Link
+            href={`/platform/organizations/${organization.id}/edit#limits`}
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'sm' }),
+              'self-start md:self-end',
+            )}
+          >
+            <PencilIcon aria-hidden />
+            Edit limits
+          </Link>
+        </div>
       )}
     </ConsoleCard>
   );
+}
+
+/**
+ * The plan in words: Stripe's, assigned by the platform, or Free.
+ *
+ * @example planLabel({ planName: 'Pro', billedThroughStripe: true, planAssigned: false }) // 'Pro (Stripe)'
+ */
+export function planLabel(data: {
+  planName?: string | null;
+  billedThroughStripe: boolean;
+  planAssigned: boolean;
+}): string {
+  if (!data.planName) return 'Free';
+  if (data.billedThroughStripe) return `${data.planName} (Stripe)`;
+  return data.planAssigned ? `${data.planName} (assigned)` : data.planName;
 }
 
 /** Its meters this billing period, the same its admins see. Seats aren't people. */

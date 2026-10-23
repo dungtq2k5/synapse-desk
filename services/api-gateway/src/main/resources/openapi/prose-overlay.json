@@ -720,6 +720,12 @@
     },
     "PUT /api/v1/users/{id}/roles": {
       "summary": "Set roles"
+    },
+    "POST /api/v1/platform/organizations/{id}/plan": {
+      "summary": "Assign a negotiated plan (or dry-run it)"
+    },
+    "DELETE /api/v1/platform/organizations/{id}/plan": {
+      "summary": "Release an assigned plan (or dry-run it)"
     }
   },
   "parameters": {
@@ -1634,6 +1640,33 @@
     },
     "PlatformOrganizationStatusResponseDto.statusChangedAt": {
       "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+    },
+    "PlatformOrganizationResponseDto.entitlementsPinned": {
+      "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+    },
+    "PlatformOrganizationResponseDto.planAssigned": {
+      "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+    },
+    "PlatformOrganizationDetailResponseDto.entitlementsPinned": {
+      "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+    },
+    "PlatformOrganizationDetailResponseDto.planAssigned": {
+      "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+    },
+    "PlatformOrganizationStatusResponseDto.entitlementsPinned": {
+      "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+    },
+    "PlatformOrganizationStatusResponseDto.planAssigned": {
+      "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+    },
+    "UpdatePlatformOrganizationDto.entitlementsPinned": {
+      "description": "Keep these limits when Stripe's events arrive (true), or let the next one\nwrite the plan's grants back (false). Absent leaves the pin as it is."
+    },
+    "AssignPlanDto.reason": {
+      "description": "Recorded in the audit log, with who assigned it. Required to assign; a\ndry run may leave it out."
+    },
+    "ReleasePlanDto.reason": {
+      "description": "Recorded in the audit log, with who released it. Required to release; a\ndry run may leave it out."
     }
   }
 }

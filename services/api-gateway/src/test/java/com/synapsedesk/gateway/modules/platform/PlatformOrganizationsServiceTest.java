@@ -256,6 +256,24 @@ class PlatformOrganizationsServiceTest {
     assertThat(captor.getValue().hasMaxAgentSeats()).isFalse();
     assertThat(captor.getValue().hasMaxStorageBytes()).isFalse();
     assertThat(captor.getValue().hasMonthlyAiTokenBudget()).isFalse();
+    assertThat(captor.getValue().hasEntitlementsPinned()).isFalse();
+  }
+
+  @Test
+  void aPinSentIsForwardedEvenWhenItClearsThePin() {
+    when(stub.updateOrganization(any())).thenReturn(reply());
+
+    service.updateOrganization(
+      context(),
+      "org-1",
+      new UpdatePlatformOrganizationDto().entitlementsPinned(false)
+    );
+
+    ArgumentCaptor<UpdatePlatformOrganizationRequest> captor =
+      ArgumentCaptor.forClass(UpdatePlatformOrganizationRequest.class);
+    verify(stub).updateOrganization(captor.capture());
+    assertThat(captor.getValue().hasEntitlementsPinned()).isTrue();
+    assertThat(captor.getValue().getEntitlementsPinned()).isFalse();
   }
 
   @Test
@@ -395,6 +413,56 @@ class PlatformOrganizationsServiceTest {
     assertThat(data.getPlanName()).isEqualTo("Pro");
     assertThat(data.getBilledThroughStripe()).isTrue();
     assertThat(data.getStatusChangedAt()).hasToString("2025-09-01T00:00Z");
+  }
+
+  @Test
+  void anOrganizationSaysWhetherItIsPinnedAndOnAnAssignedPlan() {
+    when(stub.updateOrganization(any())).thenReturn(
+      reply()
+        .toBuilder()
+        .setEntitlementsPinned(true)
+        .setPlanAssigned(true)
+        .build()
+    );
+    when(stub.setOrganizationStatus(any())).thenReturn(
+      reply().toBuilder().setPlanAssigned(true).build()
+    );
+    when(stub.getOrganization(any())).thenReturn(
+      reply().toBuilder().setEntitlementsPinned(true).build()
+    );
+    when(stub.getOrganizationUsage(any())).thenThrow(
+      io.grpc.Status.UNAVAILABLE.asRuntimeException()
+    );
+    when(usageStub.getPlatformUsage(any())).thenThrow(
+      io.grpc.Status.UNAVAILABLE.asRuntimeException()
+    );
+    var status =
+      new com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto();
+    status.setStatus(
+      com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto.StatusEnum.ACTIVE
+    );
+    status.setReason("paid");
+
+    var updated = service
+      .updateOrganization(
+        context(),
+        "org-9",
+        new UpdatePlatformOrganizationDto()
+      )
+      .getBody()
+      .data();
+    var changed = service
+      .setStatus(context(), "org-9", status)
+      .getBody()
+      .data();
+    var detail = service.getOrganization(context(), "org-9").getBody().data();
+
+    assertThat(updated.getEntitlementsPinned()).isTrue();
+    assertThat(updated.getPlanAssigned()).isTrue();
+    assertThat(changed.getEntitlementsPinned()).isFalse();
+    assertThat(changed.getPlanAssigned()).isTrue();
+    assertThat(detail.getEntitlementsPinned()).isTrue();
+    assertThat(detail.getPlanAssigned()).isFalse();
   }
 
   @Test

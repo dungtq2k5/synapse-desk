@@ -197,6 +197,8 @@ export const PLATFORM_ACTION_WORDS: Record<string, string> = {
   PLATFORM_PLAN_APPLIED: 'Applied a plan',
   PLATFORM_JOB_RUN: 'Ran a job',
   PLATFORM_JOB_BACKFILLED: 'Recomputed a job’s range',
+  PLATFORM_PLAN_ASSIGNED: 'Assigned a plan',
+  PLATFORM_PLAN_RELEASED: 'Released to self-service',
 };
 
 export function platformActionWords(action: string | null | undefined): string {
@@ -220,6 +222,8 @@ export const ORGANIZATION_ACT_WORDS: Record<string, string> = {
   PLATFORM_BILLING_CYCLE_RESET: 'Reset its billing cycle',
   PLATFORM_ORGANIZATION_OFFBOARDED: 'Offboarded it',
   PLATFORM_ORGANIZATION_RESTORED: 'Restored it',
+  PLATFORM_PLAN_ASSIGNED: 'Assigned it',
+  PLATFORM_PLAN_RELEASED: 'Released it to self-service',
 };
 
 /**
@@ -239,6 +243,12 @@ export function organizationAct(
     const to = STATUS_WORDS[metadata?.to as ConsoleStatus];
     if (from && to) return `${words}: ${from} → ${to}`;
   }
+  if (
+    action === 'PLATFORM_PLAN_ASSIGNED' &&
+    typeof metadata?.planName === 'string'
+  ) {
+    return `${words} ${metadata.planName}`;
+  }
   if (action === 'PLATFORM_ORGANIZATION_UPDATED') {
     const what = changedFields(metadata);
     if (what) return `${words}: ${what}`;
@@ -256,6 +266,7 @@ const FIELD_WORDS: Record<string, string> = {
  * "seats 25 → 30": what an edit changed, from the entry's before and after.
  *
  * @example changedFields({ before: { maxAgentSeats: 25 }, after: { maxAgentSeats: 30 } }) // 'seats 25 → 30'
+ * @example changedFields({ before: { entitlementsPinned: false }, after: { entitlementsPinned: true } }) // 'limits pinned'
  */
 export function changedFields(
   metadata: Record<string, unknown> | null | undefined,
@@ -268,6 +279,12 @@ export function changedFields(
       (key) =>
         `${FIELD_WORDS[key]} ${String(before[key])} → ${String(after[key])}`,
     );
+  if (
+    'entitlementsPinned' in after &&
+    before.entitlementsPinned !== after.entitlementsPinned
+  ) {
+    words.push(after.entitlementsPinned ? 'limits pinned' : 'limits unpinned');
+  }
   return words.length ? words.join(', ') : null;
 }
 
@@ -455,7 +472,11 @@ export function aboutOf(entry: Entry, organizationName?: string | null): About {
                 .join(' · ')
             : entry.action === 'PLATFORM_ORGANIZATION_UPDATED'
               ? changedFields(metadata)
-              : sessions;
+              : (entry.action === 'PLATFORM_PLAN_ASSIGNED' ||
+                    entry.action === 'PLATFORM_PLAN_RELEASED') &&
+                  typeof metadata.planName === 'string'
+                ? `Plan: ${metadata.planName}`
+                : sessions;
       return {
         name: name('An organization'),
         href: entry.resourceId

@@ -13,23 +13,28 @@ import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanPriceDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.ReleasePlanDto;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Platform.ApplyPlanResponse;
+import synapsedesk.auth.Platform.AssignPlanRequest;
 import synapsedesk.auth.Platform.PlanSubscriberProjection;
+import synapsedesk.auth.Platform.ReleasePlanRequest;
 import synapsedesk.auth.PlatformServiceGrpc;
 import synapsedesk.ingestion.IngestionPlatformServiceGrpc;
 import synapsedesk.ingestion.Platform.PlatformUsageResponse;
 import synapsedesk.ingestion.Platform.TenantUsage;
 
 /**
- * `PlatformApi`'s plan-catalogue group (group 3 of 3). Sharpest property:
+ * `PlatformApi`'s plan-catalog group (group 3 of 3). Sharpest property:
  * {@code applyPlan}'s usage leg DEGRADES on failure — it never refuses the
  * write, because the leg only annotates the projection with current
  * consumption, and auth-service's own grant computation (seats, storage,
@@ -317,6 +322,131 @@ class PlatformPlansServiceTest {
 
     // A limit gates the NEXT addition, not tenure at exactly the ceiling.
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();
+  }
+
+  @Test
+  void assigningForwardsTheOrganizationPlanAndReasonAndComposesLikeApply() {
+    when(stub.assignPlan(any())).thenReturn(oneSubscriber());
+    when(usageStub.getPlatformUsage(any())).thenReturn(overStorage());
+
+    var data = service
+      .assignPlan(
+        context(),
+        "org-1",
+        new AssignPlanDto()
+          .planId(new java.util.UUID(0, 7))
+          .reason("Signed the agreement"),
+        true
+      )
+      .getBody()
+      .data();
+
+    var captor = ArgumentCaptor.forClass(AssignPlanRequest.class);
+    verify(stub).assignPlan(captor.capture());
+    assertThat(captor.getValue().getOrganizationId()).isEqualTo("org-1");
+    assertThat(captor.getValue().getPlanId()).isEqualTo(
+      new java.util.UUID(0, 7).toString()
+    );
+    assertThat(captor.getValue().getReason()).isEqualTo("Signed the agreement");
+    assertThat(captor.getValue().getDryRun()).isTrue();
+    assertThat(data.getEvaluatedDimensions()).contains("storage", "documents");
+    assertThat(data.getOverLimitCount()).isEqualTo(java.math.BigDecimal.ONE);
+  }
+
+  @Test
+  void aPreviewWithNoReasonSendsAnEmptyOne() {
+    when(stub.assignPlan(any())).thenReturn(oneSubscriber());
+    when(stub.releasePlan(any())).thenReturn(oneSubscriber());
+    when(usageStub.getPlatformUsage(any())).thenReturn(overStorage());
+
+    service.assignPlan(
+      context(),
+      "org-1",
+      new AssignPlanDto().planId(new java.util.UUID(0, 7)),
+      null
+    );
+    service.releasePlan(context(), "org-1", new ReleasePlanDto(), null);
+
+    var assign = ArgumentCaptor.forClass(AssignPlanRequest.class);
+    verify(stub).assignPlan(assign.capture());
+    assertThat(assign.getValue().getReason()).isEmpty();
+    assertThat(assign.getValue().getDryRun()).isFalse();
+    var release = ArgumentCaptor.forClass(ReleasePlanRequest.class);
+    verify(stub).releasePlan(release.capture());
+    assertThat(release.getValue().getReason()).isEmpty();
+  }
+
+  @Test
+  void releasingForwardsTheOrganizationAndReasonAndComposesLikeApply() {
+    when(stub.releasePlan(any())).thenReturn(oneSubscriber());
+    when(usageStub.getPlatformUsage(any())).thenReturn(overStorage());
+
+    var data = service
+      .releasePlan(
+        context(),
+        "org-1",
+        new ReleasePlanDto().reason("Self-service"),
+        false
+      )
+      .getBody()
+      .data();
+
+    var captor = ArgumentCaptor.forClass(ReleasePlanRequest.class);
+    verify(stub).releasePlan(captor.capture());
+    assertThat(captor.getValue().getOrganizationId()).isEqualTo("org-1");
+    assertThat(captor.getValue().getReason()).isEqualTo("Self-service");
+    assertThat(captor.getValue().getDryRun()).isFalse();
+    assertThat(data.getOverLimitCount()).isEqualTo(java.math.BigDecimal.ONE);
+  }
+
+  @Test
+  void assigningAndReleasingRefuseBeforeTouchingThePeerWhenTheCheckFails() {
+    org.mockito.Mockito.doThrow(new IllegalStateException("not a super admin"))
+      .when(superAdminCheck)
+      .require(any());
+
+    assertThatThrownBy(() ->
+      service.assignPlan(
+        context(),
+        "org-1",
+        new AssignPlanDto().planId(new java.util.UUID(0, 7)),
+        true
+      )
+    ).hasMessage("not a super admin");
+    assertThatThrownBy(() ->
+      service.releasePlan(context(), "org-1", new ReleasePlanDto(), true)
+    ).hasMessage("not a super admin");
+    org.mockito.Mockito.verifyNoInteractions(usageStub);
+    org.mockito.Mockito.verify(stub, org.mockito.Mockito.never()).assignPlan(
+      any()
+    );
+    org.mockito.Mockito.verify(stub, org.mockito.Mockito.never()).releasePlan(
+      any()
+    );
+  }
+
+  private static ApplyPlanResponse oneSubscriber() {
+    return ApplyPlanResponse.newBuilder()
+      .addSubscribers(
+        PlanSubscriberProjection.newBuilder()
+          .setOrganizationId("org-1")
+          .setOrganizationName("Acme")
+          .putChanges("maxStorageBytes", "20 -> 10")
+          .putAfter("maxStorageBytes", 10)
+          .build()
+      )
+      .setDryRun(true)
+      .setChangedCount(1)
+      .addEvaluatedDimensions("seats")
+      .build();
+  }
+
+  private static PlatformUsageResponse overStorage() {
+    return PlatformUsageResponse.newBuilder()
+      .addUsage(
+        TenantUsage.newBuilder().setOrganizationId("org-1").setUsedBytes(15)
+      )
+      .build();
   }
 
   @Test

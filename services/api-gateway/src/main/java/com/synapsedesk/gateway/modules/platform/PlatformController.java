@@ -14,6 +14,7 @@ import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OffboardResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.BillingEventsResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreateGlobalRoleDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
@@ -30,6 +31,7 @@ import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationDet
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformOrganizationStatusResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.PlatformUserResponseDto;
+import com.synapsedesk.gateway.modules.platform.dto.rest.ReleasePlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ResetBillingCycleDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.SubscriptionPlanResponseDto;
@@ -270,6 +272,73 @@ public class PlatformController {
     ApiResponse<PlatformOrganizationResponseDto>
   > platformControllerRestoreV1(@PathVariable("id") String id) {
     return organizations.restore(context(), id);
+  }
+
+  /**
+   * Puts an organization on a negotiated plan (no Stripe product, not Free),
+   * or previews it with `?dryRun=true`. Answered in apply's shape, one
+   * subscriber; over a limit still goes through.
+   */
+  @PostMapping(
+    value = "/platform/organizations/{id}/plan",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors(
+    value = { "400", "401", "404", "409" },
+    descriptions = {
+      @ApiErrors.Description(
+        status = "400",
+        value = "The plan is sold through Stripe, or is Free, or the request is malformed."
+      ),
+      @ApiErrors.Description(
+        status = "409",
+        value = "The organization has a Stripe subscription; cancel it first."
+      ),
+    }
+  )
+  public ResponseEntity<
+    ApiResponse<ApplyPlanResponseDto>
+  > platformControllerAssignPlanV1(
+    @PathVariable("id") String id,
+    @Valid @RequestParam(
+      value = "dryRun",
+      required = false,
+      defaultValue = "false"
+    ) Boolean dryRun,
+    @Valid @RequestBody AssignPlanDto assignPlanDto
+  ) {
+    return plans.assignPlan(context(), id, assignPlanDto, dryRun);
+  }
+
+  /**
+   * Releases an assigned organization to self-service: no plan, the free
+   * tier's grants. `?dryRun=true` previews it. A pin is left as it is.
+   */
+  @DeleteMapping(
+    value = "/platform/organizations/{id}/plan",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors(
+    value = { "400", "401", "404", "409" },
+    descriptions = @ApiErrors.Description(
+      status = "409",
+      value = "It isn’t on an assigned plan, or it has a Stripe subscription; the sentence says which."
+    )
+  )
+  public ResponseEntity<
+    ApiResponse<ApplyPlanResponseDto>
+  > platformControllerReleasePlanV1(
+    @PathVariable("id") String id,
+    @Valid @RequestParam(
+      value = "dryRun",
+      required = false,
+      defaultValue = "false"
+    ) Boolean dryRun,
+    @Valid @RequestBody ReleasePlanDto releasePlanDto
+  ) {
+    return plans.releasePlan(context(), id, releasePlanDto, dryRun);
   }
 
   @GetMapping(value = "/platform/users", produces = { "application/json" })

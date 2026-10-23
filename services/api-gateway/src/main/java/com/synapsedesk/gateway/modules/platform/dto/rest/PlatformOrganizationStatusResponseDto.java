@@ -34,6 +34,10 @@ public class PlatformOrganizationStatusResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime statusChangedAt = null;
 
+  private Boolean entitlementsPinned;
+
+  private Boolean planAssigned;
+
   private BigDecimal revokedSessionCount;
 
   public PlatformOrganizationStatusResponseDto() {
@@ -237,6 +241,50 @@ public class PlatformOrganizationStatusResponseDto {
     this.revokedSessionCount = revokedSessionCount;
   }
 
+  public PlatformOrganizationStatusResponseDto entitlementsPinned(
+    Boolean entitlementsPinned
+  ) {
+    this.entitlementsPinned = entitlementsPinned;
+    return this;
+  }
+
+  /**
+   * Get entitlementsPinned
+   * @return entitlementsPinned
+   */
+  @NotNull
+  @JsonProperty("entitlementsPinned")
+  public Boolean getEntitlementsPinned() {
+    return entitlementsPinned;
+  }
+
+  @JsonProperty("entitlementsPinned")
+  public void setEntitlementsPinned(Boolean entitlementsPinned) {
+    this.entitlementsPinned = entitlementsPinned;
+  }
+
+  public PlatformOrganizationStatusResponseDto planAssigned(
+    Boolean planAssigned
+  ) {
+    this.planAssigned = planAssigned;
+    return this;
+  }
+
+  /**
+   * Get planAssigned
+   * @return planAssigned
+   */
+  @NotNull
+  @JsonProperty("planAssigned")
+  public Boolean getPlanAssigned() {
+    return planAssigned;
+  }
+
+  @JsonProperty("planAssigned")
+  public void setPlanAssigned(Boolean planAssigned) {
+    this.planAssigned = planAssigned;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -281,6 +329,14 @@ public class PlatformOrganizationStatusResponseDto {
         platformOrganizationStatusResponseDto.statusChangedAt
       ) &&
       Objects.equals(
+        this.entitlementsPinned,
+        platformOrganizationStatusResponseDto.entitlementsPinned
+      ) &&
+      Objects.equals(
+        this.planAssigned,
+        platformOrganizationStatusResponseDto.planAssigned
+      ) &&
+      Objects.equals(
         this.revokedSessionCount,
         platformOrganizationStatusResponseDto.revokedSessionCount
       )
@@ -298,6 +354,8 @@ public class PlatformOrganizationStatusResponseDto {
       planName,
       billedThroughStripe,
       statusChangedAt,
+      entitlementsPinned,
+      planAssigned,
       revokedSessionCount
     );
   }
@@ -327,6 +385,12 @@ public class PlatformOrganizationStatusResponseDto {
       .append("\n");
     sb.append("    statusChangedAt: ")
       .append(toIndentedString(statusChangedAt))
+      .append("\n");
+    sb.append("    entitlementsPinned: ")
+      .append(toIndentedString(entitlementsPinned))
+      .append("\n");
+    sb.append("    planAssigned: ")
+      .append(toIndentedString(planAssigned))
       .append("\n");
     sb.append("    revokedSessionCount: ")
       .append(toIndentedString(revokedSessionCount))

@@ -34,6 +34,10 @@ public class PlatformOrganizationDetailResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime statusChangedAt = null;
 
+  private Boolean entitlementsPinned;
+
+  private Boolean planAssigned;
+
   private PlatformOrganizationUsageResponseDto usage;
 
   public PlatformOrganizationDetailResponseDto() {
@@ -254,6 +258,50 @@ public class PlatformOrganizationDetailResponseDto {
     this.usage = usage;
   }
 
+  public PlatformOrganizationDetailResponseDto entitlementsPinned(
+    Boolean entitlementsPinned
+  ) {
+    this.entitlementsPinned = entitlementsPinned;
+    return this;
+  }
+
+  /**
+   * Get entitlementsPinned
+   * @return entitlementsPinned
+   */
+  @NotNull
+  @JsonProperty("entitlementsPinned")
+  public Boolean getEntitlementsPinned() {
+    return entitlementsPinned;
+  }
+
+  @JsonProperty("entitlementsPinned")
+  public void setEntitlementsPinned(Boolean entitlementsPinned) {
+    this.entitlementsPinned = entitlementsPinned;
+  }
+
+  public PlatformOrganizationDetailResponseDto planAssigned(
+    Boolean planAssigned
+  ) {
+    this.planAssigned = planAssigned;
+    return this;
+  }
+
+  /**
+   * Get planAssigned
+   * @return planAssigned
+   */
+  @NotNull
+  @JsonProperty("planAssigned")
+  public Boolean getPlanAssigned() {
+    return planAssigned;
+  }
+
+  @JsonProperty("planAssigned")
+  public void setPlanAssigned(Boolean planAssigned) {
+    this.planAssigned = planAssigned;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -297,6 +345,14 @@ public class PlatformOrganizationDetailResponseDto {
       Objects.equals(
         this.statusChangedAt,
         platformOrganizationDetailResponseDto.statusChangedAt
+      ) &&
+      Objects.equals(
+        this.entitlementsPinned,
+        platformOrganizationDetailResponseDto.entitlementsPinned
+      ) &&
+      Objects.equals(
+        this.planAssigned,
+        platformOrganizationDetailResponseDto.planAssigned
       )
     );
   }
@@ -312,7 +368,9 @@ public class PlatformOrganizationDetailResponseDto {
       usage,
       planName,
       billedThroughStripe,
-      statusChangedAt
+      statusChangedAt,
+      entitlementsPinned,
+      planAssigned
     );
   }
 
@@ -342,6 +400,12 @@ public class PlatformOrganizationDetailResponseDto {
       .append("\n");
     sb.append("    statusChangedAt: ")
       .append(toIndentedString(statusChangedAt))
+      .append("\n");
+    sb.append("    entitlementsPinned: ")
+      .append(toIndentedString(entitlementsPinned))
+      .append("\n");
+    sb.append("    planAssigned: ")
+      .append(toIndentedString(planAssigned))
       .append("\n");
     sb.append("}");
     return sb.toString();

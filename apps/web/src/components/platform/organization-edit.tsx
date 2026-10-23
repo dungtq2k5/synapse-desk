@@ -14,7 +14,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type SubmitEvent } from 'react';
+import { useId, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
 import { LoadError, Loading } from '@/components/settings/settings-frame';
@@ -22,6 +22,8 @@ import { PageUnavailable } from '@/components/shell/page-unavailable';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { aiMoney } from '@/lib/billing';
 import { fileSize } from '@/lib/format';
 import { toastError } from '@/lib/toast';
@@ -90,6 +92,8 @@ function EditForm({ data }: { data: PlatformOrganizationDetailResponseDto }) {
     ai: usdOf(organization.monthlyAiTokenBudget),
   };
   const [form, setForm] = useState(initial);
+  const [pinned, setPinned] = useState(data.entitlementsPinned);
+  const pinId = useId();
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -138,6 +142,7 @@ function EditForm({ data }: { data: PlatformOrganizationDetailResponseDto }) {
     if (form.storage !== initial.storage)
       change.maxStorageBytes = storage ?? undefined;
     if (form.ai !== initial.ai) change.monthlyAiTokenBudget = ai ?? undefined;
+    if (pinned !== data.entitlementsPinned) change.entitlementsPinned = pinned;
     if (Object.keys(change).length === 0) return router.push(back);
 
     setBusy(true);
@@ -271,6 +276,26 @@ function EditForm({ data }: { data: PlatformOrganizationDetailResponseDto }) {
                 'GB',
               )}
               {limit('ai', 'AI allowance a month', grant(plan, 'ai'), 'USD')}
+            </div>
+            <div className="flex items-start gap-3">
+              <Switch
+                id={pinId}
+                checked={pinned}
+                onCheckedChange={setPinned}
+                aria-describedby={`${pinId}-help`}
+              />
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={pinId}>
+                  Keep these limits when Stripe’s events arrive
+                </Label>
+                <p
+                  id={`${pinId}-help`}
+                  className="text-sm text-muted-foreground"
+                >
+                  Neither Stripe’s events nor applying its plan change them
+                  until this is turned off.
+                </p>
+              </div>
             </div>
           </ConsoleCard>
         </div>
