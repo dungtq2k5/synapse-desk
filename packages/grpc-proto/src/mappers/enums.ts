@@ -734,6 +734,10 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_JOB_RUN,
     [AuditAction.PLATFORM_JOB_BACKFILLED]:
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_JOB_BACKFILLED,
+    [AuditAction.PLATFORM_PLAN_ASSIGNED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_ASSIGNED,
+    [AuditAction.PLATFORM_PLAN_RELEASED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_RELEASED,
   },
   ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED,
 );

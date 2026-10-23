@@ -261,6 +261,44 @@ export class UpdatePlatformOrganizationDto {
   // "absent takes the schema default rather than zero" -- so a default here
   // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly monthlyAiTokenBudget?: number;
+
+  /**
+   * Keep these limits when Stripe's events arrive (true), or let the next one
+   * write the plan's grants back (false). Absent leaves the pin as it is.
+   */
+  @IsOptional()
+  @IsBoolean()
+  readonly entitlementsPinned?: boolean;
+}
+
+/**
+ * Put an organization on a negotiated plan: one with no Stripe product, not
+ * Free. Its grants become the plan's, so applying the plan reaches it.
+ */
+export class AssignPlanDto {
+  @IsUUID()
+  readonly planId!: string;
+
+  /**
+   * Recorded in the audit log, with who assigned it. Required to assign; a
+   * dry run may leave it out.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
+  readonly reason?: string;
+}
+
+/** Release an assigned organization to self-service: no plan, the free tier's grants. */
+export class ReleasePlanDto {
+  /**
+   * Recorded in the audit log, with who released it. Required to release; a
+   * dry run may leave it out.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
+  readonly reason?: string;
 }
 
 export class SetOrganizationStatusDto {

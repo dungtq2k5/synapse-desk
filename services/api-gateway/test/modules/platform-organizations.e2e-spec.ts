@@ -50,6 +50,8 @@ describe('Platform organizations (e2e)', () => {
     planName: 'Pro',
     billedThroughStripe: true,
     statusChangedAt: timestamp(new Date('2026-09-01T00:00:00Z')),
+    entitlementsPinned: false,
+    planAssigned: false,
   });
 
   const wireUsage = () => ({
@@ -147,6 +149,26 @@ describe('Platform organizations (e2e)', () => {
       billedThroughStripe: true,
       statusChangedAt: '2026-09-01T00:00:00.000Z',
     });
+  });
+
+  it('says whether the plan is assigned and the limits pinned, and a PATCH can pin them', async () => {
+    fx.stubs.platform.updateOrganization.mockReturnValue(
+      of({ ...wireOrganization(), entitlementsPinned: true }),
+    );
+
+    const response = await superAdmin()
+      .patch(`${API}/platform/organizations/${organizationId}`)
+      .send({ entitlementsPinned: true })
+      .expect(200);
+
+    expect(response.body.data).toMatchObject({
+      entitlementsPinned: true,
+      planAssigned: false,
+    });
+    expect(fx.stubs.platform.updateOrganization).toHaveBeenCalledWith(
+      { organizationId, entitlementsPinned: true },
+      expect.anything(),
+    );
   });
 
   it('a status change answers how many sessions it ended', async () => {

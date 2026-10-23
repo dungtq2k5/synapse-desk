@@ -634,6 +634,56 @@ describe('Plan change (e2e)', () => {
         status.FAILED_PRECONDITION,
       );
 
+      // On a negotiated plan the platform assigned: the platform's to change.
+      const agreement = await fx.prisma.subscriptionPlan.create({
+        data: {
+          name: `Agreement ${(fixtureSeq += 1)}`,
+          stripeProductId: null,
+          maxAgentSeats: 60,
+          maxStorageBytes: 10n * 1024n ** 3n,
+          monthlyAiTokenBudget: 1_000_000n,
+          aiModelTier: 'FAST',
+          maxDocumentBytes: 10n * 1024n ** 2n,
+          maxAttachmentBytes: 5n * 1024n ** 2n,
+          maxDocumentUploads: 1000,
+          maxAnalyticsRangeDays: 90,
+        },
+      });
+      const assigned = await freeTenant({
+        plan: { connect: { id: agreement.id } },
+      });
+      await expectRpc(
+        planChange.previewCheckout(
+          { priceId: 'price_pro_monthly', ...CHECKOUT },
+          ctx(assigned),
+        ),
+        status.FAILED_PRECONDITION,
+      );
+      const assignedAndBilled = await subscribedTenant({
+        plan: { connect: { id: agreement.id } },
+      });
+      await expectRpc(
+        planChange.changePlan(
+          {
+            planId: (await planNamed('Starter')).id,
+            priceId: 'price_starter_monthly',
+          },
+          ctx(assignedAndBilled),
+        ),
+        status.FAILED_PRECONDITION,
+      );
+
+      // Free is a plan with no Stripe product, but nobody assigned it.
+      const onFree = await freeTenant({
+        plan: { connect: { id: (await planNamed('Free')).id } },
+      });
+      await expect(
+        planChange.previewCheckout(
+          { priceId: 'price_pro_monthly', ...CHECKOUT },
+          ctx(onFree),
+        ),
+      ).resolves.toBeDefined();
+
       const t = await freeTenant();
       await fx.prisma.subscriptionPlan.update({
         where: { id: (await planNamed('Enterprise')).id },

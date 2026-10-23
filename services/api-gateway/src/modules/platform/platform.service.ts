@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
-import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
+import {
+  toProtoOrgStatus,
+  type ApplyPlanResponse,
+} from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { PlatformGrpcClient } from './platform-grpc.client';
 import { PlatformUsageClient } from './platform-usage.client';
@@ -38,6 +41,8 @@ import {
   ListPlansQueryDto,
   UpdatePlanDto,
   FinanceEventsQueryDto,
+  AssignPlanDto,
+  ReleasePlanDto,
 } from './dto/rest/platform.dto';
 import {
   CreatePlatformOrganizationResponseDto,
@@ -346,15 +351,61 @@ export class PlatformService {
     dryRun: boolean,
     context: RequestContext,
   ): Promise<ApplyPlanResponseDto> {
-    const projection = toApplyPlanResponseDto(
+    return this.composed(
       await this.platformGrpcClient.applyPlan({ planId, dryRun }, context),
+      context,
     );
+  }
 
+  /**
+   * One organization onto a negotiated plan, or its preview, in apply's shape
+   * and composed the same way: storage and documents from ingestion.
+   */
+  async assignPlan(
+    organizationId: string,
+    dto: AssignPlanDto,
+    dryRun: boolean,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponseDto> {
+    return this.composed(
+      await this.platformGrpcClient.assignPlan(
+        {
+          organizationId,
+          planId: dto.planId,
+          reason: dto.reason ?? '',
+          dryRun,
+        },
+        context,
+      ),
+      context,
+    );
+  }
+
+  /** An assigned organization back to self-service, or its preview. */
+  async releasePlan(
+    organizationId: string,
+    dto: ReleasePlanDto,
+    dryRun: boolean,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponseDto> {
+    return this.composed(
+      await this.platformGrpcClient.releasePlan(
+        { organizationId, reason: dto.reason ?? '', dryRun },
+        context,
+      ),
+      context,
+    );
+  }
+
+  private async composed(
+    response: ApplyPlanResponse,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponseDto> {
+    const projection = toApplyPlanResponseDto(response);
     const usage = await this.usageClient.usageFor(
       projection.subscribers.map((row) => row.organizationId),
       context,
     );
-
     return enrichWithUsage(projection, usage);
   }
 }

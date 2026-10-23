@@ -6,7 +6,7 @@ import {
   authenticatedAgent,
   bootstrapE2eTest,
 } from '../utils';
-import { timestamp } from '../fixtures/wire';
+import { grpcError, timestamp } from '../fixtures/wire';
 
 /**
  * `/platform/plans` — the DTO layer, which is the only place these bugs live.
@@ -422,6 +422,84 @@ describe('Platform plans (e2e)', () => {
         .expect(200);
 
       expect(response.body.data.subscribers[0].overLimit).toEqual([]);
+    });
+
+    it('4. assigning a plan sends the body and dryRun, and is composed like apply', async () => {
+      fx.stubs.platform.assignPlan.mockReturnValue(
+        of(wireProjection({ maxStorageBytes: 500 })),
+      );
+      fx.stubs.ingestionPlatform.getPlatformUsage.mockReturnValue(
+        of({
+          usage: [{ organizationId: org, usedBytes: 900, documentCount: 3 }],
+        }),
+      );
+
+      const response = await superAdmin()
+        .post(`${API}/platform/organizations/${org}/plan?dryRun=true`)
+        .send({ planId, reason: 'Signed the agreement' })
+        .expect(200);
+
+      expect(fx.stubs.platform.assignPlan).toHaveBeenCalledWith(
+        {
+          organizationId: org,
+          planId,
+          reason: 'Signed the agreement',
+          dryRun: true,
+        },
+        expect.anything(),
+      );
+      expect(response.body.data.subscribers[0].overLimitItems).toEqual([
+        { dimension: 'STORAGE', inUse: 900, allowed: 500 },
+      ]);
+    });
+
+    it("4b. a plan that isn't an id is a 400 at the edge; a missing reason is auth's to refuse", async () => {
+      await superAdmin()
+        .post(`${API}/platform/organizations/${org}/plan`)
+        .send({ planId: 'pro', reason: 'x' })
+        .expect(400);
+      expect(fx.stubs.platform.assignPlan).not.toHaveBeenCalled();
+
+      fx.stubs.platform.assignPlan.mockReturnValue(
+        throwError(() => grpcError(3, 'A reason is required.')),
+      );
+      await superAdmin()
+        .post(`${API}/platform/organizations/${org}/plan`)
+        .send({ planId })
+        .expect(400);
+      expect(fx.stubs.platform.assignPlan).toHaveBeenCalledWith(
+        { organizationId: org, planId, reason: '', dryRun: false },
+        expect.anything(),
+      );
+    });
+
+    it('4c. releasing sends the reason, and a refusal keeps its 409', async () => {
+      fx.stubs.platform.releasePlan.mockReturnValue(
+        of(wireProjection({ maxAgentSeats: 10 })),
+      );
+      await superAdmin()
+        .delete(`${API}/platform/organizations/${org}/plan`)
+        .send({ reason: 'Self-service from now on' })
+        .expect(200);
+      expect(fx.stubs.platform.releasePlan).toHaveBeenCalledWith(
+        {
+          organizationId: org,
+          reason: 'Self-service from now on',
+          dryRun: false,
+        },
+        expect.anything(),
+      );
+
+      fx.stubs.platform.releasePlan.mockReturnValue(
+        throwError(() =>
+          grpcError(9, '[http:409] It isn’t on an assigned plan.'),
+        ),
+      );
+      const refused = await superAdmin()
+        .delete(`${API}/platform/organizations/${org}/plan`)
+        .send({ reason: 'x' })
+        .expect(409);
+      expect(refused.body.error).toBe('It isn’t on an assigned plan!');
     });
   });
 });

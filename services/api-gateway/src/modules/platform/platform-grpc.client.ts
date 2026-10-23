@@ -23,6 +23,8 @@ import {
   SetOrganizationStatusRequest,
   UpdatePlatformOrganizationRequest,
   ApplyPlanRequest,
+  AssignPlanRequest,
+  ReleasePlanRequest,
   ApplyPlanResponse,
   CreatePlanRequest,
   DeletePlanResponse,
@@ -301,6 +303,26 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
   ): Promise<ApplyPlanResponse> {
     return this.call(
       (metadata) => this.platformGrpcService.applyPlan(request, metadata),
+      context,
+    );
+  }
+
+  assignPlan(
+    request: AssignPlanRequest,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.assignPlan(request, metadata),
+      context,
+    );
+  }
+
+  releasePlan(
+    request: ReleasePlanRequest,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.releasePlan(request, metadata),
       context,
     );
   }

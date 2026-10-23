@@ -34140,6 +34140,758 @@
         "tags": ["Platform"]
       }
     },
+    "/api/v1/platform/organizations/{id}/plan": {
+      "post": {
+        "operationId": "PlatformController_assignPlan_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "statusCode", "message", "data"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ApplyPlanResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The plan is sold through Stripe, or is Free, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session cookie, or the session has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource — or one the caller may not see. The two are deliberately indistinguishable, so a by-id route cannot be used as an existence oracle across tenants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The organization has a Stripe subscription; cancel it first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ],
+        "summary": "Assign a negotiated plan (or dry-run it)",
+        "tags": ["Platform"]
+      },
+      "delete": {
+        "operationId": "PlatformController_releasePlan_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleasePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "statusCode", "message", "data"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ApplyPlanResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session cookie, or the session has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such resource — or one the caller may not see. The two are deliberately indistinguishable, so a by-id route cannot be used as an existence oracle across tenants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It isn’t on an assigned plan, or it has a Stripe subscription; the sentence says which.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 409
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ],
+        "summary": "Release an assigned plan (or dry-run it)",
+        "tags": ["Platform"]
+      }
+    },
     "/api/v1/platform/organizations/{id}/restore": {
       "post": {
         "operationId": "PlatformController_restore_v1",
@@ -57382,8 +58134,10 @@
                 "PLATFORM_ORGANIZATION_STATUS_CHANGED",
                 "PLATFORM_ORGANIZATION_UPDATED",
                 "PLATFORM_PLAN_APPLIED",
+                "PLATFORM_PLAN_ASSIGNED",
                 "PLATFORM_PLAN_CREATED",
                 "PLATFORM_PLAN_DELETED",
+                "PLATFORM_PLAN_RELEASED",
                 "PLATFORM_PLAN_UPDATED",
                 "ROLE_CREATED",
                 "ROLE_DELETED",
@@ -58653,8 +59407,10 @@
                 "PLATFORM_ORGANIZATION_STATUS_CHANGED",
                 "PLATFORM_ORGANIZATION_UPDATED",
                 "PLATFORM_PLAN_APPLIED",
+                "PLATFORM_PLAN_ASSIGNED",
                 "PLATFORM_PLAN_CREATED",
                 "PLATFORM_PLAN_DELETED",
+                "PLATFORM_PLAN_RELEASED",
                 "PLATFORM_PLAN_UPDATED",
                 "ROLE_CREATED",
                 "ROLE_DELETED",
@@ -70255,6 +71011,14 @@
             "type": "string",
             "nullable": true,
             "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
+          },
+          "entitlementsPinned": {
+            "type": "boolean",
+            "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+          },
+          "planAssigned": {
+            "type": "boolean",
+            "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
           }
         },
         "required": [
@@ -70265,7 +71029,9 @@
           "deletedAt",
           "planName",
           "billedThroughStripe",
-          "statusChangedAt"
+          "statusChangedAt",
+          "entitlementsPinned",
+          "planAssigned"
         ]
       },
       "CreatePlatformOrganizationResponseDto": {
@@ -70389,6 +71155,14 @@
             "nullable": true,
             "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
           },
+          "entitlementsPinned": {
+            "type": "boolean",
+            "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+          },
+          "planAssigned": {
+            "type": "boolean",
+            "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+          },
           "usage": {
             "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads.",
             "allOf": [
@@ -70407,6 +71181,8 @@
           "planName",
           "billedThroughStripe",
           "statusChangedAt",
+          "entitlementsPinned",
+          "planAssigned",
           "usage"
         ]
       },
@@ -70439,6 +71215,10 @@
             "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
             "minimum": 0
+          },
+          "entitlementsPinned": {
+            "type": "boolean",
+            "description": "Keep these limits when Stripe's events arrive (true), or let the next one\nwrite the plan's grants back (false). Absent leaves the pin as it is."
           }
         }
       },
@@ -70477,6 +71257,14 @@
             "nullable": true,
             "description": "When the status last changed (\"Frozen since\"). Null for an organization\nwhose status changed before that was recorded."
           },
+          "entitlementsPinned": {
+            "type": "boolean",
+            "description": "A Super Admin's override of its limits: neither a Stripe event nor\napplying its plan rewrites them."
+          },
+          "planAssigned": {
+            "type": "boolean",
+            "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+          },
           "revokedSessionCount": {
             "type": "number",
             "description": "Sessions the change ended: every one on a freeze, none otherwise."
@@ -70491,6 +71279,8 @@
           "planName",
           "billedThroughStripe",
           "statusChangedAt",
+          "entitlementsPinned",
+          "planAssigned",
           "revokedSessionCount"
         ]
       },
@@ -70536,6 +71326,143 @@
           }
         },
         "required": ["reason"]
+      },
+      "OverLimitItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "enum": ["DOCUMENTS", "SEATS", "STORAGE"],
+            "type": "string"
+          },
+          "inUse": {
+            "type": "number",
+            "description": "Seats, bytes or documents, by dimension."
+          },
+          "allowed": {
+            "type": "number"
+          }
+        },
+        "required": ["dimension", "inUse", "allowed"]
+      },
+      "PlanSubscriberProjectionResponseDto": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "organizationName": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Field name → `\"before -> after\"`, for the columns this apply would change."
+          },
+          "after": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "The AFTER value of every NUMERIC column in `changes`, keyed the same way.\n\n`changes` renders for a human; this is what a machine reads. A key absent\nhere means the column is not changing — never \"zero\", which would put every\ntenant over. `aiModelTier` is a string and never appears.\n\nknown-gaps #21: the composer used to parse the display string, and a\ncosmetic change to its separator silently disarmed two limit checks."
+          },
+          "overLimit": {
+            "description": "Limits this tenant is ALREADY past under the new plan.\n\nReported, never enforced: a limit gates admission, never tenure. These\ntenants keep everything they have and are refused their next addition.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "overLimitItems": {
+            "description": "The same limits as data, one per limit it breaks: what's in use against\nwhat the new plan allows. The strings above stay one release.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverLimitItemResponseDto"
+            }
+          },
+          "skippedPinned": {
+            "type": "boolean",
+            "description": "Off-catalogue by deliberate policy; this apply does not touch them."
+          },
+          "budgetDeferred": {
+            "type": "boolean",
+            "description": "Held to the next cycle roll: lowering a part-spent budget is retroactive."
+          }
+        },
+        "required": [
+          "organizationId",
+          "organizationName",
+          "changes",
+          "after",
+          "overLimit",
+          "overLimitItems",
+          "skippedPinned",
+          "budgetDeferred"
+        ]
+      },
+      "ApplyPlanResponseDto": {
+        "type": "object",
+        "properties": {
+          "subscribers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanSubscriberProjectionResponseDto"
+            }
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "changedCount": {
+            "type": "number"
+          },
+          "skippedPinnedCount": {
+            "type": "number"
+          },
+          "overLimitCount": {
+            "type": "number"
+          },
+          "evaluatedDimensions": {
+            "description": "Which limits this run actually checked.\n\nA dimension absent from the list was NOT evaluated, and `overLimitCount`\nsays nothing about it — render it as unknown rather than as zero affected.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "subscribers",
+          "dryRun",
+          "changedCount",
+          "skippedPinnedCount",
+          "overLimitCount",
+          "evaluatedDimensions"
+        ]
+      },
+      "AssignPlanDto": {
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Recorded in the audit log, with who assigned it. Required to assign; a\ndry run may leave it out.",
+            "maxLength": 500
+          }
+        },
+        "required": ["planId"]
+      },
+      "ReleasePlanDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Recorded in the audit log, with who released it. Required to release; a\ndry run may leave it out.",
+            "maxLength": 500
+          }
+        }
       },
       "PlatformUserResponseDto": {
         "type": "object",
@@ -70913,118 +71840,6 @@
           }
         },
         "required": ["deleted"]
-      },
-      "OverLimitItemResponseDto": {
-        "type": "object",
-        "properties": {
-          "dimension": {
-            "enum": ["DOCUMENTS", "SEATS", "STORAGE"],
-            "type": "string"
-          },
-          "inUse": {
-            "type": "number",
-            "description": "Seats, bytes or documents, by dimension."
-          },
-          "allowed": {
-            "type": "number"
-          }
-        },
-        "required": ["dimension", "inUse", "allowed"]
-      },
-      "PlanSubscriberProjectionResponseDto": {
-        "type": "object",
-        "properties": {
-          "organizationId": {
-            "type": "string"
-          },
-          "organizationName": {
-            "type": "string"
-          },
-          "changes": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Field name → `\"before -> after\"`, for the columns this apply would change."
-          },
-          "after": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "number"
-            },
-            "description": "The AFTER value of every NUMERIC column in `changes`, keyed the same way.\n\n`changes` renders for a human; this is what a machine reads. A key absent\nhere means the column is not changing — never \"zero\", which would put every\ntenant over. `aiModelTier` is a string and never appears.\n\nknown-gaps #21: the composer used to parse the display string, and a\ncosmetic change to its separator silently disarmed two limit checks."
-          },
-          "overLimit": {
-            "description": "Limits this tenant is ALREADY past under the new plan.\n\nReported, never enforced: a limit gates admission, never tenure. These\ntenants keep everything they have and are refused their next addition.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "overLimitItems": {
-            "description": "The same limits as data, one per limit it breaks: what's in use against\nwhat the new plan allows. The strings above stay one release.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OverLimitItemResponseDto"
-            }
-          },
-          "skippedPinned": {
-            "type": "boolean",
-            "description": "Off-catalogue by deliberate policy; this apply does not touch them."
-          },
-          "budgetDeferred": {
-            "type": "boolean",
-            "description": "Held to the next cycle roll: lowering a part-spent budget is retroactive."
-          }
-        },
-        "required": [
-          "organizationId",
-          "organizationName",
-          "changes",
-          "after",
-          "overLimit",
-          "overLimitItems",
-          "skippedPinned",
-          "budgetDeferred"
-        ]
-      },
-      "ApplyPlanResponseDto": {
-        "type": "object",
-        "properties": {
-          "subscribers": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlanSubscriberProjectionResponseDto"
-            }
-          },
-          "dryRun": {
-            "type": "boolean"
-          },
-          "changedCount": {
-            "type": "number"
-          },
-          "skippedPinnedCount": {
-            "type": "number"
-          },
-          "overLimitCount": {
-            "type": "number"
-          },
-          "evaluatedDimensions": {
-            "description": "Which limits this run actually checked.\n\nA dimension absent from the list was NOT evaluated, and `overLimitCount`\nsays nothing about it — render it as unknown rather than as zero affected.",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "subscribers",
-          "dryRun",
-          "changedCount",
-          "skippedPinnedCount",
-          "overLimitCount",
-          "evaluatedDimensions"
-        ]
       },
       "PlatformMetricsResponseDto": {
         "type": "object",
@@ -73333,8 +74148,10 @@
               "PLATFORM_ORGANIZATION_STATUS_CHANGED",
               "PLATFORM_ORGANIZATION_UPDATED",
               "PLATFORM_PLAN_APPLIED",
+              "PLATFORM_PLAN_ASSIGNED",
               "PLATFORM_PLAN_CREATED",
               "PLATFORM_PLAN_DELETED",
+              "PLATFORM_PLAN_RELEASED",
               "PLATFORM_PLAN_UPDATED",
               "ROLE_CREATED",
               "ROLE_DELETED",
@@ -73465,8 +74282,10 @@
                 "PLATFORM_ORGANIZATION_STATUS_CHANGED",
                 "PLATFORM_ORGANIZATION_UPDATED",
                 "PLATFORM_PLAN_APPLIED",
+                "PLATFORM_PLAN_ASSIGNED",
                 "PLATFORM_PLAN_CREATED",
                 "PLATFORM_PLAN_DELETED",
+                "PLATFORM_PLAN_RELEASED",
                 "PLATFORM_PLAN_UPDATED",
                 "ROLE_CREATED",
                 "ROLE_DELETED",
@@ -73545,8 +74364,10 @@
               "PLATFORM_ORGANIZATION_STATUS_CHANGED",
               "PLATFORM_ORGANIZATION_UPDATED",
               "PLATFORM_PLAN_APPLIED",
+              "PLATFORM_PLAN_ASSIGNED",
               "PLATFORM_PLAN_CREATED",
               "PLATFORM_PLAN_DELETED",
+              "PLATFORM_PLAN_RELEASED",
               "PLATFORM_PLAN_UPDATED",
               "ROLE_CREATED",
               "ROLE_DELETED",

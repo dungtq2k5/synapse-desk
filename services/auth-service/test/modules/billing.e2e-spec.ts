@@ -499,6 +499,43 @@ describe('Billing and entitlements (e2e)', () => {
       expect(outcome.status).toBe(BillingEventStatus.SKIPPED_PINNED);
     });
 
+    it("5a. **A pin set on the platform's edit holds; cleared, the next event writes the plan back**", async () => {
+      const organization = await subscribedOrganization('cus_pin_patch');
+      await platform.updateOrganization(
+        {
+          organizationId: organization.id,
+          maxAgentSeats: 999,
+          entitlementsPinned: true,
+        },
+        superAdminContext(SUPER_ADMIN_ID),
+      );
+
+      await deliver(
+        subscriptionEvent({ customerId: 'cus_pin_patch', priceId: PRO }),
+      );
+      const held = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(held.maxAgentSeats).toBe(999);
+      expect(held.entitlementsPinned).toBe(true);
+
+      await platform.updateOrganization(
+        { organizationId: organization.id, entitlementsPinned: false },
+        superAdminContext(SUPER_ADMIN_ID),
+      );
+      await deliver(
+        subscriptionEvent({
+          customerId: 'cus_pin_patch',
+          priceId: PRO,
+          createdAt: new Date(Date.now() + 60_000),
+        }),
+      );
+      const written = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(written.maxAgentSeats).toBe(planForPrice(PRO).maxAgentSeats);
+    });
+
     it('5b. **…and SKIPPED_PINNED is distinguishable from SKIPPED_STALE**', async () => {
       // Two skips that mean opposite things. Stale is a transport artefact and
       // self-correcting; pinned is a deliberate policy about one tenant that
@@ -1420,6 +1457,37 @@ describe('Billing and entitlements (e2e)', () => {
       expect(response.priceId).toBeUndefined();
       expect(response.interval).toBeUndefined();
       expect(response.cancelAtPeriodEnd).toBe(false);
+    });
+
+    it("13c. Says a tenant on an assigned plan is negotiated, and one on Free isn't", async () => {
+      const agreement = await fx.prisma.subscriptionPlan.create({
+        data: {
+          name: 'Billing agreement 13c',
+          stripeProductId: null,
+          maxAgentSeats: 60,
+          maxStorageBytes: 1024n ** 3n,
+          monthlyAiTokenBudget: 1_000_000n,
+          aiModelTier: 'FAST',
+          maxDocumentBytes: 1024n ** 2n,
+          maxAttachmentBytes: 1024n ** 2n,
+          maxDocumentUploads: 100,
+          maxAnalyticsRangeDays: 30,
+        },
+      });
+      const assigned = await createOrganization(fx.prisma, {
+        plan: { connect: { id: agreement.id } },
+      });
+      const free = await fx.prisma.subscriptionPlan.findFirstOrThrow({
+        where: { name: 'Free', deletedAt: null },
+      });
+      const onFree = await createOrganization(fx.prisma, {
+        plan: { connect: { id: free.id } },
+      });
+
+      const read = (organizationId: string) =>
+        billing.getSubscription(memberContext({ id: 'u', organizationId }));
+      expect((await read(assigned.id)).negotiated).toBe(true);
+      expect((await read(onFree.id)).negotiated).toBe(false);
     });
 
     it('4b. Labels a grandfathered tenant "Free" rather than by its tier', async () => {

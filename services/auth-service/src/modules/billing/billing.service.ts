@@ -28,6 +28,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
 import { PlanChangeService } from './plan-change.service';
+import { isAssignedPlan } from './plan-assignment';
 
 /** How many invoices a page shows. Stripe's own default is 10. */
 const DEFAULT_INVOICE_LIMIT = 12;
@@ -119,7 +120,9 @@ export class BillingService {
       cancelAtPeriodEnd: organization.cancelAtPeriodEnd,
       priceId: organization.stripePriceId ?? undefined,
       interval: price?.interval,
-      negotiated: organization.entitlementsPinned,
+      // A pin, or a negotiated plan the platform assigned.
+      negotiated:
+        organization.entitlementsPinned || isAssignedPlan(organization.plan),
     };
   }
 
@@ -384,7 +387,7 @@ export class BillingService {
         entitlementsPinned: true,
         // The plan's own name, for the label above. One join rather than a
         // reverse-lookup by tier that could not tell two QUALITY plans apart.
-        plan: { select: { name: true } },
+        plan: { select: { name: true, stripeProductId: true } },
       },
     });
 

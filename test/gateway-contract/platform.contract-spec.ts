@@ -860,6 +860,150 @@ describe('platform', () => {
       },
     );
 
+    const ORG = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+    const PLAN = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+    const oneSubscriber = {
+      subscribers: [
+        {
+          organizationId: ORG,
+          organizationName: 'Acme',
+          changes: { maxAgentSeats: '25 -> 60' },
+          after: { maxAgentSeats: '60' },
+          overLimit: [],
+          overLimitItems: [],
+          skippedPinned: false,
+          budgetDeferred: false,
+        },
+      ],
+      dryRun: true,
+      changedCount: 1,
+      skippedPinnedCount: 0,
+      overLimitCount: 0,
+      evaluatedDimensions: ['seats'],
+    };
+
+    rowFor('Platform')(
+      "**assigning a plan forwards it with the reason and answers apply's shape**",
+      async () => {
+        peers.auth.on('PlatformService/AssignPlan').reply(oneSubscriber);
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .reply({ usage: [] });
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/${ORG}/plan?dryRun=true`,
+          { planId: PLAN, reason: 'Signed the agreement' },
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: {
+            dryRun: true,
+            changedCount: 1,
+            subscribers: [
+              { organizationId: ORG, changes: { maxAgentSeats: '25 -> 60' } },
+            ],
+          },
+        });
+        const [call] = peers.auth.calls('PlatformService/AssignPlan');
+        expect(call.request).toMatchObject({
+          organizationId: ORG,
+          planId: PLAN,
+          reason: 'Signed the agreement',
+          dryRun: true,
+        });
+      },
+    );
+
+    rowFor('Platform')(
+      "**assigning beside a Stripe subscription is a 409 with auth's sentence**",
+      async () => {
+        peers.auth
+          .on('PlatformService/AssignPlan')
+          .fail(
+            GrpcStatus.FAILED_PRECONDITION,
+            '[http:409] Cancel its Stripe subscription first; it would keep charging for its old plan.',
+          );
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/${ORG}/plan`,
+          { planId: PLAN, reason: 'x' },
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(409);
+        expect(response.body).toMatchObject({
+          error:
+            'Cancel its Stripe subscription first; it would keep charging for its old plan!',
+        });
+      },
+    );
+
+    rowFor('Platform')(
+      "**releasing forwards the reason; a plan that isn't assigned is a 409**",
+      async () => {
+        peers.auth.on('PlatformService/ReleasePlan').reply({
+          ...oneSubscriber,
+          dryRun: false,
+        });
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .reply({ usage: [] });
+
+        const released = await new Session(gateway.baseUrl).request(
+          'DELETE',
+          `${API}/platform/organizations/${ORG}/plan`,
+          { body: { reason: 'Self-service' }, headers: superAdminHeaders() },
+        );
+        expect(released.status).toBe(200);
+        const [call] = peers.auth.calls('PlatformService/ReleasePlan');
+        expect(call.request).toMatchObject({
+          organizationId: ORG,
+          reason: 'Self-service',
+          dryRun: false,
+        });
+
+        peers.auth
+          .on('PlatformService/ReleasePlan')
+          .fail(
+            GrpcStatus.FAILED_PRECONDITION,
+            '[http:409] It isn’t on an assigned plan.',
+          );
+        const refused = await new Session(gateway.baseUrl).request(
+          'DELETE',
+          `${API}/platform/organizations/${ORG}/plan`,
+          { body: { reason: 'Self-service' }, headers: superAdminHeaders() },
+        );
+        expect(refused.status).toBe(409);
+      },
+    );
+
+    rowFor('Platform')(
+      "**a PATCH pins the limits, and an organization says whether it's pinned and assigned**",
+      async () => {
+        peers.auth.on('PlatformService/UpdateOrganization').reply(
+          wirePlatformOrganization(ORG, {
+            entitlementsPinned: true,
+            planAssigned: true,
+          }),
+        );
+
+        const response = await new Session(gateway.baseUrl).request(
+          'PATCH',
+          `${API}/platform/organizations/${ORG}`,
+          { body: { entitlementsPinned: true }, headers: superAdminHeaders() },
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { entitlementsPinned: true, planAssigned: true },
+        });
+        const [call] = peers.auth.calls('PlatformService/UpdateOrganization');
+        expect(call.request).toMatchObject({ entitlementsPinned: true });
+      },
+    );
+
     rowFor('Platform')(
       "**apply carries auth's over-limit seats as data**",
       async () => {

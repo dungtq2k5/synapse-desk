@@ -29,6 +29,16 @@ export class PlatformOrganizationResponseDto {
    * whose status changed before that was recorded.
    */
   readonly statusChangedAt!: Date | null;
+  /**
+   * A Super Admin's override of its limits: neither a Stripe event nor
+   * applying its plan rewrites them.
+   */
+  readonly entitlementsPinned!: boolean;
+  /**
+   * On a negotiated plan the platform assigned (no Stripe product, not Free):
+   * checkout refuses it, and only the platform releases it.
+   */
+  readonly planAssigned!: boolean;
 }
 
 export class PlatformOrganizationStatusResponseDto extends PlatformOrganizationResponseDto {

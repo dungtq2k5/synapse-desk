@@ -103,6 +103,8 @@ export function toPlatformOrganizationResponseDto(
     planName: row.planName ?? null,
     billedThroughStripe: row.billedThroughStripe,
     statusChangedAt: fromProtoTimestamp(row.statusChangedAt) ?? null,
+    entitlementsPinned: row.entitlementsPinned,
+    planAssigned: row.planAssigned,
   };
 }
 

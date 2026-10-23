@@ -38,6 +38,8 @@ import {
   SetOrganizationStatusDto,
   UpdatePlatformOrganizationDto,
   ApplyPlanQueryDto,
+  AssignPlanDto,
+  ReleasePlanDto,
   CreatePlanDto,
   ListPlansQueryDto,
   UpdatePlanDto,
@@ -225,6 +227,64 @@ export class PlatformController {
     await this.organizationStatus.invalidate(id);
 
     return result;
+  }
+
+  /**
+   * Puts an organization on a negotiated plan (no Stripe product, not Free),
+   * or previews it with `?dryRun=true`. Answered in apply's shape, one
+   * subscriber; over a limit still goes through.
+   */
+  @ApiOperation({ summary: 'Assign a negotiated plan (or dry-run it)' })
+  @ApiWrappedResponse(ApplyPlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404', '409'], {
+    descriptions: {
+      '400':
+        'The plan is sold through Stripe, or is Free, or the request is malformed.',
+      '409': 'The organization has a Stripe subscription; cancel it first.',
+    },
+  })
+  @Post('organizations/:id/plan')
+  @HttpCode(HttpStatus.OK)
+  assignPlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ApplyPlanQueryDto,
+    @Body() assignPlanDto: AssignPlanDto,
+  ): Promise<ApplyPlanResponseDto> {
+    return this.platform.assignPlan(
+      id,
+      assignPlanDto,
+      query.dryRun ?? false,
+      context,
+    );
+  }
+
+  /**
+   * Releases an assigned organization to self-service: no plan, the free
+   * tier's grants. `?dryRun=true` previews it. A pin is left as it is.
+   */
+  @ApiOperation({ summary: 'Release an assigned plan (or dry-run it)' })
+  @ApiWrappedResponse(ApplyPlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404', '409'], {
+    descriptions: {
+      '409':
+        'It isn’t on an assigned plan, or it has a Stripe subscription; the sentence says which.',
+    },
+  })
+  @Delete('organizations/:id/plan')
+  @HttpCode(HttpStatus.OK)
+  releasePlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ApplyPlanQueryDto,
+    @Body() releasePlanDto: ReleasePlanDto,
+  ): Promise<ApplyPlanResponseDto> {
+    return this.platform.releasePlan(
+      id,
+      releasePlanDto,
+      query.dryRun ?? false,
+      context,
+    );
   }
 
   @ApiOperation({ summary: 'Restore' })
