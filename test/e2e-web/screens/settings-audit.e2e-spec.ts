@@ -85,7 +85,7 @@ test('the action filter: every action in words', async ({ page }) => {
   await expect(
     page.getByRole('option', { name: 'Rotated a webhook’s signing secret' }),
   ).toBeAttached();
-  await expect(page.getByRole('option')).toHaveCount(53);
+  await expect(page.getByRole('option')).toHaveCount(55);
   await look(page, 'audit-action-filter', { viewportOnly: true, ...MENU });
 });
 

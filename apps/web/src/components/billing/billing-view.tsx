@@ -41,7 +41,6 @@ import {
   LoadError,
   PageHeading,
   SettingsFrame,
-  SettingsUnavailable,
 } from '@/components/settings/settings-frame';
 import { UsageMeters } from '@/components/settings/usage-meter';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -86,6 +85,7 @@ import {
   type StartIntent,
 } from './plan-dialogs';
 import { useOpenPortal } from './use-open-portal';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 /** How often the page re-reads the subscription while it waits. */
 const POLL_MS = 2_000;
@@ -122,7 +122,7 @@ export function BillingView() {
   if (viewer.isSuccess && !readable) {
     return (
       <SettingsFrame crumbs={[{ label: 'Billing' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

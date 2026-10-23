@@ -12,10 +12,11 @@ import { TwoStepSection } from './two-step-section';
  * where they're signed in.
  */
 export function SecurityView() {
-  const { user, hasPassword } = useViewer();
+  const { user, hasPassword, isSuperAdmin } = useViewer();
   // The shell asks for the organization too; this is the same cached query.
+  // A Super Admin has none.
   const organization = useOrganizationsControllerGetV1({
-    query: { retry: false },
+    query: { retry: false, enabled: !isSuperAdmin },
   }).data?.data;
   if (!user) return null;
 
@@ -25,6 +26,7 @@ export function SecurityView() {
       <TwoStepSection
         enabled={user.isTwoFactorEnabled}
         required={organization?.enforceTwoFactor ?? false}
+        superAdmin={isSuperAdmin}
         organizationName={organization?.name ?? 'Your organization'}
         hasPassword={hasPassword}
       />

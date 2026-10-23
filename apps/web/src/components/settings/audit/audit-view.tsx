@@ -80,8 +80,8 @@ import {
   Loading,
   PageHeading,
   SettingsFrame,
-  SettingsUnavailable,
 } from '../settings-frame';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const PAGE_SIZE = 20;
 /**
@@ -172,7 +172,7 @@ export function AuditView() {
   if (viewer.isSuccess && !can('audit.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'Audit log' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

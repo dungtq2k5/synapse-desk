@@ -32,14 +32,11 @@ import { dayDate, relativeTime } from '@/lib/format';
 import { toastError } from '@/lib/toast';
 import { InvitationStatus } from '../badges';
 import { ConfirmDialog } from '../confirm-dialog';
-import {
-  LoadError,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, SettingsFrame } from '../settings-frame';
 import { InviteButton } from './invite-dialog';
 import { refusalText, serverRefusal } from './person-dialogs';
 import { PeopleHeader, usePeopleCache, useRoles } from './shared';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const STATUSES = {
   PENDING: 'Pending',
@@ -103,7 +100,7 @@ export function InvitationsView() {
   if (viewer.isSuccess && !can('user.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'People', href: '/settings/people' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

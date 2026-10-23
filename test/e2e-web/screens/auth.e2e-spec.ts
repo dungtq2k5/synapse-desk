@@ -271,6 +271,38 @@ test.describe('two-step code', () => {
   });
 });
 
+test.describe('a Super Admin', () => {
+  test('a code every time: no "Remember this device"', async ({ page }) => {
+    await reply(page, '/auth/login', 200, {
+      ...CODE,
+      canRememberDevice: false,
+    });
+    await page.goto('/login');
+    await signIn(page);
+    await expect(
+      page.getByText('Super Admins enter a code every time they sign in.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Remember this device')).toHaveCount(0);
+    await look(page, 'two-step-code-super-admin');
+  });
+
+  test('without two-step: must set it up', async ({ page }) => {
+    await reply(page, '/auth/login', 200, {
+      ...SETUP,
+      canRememberDevice: false,
+    });
+    await reply(page, '/auth/2fa/setup', 200, SECRET);
+    await page.goto('/login');
+    await signIn(page);
+    await expect(
+      page.getByText(
+        /^Super Admins must use a second step when they sign in\./,
+      ),
+    ).toBeVisible();
+    await look(page, 'two-step-setup-super-admin');
+  });
+});
+
 test.describe('two-step setup', () => {
   test.beforeEach(async ({ page }) => {
     await reply(page, '/auth/login', 200, SETUP);

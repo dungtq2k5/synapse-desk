@@ -57,12 +57,7 @@ import {
   serverRefusal,
 } from '../people/person-dialogs';
 import { PersonCell, useOrganizationName } from '../people/shared';
-import {
-  LoadError,
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, PageHeading, SettingsFrame } from '../settings-frame';
 import {
   CATALOG_SIZE,
   DeleteRoleDialog,
@@ -71,6 +66,7 @@ import {
   people,
   useRoleCache,
 } from './roles-view';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const NAME_MAX = 100;
 const DESCRIPTION_MAX = 2000;
@@ -94,7 +90,7 @@ export function RoleView({ roleId }: { roleId: string }) {
   if (viewer.isSuccess && !can('role.read')) {
     return (
       <SettingsFrame crumbs={crumbs()}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

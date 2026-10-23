@@ -59,16 +59,20 @@ export function useSetupSecret() {
 }
 
 /**
- * Two-step setup, for an organization that requires it: scan the QR code
+ * Two-step setup, for an organization that requires it (or a Super Admin,
+ * who always must): scan the QR code
  * (or type the key), confirm with a code, then the backup codes, shown once.
  * Both calls are allowed on the sign-in challenge alone, which is what lets a
  * member with no second factor yet enrol. Confirming through the challenge
  * also signs the member in, so `onEnrolled` says whether a code is still due.
  */
 export function TwoStepSetup({
+  superAdmin = false,
   onEnrolled,
   onBack,
 }: {
+  /** A Super Admin, who must use it with no organization requiring it. */
+  superAdmin?: boolean;
   onEnrolled: (signedIn: boolean) => void;
   onBack: () => void;
 }) {
@@ -130,7 +134,11 @@ export function TwoStepSetup({
     <AuthCard
       above="Step 1 of 2"
       title="Set up two-step verification"
-      lead="Your organization requires a second step when you sign in. Scan this QR code with an authenticator app."
+      lead={
+        superAdmin
+          ? 'Super Admins must use a second step when they sign in. Scan this QR code with an authenticator app.'
+          : 'Your organization requires a second step when you sign in. Scan this QR code with an authenticator app.'
+      }
       busy={!secret}
     >
       <ScanAndConfirm

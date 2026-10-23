@@ -69,7 +69,7 @@ import { toastError } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { PersonStatus, PrimaryBadge, TwoStep } from '../badges';
 import { ConfirmDialog, RefusalAlert, type Refusal } from '../confirm-dialog';
-import { SettingsFrame, SettingsUnavailable } from '../settings-frame';
+import { SettingsFrame } from '../settings-frame';
 import {
   EditDepartmentsDialog,
   EditRolesDialog,
@@ -80,6 +80,7 @@ import {
   serverRefusal,
 } from './person-dialogs';
 import { useMemberships, usePeopleCache, useRoles } from './shared';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const GENDERS = [
   ['', 'Not given'],
@@ -105,7 +106,7 @@ export function PersonView({ userId }: { userId: string }) {
   if ((viewerQuery.isSuccess && !can('user.read')) || person.isError) {
     return (
       <SettingsFrame crumbs={[{ label: 'People', href: '/settings/people' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

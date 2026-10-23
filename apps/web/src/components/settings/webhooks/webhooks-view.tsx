@@ -47,12 +47,8 @@ import { EndpointStatus } from '../badges';
 import { CopyField } from '../copy-field';
 import { refusalText } from '../people/person-dialogs';
 import { useOrganizationName } from '../people/shared';
-import {
-  LoadError,
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, PageHeading, SettingsFrame } from '../settings-frame';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const URL_MAX = 2000;
 const DESCRIPTION_MAX = 500;
@@ -101,7 +97,7 @@ export function WebhooksView() {
   if (viewer.isSuccess && !can('organization.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'Webhooks' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

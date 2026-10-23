@@ -69,10 +69,7 @@ import {
 } from '@/lib/documents';
 import { fileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import {
-  KnowledgeHeader,
-  KnowledgeUnavailable,
-} from '../knowledge/knowledge-header';
+import { KnowledgeHeader } from '../knowledge/knowledge-header';
 import {
   DeletedBadge,
   DocumentStatusBadge,
@@ -95,6 +92,7 @@ import {
 } from './parts';
 import { UploadButton } from './upload-dialog';
 import { useDocumentLive } from './use-document-live';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const PAGE = 8;
 /** How often a list with work in flight looks again. */
@@ -183,7 +181,7 @@ export function DocumentsView() {
           ]}
         />
         <main id="main" tabIndex={-1} className="p-4 outline-none md:p-6">
-          <KnowledgeUnavailable />
+          <PageUnavailable back={{ href: '/knowledge', label: 'Knowledge' }} />
         </main>
       </>
     );

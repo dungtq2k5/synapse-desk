@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, type ReactNode } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,7 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar';
 import { NotificationsLive } from '@/components/notifications/store';
+import { ConsoleShell } from '@/components/platform/console-shell';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
 import { useViewer } from '@/hooks/use-viewer';
 import { SupportEmailContext } from '@/lib/support';
@@ -121,11 +122,33 @@ export function AppShell({
   /** The web server's `SUPPORT_EMAIL`, for the frozen page's mail link. */
   supportEmail?: string;
 }) {
+  const { isSuperAdmin } = useViewer();
   return (
     <SupportEmailContext value={supportEmail}>
-      <Shell>{children}</Shell>
+      {isSuperAdmin ? (
+        <SuperAdminAccount>{children}</SuperAdminAccount>
+      ) : (
+        <Shell>{children}</Shell>
+      )}
     </SupportEmailContext>
   );
+}
+
+/** The app's pages a Super Admin has: their own account, in the console. */
+const ACCOUNT_PATHS = ['/profile', '/security'];
+
+/**
+ * A Super Admin outside the console: their account pages wear the
+ * console's frame; any organization's page sends them to the console.
+ */
+function SuperAdminAccount({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const account = ACCOUNT_PATHS.some((path) => pathname.startsWith(path));
+  useEffect(() => {
+    if (!account) router.replace('/platform');
+  }, [account, router]);
+  return account ? <ConsoleShell>{children}</ConsoleShell> : null;
 }
 
 function Shell({ children }: { children: ReactNode }) {

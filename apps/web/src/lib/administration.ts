@@ -198,6 +198,8 @@ export const AUDIT_ACTION_WORDS: Record<AuditAction, string> = {
   [AuditAction.PLATFORM_PLAN_DELETED]: 'SynapseDesk deleted a plan',
   [AuditAction.PLATFORM_PLAN_APPLIED]:
     'SynapseDesk changed the organization’s plan',
+  [AuditAction.PLATFORM_JOB_RUN]: 'SynapseDesk ran a job',
+  [AuditAction.PLATFORM_JOB_BACKFILLED]: 'SynapseDesk recomputed a job’s range',
   [AuditAction.INVITATION_SENT]: 'Invited a person',
   [AuditAction.INVITATION_RESENT]: 'Resent an invitation',
   [AuditAction.INVITATION_REVOKED]: 'Revoked an invitation',
@@ -227,6 +229,7 @@ export const RESOURCE_TYPE_WORDS: Record<AuditResourceType, string> = {
   [AuditResourceType.SUBSCRIPTION_PLAN]: 'Plan',
   [AuditResourceType.INVITATION]: 'Invitation',
   [AuditResourceType.WEBHOOK_ENDPOINT]: 'Webhook endpoint',
+  [AuditResourceType.JOB]: 'Job',
 };
 
 /** Each webhook event type, as the endpoint's checkboxes say it. */

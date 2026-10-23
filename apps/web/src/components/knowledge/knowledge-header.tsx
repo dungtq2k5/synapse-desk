@@ -3,7 +3,6 @@
 import { useDocumentsControllerListFlagsV1 } from '@synapsedesk/api-client';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { buttonVariants } from '@/components/ui/button';
 import { useViewer } from '@/hooks/use-viewer';
 import { cn } from '@/lib/utils';
 
@@ -78,27 +77,6 @@ export function KnowledgeHeader({
           </ul>
         </nav>
       )}
-    </div>
-  );
-}
-
-/**
- * A Knowledge page the viewer may not open: the same words a missing
- * document gets, so the two can't be told apart.
- */
-export function KnowledgeUnavailable() {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
-      <h1 className="text-lg font-semibold">This page isn’t available</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        It doesn’t exist, or it isn’t shared with you.
-      </p>
-      <Link
-        href="/knowledge"
-        className={buttonVariants({ variant: 'outline', size: 'sm' })}
-      >
-        Back to Knowledge
-      </Link>
     </div>
   );
 }

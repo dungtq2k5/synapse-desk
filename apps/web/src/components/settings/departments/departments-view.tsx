@@ -58,12 +58,8 @@ import { toastError } from '@/lib/toast';
 import { Status } from '../badges';
 import { ConfirmDialog, type Refusal, useMenuHandoff } from '../confirm-dialog';
 import { refusalText, serverRefusal } from '../people/person-dialogs';
-import {
-  LoadError,
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, PageHeading, SettingsFrame } from '../settings-frame';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const NAME_MAX = 100;
 const DESCRIPTION_MAX = 2000;
@@ -128,7 +124,7 @@ export function DepartmentsView() {
   if (viewer.isSuccess && !can('department.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'Departments' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

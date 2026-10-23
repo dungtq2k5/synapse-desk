@@ -3,11 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useViewer } from '@/hooks/use-viewer';
-import {
-  SettingsFrame,
-  SettingsUnavailable,
-  useSettingsSections,
-} from './settings-frame';
+import { SettingsFrame, useSettingsSections } from './settings-frame';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 /**
  * Opens the first section the viewer can see, or says the area isn't theirs
@@ -24,7 +21,7 @@ export function SettingsHome() {
 
   return query.isSuccess && !first ? (
     <SettingsFrame crumbs={[]}>
-      <SettingsUnavailable />
+      <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
     </SettingsFrame>
   ) : null;
 }

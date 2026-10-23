@@ -18,6 +18,8 @@ export function useViewer() {
     user: query.data?.data?.user ?? null,
     /** False for someone who has only ever signed in with Google. */
     hasPassword: query.data?.data?.hasPassword ?? true,
+    /** A Super Admin, who runs the platform and belongs to no organization. */
+    isSuperAdmin: query.data?.data?.isSuperAdmin ?? false,
     /** The departments they belong to, by id. */
     departmentIds: query.data?.data?.departmentIds ?? [],
     can: (code: PermissionCode) => codes.includes(code),

@@ -64,6 +64,7 @@ export function RangePicker({
   limit,
   today,
   billing,
+  limitLine,
   onApply,
 }: {
   value: Range;
@@ -71,6 +72,8 @@ export function RangePicker({
   today: string;
   /** The reader may open Billing (`organization.read`). */
   billing: boolean;
+  /** The limit in words, when it isn't the plan's. */
+  limitLine?: string;
   onApply: (range: Range) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -89,6 +92,7 @@ export function RangePicker({
       limit={limit}
       today={today}
       billing={billing}
+      limitLine={limitLine}
       onCancel={() => setOpen(false)}
       onApply={(range) => {
         setOpen(false);
@@ -126,6 +130,7 @@ function PickerBody({
   limit,
   today,
   billing,
+  limitLine: ownLimitLine,
   onCancel,
   onApply,
 }: {
@@ -133,13 +138,15 @@ function PickerBody({
   limit: number;
   today: string;
   billing: boolean;
+  limitLine?: string;
   onCancel: () => void;
   onApply: (range: Range) => void;
 }) {
   const [start, setStart] = useState(value.from);
   const [end, setEnd] = useState<string | null>(value.to);
   const [month, setMonth] = useState(value.to.slice(0, 7));
-  const limitLine = `Your plan shows up to ${limit} days at a time.`;
+  const limitLine =
+    ownLimitLine ?? `Your plan shows up to ${limit} days at a time.`;
   const options = presets(today, limit);
   const chosen = options.find(
     (preset) => preset.from === start && preset.to === end,

@@ -11,7 +11,11 @@ const AUTHENTICATE = 'POST /api/v1/auth/2fa/authenticate';
 const GENERATE = 'POST /api/v1/auth/2fa/setup';
 const ENABLE = 'POST /api/v1/auth/2fa/enable';
 const SIGNED_IN = ok({ accessTokenExpiresIn: 900 });
-const CODE = ok({ requiresTwoFactor: true, requiresTwoFactorSetup: false });
+const CODE = ok({
+  requiresTwoFactor: true,
+  requiresTwoFactorSetup: false,
+  canRememberDevice: true,
+});
 
 // jsdom navigates only within the page, so `next` is a fragment the test can
 // watch the page arrive at.
@@ -103,7 +107,11 @@ describe('the sign-in flow', () => {
 
   it('**setup through the sign-in challenge signs in: no second code**', async () => {
     const { calls, user } = setup({
-      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
+      [LOGIN]: ok({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: true,
+        canRememberDevice: true,
+      }),
       [GENERATE]: ok({
         otpauthUri: 'otpauth://totp/SynapseDesk:priya?secret=JBSWY3DPEHPK3PXP',
         qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgo=',
@@ -125,7 +133,11 @@ describe('the sign-in flow', () => {
 
   it('without a session from setup, it still asks for a code', async () => {
     const { user } = setup({
-      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
+      [LOGIN]: ok({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: true,
+        canRememberDevice: true,
+      }),
       [GENERATE]: ok({
         otpauthUri: 'otpauth://totp/SynapseDesk:priya?secret=JBSWY3DPEHPK3PXP',
         qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgo=',

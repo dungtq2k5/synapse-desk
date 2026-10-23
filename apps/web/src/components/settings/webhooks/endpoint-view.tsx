@@ -49,17 +49,14 @@ import { toastError } from '@/lib/toast';
 import { DeliveryStatus, EndpointStatus } from '../badges';
 import { ConfirmDialog, useMenuHandoff } from '../confirm-dialog';
 import { refusalText, serverRefusal } from '../people/person-dialogs';
-import {
-  LoadError,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, SettingsFrame } from '../settings-frame';
 import {
   EndpointDialog,
   SecretDialog,
   failedInARow,
   useWebhookCache,
 } from './webhooks-view';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const DELIVERIES_SHOWN = 50;
 /** How long the old secret keeps signing after a rotation (the server's rule). */
@@ -110,7 +107,7 @@ export function EndpointView({ endpointId }: { endpointId: string }) {
   if (viewer.isSuccess && !can('organization.read')) {
     return (
       <SettingsFrame crumbs={crumbs()}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

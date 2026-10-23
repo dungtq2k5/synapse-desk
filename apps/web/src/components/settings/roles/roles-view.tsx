@@ -58,11 +58,8 @@ import {
 } from '../confirm-dialog';
 import { refusalText, serverRefusal } from '../people/person-dialogs';
 import { useOrganizationName, useRoles } from '../people/shared';
-import {
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { PageHeading, SettingsFrame } from '../settings-frame';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const NAME_MAX = 100;
 const DESCRIPTION_MAX = 2000;
@@ -112,7 +109,7 @@ export function RolesView() {
   if (viewer.isSuccess && !can('role.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'Roles' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

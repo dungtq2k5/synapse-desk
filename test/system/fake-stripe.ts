@@ -68,6 +68,18 @@ export const FAKE_CATALOG = [
   })),
 }));
 
+/**
+ * A price no seeded plan holds, for a journey that creates a plan of its own:
+ * a price belongs to one plan, so it can't borrow the catalog's. Readable by
+ * id only; no product lists it.
+ */
+export const FAKE_SPARE_PRICE = {
+  id: 'price_fake_team_monthly',
+  product: 'prod_fake_team',
+  interval: 'month' as const,
+  unitAmount: 4_900,
+};
+
 /** A catalog price as Stripe answers one. */
 function priceJson(price: (typeof FAKE_CATALOG)[number]['prices'][number]) {
   return {
@@ -141,7 +153,7 @@ export async function startFakeStripe(
   const id = (prefix: string) => `${prefix}_fake_${run}_${(seq += 1)}`;
 
   const priceById = (priceId: string) =>
-    FAKE_CATALOG.flatMap((plan) => plan.prices).find(
+    [...FAKE_CATALOG.flatMap((plan) => plan.prices), FAKE_SPARE_PRICE].find(
       (price) => price.id === priceId,
     );
   const customerOf = (organizationId: string) =>

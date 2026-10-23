@@ -22,6 +22,27 @@ const setup = (justEnrolled = false) => {
 const code = () => screen.getByLabelText('Verification code');
 
 describe('the two-step code', () => {
+  it('has no "Remember this device" for a Super Admin, and says why', async () => {
+    const calls = stubApi({
+      [AUTHENTICATE]: ok({ accessTokenExpiresIn: 900 }),
+    });
+    render(
+      <TwoStepCode
+        justEnrolled={false}
+        canRememberDevice={false}
+        onSignedIn={jest.fn()}
+        onBack={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Remember this device')).toBeNull();
+    expect(
+      screen.getByText('Super Admins enter a code every time they sign in.'),
+    ).toBeVisible();
+    await userEvent.setup().type(code(), '123456');
+    expect(calls[0].body).toMatchObject({ rememberDevice: false });
+  });
+
   it('verifies as soon as the sixth digit is typed', async () => {
     const calls = stubApi({
       [AUTHENTICATE]: ok({ accessTokenExpiresIn: 900 }),

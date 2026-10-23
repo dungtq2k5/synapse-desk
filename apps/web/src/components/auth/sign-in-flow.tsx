@@ -26,8 +26,8 @@ export type SignInNotice =
 
 type Step =
   | { kind: 'credentials' }
-  | { kind: 'code'; justEnrolled: boolean }
-  | { kind: 'setup' }
+  | { kind: 'code'; justEnrolled: boolean; canRememberDevice: boolean }
+  | { kind: 'setup'; superAdmin: boolean }
   | { kind: 'tenant'; tenants: TenantOptionResponseDto[] };
 
 /**
@@ -64,7 +64,7 @@ export function SignInFlow({
   const advance = (answer: SignInStep) => {
     if (answer.kind === 'signed-in') void finish();
     else if (answer.kind === 'code')
-      setStep({ kind: 'code', justEnrolled: false });
+      setStep({ ...answer, justEnrolled: false });
     else setStep(answer);
   };
   const back = () => setStep({ kind: 'credentials' });
@@ -99,6 +99,7 @@ export function SignInFlow({
       return (
         <TwoStepCode
           justEnrolled={step.justEnrolled}
+          canRememberDevice={step.canRememberDevice}
           onSignedIn={(warning) => void finish(warning)}
           onBack={back}
         />
@@ -106,10 +107,15 @@ export function SignInFlow({
     case 'setup':
       return (
         <TwoStepSetup
+          superAdmin={step.superAdmin}
           onEnrolled={(signedIn) =>
             signedIn
               ? void finish()
-              : setStep({ kind: 'code', justEnrolled: true })
+              : setStep({
+                  kind: 'code',
+                  justEnrolled: true,
+                  canRememberDevice: !step.superAdmin,
+                })
           }
           onBack={back}
         />

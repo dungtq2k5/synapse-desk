@@ -53,16 +53,18 @@ export async function afterSignIn(next: string): Promise<string> {
 /** What a sign-in leg answered, as the step the user takes next. */
 export type SignInStep =
   | { kind: 'signed-in' }
-  | { kind: 'code' }
-  | { kind: 'setup' }
+  | { kind: 'code'; canRememberDevice: boolean }
+  | { kind: 'setup'; superAdmin: boolean }
   | { kind: 'tenant'; tenants: TenantOptionResponseDto[] };
 
 /**
  * Reads `POST /auth/login` (or `/auth/login/tenant`): signed in, a two-step
- * code, two-step setup (the organization requires it and this account has
- * none), or a choice of organization.
+ * code, two-step setup (the organization requires it, or it's a Super Admin,
+ * and this account has none), or a choice of organization. Only a Super
+ * Admin's challenge can't remember the device, which is how setup knows to
+ * use their wording.
  *
- * @example signInStep({ requiresTwoFactor: true, requiresTwoFactorSetup: false }) // { kind: 'code' }
+ * @example signInStep({ requiresTwoFactor: true, requiresTwoFactorSetup: false, canRememberDevice: true }) // { kind: 'code', canRememberDevice: true }
  */
 export function signInStep(
   answer:
@@ -73,11 +75,13 @@ export function signInStep(
   if ('requiresTenantSelection' in answer && answer.requiresTenantSelection) {
     return { kind: 'tenant', tenants: answer.tenants };
   }
+  const canRememberDevice =
+    'canRememberDevice' in answer ? answer.canRememberDevice : true;
   if ('requiresTwoFactorSetup' in answer && answer.requiresTwoFactorSetup) {
-    return { kind: 'setup' };
+    return { kind: 'setup', superAdmin: !canRememberDevice };
   }
   if ('requiresTwoFactor' in answer && answer.requiresTwoFactor) {
-    return { kind: 'code' };
+    return { kind: 'code', canRememberDevice };
   }
   return { kind: 'signed-in' };
 }

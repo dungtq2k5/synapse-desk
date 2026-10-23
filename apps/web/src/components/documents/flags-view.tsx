@@ -21,12 +21,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useViewer } from '@/hooks/use-viewer';
 import { FLAG_TYPE } from '@/lib/documents';
-import {
-  KnowledgeHeader,
-  KnowledgeUnavailable,
-} from '../knowledge/knowledge-header';
+import { KnowledgeHeader } from '../knowledge/knowledge-header';
 import { FlagCard } from './flag-card';
 import { Empty, Pagination } from './parts';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const PAGE = 10;
 const ALL = 'all';
@@ -95,7 +93,7 @@ export function FlagsView() {
           ]}
         />
         <main id="main" tabIndex={-1} className="p-4 outline-none md:p-6">
-          <KnowledgeUnavailable />
+          <PageUnavailable back={{ href: '/knowledge', label: 'Knowledge' }} />
         </main>
       </>
     );

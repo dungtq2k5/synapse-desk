@@ -47,7 +47,11 @@ describe('choosing an organization', () => {
 
   it('dims the others while one signs in, and ignores a second choice', async () => {
     stubApi({
-      [TENANT]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: false }),
+      [TENANT]: ok({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+        canRememberDevice: true,
+      }),
     });
     // Hold the answer, to look at the page while the sign-in is in flight.
     const stubbed = globalThis.fetch;
@@ -71,7 +75,10 @@ describe('choosing an organization', () => {
 
     release();
     await waitFor(() =>
-      expect(onAnswer).toHaveBeenCalledWith({ kind: 'code' }),
+      expect(onAnswer).toHaveBeenCalledWith({
+        kind: 'code',
+        canRememberDevice: true,
+      }),
     );
   });
 

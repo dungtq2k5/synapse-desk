@@ -86,12 +86,36 @@ describe('signInStep', () => {
       kind: 'signed-in',
     });
     expect(
-      signInStep({ requiresTwoFactor: true, requiresTwoFactorSetup: false }),
-    ).toEqual({ kind: 'code' });
+      signInStep({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+        canRememberDevice: true,
+      }),
+    ).toEqual({ kind: 'code', canRememberDevice: true });
+    // A Super Admin's challenge can't remember the device.
+    expect(
+      signInStep({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+        canRememberDevice: false,
+      }),
+    ).toEqual({ kind: 'code', canRememberDevice: false });
     // Setup wins: there is no code to ask for yet.
     expect(
-      signInStep({ requiresTwoFactor: true, requiresTwoFactorSetup: true }),
-    ).toEqual({ kind: 'setup' });
+      signInStep({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: true,
+        canRememberDevice: true,
+      }),
+    ).toEqual({ kind: 'setup', superAdmin: false });
+    // Only a Super Admin's setup can't remember the device: their wording.
+    expect(
+      signInStep({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: true,
+        canRememberDevice: false,
+      }),
+    ).toEqual({ kind: 'setup', superAdmin: true });
     const tenants = [{ organizationId: 'o', name: 'Northwind', slug: 'nw' }];
     expect(signInStep({ requiresTenantSelection: true, tenants })).toEqual({
       kind: 'tenant',

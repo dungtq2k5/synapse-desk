@@ -76,13 +76,20 @@ describe('the sign-in form', () => {
 
   it('sends the trimmed email and answers with the next step', async () => {
     const calls = stubApi({
-      [LOGIN]: ok({ requiresTwoFactor: true, requiresTwoFactorSetup: false }),
+      [LOGIN]: ok({
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: false,
+        canRememberDevice: true,
+      }),
     });
     const { onAnswer, user } = setup();
 
     await signIn(user, '  priya@acme.example  ');
 
-    expect(onAnswer).toHaveBeenCalledWith({ kind: 'code' });
+    expect(onAnswer).toHaveBeenCalledWith({
+      kind: 'code',
+      canRememberDevice: true,
+    });
     expect(calls[0].body).toMatchObject({
       email: 'priya@acme.example',
       password: 'hunter2',

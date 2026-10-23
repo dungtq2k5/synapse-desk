@@ -68,18 +68,22 @@ const refusalOf = (failed: unknown): Refusal =>
 
 /**
  * Two-step verification: on, with its backup codes (regenerate) and a way to
- * turn it off, unless the organization requires it; or off, with a way to
+ * turn it off, unless the organization requires it (or it's a Super Admin's,
+ * who must always use it); or off, with a way to
  * turn it on. Each change takes the password, and a code to turn it off, so
  * an account without one (Google only) is pointed at setting one instead.
  */
 export function TwoStepSection({
   enabled,
   required,
+  superAdmin = false,
   organizationName,
   hasPassword,
 }: {
   enabled: boolean;
   required: boolean;
+  /** A Super Admin's account, which can't turn it off. */
+  superAdmin?: boolean;
   organizationName: string;
   hasPassword: boolean;
 }) {
@@ -129,7 +133,8 @@ export function TwoStepSection({
       <Separator />
       {hasPassword ? (
         <TurnOffRow
-          required={required}
+          required={required || superAdmin}
+          superAdmin={superAdmin}
           organizationName={organizationName}
           onDisabled={changed}
         />
@@ -376,10 +381,12 @@ function NewCodesDialog({
 
 function TurnOffRow({
   required,
+  superAdmin,
   organizationName,
   onDisabled,
 }: {
   required: boolean;
+  superAdmin: boolean;
   organizationName: string;
   onDisabled: () => void;
 }) {
@@ -390,9 +397,11 @@ function TurnOffRow({
       title="Turn off two-step verification"
       detailId="turn-off-detail"
       detail={
-        required
-          ? `${organizationName} requires two-step verification, so you can’t turn it off.`
-          : 'You’ll need your password and a code from your app.'
+        superAdmin
+          ? 'Super Admins must use two-step verification, so you can’t turn it off.'
+          : required
+            ? `${organizationName} requires two-step verification, so you can’t turn it off.`
+            : 'You’ll need your password and a code from your app.'
       }
     >
       <Button
@@ -407,6 +416,7 @@ function TurnOffRow({
       <TurnOffDialog
         open={open}
         onOpenChange={setOpen}
+        superAdmin={superAdmin}
         organizationName={organizationName}
         onDisabled={() => {
           setOpen(false);
@@ -421,16 +431,18 @@ function TurnOffRow({
 /**
  * Turning two-step off takes the password and a code from the app. An
  * organization that requires two-step refuses (a 400), and the dialog then
- * only closes.
+ * only closes. A Super Admin's refusal is the server's own sentence.
  */
 function TurnOffDialog({
   open,
   onOpenChange,
+  superAdmin,
   organizationName,
   onDisabled,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  superAdmin: boolean;
   organizationName: string;
   onDisabled: () => void;
 }) {
@@ -438,6 +450,7 @@ function TurnOffDialog({
   const [code, setCode] = useState('');
   const [error, setError] = useState<{ password?: string; code?: string }>({});
   const [refusal, setRefusal] = useState<Refusal | 'required' | null>(null);
+  const [sentence, setSentence] = useState('');
   const [busy, setBusy] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
@@ -475,6 +488,8 @@ function TurnOffDialog({
         setCode('');
         codeRef.current?.focus();
       } else if (failed instanceof ApiError && failed.status === 400) {
+        // The gateway ends its sentences with "!"; the page uses a period.
+        setSentence(failed.message.replace(/!$/, '.'));
         setRefusal('required');
       } else {
         setRefusal(refusalOf(failed));
@@ -498,7 +513,12 @@ function TurnOffDialog({
               code from your app to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {refusal === 'required' ? (
+          {refusal === 'required' && superAdmin ? (
+            <Alert variant="destructive" role="alert">
+              <CircleAlertIcon />
+              <AlertTitle>{sentence}</AlertTitle>
+            </Alert>
+          ) : refusal === 'required' ? (
             <Alert variant="destructive" role="alert">
               <CircleAlertIcon />
               <AlertTitle>

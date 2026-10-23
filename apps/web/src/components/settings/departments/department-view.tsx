@@ -51,18 +51,14 @@ import { RefusalAlert, type Refusal } from '../confirm-dialog';
 import { PeoplePicker, type Picked } from '../people-picker';
 import { refusalText, serverRefusal } from '../people/person-dialogs';
 import { PersonCell } from '../people/shared';
-import {
-  LoadError,
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, PageHeading, SettingsFrame } from '../settings-frame';
 import {
   DeleteDepartmentDialog,
   DepartmentDialog,
   members,
   useDepartmentCache,
 } from './departments-view';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const ADD_MAX = 50;
 
@@ -95,7 +91,7 @@ export function DepartmentView({ departmentId }: { departmentId: string }) {
   if (viewer.isSuccess && !readable) {
     return (
       <SettingsFrame crumbs={crumbs()}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

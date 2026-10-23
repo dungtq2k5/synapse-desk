@@ -60,12 +60,7 @@ import { calendarDate, relativeTime } from '@/lib/format';
 import { toastError } from '@/lib/toast';
 import { PersonStatus, TwoStep } from '../badges';
 import { ConfirmDialog, useMenuHandoff } from '../confirm-dialog';
-import {
-  LoadError,
-  Loading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from '../settings-frame';
+import { LoadError, Loading, SettingsFrame } from '../settings-frame';
 import { InviteButton } from './invite-dialog';
 import {
   EditDepartmentsDialog,
@@ -83,6 +78,7 @@ import {
   usePeopleCache,
   useRoles,
 } from './shared';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 const PAGE_SIZE = 10;
 
@@ -135,7 +131,7 @@ export function MembersView() {
   if (viewer.isSuccess && !can('user.read')) {
     return (
       <SettingsFrame crumbs={[{ label: 'People' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useInConsole } from '@/components/platform/console-context';
 import { SidebarMenuButton } from '@/components/ui/sidebar';
 import { useViewer } from '@/hooks/use-viewer';
 import { leaveFor } from '@/lib/leave';
@@ -42,9 +43,14 @@ export function useSignOut(): () => Promise<void> {
   return signOut;
 }
 
-/** The account button at the foot of the sidebar: theme and sign-out. */
+/**
+ * The account button at the foot of the sidebar: theme and sign-out. In the
+ * platform console it says "Super Admin" and has no notification settings.
+ */
 export function UserMenu() {
   const { user } = useViewer();
+  const inConsole = useInConsole();
+  const email = inConsole ? `Super Admin · ${user?.email ?? ''}` : user?.email;
   const { theme, setTheme } = useTheme();
   const signOut = useSignOut();
 
@@ -60,7 +66,7 @@ export function UserMenu() {
           <span className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-medium">{user?.fullName}</span>
             <span className="truncate text-xs text-muted-foreground">
-              {user?.email}
+              {email}
             </span>
           </span>
           <ChevronsUpDownIcon className="ml-auto size-4" />
@@ -84,12 +90,14 @@ export function UserMenu() {
             Security
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/notifications/settings">
-            <BellIcon />
-            Notification settings
-          </Link>
-        </DropdownMenuItem>
+        {!inConsole && (
+          <DropdownMenuItem asChild>
+            <Link href="/notifications/settings">
+              <BellIcon />
+              Notification settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           Theme

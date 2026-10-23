@@ -7,7 +7,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AppHeader } from '@/components/shell/app-header';
-import { buttonVariants } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -31,6 +30,7 @@ import { clockTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { ExportButton, ExportStatus } from './export';
 import { RangePicker } from './range-picker';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 export type Section =
   'overview' | 'agents' | 'knowledge' | 'ai-usage' | 'feedback';
@@ -192,7 +192,7 @@ export function AnalyticsFrame({
         className="flex flex-col gap-6 p-4 outline-none md:p-6"
       >
         {viewer.isSuccess && !allowed ? (
-          <Unavailable />
+          <PageUnavailable back={{ href: '/tickets', label: 'Tickets' }} />
         ) : (
           <>
             <header className="flex flex-wrap items-start justify-between gap-4">
@@ -337,23 +337,6 @@ function FilterBar({
         </p>
       )}
       <div className="md:ml-auto">{status}</div>
-    </div>
-  );
-}
-
-function Unavailable() {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-16 text-center">
-      <h1 className="text-lg font-semibold">This page isn’t available</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        It doesn’t exist, or it isn’t shared with you.
-      </p>
-      <Link
-        href="/tickets"
-        className={buttonVariants({ variant: 'outline', size: 'sm' })}
-      >
-        Back to Tickets
-      </Link>
     </div>
   );
 }

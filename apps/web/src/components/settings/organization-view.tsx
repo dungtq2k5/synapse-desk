@@ -26,14 +26,10 @@ import { OrganizationStatus } from './badges';
 import { DangerZone } from './organization-danger';
 import { InboundEmailCard } from './organization-inbound';
 import { SecurityCard, UploadLimitsCard } from './organization-security';
-import {
-  LoadError,
-  PageHeading,
-  SettingsFrame,
-  SettingsUnavailable,
-} from './settings-frame';
+import { LoadError, PageHeading, SettingsFrame } from './settings-frame';
 import { useOrganizationCache } from './use-organization-cache';
 import { UsageMeters } from './usage-meter';
+import { PageUnavailable } from '@/components/shell/page-unavailable';
 
 /** The 409s that name a field, in the server's words. */
 export const SLUG_TAKEN =
@@ -57,7 +53,7 @@ export function OrganizationView() {
   if (viewer.isSuccess && !readable) {
     return (
       <SettingsFrame crumbs={[{ label: 'Organization' }]}>
-        <SettingsUnavailable />
+        <PageUnavailable back={{ href: '/settings', label: 'Settings' }} />
       </SettingsFrame>
     );
   }

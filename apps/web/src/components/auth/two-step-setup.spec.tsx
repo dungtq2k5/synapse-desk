@@ -30,6 +30,20 @@ const textOf = (blob: Blob | undefined) =>
     reader.readAsText(blob as Blob);
   });
 
+describe('a Super Admin’s setup', () => {
+  it('says Super Admins must use it, not that an organization requires it', async () => {
+    stubApi({ [GENERATE]: SECRET });
+    render(
+      <TwoStepSetup superAdmin onEnrolled={jest.fn()} onBack={jest.fn()} />,
+    );
+
+    expect(
+      await screen.findByText(/^Super Admins must use a second step/),
+    ).toBeVisible();
+    expect(screen.queryByText(/Your organization requires/)).toBeNull();
+  });
+});
+
 describe('the manual key', () => {
   it('is the secret in groups of four', () => {
     expect(

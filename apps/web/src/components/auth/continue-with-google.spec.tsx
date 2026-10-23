@@ -43,6 +43,7 @@ describe('continue with Google', () => {
       'POST /api/v1/auth/google': ok({
         requiresTwoFactor: true,
         requiresTwoFactorSetup: false,
+        canRememberDevice: true,
       }),
     });
     const { onAnswer, user } = setup();
@@ -53,7 +54,10 @@ describe('continue with Google', () => {
       url: '/api/v1/auth/google',
       body: { idToken: 'id-token' },
     });
-    expect(onAnswer).toHaveBeenCalledWith({ kind: 'code' });
+    expect(onAnswer).toHaveBeenCalledWith({
+      kind: 'code',
+      canRememberDevice: true,
+    });
   });
 
   it('says nothing when the person closes the popup', async () => {

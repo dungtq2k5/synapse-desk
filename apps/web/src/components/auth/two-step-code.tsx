@@ -112,11 +112,14 @@ export function CodeSlots({
  */
 export function TwoStepCode({
   justEnrolled,
+  canRememberDevice = true,
   onSignedIn,
   onBack,
 }: {
   /** Two-step setup just finished: say it's on. */
   justEnrolled: boolean;
+  /** False for a Super Admin, who enters a code every time: no box. */
+  canRememberDevice?: boolean;
   onSignedIn: (warning: string | null) => void;
   onBack: () => void;
 }) {
@@ -140,7 +143,7 @@ export function TwoStepCode({
     try {
       const answer = await twoFactorAuthControllerAuthenticateV1({
         ...value,
-        rememberDevice: remember,
+        rememberDevice: canRememberDevice && remember,
         deviceName: deviceName(navigator.userAgent),
       });
       onSignedIn(answer.data?.warning ?? null);
@@ -251,14 +254,20 @@ export function TwoStepCode({
           </Field>
         )}
 
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="remember-device"
-            checked={remember}
-            onCheckedChange={(checked) => setRemember(checked === true)}
-          />
-          <Label htmlFor="remember-device">Remember this device</Label>
-        </div>
+        {canRememberDevice ? (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="remember-device"
+              checked={remember}
+              onCheckedChange={(checked) => setRemember(checked === true)}
+            />
+            <Label htmlFor="remember-device">Remember this device</Label>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Super Admins enter a code every time they sign in.
+          </p>
+        )}
 
         <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
           {busy ? 'Verifying…' : 'Verify'}

@@ -48,11 +48,16 @@ export function PlanLink({ canChange }: { canChange: boolean }) {
   );
 }
 
-/** "Showing {from}–{to} of {total}", with Previous and Next. */
+/**
+ * "Showing {from}–{to} of {total}", with Previous and Next. `stacked` gives
+ * the buttons their own row under the count below 768 px, never one
+ * wrapping row.
+ */
 export function Pagination({
   meta,
   onPage,
   noun,
+  stacked = false,
 }: {
   meta: {
     currentPage: number;
@@ -63,13 +68,19 @@ export function Pagination({
   };
   onPage: (page: number) => void;
   noun: string;
+  stacked?: boolean;
 }) {
   const from = (meta.currentPage - 1) * meta.itemsPerPage + 1;
   const to = from + meta.itemCount - 1;
   return (
     <nav
       aria-label={`Pages of ${noun}`}
-      className="flex flex-wrap items-center justify-between gap-3 text-sm"
+      className={cn(
+        'flex gap-3 text-sm',
+        stacked
+          ? 'flex-col items-start md:flex-row md:items-center md:justify-between'
+          : 'flex-wrap items-center justify-between',
+      )}
     >
       <p className="text-muted-foreground">
         Showing {from}–{to} of {meta.totalItems.toLocaleString('en-US')}
