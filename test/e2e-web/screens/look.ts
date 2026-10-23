@@ -51,12 +51,17 @@ export async function look(
      * the viewport and moves when a full-page capture resizes it.
      */
     viewportOnly?: boolean;
+    /**
+     * The row paused the page's clock to hold a state on a timer (a "Copied"
+     * that reverts): axe gets the clock moved on only as far as it needs.
+     */
+    heldClock?: boolean;
   } = {},
 ): Promise<void> {
   const initial = page.viewportSize();
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
-    await accessible(page, options.disabled ?? []);
+    await accessible(page, options.disabled ?? [], options.heldClock);
     for (const { name: width, ...size } of WIDTHS.filter(
       ({ name: each }) => !options.widths || options.widths.includes(each),
     )) {
@@ -102,11 +107,23 @@ const CLOSING_LAYER =
 export async function accessible(
   page: Page,
   disabled: string[] = [],
+  heldClock = false,
 ): Promise<void> {
   await expect(page.locator(CLOSING_LAYER)).toHaveCount(0);
-  const { violations } = await new AxeBuilder({ page })
-    .disableRules(disabled)
-    .analyze();
+  const run = new AxeBuilder({ page }).disableRules(disabled).analyze();
+  // Axe waits on the page's timers, so a paused clock would hang it: move it
+  // on a millisecond at a time until axe is done (about 15 ms a pass). The
+  // clock is the context's, so a tick can land as axe closes its own helper
+  // page and fail; `run` still says how axe went.
+  let done = false;
+  const settle = () => {
+    done = true;
+  };
+  void run.then(settle, settle);
+  while (heldClock && !done) {
+    await page.clock.runFor(1).catch(() => undefined);
+  }
+  const { violations } = await run;
   expect(
     violations
       .filter(({ impact }) => impact === 'serious' || impact === 'critical')

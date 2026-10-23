@@ -128,10 +128,20 @@ test.describe('inbound email on', () => {
 
   test('the address, just copied', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.clock.install();
     await open(page, on);
     await page.getByRole('button', { name: 'Copy' }).click();
     await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
-    await look(page, 'organization-inbound-on', { mask: profile(page) });
+    // "Copied" reverts after 2 s, sooner than six checks and captures take:
+    // the clock is paused (a moment ahead, so it never runs backward) to hold it.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    await look(page, 'organization-inbound-on', {
+      mask: profile(page),
+      heldClock: true,
+    });
+    // It only ever turns back into Copy, so still Copied now is Copied in
+    // every capture.
+    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
   });
 
   test('Rotate: the confirmation', async ({ page }) => {
