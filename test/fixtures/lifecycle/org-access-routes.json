@@ -156,6 +156,8 @@
     true,
     true
   ],
+  ["DELETE", "/api/v1/platform/organizations/{id}/plan", "WRITE", true, true],
+  ["POST", "/api/v1/platform/organizations/{id}/plan", "WRITE", true, true],
   ["POST", "/api/v1/platform/organizations/{id}/restore", "WRITE", true, true],
   ["POST", "/api/v1/platform/organizations/{id}/status", "WRITE", true, true],
   ["GET", "/api/v1/platform/plans", "READ", true, true],

@@ -138,6 +138,12 @@ export enum AuditAction {
   // by the service that runs it, with the reason and what it counted.
   PLATFORM_JOB_RUN = 'PLATFORM_JOB_RUN',
   PLATFORM_JOB_BACKFILLED = 'PLATFORM_JOB_BACKFILLED',
+
+  // An organization put on a negotiated plan (no Stripe product) by a Super
+  // Admin, or released from one to self-service: recorded under the
+  // organization, with the plan, before and after, and the reason.
+  PLATFORM_PLAN_ASSIGNED = 'PLATFORM_PLAN_ASSIGNED',
+  PLATFORM_PLAN_RELEASED = 'PLATFORM_PLAN_RELEASED',
 }
 
 /**

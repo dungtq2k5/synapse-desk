@@ -64,6 +64,7 @@ import { OrganizationsService } from '../organizations/organizations.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';
+import { isAssignedPlan } from '../billing/plan-assignment';
 import { toUserResponse } from '../users/user.mapper';
 import { ROLE_INCLUDE, toRoleResponse } from '../roles/role.mapper';
 import { Organization, Prisma } from '../../generated/prisma/client';
@@ -73,12 +74,12 @@ const ORGANIZATION_COUNTS = {
   _count: {
     select: { users: true, departments: true, invitations: true },
   },
-  plan: { select: { name: true } },
+  plan: { select: { name: true, stripeProductId: true } },
 } satisfies Prisma.OrganizationInclude;
 
 type OrganizationRow = Organization & {
   _count: { users: number; departments: number; invitations: number };
-  plan: { name: string } | null;
+  plan: { name: string; stripeProductId: string | null } | null;
 };
 
 /**
@@ -370,6 +371,9 @@ export class PlatformService {
     if (request.monthlyAiTokenBudget !== undefined) {
       data.monthlyAiTokenBudget = BigInt(request.monthlyAiTokenBudget);
     }
+    if (request.entitlementsPinned !== undefined) {
+      data.entitlementsPinned = request.entitlementsPinned;
+    }
 
     const organization = await this.updateOrConflict(existing.id, data);
 
@@ -383,6 +387,7 @@ export class PlatformService {
           name: existing.name,
           slug: existing.slug,
           maxAgentSeats: existing.maxAgentSeats,
+          entitlementsPinned: existing.entitlementsPinned,
         },
         // Recorded so the revert is attributable when it happens: a tenant
         // with a subscription had a quota set by hand, and the next webhook
@@ -396,6 +401,7 @@ export class PlatformService {
           name: organization.name,
           slug: organization.slug,
           maxAgentSeats: organization.maxAgentSeats,
+          entitlementsPinned: organization.entitlementsPinned,
         },
       },
     });
@@ -939,5 +945,7 @@ function toPlatformOrganizationResponse(
     statusChangedAt: row.statusChangedAt
       ? toProtoTimestamp(row.statusChangedAt)
       : undefined,
+    entitlementsPinned: row.entitlementsPinned,
+    planAssigned: isAssignedPlan(row.plan),
   };
 }

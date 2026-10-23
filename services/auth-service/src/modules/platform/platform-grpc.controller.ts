@@ -31,6 +31,8 @@ import {
   UpdatePlatformOrganizationRequest,
   ApplyPlanRequest,
   ApplyPlanResponse,
+  AssignPlanRequest,
+  ReleasePlanRequest,
   CreatePlanRequest,
   DeletePlanResponse,
   ListPlansRequest,
@@ -219,6 +221,20 @@ export class PlatformGrpcController implements PlatformServiceController {
     metadata?: Metadata,
   ): Promise<ApplyPlanResponse> {
     return this.planAdmin.applyPlan(request, unpackCallerContext(metadata));
+  }
+
+  assignPlan(
+    request: AssignPlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> {
+    return this.planAdmin.assignPlan(request, unpackCallerContext(metadata));
+  }
+
+  releasePlan(
+    request: ReleasePlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> {
+    return this.planAdmin.releasePlan(request, unpackCallerContext(metadata));
   }
 
   getMetrics(): Promise<PlatformMetricsResponse> {

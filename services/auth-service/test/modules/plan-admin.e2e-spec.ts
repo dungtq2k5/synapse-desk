@@ -1,7 +1,11 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc } from '@synapsedesk/testing/rpc';
-import { AuditAction, PLAN_LIMIT_DIMENSIONS } from '@synapsedesk/contracts';
+import {
+  AuditAction,
+  FREE_TIER_ORGANIZATION_GRANTS,
+  PLAN_LIMIT_DIMENSIONS,
+} from '@synapsedesk/contracts';
 import { AuditPublisher, JetStreamPublisher } from '@synapsedesk/nest-common';
 import { AiModelTier as ProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
@@ -271,9 +275,13 @@ describe('The plan catalogue (e2e)', () => {
       const plan = await buildPlan({ monthlyAiTokenBudget: 10_000_000 });
       const organization = await subscriberOf(plan.id);
 
+      // A subscriber Stripe bills: its next event is the cycle roll.
       await fx.prisma.organization.update({
         where: { id: organization.id },
-        data: { monthlyAiTokenBudget: 10_000_000n },
+        data: {
+          monthlyAiTokenBudget: 10_000_000n,
+          stripeSubscriptionId: `sub_budget_${organization.id}`,
+        },
       });
 
       await plans.updatePlan(
@@ -314,6 +322,313 @@ describe('The plan catalogue (e2e)', () => {
 
       expect(afterRaise.monthlyAiTokenBudget).toBe(99_000_000n);
       expect(raised.subscribers[0].budgetDeferred).toBe(false);
+    });
+
+    it('4b. **…but with no subscription the cut lands now**: nothing else rolls its cycle', async () => {
+      const plan = await buildPlan({ monthlyAiTokenBudget: 10_000_000 });
+      const organization = await subscriberOf(plan.id);
+      await fx.prisma.organization.update({
+        where: { id: organization.id },
+        data: { monthlyAiTokenBudget: 10_000_000n },
+      });
+
+      await plans.updatePlan(
+        { planId: plan.id, monthlyAiTokenBudget: 1_000_000 } as never,
+        context(),
+      );
+      const lowered = await plans.applyPlan(
+        { planId: plan.id, dryRun: false },
+        context(),
+      );
+
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(after.monthlyAiTokenBudget).toBe(1_000_000n);
+      expect(lowered.subscribers[0].budgetDeferred).toBe(false);
+    });
+  });
+
+  // ---------------------------------------------------------------- One organization's plan
+
+  /** A refusal with its code and its sentence. */
+  const refusedWith = async (
+    promise: Promise<unknown>,
+    code: number,
+    sentence: RegExp,
+  ) => {
+    const error = await promise.then(
+      () => null,
+      (failure: unknown) => failure,
+    );
+    expect(error).toBeInstanceOf(RpcException);
+    const { code: actual, message } = (error as RpcException).getError() as {
+      code: number;
+      message: string;
+    };
+    expect(actual).toBe(code);
+    expect(message).toMatch(sentence);
+  };
+
+  describe('Assigning a negotiated plan, and releasing it', () => {
+    const assign = (organizationId: string, planId: string, dryRun = false) =>
+      plans.assignPlan(
+        { organizationId, planId, reason: 'Signed the agreement', dryRun },
+        context(),
+      );
+    const release = (organizationId: string, dryRun = false) =>
+      plans.releasePlan(
+        { organizationId, reason: 'Moving to self-service', dryRun },
+        context(),
+      );
+
+    it('A1. assigns: the plan and its grants, no pin, announced and audited under the organization', async () => {
+      const plan = await buildPlan({ maxAgentSeats: 60 });
+      const organization = await createOrganization(fx.prisma);
+
+      const preview = await assign(organization.id, plan.id, true);
+      expect(preview.dryRun).toBe(true);
+      expect(preview.subscribers[0].changes).toHaveProperty('maxAgentSeats');
+      const untouched = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(untouched.planId).toBeNull();
+      expect(publishEntitlementsChanged).not.toHaveBeenCalled();
+
+      const done = await assign(organization.id, plan.id);
+      expect(done.subscribers).toEqual(preview.subscribers);
+
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(after.planId).toBe(plan.id);
+      expect(after.maxAgentSeats).toBe(60);
+      expect(after.entitlementsPinned).toBe(false);
+      expect(publishEntitlementsChanged).toHaveBeenCalledWith(
+        organization.id,
+        expect.stringMatching(
+          new RegExp(`^assign:${organization.id}:${plan.id}:`),
+        ),
+      );
+      expect(auditRecord).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: AuditAction.PLATFORM_PLAN_ASSIGNED,
+          resourceType: 'ORGANIZATION',
+          resourceId: organization.id,
+          organizationId: null,
+          metadata: expect.objectContaining({
+            planId: plan.id,
+            planName: plan.name,
+            before: { planId: null, planName: null },
+            after: { planId: plan.id, planName: plan.name },
+            reason: 'Signed the agreement',
+          }),
+        }),
+      );
+    });
+
+    it('A2. an inactive negotiated plan is assignable; a Stripe plan, Free and a retired plan are not', async () => {
+      const organization = await createOrganization(fx.prisma);
+
+      const inactive = await buildPlan({ isActive: false });
+      await assign(organization.id, inactive.id);
+
+      const sold = await buildPlan({
+        stripeProductId: `prod_sold_${uniqueIndex}`,
+      });
+      await expectRpc(
+        assign(organization.id, sold.id),
+        status.INVALID_ARGUMENT,
+      );
+
+      const free = await fx.prisma.subscriptionPlan.findFirstOrThrow({
+        where: { name: 'Free', deletedAt: null },
+      });
+      await expectRpc(
+        assign(organization.id, free.id),
+        status.INVALID_ARGUMENT,
+      );
+
+      const retired = await buildPlan();
+      await plans.deletePlan(retired.id, context());
+      await expectRpc(assign(organization.id, retired.id), status.NOT_FOUND);
+    });
+
+    it('A3. refused beside a Stripe subscription, for an offboarded organization, and without a reason', async () => {
+      const plan = await buildPlan();
+      const billed = await createOrganization(fx.prisma, {
+        stripeSubscriptionId: `sub_assign_${uniqueIndex}`,
+      });
+      await refusedWith(
+        assign(billed.id, plan.id),
+        status.FAILED_PRECONDITION,
+        /Cancel its Stripe subscription first/,
+      );
+
+      const gone = await createOrganization(fx.prisma, {
+        deletedAt: new Date(),
+      });
+      await expectRpc(assign(gone.id, plan.id), status.NOT_FOUND);
+
+      const organization = await createOrganization(fx.prisma);
+      await expectRpc(
+        plans.assignPlan(
+          {
+            organizationId: organization.id,
+            planId: plan.id,
+            reason: ' ',
+            dryRun: false,
+          },
+          context(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      // A preview needs no reason.
+      await expect(
+        plans.assignPlan(
+          {
+            organizationId: organization.id,
+            planId: plan.id,
+            reason: '',
+            dryRun: true,
+          },
+          context(),
+        ),
+      ).resolves.toMatchObject({ dryRun: true });
+    });
+
+    it('A4. the preview names a seat overrun, and the assignment still goes through', async () => {
+      const plan = await buildPlan({ maxAgentSeats: 1 });
+      const organization = await createOrganization(fx.prisma);
+      for (let index = 0; index < 3; index += 1) {
+        await createUser(fx.prisma, { organizationId: organization.id });
+      }
+
+      const preview = await assign(organization.id, plan.id, true);
+      expect(preview.overLimitCount).toBe(1);
+      expect(preview.subscribers[0].overLimitItems).toEqual([
+        { dimension: 'SEATS', inUse: 3, allowed: 1 },
+      ]);
+
+      await assign(organization.id, plan.id);
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(after.maxAgentSeats).toBe(1);
+    });
+
+    it('A5. applying the plan reaches an assigned subscriber, and still skips a pinned one', async () => {
+      const plan = await buildPlan({ maxAgentSeats: 20 });
+      const assigned = await createOrganization(fx.prisma);
+      await assign(assigned.id, plan.id);
+      const pinned = await subscriberOf(plan.id);
+      await fx.prisma.organization.update({
+        where: { id: pinned.id },
+        data: { entitlementsPinned: true, maxAgentSeats: 99 },
+      });
+
+      await plans.updatePlan(
+        { planId: plan.id, maxAgentSeats: 30 } as never,
+        context(),
+      );
+      const applied = await plans.applyPlan(
+        { planId: plan.id, dryRun: false },
+        context(),
+      );
+
+      const byId = new Map(
+        applied.subscribers.map((row) => [row.organizationId, row]),
+      );
+      expect(byId.get(assigned.id)?.skippedPinned).toBe(false);
+      expect(byId.get(pinned.id)?.skippedPinned).toBe(true);
+      const [afterAssigned, afterPinned] = await Promise.all(
+        [assigned.id, pinned.id].map((id) =>
+          fx.prisma.organization.findUniqueOrThrow({ where: { id } }),
+        ),
+      );
+      expect(afterAssigned.maxAgentSeats).toBe(30);
+      expect(afterPinned.maxAgentSeats).toBe(99);
+    });
+
+    it("B1. releases: no plan, the free tier's grants, a pin left as it is", async () => {
+      const plan = await buildPlan({
+        maxAgentSeats: 60,
+        maxAnalyticsRangeDays: 90,
+      });
+      const organization = await createOrganization(fx.prisma);
+      await assign(organization.id, plan.id);
+      await fx.prisma.organization.update({
+        where: { id: organization.id },
+        data: { entitlementsPinned: true },
+      });
+
+      const preview = await release(organization.id, true);
+      expect(preview.subscribers[0].changes).toHaveProperty('maxAgentSeats');
+
+      await release(organization.id);
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(after.planId).toBeNull();
+      expect(after.maxAgentSeats).toBe(
+        FREE_TIER_ORGANIZATION_GRANTS.maxAgentSeats,
+      );
+      expect(after.maxStorageBytes).toBe(
+        FREE_TIER_ORGANIZATION_GRANTS.maxStorageBytes,
+      );
+      expect(after.monthlyAiTokenBudget).toBe(
+        FREE_TIER_ORGANIZATION_GRANTS.monthlyAiTokenBudget,
+      );
+      expect(after.maxAnalyticsRangeDays).toBe(
+        FREE_TIER_ORGANIZATION_GRANTS.maxAnalyticsRangeDays,
+      );
+      expect(after.entitlementsPinned).toBe(true);
+      expect(publishEntitlementsChanged).toHaveBeenLastCalledWith(
+        organization.id,
+        expect.stringMatching(new RegExp(`^release:${organization.id}:`)),
+      );
+      expect(auditRecord).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: AuditAction.PLATFORM_PLAN_RELEASED,
+          resourceId: organization.id,
+          metadata: expect.objectContaining({
+            planId: plan.id,
+            after: { planId: null, planName: null },
+            reason: 'Moving to self-service',
+          }),
+        }),
+      );
+    });
+
+    it('B2. refused for an organization not on an assigned plan, and beside a subscription', async () => {
+      const free = await createOrganization(fx.prisma);
+      await refusedWith(
+        release(free.id),
+        status.FAILED_PRECONDITION,
+        /isn’t on an assigned plan/,
+      );
+
+      const sold = await buildPlan({
+        stripeProductId: `prod_release_${uniqueIndex}`,
+      });
+      const onStripe = await subscriberOf(sold.id);
+      await expectRpc(release(onStripe.id), status.FAILED_PRECONDITION);
+
+      const plan = await buildPlan();
+      const assigned = await createOrganization(fx.prisma);
+      await assign(assigned.id, plan.id);
+      await fx.prisma.organization.update({
+        where: { id: assigned.id },
+        data: { stripeSubscriptionId: `sub_release_${uniqueIndex}` },
+      });
+      await refusedWith(
+        release(assigned.id),
+        status.FAILED_PRECONDITION,
+        /Cancel its Stripe subscription first/,
+      );
     });
   });
 

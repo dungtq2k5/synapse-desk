@@ -45,7 +45,19 @@ export interface PlatformOrganizationResponse {
    * When the status last changed. Absent for an organization older than the
    * record of it.
    */
-  statusChangedAt?: Timestamp | undefined;
+  statusChangedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * A Super Admin's override of its limits that nothing rewrites: not a
+   * Stripe event, not applying its plan.
+   */
+  entitlementsPinned: boolean;
+  /**
+   * On a plan with no Stripe product that isn't Free: a negotiated plan the
+   * platform assigned, released only by the platform.
+   */
+  planAssigned: boolean;
 }
 
 export interface ListPlatformOrganizationsRequest {
@@ -112,7 +124,37 @@ export interface UpdatePlatformOrganizationRequest {
   domain?: string | undefined;
   maxAgentSeats?: number | undefined;
   maxStorageBytes?: number | undefined;
-  monthlyAiTokenBudget?: number | undefined;
+  monthlyAiTokenBudget?:
+    | number
+    | undefined;
+  /**
+   * Keep the limits when Stripe's events arrive (true), or let the next one
+   * write the plan's grants back (false). Absent leaves the pin alone.
+   */
+  entitlementsPinned?: boolean | undefined;
+}
+
+/**
+ * Put an organization on a negotiated plan: a plan with no Stripe product,
+ * not Free. Its grants become the plan's row, so applying the plan later
+ * reaches it like any subscriber. Refused beside a Stripe subscription.
+ */
+export interface AssignPlanRequest {
+  organizationId: string;
+  planId: string;
+  reason: string;
+  /** TRUE projects and writes nothing, through the same code. */
+  dryRun: boolean;
+}
+
+/**
+ * Take an assigned organization off its plan, onto the free tier's grants
+ * and no plan, so it can buy one through checkout. A pin is left as it is.
+ */
+export interface ReleasePlanRequest {
+  organizationId: string;
+  reason: string;
+  dryRun: boolean;
 }
 
 export interface SetOrganizationStatusRequest {
@@ -736,6 +778,12 @@ export interface PlatformServiceClient {
 
   applyPlan(request: ApplyPlanRequest, metadata?: Metadata): Observable<ApplyPlanResponse>;
 
+  /** One organization's plan, answered in apply's shape with one subscriber. */
+
+  assignPlan(request: AssignPlanRequest, metadata?: Metadata): Observable<ApplyPlanResponse>;
+
+  releasePlan(request: ReleasePlanRequest, metadata?: Metadata): Observable<ApplyPlanResponse>;
+
   getMetrics(request: GetPlatformMetricsRequest, metadata?: Metadata): Observable<PlatformMetricsResponse>;
 
   /**
@@ -861,6 +909,18 @@ export interface PlatformServiceController {
     metadata?: Metadata,
   ): Promise<ApplyPlanResponse> | Observable<ApplyPlanResponse> | ApplyPlanResponse;
 
+  /** One organization's plan, answered in apply's shape with one subscriber. */
+
+  assignPlan(
+    request: AssignPlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> | Observable<ApplyPlanResponse> | ApplyPlanResponse;
+
+  releasePlan(
+    request: ReleasePlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> | Observable<ApplyPlanResponse> | ApplyPlanResponse;
+
   getMetrics(
     request: GetPlatformMetricsRequest,
     metadata?: Metadata,
@@ -914,6 +974,8 @@ export function PlatformServiceControllerMethods() {
       "updatePlan",
       "deletePlan",
       "applyPlan",
+      "assignPlan",
+      "releasePlan",
       "getMetrics",
       "getFinanceSnapshot",
       "listBillingEvents",

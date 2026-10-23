@@ -30,6 +30,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { StripeService } from './stripe.service';
+import { isAssignedPlan } from './plan-assignment';
 
 /**
  * A tenant moving between catalogue plans.
@@ -344,6 +345,7 @@ export class PlanChangeService {
         stripeSubscriptionId: true,
         maxStorageBytes: true,
         maxDocumentUploads: true,
+        plan: { select: { name: true, stripeProductId: true } },
       },
     });
 
@@ -370,7 +372,9 @@ export class PlanChangeService {
     // overwrite a pinned tenant (`SKIPPED_PINNED`); letting them self-serve
     // onto a catalogue plan would discard the negotiated grant through the
     // front door while the back door is bolted.
-    if (organization.entitlementsPinned) {
+    // A pin, or a negotiated plan the platform assigned: either way the
+    // platform's to change, not the workspace's.
+    if (organization.entitlementsPinned || isAssignedPlan(organization.plan)) {
       throw new RpcException({
         code: status.FAILED_PRECONDITION,
         message:
@@ -420,6 +424,7 @@ export class PlanChangeService {
         stripeSubscriptionId: true,
         maxStorageBytes: true,
         maxDocumentUploads: true,
+        plan: { select: { name: true, stripeProductId: true } },
       },
     });
 
@@ -440,7 +445,9 @@ export class PlanChangeService {
       });
     }
 
-    if (organization.entitlementsPinned) {
+    // A pin, or a negotiated plan the platform assigned: either way the
+    // platform's to change, not the workspace's.
+    if (organization.entitlementsPinned || isAssignedPlan(organization.plan)) {
       throw new RpcException({
         code: status.FAILED_PRECONDITION,
         message:

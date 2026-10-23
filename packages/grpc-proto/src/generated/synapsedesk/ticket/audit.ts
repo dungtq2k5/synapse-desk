@@ -102,6 +102,9 @@ export enum AuditAction {
   /** AUDIT_ACTION_PLATFORM_JOB_RUN - A scheduled job run by hand, or over a range. */
   AUDIT_ACTION_PLATFORM_JOB_RUN = 53,
   AUDIT_ACTION_PLATFORM_JOB_BACKFILLED = 54,
+  /** AUDIT_ACTION_PLATFORM_PLAN_ASSIGNED - An organization put on a negotiated plan, or released to self-service. */
+  AUDIT_ACTION_PLATFORM_PLAN_ASSIGNED = 55,
+  AUDIT_ACTION_PLATFORM_PLAN_RELEASED = 56,
   UNRECOGNIZED = -1,
 }
 

@@ -136,6 +136,8 @@
   "GET /api/v1/platform/organizations/{id}": [],
   "PATCH /api/v1/platform/organizations/{id}": [],
   "POST /api/v1/platform/organizations/{id}/billing-cycle/reset": [],
+  "POST /api/v1/platform/organizations/{id}/plan": [],
+  "DELETE /api/v1/platform/organizations/{id}/plan": [],
   "POST /api/v1/platform/organizations/{id}/restore": [],
   "POST /api/v1/platform/organizations/{id}/status": [],
   "GET /api/v1/platform/plans": [],

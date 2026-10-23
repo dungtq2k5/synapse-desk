@@ -39,6 +39,13 @@ message PlatformOrganizationResponse {
   // When the status last changed. Absent for an organization older than the
   // record of it.
   optional google.protobuf.Timestamp status_changed_at = 9;
+
+  // A Super Admin's override of its limits that nothing rewrites: not a
+  // Stripe event, not applying its plan.
+  bool entitlements_pinned = 10;
+  // On a plan with no Stripe product that isn't Free: a negotiated plan the
+  // platform assigned, released only by the platform.
+  bool plan_assigned = 11;
 }
 
 message ListPlatformOrganizationsRequest {
@@ -98,6 +105,28 @@ message UpdatePlatformOrganizationRequest {
   optional int32 max_agent_seats = 5;
   optional int64 max_storage_bytes = 6;
   optional int64 monthly_ai_token_budget = 7;
+  // Keep the limits when Stripe's events arrive (true), or let the next one
+  // write the plan's grants back (false). Absent leaves the pin alone.
+  optional bool entitlements_pinned = 8;
+}
+
+// Put an organization on a negotiated plan: a plan with no Stripe product,
+// not Free. Its grants become the plan's row, so applying the plan later
+// reaches it like any subscriber. Refused beside a Stripe subscription.
+message AssignPlanRequest {
+  string organization_id = 1;
+  string plan_id = 2;
+  string reason = 3;
+  // TRUE projects and writes nothing, through the same code.
+  bool dry_run = 4;
+}
+
+// Take an assigned organization off its plan, onto the free tier's grants
+// and no plan, so it can buy one through checkout. A pin is left as it is.
+message ReleasePlanRequest {
+  string organization_id = 1;
+  string reason = 2;
+  bool dry_run = 3;
 }
 
 message SetOrganizationStatusRequest {
@@ -593,6 +622,9 @@ service PlatformService {
   // is called. A silent fan-out on save would rewrite two hundred tenants'
   // entitlements from a form submit.
   rpc ApplyPlan(ApplyPlanRequest) returns (ApplyPlanResponse);
+  // One organization's plan, answered in apply's shape with one subscriber.
+  rpc AssignPlan(AssignPlanRequest) returns (ApplyPlanResponse);
+  rpc ReleasePlan(ReleasePlanRequest) returns (ApplyPlanResponse);
 
   rpc GetMetrics(GetPlatformMetricsRequest) returns (PlatformMetricsResponse);
 

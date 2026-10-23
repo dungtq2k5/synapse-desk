@@ -126,6 +126,46 @@ describe('Platform (e2e)', () => {
       // A new organization's status starts when it's created.
       expect(bare.statusChangedAt).toBeDefined();
     });
+
+    it('says whether the plan is assigned and the limits pinned', async () => {
+      const agreement = await fx.prisma.subscriptionPlan.create({
+        data: {
+          name: `Agreement ${Date.now()}`,
+          stripeProductId: null,
+          maxAgentSeats: 60,
+          maxStorageBytes: 1024n ** 3n,
+          monthlyAiTokenBudget: 1_000_000n,
+          aiModelTier: 'FAST',
+          maxDocumentBytes: 1024n ** 2n,
+          maxAttachmentBytes: 1024n ** 2n,
+          maxDocumentUploads: 100,
+          maxAnalyticsRangeDays: 30,
+        },
+      });
+      const free = await fx.prisma.subscriptionPlan.findFirstOrThrow({
+        where: { name: 'Free', deletedAt: null },
+      });
+      const assigned = await seedTenantWithUser(fx.prisma, {
+        organization: { plan: { connect: { id: agreement.id } } },
+      });
+      const onFree = await seedTenantWithUser(fx.prisma, {
+        organization: { plan: { connect: { id: free.id } } },
+      });
+
+      const read = (id: string) =>
+        platform.getOrganization({ organizationId: id });
+      expect(await read(assigned.org.id)).toMatchObject({
+        planAssigned: true,
+        entitlementsPinned: false,
+      });
+      expect((await read(onFree.org.id)).planAssigned).toBe(false);
+
+      const pinned = await platform.updateOrganization(
+        { organizationId: onFree.org.id, entitlementsPinned: true },
+        ctx,
+      );
+      expect(pinned.entitlementsPinned).toBe(true);
+    });
   });
 
   describe('getOrganizationUsage', () => {

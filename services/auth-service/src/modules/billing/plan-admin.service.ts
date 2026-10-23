@@ -5,6 +5,7 @@ import {
   AuditAction,
   AuditResourceType,
   CallerContext,
+  FREE_TIER_ORGANIZATION_GRANTS,
   PLAN_SORTABLE_FIELDS,
   type PlanLimitDimension,
 } from '@synapsedesk/contracts';
@@ -24,6 +25,8 @@ import {
 import type {
   ApplyPlanRequest,
   ApplyPlanResponse,
+  AssignPlanRequest,
+  ReleasePlanRequest,
   CreatePlanRequest,
   ListPlansRequest,
   ListPlansResponse,
@@ -35,6 +38,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { BillingEventPublisher } from './billing-event.publisher';
+import { isAssignedPlan } from './plan-assignment';
 import { StripeService } from './stripe.service';
 import {
   PLAN_INCLUDE,
@@ -57,11 +61,45 @@ import {
  */
 const EVALUATED_DIMENSIONS: readonly PlanLimitDimension[] = ['seats'];
 
+/** What a projection and a write read off an organization. */
+const SUBSCRIBER_SELECT = {
+  id: true,
+  name: true,
+  entitlementsPinned: true,
+  stripeSubscriptionId: true,
+  maxAgentSeats: true,
+  maxStorageBytes: true,
+  monthlyAiTokenBudget: true,
+  aiModelTier: true,
+  maxDocumentBytes: true,
+  maxAttachmentBytes: true,
+  maxDocumentUploads: true,
+  maxAnalyticsRangeDays: true,
+} as const;
+
+/** A's and B's refusal beside a live subscription: it would bill one plan and grant another. */
+const SUBSCRIPTION_REFUSAL =
+  'Cancel its Stripe subscription first; it would keep charging for its old plan.';
+
+/** The eight columns a plan grants, as the catalogue and the free tier hold them. */
+type Grants = Pick<
+  PlanRow,
+  | 'maxAgentSeats'
+  | 'maxStorageBytes'
+  | 'monthlyAiTokenBudget'
+  | 'aiModelTier'
+  | 'maxDocumentBytes'
+  | 'maxAttachmentBytes'
+  | 'maxDocumentUploads'
+  | 'maxAnalyticsRangeDays'
+>;
+
 /** A subscriber row, with the two counts a seat check needs. */
 type SubscriberRow = {
   id: string;
   name: string;
   entitlementsPinned: boolean;
+  stripeSubscriptionId: string | null;
   maxAgentSeats: number;
   maxStorageBytes: bigint;
   monthlyAiTokenBudget: bigint;
@@ -405,32 +443,24 @@ export class PlanAdminService {
 
     const subscribers = await this.prisma.organization.findMany({
       where: { planId: plan.id, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        entitlementsPinned: true,
-        maxAgentSeats: true,
-        maxStorageBytes: true,
-        monthlyAiTokenBudget: true,
-        aiModelTier: true,
-        maxDocumentBytes: true,
-        maxAttachmentBytes: true,
-        maxDocumentUploads: true,
-        maxAnalyticsRangeDays: true,
-      },
+      select: SUBSCRIBER_SELECT,
       orderBy: { name: 'asc' },
     });
 
     const projections: PlanSubscriberProjection[] = [];
 
     for (const subscriber of subscribers) {
-      const projection = await this.project(subscriber, plan);
+      // The pin is apply's to honour, not the projection's: an assignment
+      // projects onto an organization whatever its pin says.
+      const projection = subscriber.entitlementsPinned
+        ? pinnedProjection(subscriber)
+        : await this.project(subscriber, plan);
       projections.push(projection);
 
       if (request.dryRun || projection.skippedPinned) continue;
       if (Object.keys(projection.changes).length === 0) continue;
 
-      await this.write(subscriber, plan, projection.budgetDeferred);
+      await this.write(subscriber.id, plan, projection.budgetDeferred);
       // Same announcement the webhook path makes, for the same consumers.
       // The PLAN's `updatedAt` is what identifies this change: every subscriber
       // in one apply shares it, and two applies of the same plan do not — so a
@@ -485,26 +515,177 @@ export class PlanAdminService {
     };
   }
 
-  // ---------------------------------------------------------------- Internals
+  // ---------------------------------------------------------------- One organization
 
-  /** What this plan would do to ONE subscriber. Reads nothing it writes. */
-  private async project(
-    subscriber: SubscriberRow,
-    plan: PlanRow,
-  ): Promise<PlanSubscriberProjection> {
-    if (subscriber.entitlementsPinned) {
-      return {
-        organizationId: subscriber.id,
-        organizationName: subscriber.name,
-        changes: {},
-        after: {},
-        overLimit: [],
-        overLimitItems: [],
-        skippedPinned: true,
-        budgetDeferred: false,
-      };
+  /**
+   * Puts one organization on a negotiated plan: a plan with no Stripe product,
+   * not Free. Its grants become the plan's row, written by apply's own write,
+   * so applying the plan later reaches it like any subscriber. It isn't
+   * pinned: the pin stays a Super Admin's individual override.
+   *
+   * Answered in apply's shape, one subscriber, so the gateway composes storage
+   * and documents the same way. Over a limit still goes through, as apply does.
+   *
+   * @throws RpcException `INVALID_ARGUMENT` for a Stripe plan, Free, or no reason;
+   *   `NOT_FOUND` for a retired plan or an offboarded organization;
+   *   `FAILED_PRECONDITION` (409) beside a live Stripe subscription.
+   */
+  async assignPlan(
+    request: AssignPlanRequest,
+    context: CallerContext,
+  ): Promise<ApplyPlanResponse> {
+    requireActor(context);
+    // A preview needs no reason; the change itself is refused without one.
+    const reason = request.dryRun
+      ? request.reason.trim()
+      : requireReason(request.reason);
+
+    const plan = await this.load(request.planId);
+    if (plan.stripeProductId !== null) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message:
+          'This plan is sold through Stripe. The organization chooses it in Billing.',
+      });
+    }
+    if (!isAssignedPlan(plan)) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'Free isn’t assigned: release the organization instead.',
+      });
     }
 
+    const organization = await this.loadOrganization(request.organizationId);
+    refuseBesideSubscription(organization);
+
+    const projection = await this.project(organization, plan);
+    if (!request.dryRun) {
+      await this.write(organization.id, plan, projection.budgetDeferred, {
+        planId: plan.id,
+      });
+      this.billingEvents.publishEntitlementsChanged(
+        organization.id,
+        `assign:${organization.id}:${plan.id}:${new Date().toISOString()}`,
+      );
+      this.audit.record(context, {
+        action: AuditAction.PLATFORM_PLAN_ASSIGNED,
+        resourceType: AuditResourceType.ORGANIZATION,
+        resourceId: organization.id,
+        organizationId: null,
+        metadata: {
+          planId: plan.id,
+          planName: plan.name,
+          before: {
+            planId: organization.plan?.id ?? null,
+            planName: organization.plan?.name ?? null,
+          },
+          after: { planId: plan.id, planName: plan.name },
+          changes: projection.changes,
+          reason,
+        },
+      });
+    }
+
+    return oneOrganization(projection, request.dryRun);
+  }
+
+  /**
+   * Releases an assigned organization to self-service: no plan, as a create
+   * leaves one, and the free tier's eight grants, through the same write. A
+   * pin is left as it is: it's C's to set and clear.
+   *
+   * @throws RpcException `FAILED_PRECONDITION` (409) when it isn't on an
+   *   assigned plan, or has a live Stripe subscription; `NOT_FOUND` when offboarded.
+   */
+  async releasePlan(
+    request: ReleasePlanRequest,
+    context: CallerContext,
+  ): Promise<ApplyPlanResponse> {
+    requireActor(context);
+    // A preview needs no reason; the change itself is refused without one.
+    const reason = request.dryRun
+      ? request.reason.trim()
+      : requireReason(request.reason);
+
+    const organization = await this.loadOrganization(request.organizationId);
+    if (!isAssignedPlan(organization.plan)) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: withHttpStatus(409, 'It isn’t on an assigned plan.'),
+      });
+    }
+    refuseBesideSubscription(organization);
+
+    const projection = await this.project(
+      organization,
+      FREE_TIER_ORGANIZATION_GRANTS,
+    );
+    if (!request.dryRun) {
+      await this.write(
+        organization.id,
+        FREE_TIER_ORGANIZATION_GRANTS,
+        projection.budgetDeferred,
+        { planId: null },
+      );
+      this.billingEvents.publishEntitlementsChanged(
+        organization.id,
+        `release:${organization.id}:${new Date().toISOString()}`,
+      );
+      this.audit.record(context, {
+        action: AuditAction.PLATFORM_PLAN_RELEASED,
+        resourceType: AuditResourceType.ORGANIZATION,
+        resourceId: organization.id,
+        organizationId: null,
+        metadata: {
+          planId: organization.plan?.id ?? null,
+          planName: organization.plan?.name ?? null,
+          before: {
+            planId: organization.plan?.id ?? null,
+            planName: organization.plan?.name ?? null,
+          },
+          after: { planId: null, planName: null },
+          changes: projection.changes,
+          reason,
+        },
+      });
+    }
+
+    return oneOrganization(projection, request.dryRun);
+  }
+
+  /** A live organization with what a projection reads, and its plan. */
+  private async loadOrganization(organizationId: string) {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: {
+        ...SUBSCRIBER_SELECT,
+        plan: { select: { id: true, name: true, stripeProductId: true } },
+      },
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Organization not found',
+      });
+    }
+    return organization;
+  }
+
+  // ---------------------------------------------------------------- Internals
+
+  /**
+   * What these grants would do to ONE organization. Reads nothing it writes.
+   *
+   * **A budget cut waits only when Stripe will roll the cycle.** Lowering a
+   * part-spent allowance mid-cycle is retroactive, so a subscriber's cut lands
+   * with its next subscription event. An organization with no subscription
+   * has no such event (nothing else rolls its cycle), so its cut is written
+   * now rather than never.
+   */
+  private async project(
+    subscriber: SubscriberRow,
+    plan: Grants,
+  ): Promise<PlanSubscriberProjection> {
     const changes: Record<string, string> = {};
 
     /**
@@ -569,6 +750,7 @@ export class PlanAdminService {
     // The budget is diffed either way — a Super Admin should see a deferred
     // reduction, not have it hidden until it silently lands weeks later.
     const budgetDeferred =
+      subscriber.stripeSubscriptionId !== null &&
       plan.monthlyAiTokenBudget < subscriber.monthlyAiTokenBudget;
     diff(
       'monthlyAiTokenBudget',
@@ -606,7 +788,7 @@ export class PlanAdminService {
    */
   private async overLimit(
     subscriber: SubscriberRow,
-    plan: PlanRow,
+    plan: Grants,
   ): Promise<{ overLimit: string[]; overLimitItems: OverLimit[] }> {
     const seatsInUse = await this.organizations.seatsInUse(
       this.prisma,
@@ -626,15 +808,20 @@ export class PlanAdminService {
     };
   }
 
-  /** The write half. Never called on a dry run, never on a pinned tenant. */
+  /**
+   * The write half. Never called on a dry run; apply never calls it on a
+   * pinned tenant. `link` moves the organization's plan in the same statement.
+   */
   private async write(
-    subscriber: SubscriberRow,
-    plan: PlanRow,
+    organizationId: string,
+    plan: Grants,
     budgetDeferred: boolean,
+    link: { planId?: string | null } = {},
   ): Promise<void> {
     await this.prisma.organization.update({
-      where: { id: subscriber.id },
+      where: { id: organizationId },
       data: {
+        ...link,
         maxAgentSeats: plan.maxAgentSeats,
         maxStorageBytes: plan.maxStorageBytes,
         aiModelTier: plan.aiModelTier,
@@ -688,5 +875,58 @@ export class PlanAdminService {
     }
 
     return name;
+  }
+}
+
+/** A pinned subscriber in apply's answer: skipped, nothing projected. */
+function pinnedProjection(subscriber: SubscriberRow): PlanSubscriberProjection {
+  return {
+    organizationId: subscriber.id,
+    organizationName: subscriber.name,
+    changes: {},
+    after: {},
+    overLimit: [],
+    overLimitItems: [],
+    skippedPinned: true,
+    budgetDeferred: false,
+  };
+}
+
+/** One organization's projection, in apply's shape. */
+function oneOrganization(
+  projection: PlanSubscriberProjection,
+  dryRun: boolean,
+): ApplyPlanResponse {
+  return {
+    subscribers: [projection],
+    dryRun,
+    changedCount: Object.keys(projection.changes).length > 0 ? 1 : 0,
+    skippedPinnedCount: 0,
+    overLimitCount: projection.overLimit.length > 0 ? 1 : 0,
+    evaluatedDimensions: [...EVALUATED_DIMENSIONS],
+  };
+}
+
+/** The reason every platform change takes, trimmed; refused when empty. */
+function requireReason(reason: string): string {
+  const trimmed = reason.trim();
+  if (!trimmed) {
+    throw new RpcException({
+      code: status.INVALID_ARGUMENT,
+      message: 'A reason is required.',
+    });
+  }
+  return trimmed;
+}
+
+/** A and B are refused beside a live Stripe subscription. */
+function refuseBesideSubscription(organization: {
+  stripeSubscriptionId: string | null;
+}): void {
+  if (organization.stripeSubscriptionId !== null) {
+    throw new RpcException({
+      code: status.FAILED_PRECONDITION,
+      message: withHttpStatus(409, SUBSCRIPTION_REFUSAL),
+    });
   }
 }
