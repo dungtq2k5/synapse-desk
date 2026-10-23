@@ -29,20 +29,24 @@ async function personAt(
 }
 
 /**
- * One of the requester's own tickets, as their list shows it: a seeded member
- * has no `ticket.create`, so the rows use what the demo seed gave them. Their
- * own by author, not just the latest they can see: another person's ticket
- * can leave their view once an agent takes it.
+ * One of the requester's own tickets that still takes replies, as their list
+ * shows it: a seeded member has no `ticket.create`, so the rows use what the
+ * demo seed gave them. Their own by author, not just the latest they can see:
+ * another person's ticket can leave their view once an agent takes it. Not
+ * closed or resolved: a fresh seed's latest can be closed, and a closed
+ * ticket has no composer to type in.
  */
 async function ownTicket(page: Page, authorId: string): Promise<string> {
-  const tickets = await api<{ items: { id: string }[] }>(
+  const tickets = await api<{ items: { id: string; status: string }[] }>(
     page.request,
     'GET',
-    `/tickets?limit=1&sortBy=updatedAt&sortOrder=DESC&authorId=${authorId}`,
+    `/tickets?limit=20&sortBy=updatedAt&sortOrder=DESC&authorId=${authorId}`,
   );
-  const [ticket] = tickets.items;
-  expect(ticket, 'the seeded requester has no ticket').toBeDefined();
-  return ticket.id;
+  const ticket = tickets.items.find(
+    ({ status }) => status !== 'CLOSED' && status !== 'RESOLVED',
+  );
+  expect(ticket, 'the seeded requester has no open ticket').toBeDefined();
+  return ticket!.id;
 }
 
 test('a reply arrives live in the requester’s browser, and a note never does', async ({
