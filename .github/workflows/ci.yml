@@ -307,10 +307,12 @@ jobs:
   e2e-web:
     name: e2e (web, Playwright)
     runs-on: ubuntu-latest
-    # Measured locally: setup about 2½ minutes, the rows about a minute. The
-    # runner adds the installs and a cold build; re-set this once a run has
-    # been timed.
-    timeout-minutes: 40
+    # Measured on a runner (2026-10-23, 586 rows): about 14½ minutes before the
+    # first row, then about 4 seconds a row, 40 minutes for them all. The rows
+    # get 70 (`--global-timeout` below), the job 90 around them.
+    # ponytail: one runner; shard like `contract` (`--shard=k/n`, a coverage
+    # lcov per shard) once the rows near 70 minutes.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -382,7 +384,10 @@ jobs:
         env:
           SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
           WEB_COVERAGE_DIR: ${{ github.workspace }}/coverage-e2e/web
-        run: npm run test:e2e:web
+        # Playwright's own limit, under the job's: a run that hits it stops
+        # cleanly and still prints each failure, writes results.xml and keeps
+        # the traces. The job's limit kills it before any of that.
+        run: npm run test:e2e:web -- --global-timeout=4200000
 
       - uses: actions/upload-artifact@v4
         with:
@@ -394,8 +399,10 @@ jobs:
 
       # test-results holds each failed screenshot's -actual, -expected and
       # -diff images beside the trace.
+      # Canceled too: a run stopped by hand or by a limit leaves the same
+      # evidence.
       - name: upload the report, traces, screenshot diffs and service logs
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-web
