@@ -168,16 +168,16 @@ export function grantsOf(form: Form): {
     const value = Number(text);
     return text.trim() && Number.isFinite(value) && value > 0
       ? Math.round(value * MIB)
-      : NaN;
+      : Number.NaN;
   };
   const values = {
-    maxAgentSeats: wholeOf(form.seats) ?? NaN,
-    maxStorageBytes: bytesOf(form.storage) ?? NaN,
-    monthlyAiTokenBudget: microsOf(form.ai) ?? NaN,
+    maxAgentSeats: wholeOf(form.seats) ?? Number.NaN,
+    maxStorageBytes: bytesOf(form.storage) ?? Number.NaN,
+    monthlyAiTokenBudget: microsOf(form.ai) ?? Number.NaN,
     maxDocumentBytes: mb(form.document),
     maxAttachmentBytes: mb(form.attachment),
-    maxDocumentUploads: wholeOf(form.documents) ?? NaN,
-    maxAnalyticsRangeDays: wholeOf(form.analytics) ?? NaN,
+    maxDocumentUploads: wholeOf(form.documents) ?? Number.NaN,
+    maxAnalyticsRangeDays: wholeOf(form.analytics) ?? Number.NaN,
     aiModelTier: form.tier || 'FAST',
   };
   const keys: [Grant, number, number][] = [
@@ -580,7 +580,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
         </ConsoleCard>
         <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
           <Link
-            href={plan ? '/platform/plans' : '/platform/plans'}
+            href="/platform/plans"
             className={buttonVariants({ variant: 'outline' })}
           >
             Cancel

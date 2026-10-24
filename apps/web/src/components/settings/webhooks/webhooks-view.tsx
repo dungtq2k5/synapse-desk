@@ -79,7 +79,13 @@ export function eventCount(count: number, total: number): string {
  * @example failedInARow('Auto-disabled after 10 consecutive failed deliveries') // 'Deliveries failed 10 times in a row.'
  */
 export function failedInARow(reason: string): string {
-  const count = /(\d+) consecutive/.exec(reason)?.[1];
+  // The digits just before " consecutive", read without a pattern.
+  const end = reason.indexOf(' consecutive');
+  let start = end;
+  while (start > 0 && reason[start - 1] >= '0' && reason[start - 1] <= '9') {
+    start -= 1;
+  }
+  const count = end > start ? reason.slice(start, end) : '';
   return count
     ? `Deliveries failed ${count} times in a row.`
     : asSentence(reason);

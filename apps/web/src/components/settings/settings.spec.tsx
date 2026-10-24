@@ -70,6 +70,15 @@ describe('the words', () => {
       failedInARow('Auto-disabled after 10 consecutive failed deliveries'),
     ).toBe('Deliveries failed 10 times in a row.');
     expect(failedInARow('Turned off by hand!')).toBe('Turned off by hand.');
+    expect(failedInARow('3 consecutive failures')).toBe(
+      'Deliveries failed 3 times in a row.',
+    );
+    expect(failedInARow('Many consecutive failures!')).toBe(
+      'Many consecutive failures.',
+    );
+    expect(failedInARow(`${'9'.repeat(50_000)}!`)).toBe(
+      `${'9'.repeat(50_000)}.`,
+    );
   });
 
   it('counts events, all of them by name', () => {

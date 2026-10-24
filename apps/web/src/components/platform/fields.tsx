@@ -73,7 +73,9 @@ const GIB = 1024 ** 3;
 export function bytesOf(gb: string): number | null {
   if (!gb.trim()) return null;
   const value = Number(gb);
-  return Number.isFinite(value) && value >= 0 ? Math.round(value * GIB) : NaN;
+  return Number.isFinite(value) && value >= 0
+    ? Math.round(value * GIB)
+    : Number.NaN;
 }
 
 /** USD typed into the AI allowance's millionths; null when empty. */
@@ -82,14 +84,14 @@ export function microsOf(usd: string): number | null {
   const value = Number(usd);
   return Number.isFinite(value) && value >= 0
     ? Math.round(value * 1_000_000)
-    : NaN;
+    : Number.NaN;
 }
 
 /** A whole number typed in; null when empty. */
 export function wholeOf(text: string): number | null {
   if (!text.trim()) return null;
   const value = Number(text);
-  return Number.isInteger(value) && value >= 0 ? value : NaN;
+  return Number.isInteger(value) && value >= 0 ? value : Number.NaN;
 }
 
 /** Bytes as the GB a box shows. */

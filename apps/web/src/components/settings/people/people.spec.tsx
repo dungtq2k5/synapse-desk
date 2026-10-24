@@ -287,6 +287,16 @@ describe('invite', () => {
     ).toBeInTheDocument();
   });
 
+  it('refuses an address with an empty domain label before sending', async () => {
+    stubApi(routes());
+    const field = await open();
+    await userEvent.type(field, 'maya@acme..test');
+    await userEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(
+      screen.getByText('maya@acme..test isn’t an email address.'),
+    ).toBeInTheDocument();
+  });
+
   it('explains each address the preview can’t send, and the unknown role or department', async () => {
     stubApi(
       routes({

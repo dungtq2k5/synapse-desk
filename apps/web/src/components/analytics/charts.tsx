@@ -243,7 +243,7 @@ export function TimeChart({
             </g>
           ))}
           {bands.map(([start, end]) => {
-            const half = kind === 'column' ? slot / 2 : slot / 2;
+            const half = slot / 2;
             const left = Math.max(x(start) - half, MARGIN.left);
             const rightEdge = Math.min(x(end) + half, MARGIN.left + plotWidth);
             return (

@@ -85,6 +85,13 @@ function constantName(key) {
 // Code-unit order, as a bare sort() had it: the output is byte-compared.
 const byCodeUnit = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // NOSONAR
 
+/** The text without its trailing newlines, read without a pattern. */
+function trimTrailingNewlines(text) {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '\n') end -= 1;
+  return text.slice(0, end);
+}
+
 function javaString(value) {
   return `"${String(value).replace(/\\/gu, '\\\\').replace(/"/gu, '\\"')}"`;
 }
@@ -140,7 +147,7 @@ public final class ${group.className} {
 
   private ${group.className}() {}
 
-${lines.join('\n').replace(/\n+$/u, '')}
+${trimTrailingNewlines(lines.join('\n'))}
 }
 `;
 }

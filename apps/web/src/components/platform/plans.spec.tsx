@@ -216,6 +216,21 @@ describe('a plan’s page', () => {
     expect(screen.getByText(onIt, { exact: false })).toBeInTheDocument();
   });
 
+  it('Cancel leads back to the catalog, from a new plan and from an edit', async () => {
+    stubApi({ [`GET ${URL_PLAN}`]: ok(PLAN) });
+    const { unmount } = renderSettings(<PlanCreate />);
+    expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+      'href',
+      '/platform/plans',
+    );
+    unmount();
+    renderSettings(<PlanEdit planId="plan-pro" />);
+    expect(await screen.findByRole('link', { name: 'Cancel' })).toHaveAttribute(
+      'href',
+      '/platform/plans',
+    );
+  });
+
   it('says a plan that isn’t there isn’t available', async () => {
     stubApi({ [`GET ${URL_PLAN}`]: fail(404, 'Not found!') });
     renderSettings(<PlanEdit planId="plan-pro" />);

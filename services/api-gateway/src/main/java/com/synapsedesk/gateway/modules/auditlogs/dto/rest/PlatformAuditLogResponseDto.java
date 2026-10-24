@@ -93,12 +93,10 @@ public class PlatformAuditLogResponseDto extends AuditLogResponseDto {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("class PlatformAuditLogResponseDto {\n");
-    sb.append("    ").append(toIndentedString(super.toString())).append("\n");
-    sb.append("    actorName: ")
-      .append(toIndentedString(actorName))
-      .append("\n");
+    sb.append("    ").append(indentedValue(super.toString())).append("\n");
+    sb.append("    actorName: ").append(indentedValue(actorName)).append("\n");
     sb.append("    resourceName: ")
-      .append(toIndentedString(resourceName))
+      .append(indentedValue(resourceName))
       .append("\n");
     sb.append("}");
     return sb.toString();
@@ -108,7 +106,7 @@ public class PlatformAuditLogResponseDto extends AuditLogResponseDto {
    * Convert the given object to string with each line indented by 4 spaces
    * (except the first line).
    */
-  private String toIndentedString(@Nullable Object o) {
+  private String indentedValue(@Nullable Object o) {
     return o == null ? "null" : o.toString().replace("\n", "\n    ");
   }
 }

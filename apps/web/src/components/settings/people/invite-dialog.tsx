@@ -43,11 +43,10 @@ import {
 } from '@/components/ui/select';
 import { useViewer } from '@/hooks/use-viewer';
 import { asSentence } from '@/lib/documents';
+import { EMAIL } from '@/lib/sign-in';
 import { cn } from '@/lib/utils';
 import { refusalText } from './person-dialogs';
 import { useOrganizationName, usePeopleCache, useRoles } from './shared';
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The server's per-address reasons, as the preview and the result say them. */
 const PREVIEW_REASON: Record<string, string> = {
