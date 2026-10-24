@@ -246,6 +246,12 @@ export interface ListNotificationsResponse {
 
 export interface UnreadCountResponse {
   count: number;
+  /**
+   * When the database counted it (ISO 8601, the counting statement's own
+   * time): a client keeps the newest count it's been given, whichever way it
+   * came, and drops an older one that arrives later.
+   */
+  countedAt: string;
 }
 
 export interface NotificationIdRequest {
@@ -269,6 +275,8 @@ export interface MarkReadResponse {
   updated: number;
   /** Pushed back so the client never has to recompute a badge it can be told. */
   unreadCount: number;
+  /** When `unread_count` was counted, as on `UnreadCountResponse`. */
+  countedAt: string;
 }
 
 /**

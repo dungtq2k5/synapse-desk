@@ -19,6 +19,7 @@ import { connect, JSONCodec, type NatsConnection } from 'nats';
 import { io, type Socket } from 'socket.io-client';
 import { sign } from 'jsonwebtoken';
 import {
+  NOTIFICATION_REALTIME_PATTERNS,
   CLIENT_EVENTS,
   orgRoom,
   OrgStatus,
@@ -164,6 +165,37 @@ describe('realtime across replicas, and the cache', () => {
       await publishCreated(ALICE);
 
       expect([seenFirst(), seenSecond()]).toEqual([1, 1]);
+    },
+  );
+
+  rowFor('Notifications')(
+    '**a read event reaches the user as `notification:unread-count` with its `countedAt`**',
+    async () => {
+      const socket = await connectClient(first, ALICE);
+      const received = new Promise<unknown>((resolve) =>
+        socket.once(REALTIME_EVENTS.notificationUnreadCount, resolve),
+      );
+
+      const event = {
+        recipientId: ALICE,
+        notificationIds: ['99999999-9999-4999-8999-999999999999'],
+        change: 'read',
+        unreadCount: 3,
+        countedAt: '2026-10-24T10:00:00.123456Z',
+      };
+      nats.publish(
+        NOTIFICATION_REALTIME_PATTERNS.read,
+        JSONCodec().encode({
+          pattern: NOTIFICATION_REALTIME_PATTERNS.read,
+          data: event,
+        }),
+      );
+      await nats.flush();
+
+      await expect(received).resolves.toEqual({
+        count: 3,
+        countedAt: '2026-10-24T10:00:00.123456Z',
+      });
     },
   );
 

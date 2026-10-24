@@ -183,6 +183,7 @@ describe('Notification-service foundations (e2e)', () => {
       notificationIds: [],
       change: 'read',
       unreadCount: 0,
+      countedAt: '2026-10-24T10:00:00.000Z',
     });
 
     expect(fx.emitted.map((entry) => entry.pattern)).toEqual([

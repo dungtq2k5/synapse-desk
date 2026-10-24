@@ -15,7 +15,7 @@
  *
  * What is pinned is what the gateway DOES: the access table, the category each route
  * resolves to, the three requests that are never gated, the thirty-second cache in
- * Redis under `org-status:<id>` (shared by every replica, so the value is read by
+ * Redis under `org-status:<id>|#<generation>` (shared by every replica, so the value is read by
  * whichever replica asks next), failing CLOSED, riding out a peer outage on the last
  * known status but never on none, and that a platform change invalidates the cached
  * decision. The category of EVERY route is held by the table
@@ -43,7 +43,10 @@ describe('the tenant lifecycle gate', () => {
   const ORGANIZATION = 'a0470000-0000-4000-8000-000000000047';
   const USER = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
   const DEPARTMENT = 'cccccccc-1111-4111-8111-cccccccccccc';
-  const CACHE_KEY = `org-status:${ORGANIZATION}`;
+  const GENERATION_KEY = `org-status-gen:${ORGANIZATION}`;
+  /** The key a read looks up now: the organization's current generation. */
+  const cacheKey = async () =>
+    `org-status:${ORGANIZATION}|#${(await redis.get(GENERATION_KEY)) ?? '0'}`;
   const STATUS_RPC = 'OrganizationService/GetOrganizationStatus';
 
   const headers = (
@@ -100,8 +103,10 @@ describe('the tenant lifecycle gate', () => {
 
   beforeEach(async () => {
     peers.reset();
-    // The decision is cached for thirty seconds, in a store the rows share.
-    await redis.del(CACHE_KEY);
+    // The decision is cached in a store the rows share: every generation's
+    // entry, and the generation.
+    const stale = await redis.keys(`org-status:${ORGANIZATION}*`);
+    await redis.del(GENERATION_KEY, ...stale);
   });
 
   const tenantIs = (status: OrgStatus, deleted = false) =>
@@ -336,7 +341,7 @@ describe('the tenant lifecycle gate', () => {
   // --------------------------------------------------------------------- cache
 
   rowFor('Ops')(
-    '**a decision is fresh for thirty seconds in Redis under `org-status:<id>`, and kept five minutes longer for an outage — two requests, one question**',
+    '**a decision is fresh for thirty seconds in Redis under `org-status:<id>|#<generation>`, and kept five minutes longer for an outage — two requests, one question**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
       const before = Date.now();
@@ -346,12 +351,12 @@ describe('the tenant lifecycle gate', () => {
 
       expect(statusCalls()).toHaveLength(1);
       const { freshUntil, ...decision } = JSON.parse(
-        (await redis.get(CACHE_KEY)) ?? 'null',
+        (await redis.get(await cacheKey())) ?? 'null',
       ) as { freshUntil: number };
       expect(decision).toEqual({ status: 'ACTIVE', deleted: false });
       expect(freshUntil).toBeGreaterThanOrEqual(before + 30_000);
       expect(freshUntil).toBeLessThanOrEqual(Date.now() + 30_000);
-      const ttl = await redis.ttl(CACHE_KEY);
+      const ttl = await redis.ttl(await cacheKey());
       expect(ttl).toBeGreaterThan(300);
       expect(ttl).toBeLessThanOrEqual(330);
     },
@@ -362,7 +367,7 @@ describe('the tenant lifecycle gate', () => {
     async () => {
       tenantIs(OrgStatus.ACTIVE);
       await redis.set(
-        CACHE_KEY,
+        await cacheKey(),
         JSON.stringify({ status: 'FROZEN', deleted: false }),
         'EX',
         30,
@@ -380,7 +385,7 @@ describe('the tenant lifecycle gate', () => {
     '**a cached value that cannot be read is a miss, not an error — the gate asks and carries on**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
-      await redis.set(CACHE_KEY, 'not json at all', 'EX', 30);
+      await redis.set(await cacheKey(), 'not json at all', 'EX', 30);
 
       const response = await ROUTES.READ.send();
 
@@ -424,7 +429,7 @@ describe('the tenant lifecycle gate', () => {
       peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
       const stale = (status: string) =>
         redis.set(
-          CACHE_KEY,
+          await cacheKey(),
           JSON.stringify({
             status,
             deleted: false,
@@ -457,7 +462,7 @@ describe('the tenant lifecycle gate', () => {
     async () => {
       tenantIs(OrgStatus.ACTIVE);
       await ROUTES.READ.send();
-      expect(await redis.exists(CACHE_KEY)).toBe(1);
+      expect(await redis.exists(await cacheKey())).toBe(1);
 
       peers.auth.on('PlatformService/SetOrganizationStatus').reply({
         organization: {
@@ -485,7 +490,7 @@ describe('the tenant lifecycle gate', () => {
       );
 
       expect(changed.status).toBe(200);
-      expect(await redis.exists(CACHE_KEY)).toBe(0);
+      expect(await redis.exists(await cacheKey())).toBe(0);
     },
   );
 

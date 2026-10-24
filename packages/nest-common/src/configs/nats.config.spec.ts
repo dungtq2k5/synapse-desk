@@ -186,6 +186,7 @@ describe('a raw NATS publish, as the transport decodes it', () => {
       notificationIds: ['notification-1'],
       change: 'read',
       unreadCount: 0,
+      countedAt: '2026-10-24T10:00:00.000Z',
     } satisfies NotificationReadPayload;
 
     expect(handlerReceives(NOTIFICATION_REALTIME_PATTERNS.read, read)).toEqual(

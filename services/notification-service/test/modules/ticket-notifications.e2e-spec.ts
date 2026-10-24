@@ -433,6 +433,27 @@ describe('Ticket notifications (e2e)', () => {
       ]);
     });
 
+    it('**19b. Two messages at once still make ONE row**, ten times over', async () => {
+      // Ticket events are core NATS handlers, run as each message arrives: two
+      // replies close together reach `persist()` together, both find no open
+      // group, and both used to insert. The open-group unique index refuses the
+      // second, which then collapses onto the first.
+      for (let round = 0; round < 10; round += 1) {
+        await fx.prisma.notification.deleteMany();
+        await Promise.all([
+          consumer.messageCreated(
+            messageEvent({ messageId: `msg-${round}-a`, senderId: AGENT }),
+          ),
+          consumer.messageCreated(
+            messageEvent({ messageId: `msg-${round}-b`, senderId: AGENT }),
+          ),
+        ]);
+
+        const rows = await fx.prisma.notification.findMany();
+        expect(rows.map((row) => row.groupCount)).toEqual([2]);
+      }
+    });
+
     it('20. Groups PER RECIPIENT, not per ticket', async () => {
       // Two people watching one thread each get their own row: a shared counter
       // would mean one of them reading it hid the thread from the other.

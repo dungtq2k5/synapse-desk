@@ -12,6 +12,7 @@ import {
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { EVENT_KEY, OPEN_GROUP_KEY } from '../prisma/database.seeder';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookDispatchService } from '../webhooks/webhook-dispatch.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -278,12 +279,23 @@ export class InAppNotificationService {
 
       return { kind: 'created', notificationId: notification.id };
     } catch (error) {
+      // Another event for this group inserted it first (they're handled as
+      // they arrive): the open-group key refused this row, so collapse onto
+      // the winner's instead. Once, because the winner is there now.
+      if (
+        command.groupKey &&
+        isUniqueConstraintViolation(error, OPEN_GROUP_KEY)
+      ) {
+        const collapsed = await this.tryGroup(command, recipientId);
+        if (collapsed) return collapsed;
+      }
+
       // A duplicate is SUCCESS, not an error. `UNIQUE (recipient_id, event_id)`
       // is the idempotency mechanism and the producer DERIVES `event_id` from
       // the thing that happened, so a redelivered event is a duplicate-key
       // violation rather than a second notification. The stream redelivers
       // (ADR 0041), so this is the normal path.
-      if (isUniqueConstraintViolation(error)) {
+      if (isUniqueConstraintViolation(error, EVENT_KEY)) {
         return { kind: 'duplicate', notificationId: null };
       }
 

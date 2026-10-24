@@ -290,7 +290,30 @@ describe('The notification feed (e2e)', () => {
       await seed(1, { readAt: new Date() });
       await seed(1, { archivedAt: new Date() });
 
-      await expect(feed.unreadCount(me())).resolves.toBe(3);
+      await expect(feed.unreadCount(me())).resolves.toMatchObject({ count: 3 });
+    });
+
+    it('11b. Each count carries when it was counted, later counts later', async () => {
+      // The bell keeps the newest count it's given, so a count taken later
+      // must say so, even a moment later: microseconds, in a form whose text
+      // order is its time order.
+      await seed(2);
+      const first = await feed.unreadCount(me());
+      const [row] = await fx.prisma.notification.findMany();
+      const answer = await feed.markRead({ id: row.id }, me());
+      const second = await feed.unreadCount(me());
+
+      expect(first.countedAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/,
+      );
+      expect([first.countedAt, answer.countedAt, second.countedAt]).toEqual(
+        [first.countedAt, answer.countedAt, second.countedAt].sort(),
+      );
+      expect(answer.countedAt > first.countedAt).toBe(true);
+      expect(second.countedAt > answer.countedAt).toBe(true);
+      expect([first.count, answer.unreadCount, second.count]).toEqual([
+        2, 1, 1,
+      ]);
     });
 
     it('12. Uses the PARTIAL index rather than scanning', async () => {
@@ -357,7 +380,7 @@ describe('The notification feed (e2e)', () => {
       });
       expect(after.archivedAt).not.toBeNull();
       expect(after.readAt).not.toBeNull();
-      await expect(feed.unreadCount(me())).resolves.toBe(0);
+      await expect(feed.unreadCount(me())).resolves.toMatchObject({ count: 0 });
     });
 
     it('16. Bulk read by RESOURCE clears every notification for that ticket', async () => {
@@ -420,7 +443,7 @@ describe('The notification feed (e2e)', () => {
         status.INVALID_ARGUMENT,
       );
 
-      await expect(feed.unreadCount(me())).resolves.toBe(3);
+      await expect(feed.unreadCount(me())).resolves.toMatchObject({ count: 3 });
     });
 
     it('19. Publishes `notification.read` so a second tab catches up', async () => {
@@ -451,6 +474,22 @@ describe('The notification feed (e2e)', () => {
       // Authoritative, so a client never increments a local counter that is
       // wrong the moment something is read on another device.
       expect(payload.unreadCount).toBe(1);
+    });
+
+    it('19b. The push carries the answer’s own count and time', async () => {
+      await seed(2);
+      const [row] = await fx.prisma.notification.findMany();
+      fx.emitted.length = 0;
+
+      const answer = await feed.markRead({ id: row.id }, me());
+
+      const event = fx.emitted.find(
+        (entry) => entry.pattern === NOTIFICATION_REALTIME_PATTERNS.read,
+      );
+      expect(event?.payload).toMatchObject({
+        unreadCount: answer.unreadCount,
+        countedAt: answer.countedAt,
+      });
     });
 
     it('20. Publishes NOTHING when a bulk read matched no rows', async () => {

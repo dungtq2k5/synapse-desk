@@ -592,4 +592,10 @@ export type NotificationReadPayload = {
   change: 'read' | 'archived';
   /** The authoritative unread total, so a client never has to compute it. */
   unreadCount: number;
+  /**
+   * When the database counted it (ISO 8601): a client keeps the newest count
+   * it's been given, from whichever path, and drops an older one that arrives
+   * later.
+   */
+  countedAt: string;
 };
