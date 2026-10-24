@@ -2,6 +2,10 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from './prisma.service';
 
+// The names as the SQL below spells them, LITERALLY: `schema-contract.spec`
+// reads every named object out of this file's SQL, and an interpolated name
+// is invisible to it. The collapse rows fail if the two ever disagree.
+
 /** The idempotency key: one row per recipient and event. */
 export const EVENT_KEY = 'notifications_event_key';
 
@@ -176,7 +180,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // safety net. Without it a redelivered quota alert is a second
     // notification, and the quota alert is exactly the producer that retries.
     await this.prisma.$executeRawUnsafe(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "${EVENT_KEY}"
+      CREATE UNIQUE INDEX IF NOT EXISTS "notifications_event_key"
         ON "notifications" ("recipient_id", "event_id")
         WHERE "event_id" IS NOT NULL;
     `);
@@ -208,7 +212,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       `SELECT EXISTS (
          SELECT 1 FROM pg_indexes
          WHERE tablename = 'notifications'
-           AND indexname = '${OPEN_GROUP_KEY}'
+           AND indexname = 'notifications_open_group_key'
        ) AS "found"`,
     );
     if (present?.found) return;
@@ -237,7 +241,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         'DROP INDEX IF EXISTS "notifications_group_idx"',
       );
       await tx.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS "${OPEN_GROUP_KEY}"
+        CREATE UNIQUE INDEX IF NOT EXISTS "notifications_open_group_key"
           ON "notifications" ("recipient_id", "group_key")
           WHERE "group_key" IS NOT NULL
             AND "read_at" IS NULL
