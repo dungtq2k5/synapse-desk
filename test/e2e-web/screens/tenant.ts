@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  expect,
   request as newRequest,
   type APIRequestContext,
   type Page,
@@ -220,11 +221,37 @@ async function build(slug: string): Promise<Tenant> {
   }
 
   await thread(mayaSession, priyaSession, tickets.desk);
+  await landNotices(mayaSession);
 
   for (const session of [mayaSession, priyaSession, jordanSession]) {
     await session.dispose();
   }
   return { maya, jordan, priya, departmentId, facilitiesId, tickets };
+}
+
+/**
+ * The setup's notices to Maya, landed: Priya's replies (read when a row opens
+ * the ticket) and the VPN ticket's escalation (the bell's one unread). They
+ * land as the services get to them, sometimes after a row has drawn its page
+ * (a slow runner), so the badge was in one capture and not another; every row
+ * now starts once both are there.
+ */
+async function landNotices(session: APIRequestContext): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (
+          await api<{ items: { type: string }[] }>(
+            session,
+            'GET',
+            '/notifications?limit=20',
+          )
+        ).items
+          .map((item) => item.type)
+          .sort(),
+      { timeout: 30_000 },
+    )
+    .toEqual(['ticket.escalated', 'ticket.message_created']);
 }
 
 /** Every kind of entry, in the order a reader meets them. */

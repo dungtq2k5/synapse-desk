@@ -59,6 +59,7 @@ export async function look(
   } = {},
 ): Promise<void> {
   const initial = page.viewportSize();
+  await settledBell(page);
   for (const scheme of SCHEMES) {
     await page.emulateMedia({ colorScheme: scheme });
     await accessible(page, options.disabled ?? [], options.heldClock);
@@ -90,6 +91,35 @@ export async function look(
   await page.evaluate(stopNormalizing);
   await page.emulateMedia({ colorScheme: 'light' });
   if (initial) await page.setViewportSize(initial);
+}
+
+/**
+ * The bell as the server counts it, before anything is drawn: it fetches the
+ * count on its own schedule, so a capture could land before or after its
+ * badge appears. Asked through the page, so a row's own answers count; a page
+ * with no bell, or signed out, has nothing to wait for.
+ */
+async function settledBell(page: Page): Promise<void> {
+  const bell = page
+    .getByRole('button', {
+      name: /^Notifications(, \d+ unread)?$/,
+      includeHidden: true,
+    })
+    .first();
+  if ((await bell.count()) === 0) return;
+  const count = await page.evaluate(async () => {
+    const answer = await fetch('/api/v1/notifications/unread-count');
+    if (!answer.ok) return null;
+    const body = (await answer.json()) as { data?: { count?: number } };
+    return body.data?.count ?? null;
+  });
+  if (count === null) return;
+  // Its label, not its accessible name: an open dialog hides the bell, and a
+  // hidden element's name is empty.
+  await expect(bell).toHaveAttribute(
+    'aria-label',
+    count > 0 ? `Notifications, ${count} unread` : 'Notifications',
+  );
 }
 
 /**

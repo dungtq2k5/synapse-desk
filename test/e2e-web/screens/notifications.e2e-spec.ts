@@ -505,6 +505,7 @@ test.describe('live', () => {
     state.items = state.items.map((item) =>
       item.id === 'a3' ? item : { ...item, read: true },
     );
+    state.count = 1;
     await play(REALTIME_EVENTS.notificationRead, {
       recipientId: 'maya',
       notificationIds: ['a1', 'a2', 'a4'],
