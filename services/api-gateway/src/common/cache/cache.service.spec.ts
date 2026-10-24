@@ -10,6 +10,16 @@ import { CacheService } from './cache.service';
  * about what is NOT called — `keys` must stay untouched — and a permissive
  * auto-mock answers every method including the forbidden one.
  */
+/**
+ * The cached entries' keys as the tests name them: without the generations'
+ * `|#…` suffix, and without the generation counters themselves.
+ */
+function entries(redis: FakeRedis): string[] {
+  return [...redis.store.keys()]
+    .filter((key) => key.startsWith('cache:'))
+    .map((key) => key.replace(/\|#[\d.]+$/, ''));
+}
+
 class FakeRedis {
   readonly store = new Map<string, string>();
   readonly calls: string[] = [];
@@ -30,6 +40,23 @@ class FakeRedis {
     this.store.set(key, value);
 
     return Promise.resolve('OK');
+  }
+
+  mget(keys: string[]): Promise<(string | null)[]> {
+    this.calls.push('mget');
+    if (this.broken) return Promise.reject(new Error('Redis is down'));
+
+    return Promise.resolve(keys.map((key) => this.store.get(key) ?? null));
+  }
+
+  incr(key: string): Promise<number> {
+    this.calls.push('incr');
+    if (this.broken) return Promise.reject(new Error('Redis is down'));
+
+    const next = Number(this.store.get(key) ?? '0') + 1;
+    this.store.set(key, String(next));
+
+    return Promise.resolve(next);
   }
 
   del(...keys: string[]): Promise<number> {
@@ -307,6 +334,69 @@ describe('CacheService', () => {
     });
   });
 
+  describe('An answer from before an invalidation is never served after it', () => {
+    const roles = { organizationId: 'org-1', scope: 'roles' };
+
+    it('**wrap: an invalidation while producing leaves the answer unreachable**', async () => {
+      // The race, without timing: the scope is invalidated after the read
+      // and before the store, as an event landing mid-request would.
+      const stale = await cache.wrap(roles, 60, async () => {
+        await cache.invalidateScope('org-1', 'roles');
+        return 'before';
+      });
+      const next = await cache.wrap(roles, 60, () => Promise.resolve('after'));
+
+      expect([stale, next]).toEqual(['before', 'after']);
+    });
+
+    it('**the loaders’ read and write: the same, by the key that was read**', async () => {
+      const user = {
+        organizationId: 'org-1',
+        scope: entityScope('user', 'u1'),
+      };
+      const [read] = await cache.mget<string>([user]);
+      await cache.invalidateScope('org-1', 'entity:user');
+      await cache.msetEx([{ key: read.key!, value: 'before' }], 60);
+
+      const [again] = await cache.mget<string>([user]);
+
+      expect([read.value, again.value]).toEqual([null, null]);
+    });
+
+    it('a nested invalidation reaches its own branch and no other', async () => {
+      const user = {
+        organizationId: 'org-1',
+        scope: entityScope('user', 'u1'),
+      };
+      const department = {
+        organizationId: 'org-1',
+        scope: entityScope('department', 'd1'),
+      };
+      await cache.wrap(user, 60, () => Promise.resolve('user'));
+      await cache.wrap(department, 60, () => Promise.resolve('department'));
+
+      await cache.invalidateScope('org-1', 'entity:user');
+
+      const [userAgain, departmentAgain] = await cache.mget<string>([
+        user,
+        department,
+      ]);
+      expect([userAgain.value, departmentAgain.value]).toEqual([
+        null,
+        'department',
+      ]);
+    });
+
+    it('generations unreadable means no cache, not a stale answer', async () => {
+      await cache.wrap(roles, 60, () => Promise.resolve('cached'));
+      redis.broken = true;
+
+      await expect(
+        cache.wrap(roles, 60, () => Promise.resolve('fresh')),
+      ).resolves.toBe('fresh');
+    });
+  });
+
   describe('Invalidation uses SCAN, never KEYS', () => {
     beforeEach(async () => {
       const seed = async (organizationId: string, scope: string) => {
@@ -338,7 +428,7 @@ describe('CacheService', () => {
       // belonging to a different read.
       await cache.invalidateScope(ORG, 'analytics');
 
-      expect([...redis.store.keys()]).toEqual(
+      expect(entries(redis)).toEqual(
         expect.arrayContaining([
           'cache:org-1|analytics-export|',
           'cache:org-1|roles|',
@@ -349,9 +439,7 @@ describe('CacheService', () => {
     it('**and never another tenant**', async () => {
       await cache.invalidateScope(ORG, 'analytics');
 
-      expect([...redis.store.keys()]).toContain(
-        'cache:org-2|analytics:overview|',
-      );
+      expect(entries(redis)).toContain('cache:org-2|analytics:overview|');
     });
   });
 
@@ -374,7 +462,7 @@ describe('CacheService', () => {
       const removed = await cache.invalidateScope(ORG, 'entity:user');
 
       expect(removed).toBe(2);
-      expect([...redis.store.keys()].sort()).toEqual([
+      expect(entries(redis).sort()).toEqual([
         'cache:org-1|entity:department:abc|',
         'cache:org-1|entity:user-preferences:abc|',
       ]);
@@ -397,9 +485,7 @@ describe('CacheService', () => {
       expect(await cache.invalidateScope(ORG, entityScope('user', 'abc'))).toBe(
         1,
       );
-      expect([...redis.store.keys()]).toEqual([
-        'cache:org-1|entity:user:abcd|',
-      ]);
+      expect(entries(redis)).toEqual(['cache:org-1|entity:user:abcd|']);
     });
   });
 

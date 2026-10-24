@@ -181,7 +181,8 @@ describe('The shared cache (e2e)', () => {
       const client = fx.app.get(RedisService).client;
       const keys = await client.keys(`cache:${ORG_A}|permissions|*`);
 
-      expect(keys).toEqual([`cache:${ORG_A}|permissions|`]);
+      // `|#0`: the scope's generation, never invalidated yet.
+      expect(keys).toEqual([`cache:${ORG_A}|permissions||#0`]);
 
       const ttl = await client.ttl(keys[0]);
 
@@ -493,7 +494,9 @@ describe('The shared cache (e2e)', () => {
       const client = fx.app.get(RedisService).client;
       const keys = await client.keys('cache:org-a|analytics:*');
 
-      expect(keys).toEqual(['cache:org-a|analytics:overview|to=2026-01-01']);
+      expect(keys).toEqual([
+        'cache:org-a|analytics:overview|to=2026-01-01|#0.0',
+      ]);
 
       // And the generic scope invalidation reaches it — the property that
       // makes `invalidateTenant` still mean what its docblock says.
@@ -530,7 +533,7 @@ describe('The shared cache (e2e)', () => {
 
       survivors.sort(compareAlphabetically);
       expect(survivors).toEqual(
-        ['cache:org-a|entity:user:abc|', 'cache:org-a|roles|'].sort(
+        ['cache:org-a|entity:user:abc||#0.0.0', 'cache:org-a|roles||#0'].sort(
           compareAlphabetically,
         ),
       );

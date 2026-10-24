@@ -25,24 +25,22 @@ describe('createCachedLoader', () => {
   const cacheWith = (hits: Record<string, Row>) => {
     const written: { scope: string; value: Row }[] = [];
 
+    // The key a read hands back is the scope itself here, so what was
+    // written can be read off by scope.
     const cache: Pick<CacheService, 'mget' | 'msetEx'> = {
       mget: <T>(inputs: { scope: string }[]) =>
         Promise.resolve(
-          inputs.map(
-            (input) =>
+          inputs.map((input) => ({
+            value:
               (Object.entries(hits).find(
                 ([id]) => input.scope === entityScope('user', id),
               )?.[1] as T | undefined) ?? null,
-          ),
+            key: input.scope,
+          })),
         ),
-      msetEx: <T>(
-        entries: { input: { scope: string }; value: T }[],
-      ): Promise<void> => {
+      msetEx: <T>(entries: { key: string; value: T }[]): Promise<void> => {
         for (const entry of entries) {
-          written.push({
-            scope: entry.input.scope,
-            value: entry.value as Row,
-          });
+          written.push({ scope: entry.key, value: entry.value as Row });
         }
 
         return Promise.resolve();

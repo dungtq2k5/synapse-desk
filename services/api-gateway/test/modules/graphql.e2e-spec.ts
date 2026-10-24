@@ -1408,7 +1408,7 @@ describe('The GraphQL surface (e2e)', () => {
       // slash nor the version.
       await caller.get(`${API}/permissions`).expect(200);
 
-      const [restEntry] = await cache.mget<Record<string, unknown>>([
+      const [{ value: restEntry }] = await cache.mget<Record<string, unknown>>([
         { organizationId, scope: CACHE_SCOPES.permissions, params: {} },
       ]);
 

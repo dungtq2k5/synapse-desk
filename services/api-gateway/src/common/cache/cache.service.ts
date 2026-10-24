@@ -28,6 +28,13 @@ const CACHE_PREFIX = 'cache:';
  */
 const NO_TENANT = 'no-tenant';
 
+/**
+ * Where the generation counters live, outside `cache:` so a scope's `SCAN`
+ * never deletes them. One per tenant and scope LEVEL: `entity`,
+ * `entity:user` and `entity:user:{id}` each count their own invalidations.
+ */
+const GENERATION_PREFIX = 'cache-gen:';
+
 /** What a key is built from. */
 export type CacheKeyInput = {
   /**
@@ -121,17 +128,22 @@ export class CacheService {
    *
    * **`produce()` throwing is not cached.**
    *
-   * There is an accepted read-repopulate race here: an invalidation landing
-   * between `produce()` and `set` is overwritten, and that value lives for its
-   * full TTL. The symptom is indistinguishable from a real bug, so read
-   * `docs/decisions/0034-read-repopulate-race-is-accepted.md` before chasing it.
+   * **An answer from before an invalidation is never served after it.** The
+   * key carries the scope's generations, read BEFORE `produce()`; an
+   * invalidation increments them. So an answer produced before an
+   * invalidation and stored after it lands under the old generations' key,
+   * which no read asks for again, and expires on its TTL. The price is one
+   * more round trip per read (the generations' `MGET`). Generations
+   * unreadable means no cache at all, never a stale answer.
    */
   async wrap<T>(
     input: CacheKeyInput,
     ttlSeconds: number,
     produce: () => Promise<T>,
   ): Promise<T> {
-    const key = this.buildKey(input);
+    const [suffix] = (await this.generationSuffixes([input])) ?? [];
+    if (suffix === undefined) return produce();
+    const key = this.buildKey(input) + suffix;
 
     try {
       const cached = await this.redis.get(key);
@@ -177,20 +189,37 @@ export class CacheService {
    * caller must treat them the same. Distinguishing them would let an entity
    * that resolves to nothing be remembered as nothing — see
    * `createCachedLoader`, which deliberately does not.
+   *
+   * Each entry also comes back with the key it was read under, generations
+   * included: a fetched miss is stored under THAT key with {@link msetEx}, so
+   * an invalidation between this read and that write leaves the write
+   * unreachable, as in {@link wrap}. `key` is null when the generations
+   * couldn't be read, and nothing is stored for it.
    */
-  async mget<T>(inputs: CacheKeyInput[]): Promise<(T | null)[]> {
+  async mget<T>(
+    inputs: CacheKeyInput[],
+  ): Promise<{ value: T | null; key: string | null }[]> {
     if (inputs.length === 0) return [];
 
-    try {
-      const raw = await this.redis.mget(inputs.map((i) => this.buildKey(i)));
+    const suffixes = await this.generationSuffixes(inputs);
+    if (!suffixes) return inputs.map(() => ({ value: null, key: null }));
+    const keys = inputs.map(
+      (input, index) => this.buildKey(input) + suffixes[index],
+    );
 
-      return raw.map((text) => (text === null ? null : decode<T>(text)));
+    try {
+      const raw = await this.redis.mget(keys);
+
+      return raw.map((text, index) => ({
+        value: text === null ? null : decode<T>(text),
+        key: keys[index],
+      }));
     } catch (error) {
       this.logger.warn(`Cache mget failed: ${formatErrorMsg(error)}`);
 
       // Fail OPEN: every key reported as a miss, so the caller fetches
       // everything and the request succeeds slowly rather than not at all.
-      return inputs.map(() => null);
+      return keys.map((key) => ({ value: null, key }));
     }
   }
 
@@ -203,7 +232,7 @@ export class CacheService {
    * alternative to.
    */
   async msetEx<T>(
-    entries: { input: CacheKeyInput; value: T }[],
+    entries: { key: string; value: T }[],
     ttlSeconds: number,
   ): Promise<void> {
     if (entries.length === 0) return;
@@ -211,9 +240,9 @@ export class CacheService {
     try {
       const pipeline = this.redis.pipeline();
 
-      for (const { input, value } of entries) {
+      for (const { key, value } of entries) {
         if (value === undefined) continue;
-        pipeline.set(this.buildKey(input), encode(value), 'EX', ttlSeconds);
+        pipeline.set(key, encode(value), 'EX', ttlSeconds);
       }
 
       await pipeline.exec();
@@ -222,9 +251,14 @@ export class CacheService {
     }
   }
 
-  /** Drops one exact entry. The precise half of the invalidation model. */
+  /**
+   * Drops one exact entry, as its current generations name it. The precise
+   * half of the invalidation model; a scope's invalidation is the one that
+   * also shuts out an answer still being produced.
+   */
   async invalidate(input: CacheKeyInput): Promise<void> {
-    const key = this.buildKey(input);
+    const [suffix] = (await this.generationSuffixes([input])) ?? [''];
+    const key = this.buildKey(input) + suffix;
 
     try {
       await this.redis.del(key);
@@ -247,11 +281,25 @@ export class CacheService {
    * Tenant-scoped by construction: the pattern starts with the tenant segment,
    * so one tenant's invalidation cannot reach another's entries even if the
    * scope is wrong.
+   *
+   * **The generation first, then the delete.** Incrementing the scope's
+   * generation is what keeps an answer produced before now from being
+   * stored where a read will find it; the delete frees the memory, and is
+   * what an instance still building keys without generations understands.
    */
   async invalidateScope(
     organizationId: string | null,
     scope: string,
   ): Promise<number> {
+    const generation = generationKeys(organizationId, scope).at(-1)!;
+    try {
+      await this.redis.incr(generation);
+    } catch (error) {
+      this.logger.error(
+        `Cache generation increment failed for ${generation}: ${formatErrorMsg(error)}`,
+      );
+    }
+
     const pattern = scopePattern(organizationId, scope);
     let removed = 0;
 
@@ -277,6 +325,55 @@ export class CacheService {
 
     return removed;
   }
+
+  /**
+   * Each input's generations, as the key suffix `|#g1.g2…` (one per scope
+   * level, `0` where nothing has been invalidated yet), from ONE `MGET`
+   * however many inputs. `null` when Redis can't say: the caller then
+   * neither reads nor writes the cache.
+   */
+  private async generationSuffixes(
+    inputs: CacheKeyInput[],
+  ): Promise<string[] | null> {
+    const perInput = inputs.map((input) =>
+      generationKeys(input.organizationId, input.scope),
+    );
+    const unique = [...new Set(perInput.flat())];
+
+    try {
+      const values = await this.redis.mget(unique);
+      const byKey = new Map(
+        unique.map((key, index) => [key, values[index] ?? '0']),
+      );
+
+      return perInput.map(
+        (keys) => `|#${keys.map((key) => byKey.get(key)).join('.')}`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Cache generations unreadable: ${formatErrorMsg(error)}`,
+      );
+      return null;
+    }
+  }
+}
+
+/**
+ * The generation counters a scope's keys carry, outermost first: one per
+ * level, so `invalidateScope(org, 'entity:user')` reaches every
+ * `entity:user:{id}` and no other entity.
+ *
+ * @example generationKeys('org-1', 'entity:user:u1') // ['cache-gen:org-1|entity', 'cache-gen:org-1|entity:user', 'cache-gen:org-1|entity:user:u1']
+ */
+export function generationKeys(
+  organizationId: string | null,
+  scope: string,
+): string[] {
+  const levels = scope.split(':');
+  return levels.map(
+    (_, index) =>
+      `${GENERATION_PREFIX}${organizationId ?? NO_TENANT}|${levels.slice(0, index + 1).join(':')}`,
+  );
 }
 
 /**

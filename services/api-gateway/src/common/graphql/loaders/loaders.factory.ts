@@ -264,15 +264,20 @@ export function createCachedLoader<V>(options: {
         keys.map((id) => ({ organizationId, scope: scopeOf(id) })),
       );
 
-      const misses = keys.filter((_, index) => cached[index] === null);
+      const misses = keys.filter((_, index) => cached[index].value === null);
       const fetched = misses.length > 0 ? await fetch(misses) : [];
 
       if (fetched.length > 0) {
+        // Stored under the key each id was READ under, generations included,
+        // so an invalidation since the read leaves these writes unreachable.
+        const readKey = new Map(
+          keys.map((id, index) => [id, cached[index].key]),
+        );
         await cache.msetEx(
-          fetched.map((item) => ({
-            input: { organizationId, scope: scopeOf(keyOf(item)) },
-            value: item,
-          })),
+          fetched.flatMap((item) => {
+            const key = readKey.get(keyOf(item));
+            return key ? [{ key, value: item }] : [];
+          }),
           ttlSeconds,
         );
       }
@@ -283,7 +288,9 @@ export function createCachedLoader<V>(options: {
       // and every field resolver then renders the wrong row against the wrong
       // parent, with nothing failing. Batch alignment is why this line does not move.
       const found = [
-        ...cached.filter((item): item is Awaited<V> => item !== null),
+        ...cached
+          .map((entry) => entry.value)
+          .filter((item): item is Awaited<V> => item !== null),
         ...fetched,
       ];
 

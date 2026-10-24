@@ -31,6 +31,13 @@ const STATUS_CACHE_TTL_SECONDS = 30;
 const CACHE_PREFIX = 'org-status:';
 
 /**
+ * Each organization's generation: the cached decision's key carries it, and
+ * an invalidation increments it, so a status read just before a freeze and
+ * stored just after lands where no read looks. Both gateways share it.
+ */
+const GENERATION_PREFIX = 'org-status-gen:';
+
+/**
  * The tenant lifecycle state, cached.
  *
  * Sits in front of a gRPC call because the gate runs on essentially every
@@ -72,7 +79,14 @@ export class OrganizationStatusService
   }
 
   async get(organizationId: string): Promise<OrganizationState> {
-    const cached = await this.readCache(organizationId);
+    // Read BEFORE asking auth-service: the answer is stored under the
+    // generation it was asked under. Unreadable means no cache either way.
+    const generation = await this.readGeneration(organizationId);
+    const key =
+      generation === null
+        ? null
+        : `${CACHE_PREFIX}${organizationId}|#${generation}`;
+    const cached = key ? await this.readCache(key) : null;
     if (cached) return cached;
 
     // Through `call()`, so the most frequent RPC the gateway makes is timed
@@ -97,7 +111,7 @@ export class OrganizationStatusService
       deleted: response.deleted,
     };
 
-    await this.writeCache(organizationId, state);
+    if (key) await this.writeCache(key, state);
 
     return state;
   }
@@ -111,6 +125,10 @@ export class OrganizationStatusService
    */
   async invalidate(organizationId: string): Promise<void> {
     try {
+      // The generation first: a status being read right now is then stored
+      // where no read looks. The delete is what an instance still on keys
+      // without a generation understands.
+      await this.redis.incr(`${GENERATION_PREFIX}${organizationId}`);
       await this.redis.del(`${CACHE_PREFIX}${organizationId}`);
     } catch (error) {
       // Non-fatal: the entry expires on its own within the TTL.
@@ -128,11 +146,19 @@ export class OrganizationStatusService
    * Redis being unavailable must degrade to "ask auth-service every time",
    * which is slower but correct — not to a 500 on every authenticated request.
    */
-  private async readCache(
-    organizationId: string,
-  ): Promise<OrganizationState | null> {
+  private async readGeneration(organizationId: string): Promise<string | null> {
     try {
-      const raw = await this.redis.get(`${CACHE_PREFIX}${organizationId}`);
+      return (
+        (await this.redis.get(`${GENERATION_PREFIX}${organizationId}`)) ?? '0'
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  private async readCache(key: string): Promise<OrganizationState | null> {
+    try {
+      const raw = await this.redis.get(key);
       return raw ? (JSON.parse(raw) as OrganizationState) : null;
     } catch (error) {
       this.logger.warn(
@@ -145,12 +171,12 @@ export class OrganizationStatusService
   }
 
   private async writeCache(
-    organizationId: string,
+    key: string,
     state: OrganizationState,
   ): Promise<void> {
     try {
       await this.redis.set(
-        `${CACHE_PREFIX}${organizationId}`,
+        key,
         JSON.stringify(state),
         'EX',
         STATUS_CACHE_TTL_SECONDS,
