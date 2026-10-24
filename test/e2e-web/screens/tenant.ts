@@ -230,28 +230,35 @@ async function build(slug: string): Promise<Tenant> {
 }
 
 /**
- * The setup's notices to Maya, landed: Priya's replies (read when a row opens
- * the ticket) and the VPN ticket's escalation (the bell's one unread). They
- * land as the services get to them, sometimes after a row has drawn its page
- * (a slow runner), so the badge was in one capture and not another; every row
- * now starts once both are there.
+ * The setup's notices to Maya, landed: Priya's two replies (read when a row
+ * opens the ticket) and the VPN ticket's escalation (the bell's one unread).
+ * They land as the services get to them, sometimes after a row has drawn its
+ * page (a slow runner), so the badge was in one capture and not another;
+ * every row now starts once all three are counted. The replies are counted
+ * by `groupCount`: two at once can land as one row of 2 or two rows of 1.
  */
 async function landNotices(session: APIRequestContext): Promise<void> {
+  type Notice = { type: string; groupCount: number };
   await expect
     .poll(
-      async () =>
-        (
-          await api<{ items: { type: string }[] }>(
-            session,
-            'GET',
-            '/notifications?limit=20',
-          )
-        ).items
-          .map((item) => item.type)
-          .sort(),
+      async () => {
+        const { items } = await api<{ items: Notice[] }>(
+          session,
+          'GET',
+          '/notifications?limit=20',
+        );
+        const count = (type: string) =>
+          items
+            .filter((item) => item.type === type)
+            .reduce((sum, item) => sum + item.groupCount, 0);
+        return {
+          escalated: count('ticket.escalated'),
+          replies: count('ticket.message_created'),
+        };
+      },
       { timeout: 30_000 },
     )
-    .toEqual(['ticket.escalated', 'ticket.message_created']);
+    .toEqual({ escalated: 1, replies: 2 });
 }
 
 /** Every kind of entry, in the order a reader meets them. */
