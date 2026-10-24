@@ -353,9 +353,13 @@ async function offAnyPlan(organizationId: string): Promise<void> {
   }
 }
 
+/** How long a job run or backfill may take: two minutes. */
+const RUN_WAIT_MS = 120_000;
+
 test('run a job and backfill a range, each with a reason: both are in the audit log', async ({
   page,
 }) => {
+  test.setTimeout(2 * RUN_WAIT_MS + 60_000);
   const admin = await superAdmin('jobs', { fullName: 'Ana Ruiz' });
   await consoleSignIn(page, admin);
   await page.goto('/platform/jobs');
@@ -368,7 +372,11 @@ test('run a job and backfill a range, each with a reason: both are in the audit 
     .getByLabel('Reason')
     .fill('Checking the rollup after an import.');
   await dialog.getByRole('button', { name: 'Run now' }).click();
-  await expect(page.getByText('Analytics rollup, daily ran')).toBeVisible();
+  // A real rollup over every organization in the database, which grows with
+  // each run: it gets the gateway's run deadline, not the default wait.
+  await expect(page.getByText('Analytics rollup, daily ran')).toBeVisible({
+    timeout: RUN_WAIT_MS,
+  });
 
   await page
     .getByRole('button', { name: 'Backfill: Analytics rollup, daily' })
@@ -380,7 +388,9 @@ test('run a job and backfill a range, each with a reason: both are in the audit 
     .getByLabel('Reason')
     .fill('An import arrived after the daily run.');
   await dialog.getByRole('button', { name: 'Backfill' }).click();
-  await expect(page.getByText('Backfill complete')).toBeVisible();
+  await expect(page.getByText('Backfill complete')).toBeVisible({
+    timeout: RUN_WAIT_MS,
+  });
 
   await page.goto('/platform/audit-log');
   const ran = page.getByRole('row').filter({ hasText: 'Ran a job' }).first();
