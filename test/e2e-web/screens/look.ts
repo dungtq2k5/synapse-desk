@@ -59,38 +59,79 @@ export async function look(
   } = {},
 ): Promise<void> {
   const initial = page.viewportSize();
-  await settledBell(page);
-  for (const scheme of SCHEMES) {
-    await page.emulateMedia({ colorScheme: scheme });
-    await accessible(page, options.disabled ?? [], options.heldClock);
-    for (const { name: width, ...size } of WIDTHS.filter(
-      ({ name: each }) => !options.widths || options.widths.includes(each),
-    )) {
-      await page.setViewportSize(size);
-      // No sideways scroll: nothing reaches past the viewport, at any width.
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth),
-        `${name} at ${width} is wider than the viewport`,
-      ).toBeLessThanOrEqual(size.width);
-      await page.evaluate(keepNormalized);
-      // From the top: a full-page capture draws the fixed sidebar wherever the
-      // scroll left it, and focus (an escalation notice) scrolls by timing.
-      await page.evaluate(() => window.scrollTo(0, 0));
-      const mask = [...variable(page), ...(options.mask ?? [])];
-      const file = `${name}-${width}-${scheme}.png`;
-      if (options.target) {
-        await expect(options.target).toHaveScreenshot(file, { mask });
-      } else {
-        await expect(page).toHaveScreenshot(file, {
-          mask,
-          fullPage: !options.viewportOnly,
-        });
+  // A toast on screen is held for the checks and captures, as long as they
+  // take: its timer would otherwise close it partway on a slow run.
+  const held = await holdToasts(page);
+  try {
+    await settledBell(page);
+    for (const scheme of SCHEMES) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await accessible(page, options.disabled ?? [], options.heldClock);
+      for (const { name: width, ...size } of WIDTHS.filter(
+        ({ name: each }) => !options.widths || options.widths.includes(each),
+      )) {
+        await page.setViewportSize(size);
+        // No sideways scroll: nothing reaches past the viewport, at any width.
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth),
+          `${name} at ${width} is wider than the viewport`,
+        ).toBeLessThanOrEqual(size.width);
+        await page.evaluate(keepNormalized);
+        // From the top: a full-page capture draws the fixed sidebar wherever the
+        // scroll left it, and focus (an escalation notice) scrolls by timing.
+        await page.evaluate(() => window.scrollTo(0, 0));
+        const mask = [...variable(page), ...(options.mask ?? [])];
+        const file = `${name}-${width}-${scheme}.png`;
+        if (options.target) {
+          await expect(options.target).toHaveScreenshot(file, { mask });
+        } else {
+          await expect(page).toHaveScreenshot(file, {
+            mask,
+            fullPage: !options.viewportOnly,
+          });
+        }
       }
     }
+    await page.evaluate(stopNormalizing);
+    await page.emulateMedia({ colorScheme: 'light' });
+    if (initial) await page.setViewportSize(initial);
+  } finally {
+    if (held) await releaseToasts(page);
   }
-  await page.evaluate(stopNormalizing);
-  await page.emulateMedia({ colorScheme: 'light' });
-  if (initial) await page.setViewportSize(initial);
+}
+
+/**
+ * Holds every toast on screen: the page reads as hidden, and sonner pauses a
+ * toast's timer then. Nothing drawn changes. The event goes to the document
+ * only, so a query that refetches on focus (it listens on the window) isn't
+ * woken by it.
+ *
+ * @returns whether there was a toast to hold
+ */
+async function holdToasts(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    if (!document.querySelector('[data-sonner-toast]')) return false;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => true,
+    });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+    return true;
+  });
+}
+
+/** The page visible again: the toasts' timers carry on from where they were. */
+async function releaseToasts(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const own = document as unknown as Record<string, unknown>;
+    delete own.hidden;
+    delete own.visibilityState;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
 }
 
 /**

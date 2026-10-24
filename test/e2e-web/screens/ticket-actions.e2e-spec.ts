@@ -231,20 +231,12 @@ test.describe('assigning', () => {
 
   test('unassigned: the toast offers Undo', async ({ page }) => {
     const { maya, tickets } = await tenant('unassign');
-    await page.clock.install();
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Unassign' }).click();
     await expect(page.getByText(/^Ticket #\d+ is unassigned$/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Assign…' })).toBeVisible();
-    // The toast leaves on a timer, sooner than a slow run's checks and
-    // captures take: the clock is held (a moment ahead) while they're drawn.
-    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
-    await look(page, 'actions-unassigned', {
-      viewportOnly: true,
-      heldClock: true,
-    });
-    await page.clock.resume();
+    await look(page, 'actions-unassigned', { viewportOnly: true });
 
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(
