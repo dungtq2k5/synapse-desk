@@ -72,6 +72,13 @@ public class OrganizationStatusService {
 
   static final String CACHE_PREFIX = "org-status:";
 
+  /**
+   * Each organization's generation: the cached decision's key carries it, and
+   * {@link #invalidate} increments it, so a status read just before a freeze
+   * and stored just after lands where no read looks.
+   */
+  static final String GENERATION_PREFIX = "org-status-gen:";
+
   private static final long DEADLINE_SECONDS = 5;
 
   /** The RPC is by id and unscoped: no user and no tenant travel with it. */
@@ -108,7 +115,10 @@ public class OrganizationStatusService {
   }
 
   public State get(String organizationId) {
-    Entry cached = readCache(organizationId);
+    // Read BEFORE asking auth-service: the answer is stored under the
+    // generation it was asked under. Unreadable means no cache either way.
+    String key = keyOf(organizationId);
+    Entry cached = key == null ? null : readCache(key);
     if (cached != null && !cached.stale()) return cached.state();
 
     OrganizationStatusResponse response;
@@ -140,7 +150,7 @@ public class OrganizationStatusService {
       nameOf(response.getStatus()),
       response.getDeleted()
     );
-    writeCache(organizationId, state);
+    if (key != null) writeCache(key, state);
 
     return state;
   }
@@ -156,6 +166,10 @@ public class OrganizationStatusService {
   public void invalidate(String organizationId) {
     cache.invalidateScope(organizationId, "organizations");
     try {
+      // The generation first: a status being read right now is then stored
+      // where no read looks. The delete is what an instance still on keys
+      // without a generation understands.
+      redis.opsForValue().increment(GENERATION_PREFIX + organizationId);
       redis.delete(CACHE_PREFIX + organizationId);
     } catch (RuntimeException failure) {
       LOG.warn(
@@ -187,10 +201,27 @@ public class OrganizationStatusService {
     );
   }
 
-  /** A read failure, or a value not shaped as {@code writeCache} writes it, is a miss and not an error. */
-  private Entry readCache(String organizationId) {
+  /** The key a read uses now, with the organization's generation; null when Redis can't say. */
+  private String keyOf(String organizationId) {
     try {
-      String raw = redis.opsForValue().get(CACHE_PREFIX + organizationId);
+      String generation = redis
+        .opsForValue()
+        .get(GENERATION_PREFIX + organizationId);
+      return (
+        CACHE_PREFIX +
+        organizationId +
+        "|#" +
+        (generation == null ? "0" : generation)
+      );
+    } catch (RuntimeException failure) {
+      return null;
+    }
+  }
+
+  /** A read failure, or a value not shaped as {@code writeCache} writes it, is a miss and not an error. */
+  private Entry readCache(String key) {
+    try {
+      String raw = redis.opsForValue().get(key);
       if (raw == null || raw.isEmpty()) return null;
 
       JsonNode node = json.readTree(raw);
@@ -225,18 +256,18 @@ public class OrganizationStatusService {
   }
 
   /** Losing the cache costs latency, not correctness, so it must not fail the request. */
-  private void writeCache(String organizationId, State state) {
+  private void writeCache(String key, State state) {
     try {
       redis.opsForValue().set(
-        CACHE_PREFIX + organizationId,
+        key,
         // Ordered `status`, `deleted`, `freshUntil`, as the class doc shows it.
         json.writeValueAsString(valueOf(state)),
         TTL.plus(MAX_STALE)
       );
     } catch (RuntimeException failure) {
       LOG.debug(
-        "Could not cache status for {}: {}",
-        organizationId,
+        "Could not cache status under {}: {}",
+        key,
         failure.getMessage()
       );
     }

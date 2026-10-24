@@ -65968,9 +65968,13 @@
           "unreadCount": {
             "type": "number",
             "description": "Pushed back so a client never recomputes a badge it can be told."
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "When `unreadCount` was counted, as on the unread count."
           }
         },
-        "required": ["unreadCount", "updated"]
+        "required": ["countedAt", "unreadCount", "updated"]
       },
       "MarkManyReadDto": {
         "type": "object",
@@ -70600,9 +70604,13 @@
         "properties": {
           "count": {
             "type": "number"
+          },
+          "countedAt": {
+            "type": "string",
+            "description": "When the database counted it (ISO 8601). A client keeps the newest count\nit has, from any answer, refetch or push, and drops an older one that\narrives later."
           }
         },
-        "required": ["count"]
+        "required": ["count", "countedAt"]
       },
       "ApiResponseListPreferenceResponseDto": {
         "type": "object",

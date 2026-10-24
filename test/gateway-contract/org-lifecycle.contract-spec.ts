@@ -427,7 +427,7 @@ describe('the tenant lifecycle gate', () => {
     '**a peer that cannot be reached is ridden out on the last known status — a stale ACTIVE serves, a stale FROZEN refuses**',
     async () => {
       peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
-      const stale = (status: string) =>
+      const stale = async (status: string) =>
         redis.set(
           await cacheKey(),
           JSON.stringify({

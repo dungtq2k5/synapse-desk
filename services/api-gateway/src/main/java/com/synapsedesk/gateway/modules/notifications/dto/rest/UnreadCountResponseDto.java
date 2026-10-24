@@ -15,6 +15,8 @@ public class UnreadCountResponseDto {
 
   private BigDecimal count;
 
+  private String countedAt;
+
   public UnreadCountResponseDto() {
     super();
   }
@@ -47,6 +49,28 @@ public class UnreadCountResponseDto {
     this.count = count;
   }
 
+  public UnreadCountResponseDto countedAt(String countedAt) {
+    this.countedAt = countedAt;
+    return this;
+  }
+
+  /**
+   * When the database counted it (ISO 8601). A client keeps the newest count
+   * it has, from any answer, refetch or push, and drops an older one that
+   * arrives later.
+   * @return countedAt
+   */
+  @NotNull
+  @JsonProperty("countedAt")
+  public String getCountedAt() {
+    return countedAt;
+  }
+
+  @JsonProperty("countedAt")
+  public void setCountedAt(String countedAt) {
+    this.countedAt = countedAt;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -56,12 +80,15 @@ public class UnreadCountResponseDto {
       return false;
     }
     UnreadCountResponseDto unreadCountResponseDto = (UnreadCountResponseDto) o;
-    return Objects.equals(this.count, unreadCountResponseDto.count);
+    return (
+      Objects.equals(this.count, unreadCountResponseDto.count) &&
+      Objects.equals(this.countedAt, unreadCountResponseDto.countedAt)
+    );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(count);
+    return Objects.hash(count, countedAt);
   }
 
   @Override
@@ -69,6 +96,9 @@ public class UnreadCountResponseDto {
     StringBuilder sb = new StringBuilder();
     sb.append("class UnreadCountResponseDto {\n");
     sb.append("    count: ").append(toIndentedString(count)).append("\n");
+    sb.append("    countedAt: ")
+      .append(toIndentedString(countedAt))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }

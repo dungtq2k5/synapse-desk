@@ -50,6 +50,12 @@ public class CacheService {
   private static final String PREFIX = "cache:";
   private static final String NO_TENANT = "no-tenant";
 
+  /**
+   * Where the generation counters live, outside {@code cache:} so a scope's
+   * {@code SCAN} never deletes them. One per tenant and scope LEVEL.
+   */
+  private static final String GENERATION_PREFIX = "cache-gen:";
+
   /** The `SCAN ... COUNT` hint, and the batch size a `DEL` is issued at. */
   private static final int SCAN_BATCH = 200;
 
@@ -123,6 +129,21 @@ public class CacheService {
       organizationId == null || organizationId.isEmpty()
         ? NO_TENANT
         : organizationId;
+    // The generation first: an answer produced before now is then stored
+    // where no read looks. The delete below frees the memory, and is what an
+    // instance still on keys without generations understands.
+    List<String> levels = generationKeys(tenant, scope);
+    String generation = levels.get(levels.size() - 1);
+    try {
+      redis.opsForValue().increment(generation);
+    } catch (RuntimeException incrementFailed) {
+      LOG.error(
+        "Cache generation increment failed for {}: {}",
+        generation,
+        incrementFailed.getMessage()
+      );
+    }
+
     String pattern = PREFIX + tenant + "|" + scope + "[|:]*";
 
     int removed = 0;
@@ -163,6 +184,14 @@ public class CacheService {
   /**
    * Read-through, the only read path — `wrap()`, reproduced. Fails OPEN on any
    * Redis error.
+   *
+   * <p><b>An answer from before an invalidation is never served after it.</b>
+   * The key gets the scope's generations, read BEFORE {@code produce}; an
+   * invalidation increments them. An answer produced before an invalidation
+   * and stored after it lands under the old generations' key, which no read
+   * asks for again, and expires on its TTL. The price is one more round trip
+   * per read (the generations' {@code MGET}). Generations unreadable means no
+   * cache at all, never a stale answer.
    */
   public <T> T wrap(
     String key,
@@ -170,6 +199,12 @@ public class CacheService {
     Class<T> type,
     Supplier<T> produce
   ) {
+    Optional<String> suffix = generationSuffix(key);
+    if (suffix.isEmpty()) {
+      return produce.get();
+    }
+    key = key + suffix.get();
+
     try {
       String cached = redis.opsForValue().get(key);
       if (cached != null) {
@@ -218,6 +253,12 @@ public class CacheService {
     TypeReference<T> type,
     Supplier<T> produce
   ) {
+    Optional<String> suffix = generationSuffix(key);
+    if (suffix.isEmpty()) {
+      return produce.get();
+    }
+    key = key + suffix.get();
+
     try {
       String cached = redis.opsForValue().get(key);
       if (cached != null) {
@@ -242,6 +283,63 @@ public class CacheService {
     }
 
     return value;
+  }
+
+  /**
+   * The generation counters a scope's keys carry, outermost first: one per
+   * level, so invalidating {@code entity:user} reaches every
+   * {@code entity:user:{id}} and no other entity.
+   */
+  static List<String> generationKeys(String tenant, String scope) {
+    String[] levels = scope.split(":");
+    List<String> keys = new ArrayList<>(levels.length);
+    StringBuilder level = new StringBuilder();
+    for (int index = 0; index < levels.length; index++) {
+      if (index > 0) {
+        level.append(':');
+      }
+      level.append(levels[index]);
+      keys.add(GENERATION_PREFIX + tenant + "|" + level);
+    }
+    return keys;
+  }
+
+  /**
+   * A built key's generations, as the suffix {@code |#g1.g2…} ({@code 0}
+   * where nothing has been invalidated yet), read in ONE {@code MGET}. The
+   * tenant and scope are the key's own first two segments, so callers keep
+   * building keys as before. Empty when Redis can't say.
+   */
+  private Optional<String> generationSuffix(String key) {
+    // A key not built by `buildKey` has no tenant or scope: no invalidation
+    // can reach it, so it has no generation and is cached as it was.
+    if (!key.startsWith(PREFIX)) {
+      return Optional.of("");
+    }
+    String[] segments = key.substring(PREFIX.length()).split("\\|", 3);
+    if (segments.length < 3) {
+      return Optional.of("");
+    }
+    List<String> keys = generationKeys(segments[0], segments[1]);
+    try {
+      List<String> values = redis.opsForValue().multiGet(keys);
+      StringBuilder suffix = new StringBuilder("|#");
+      for (int index = 0; index < keys.size(); index++) {
+        if (index > 0) {
+          suffix.append('.');
+        }
+        String value = values == null ? null : values.get(index);
+        suffix.append(value == null ? "0" : value);
+      }
+      return Optional.of(suffix.toString());
+    } catch (RuntimeException generationsUnreadable) {
+      LOG.warn(
+        "Cache generations unreadable for {}: {}",
+        key,
+        generationsUnreadable.getMessage()
+      );
+      return Optional.empty();
+    }
   }
 
   /** For a probe that needs the exact bytes rather than a decoded value. */

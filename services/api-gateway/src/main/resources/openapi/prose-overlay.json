@@ -1125,6 +1125,9 @@
     "LogoutDto.allDevices": {
       "description": "Log out of all devices."
     },
+    "MarkReadResponseDto.countedAt": {
+      "description": "When `unreadCount` was counted, as on the unread count."
+    },
     "MarkReadResponseDto.unreadCount": {
       "description": "Pushed back so a client never recomputes a badge it can be told."
     },
@@ -1418,6 +1421,9 @@
     },
     "UnavailableBlockResponseDto.source": {
       "description": "Which leg failed, by service name."
+    },
+    "UnreadCountResponseDto.countedAt": {
+      "description": "When the database counted it (ISO 8601). A client keeps the newest count\nit has, from any answer, refetch or push, and drops an older one that\narrives later."
     },
     "UpdateDepartmentDto.description": {
       "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."

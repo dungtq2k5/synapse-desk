@@ -150,10 +150,19 @@ public class NotificationEventsConsumer implements RuntimeParticipant {
       );
       JsonNode unreadCount = event.get("unreadCount");
       if (unreadCount != null) {
+        // With when it was counted, so a client keeps the newest count it
+        // has. Left out, not null, when the event has none (an older
+        // sender).
+        Map<String, Object> badge = new java.util.LinkedHashMap<>();
+        badge.put("count", unreadCount.asInt());
+        JsonNode countedAt = event.get("countedAt");
+        if (countedAt != null && countedAt.isString()) {
+          badge.put("countedAt", countedAt.asString());
+        }
         relay.relayToRoom(
           room,
           RealtimeEvents.REALTIME_EVENTS_NOTIFICATION_UNREAD_COUNT,
-          Map.of("count", unreadCount.asInt())
+          badge
         );
       }
     }

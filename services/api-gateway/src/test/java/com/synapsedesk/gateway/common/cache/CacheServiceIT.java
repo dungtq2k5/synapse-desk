@@ -107,12 +107,48 @@ class CacheServiceIT {
       // Compact JSON with no spacing, and the timestamp always with three
       // fractional digits and `Z`. A byte comparison, not a parse: the row
       // pins the exact stored wire format.
-      assertThat(cache.raw(key)).contains(
+      assertThat(cache.raw(key + "|#0")).contains(
         "{\"__cache_date__\":\"2024-01-01T00:00:00.000Z\"}"
       );
     } finally {
-      redis.delete(key);
+      redis.delete(List.of(key, key + "|#0"));
     }
+  }
+
+  /**
+   * The race, without timing: the scope is invalidated after the read and
+   * before the store, as an event landing mid-request would. The answer from
+   * before goes under the old generation, so the next read produces again.
+   */
+  @Test
+  void anAnswerFromBeforeAnInvalidationIsNeverServedAfterIt() {
+    String tenant = "it-race-" + System.nanoTime();
+    String key = cache.buildKey(tenant, "documents", Map.of());
+
+    try {
+      String stale = cache.wrap(key, 30, String.class, () -> {
+        cache.invalidateScope(tenant, "documents");
+        return "before";
+      });
+      String next = cache.wrap(key, 30, String.class, () -> "after");
+
+      assertThat(List.of(stale, next)).containsExactly("before", "after");
+    } finally {
+      redis.delete(
+        List.of(key + "|#0", key + "|#1", "cache-gen:" + tenant + "|documents")
+      );
+    }
+  }
+
+  @Test
+  void eachLevelOfAScopeHasItsOwnGenerationAsNodesDo() {
+    assertThat(
+      CacheService.generationKeys("org-1", "entity:user:u1")
+    ).containsExactly(
+      "cache-gen:org-1|entity",
+      "cache-gen:org-1|entity:user",
+      "cache-gen:org-1|entity:user:u1"
+    );
   }
 
   @Test
@@ -175,7 +211,7 @@ class CacheServiceIT {
       // produced by the serializer, so this half of the round trip cannot pass
       // by the writer and the reader sharing one bug.
       cache.putRaw(
-        key,
+        key + "|#0",
         "{\"__cache_date__\":\"2024-06-15T12:30:00.000Z\"}",
         30
       );
@@ -188,7 +224,7 @@ class CacheServiceIT {
         OffsetDateTime.of(2024, 6, 15, 12, 30, 0, 0, ZoneOffset.UTC)
       );
     } finally {
-      redis.delete(key);
+      redis.delete(List.of(key, key + "|#0"));
     }
   }
 
@@ -237,7 +273,7 @@ class CacheServiceIT {
       // `.get("revokedCount")`.
       assertThat(hit.data().revokedCount()).isEqualTo(3);
     } finally {
-      redis.delete(key);
+      redis.delete(List.of(key, key + "|#0"));
     }
   }
 }

@@ -240,9 +240,9 @@ public class NotificationsController {
       ApiResponse.of(
         200,
         "OK",
-        new UnreadCountResponseDto().count(
-          BigDecimal.valueOf(response.getCount())
-        )
+        new UnreadCountResponseDto()
+          .count(BigDecimal.valueOf(response.getCount()))
+          .countedAt(response.getCountedAt())
       )
     );
   }
@@ -546,7 +546,8 @@ public class NotificationsController {
   private static MarkReadResponseDto toMarkReadDto(MarkReadResponse response) {
     return new MarkReadResponseDto()
       .updated(BigDecimal.valueOf(response.getUpdated()))
-      .unreadCount(BigDecimal.valueOf(response.getUnreadCount()));
+      .unreadCount(BigDecimal.valueOf(response.getUnreadCount()))
+      .countedAt(response.getCountedAt());
   }
 
   // ----------------------------------------------------------- enum bridges

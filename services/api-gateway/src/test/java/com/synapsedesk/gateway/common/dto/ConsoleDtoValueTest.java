@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.AuditLogResponseDto;
 import com.synapsedesk.gateway.modules.auditlogs.dto.rest.PlatformAuditLogResponseDto;
 import com.synapsedesk.gateway.modules.auth.dto.rest.TwoFactorRequiredResponseDto;
+import com.synapsedesk.gateway.modules.notifications.dto.rest.MarkReadResponseDto;
+import com.synapsedesk.gateway.modules.notifications.dto.rest.UnreadCountResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.DunningTenantResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.OverLimitItemResponseDto;
@@ -49,7 +51,9 @@ class ConsoleDtoValueTest {
       PlatformAuditLogResponseDto.class,
       AssignPlanDto.class,
       ReleasePlanDto.class,
-      UpdatePlatformOrganizationDto.class
+      UpdatePlatformOrganizationDto.class,
+      UnreadCountResponseDto.class,
+      MarkReadResponseDto.class
     );
   }
 

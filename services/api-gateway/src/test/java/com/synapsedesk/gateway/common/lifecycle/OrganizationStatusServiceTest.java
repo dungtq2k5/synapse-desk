@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.common.cache.CacheService;
 import io.grpc.Status;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -33,7 +34,11 @@ import tools.jackson.databind.json.JsonMapper;
 class OrganizationStatusServiceTest {
 
   private static final String ORG = "99999999-9999-4999-8999-999999999999";
-  private static final String KEY = "org-status:" + ORG;
+  /** The key without a generation: what an invalidation deletes. */
+  private static final String BASE_KEY = "org-status:" + ORG;
+  /** The key a read uses: generation 0, never invalidated. */
+  private static final String KEY = BASE_KEY + "|#0";
+  private static final String GENERATION_KEY = "org-status-gen:" + ORG;
 
   private OrganizationServiceBlockingStub peer;
   private StringRedisTemplate redis;
@@ -92,6 +97,49 @@ class OrganizationStatusServiceTest {
         .setDeleted(deleted)
         .build()
     );
+  }
+
+  /**
+   * The race, without timing: a freeze is invalidated while the peer is still
+   * answering ACTIVE. The answer is stored under generation 0, the next read
+   * uses generation 1, so it asks again and sees FROZEN.
+   */
+  @Test
+  void aStatusReadBeforeAFreezeAndStoredAfterItIsNeverServed() {
+    when(values.get(GENERATION_KEY)).thenReturn(null, "1");
+    when(peer.getOrganizationStatus(any()))
+      .thenAnswer(asked -> {
+        service.invalidate(ORG);
+        return OrganizationStatusResponse.newBuilder()
+          .setStatus(OrgStatus.ORG_STATUS_ACTIVE)
+          .build();
+      })
+      .thenReturn(
+        OrganizationStatusResponse.newBuilder()
+          .setStatus(OrgStatus.ORG_STATUS_FROZEN)
+          .build()
+      );
+
+    var first = service.get(ORG);
+    var second = service.get(ORG);
+
+    assertThat(List.of(first.status(), second.status())).containsExactly(
+      "ACTIVE",
+      "FROZEN"
+    );
+    verify(values).set(eq(KEY), any(), eq(KEPT));
+    verify(values).set(eq(BASE_KEY + "|#1"), any(), eq(KEPT));
+  }
+
+  @Test
+  void anUnreadableGenerationAsksThePeerAndCachesNothing() {
+    when(values.get(GENERATION_KEY)).thenThrow(
+      new IllegalStateException("redis is down")
+    );
+    peerSays(OrgStatus.ORG_STATUS_ACTIVE, false);
+
+    assertThat(service.get(ORG).status()).isEqualTo("ACTIVE");
+    verify(values, never()).set(any(), any(), any(Duration.class));
   }
 
   @Test
@@ -270,13 +318,14 @@ class OrganizationStatusServiceTest {
   void invalidatingDropsTheDecisionAndTheCachedOrganizationAtOnce() {
     service.invalidate(ORG);
 
-    verify(redis).delete(KEY);
+    verify(values).increment(GENERATION_KEY);
+    verify(redis).delete(BASE_KEY);
     verify(cache).invalidateScope(ORG, "organizations");
   }
 
   @Test
   void aFailedInvalidationIsNotFatalBecauseTheEntryExpiresOnItsOwn() {
-    when(redis.delete(KEY)).thenThrow(
+    when(redis.delete(BASE_KEY)).thenThrow(
       new IllegalStateException("redis is down")
     );
 
