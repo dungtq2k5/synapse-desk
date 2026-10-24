@@ -12,7 +12,7 @@ import { lastSocket } from '@/test/socket';
 import { NotificationBell } from './bell';
 import { MAX_SELECTION, NotificationFeed } from './feed';
 import { NotificationPreferences } from './preferences';
-import { NotificationsLive } from './store';
+import { newer, NotificationsLive } from './store';
 
 jest.mock('socket.io-client', () => jest.requireActual('@/test/socket'));
 let pathname = '/tickets';
@@ -157,6 +157,74 @@ describe('the bell', () => {
     );
     await waitFor(() => expect(bell()).toHaveAccessibleName('Notifications'));
     expect(bell()).not.toHaveTextContent(/\d/);
+  });
+
+  it('keeps the newest count, whichever way it arrives', async () => {
+    // A refetch, an answer and a push travel separately, so an older count
+    // can arrive after a newer one: the server's time of counting decides.
+    const T1 = '2026-10-24T10:00:00.000001Z';
+    const T2 = '2026-10-24T10:00:00.000002Z';
+    const T3 = '2026-10-24T10:00:00.000003Z';
+    let answer = { count: 4, countedAt: T2 };
+    const { socket, calls } = show(<NotificationBell />, {
+      'GET /api/v1/notifications/unread-count': () => ok(answer),
+      'GET /api/v1/notifications': ok({
+        items: [],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    });
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName('Notifications, 4 unread'),
+    );
+
+    // Older than what's held: dropped. The cache tells the bell on a
+    // scheduled tick, so give it one before saying it stayed.
+    act(() =>
+      socket.receive(REALTIME_EVENTS.notificationUnreadCount, {
+        count: 1,
+        countedAt: T1,
+      }),
+    );
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(bell()).toHaveAccessibleName('Notifications, 4 unread');
+
+    // Newer: taken.
+    act(() =>
+      socket.receive(REALTIME_EVENTS.notificationUnreadCount, {
+        count: 1,
+        countedAt: T3,
+      }),
+    );
+    await waitFor(() =>
+      expect(bell()).toHaveAccessibleName('Notifications, 1 unread'),
+    );
+
+    // A refetch that counted before that push: dropped too.
+    answer = { count: 2, countedAt: T2 };
+    const fetched = () =>
+      calls.filter(({ url }) => url.endsWith('/notifications/unread-count'))
+        .length;
+    const before = fetched();
+    act(() =>
+      socket.receive(REALTIME_EVENTS.notificationNew, {
+        ...payload(),
+        priority: 'NORMAL',
+      }),
+    );
+    await waitFor(() => expect(fetched()).toBeGreaterThan(before));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(bell()).toHaveAccessibleName('Notifications, 1 unread');
+  });
+
+  it.each([
+    [undefined, 'b', true],
+    ['b', undefined, true],
+    ['2026-10-24T10:00:00.000001Z', '2026-10-24T10:00:00.000002Z', true],
+    ['2026-10-24T10:00:00.000002Z', '2026-10-24T10:00:00.000001Z', false],
+    ['2026-10-24T10:00:00.000002Z', '2026-10-24T10:00:00.000002Z', false],
+  ])('newer(%s, %s) is %s', (held, incoming, expected) => {
+    expect(newer(held, incoming)).toBe(expected);
   });
 
   it('opens the latest; opening one marks it read, and the badge takes the server’s answer', async () => {

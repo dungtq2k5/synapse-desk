@@ -31,16 +31,50 @@ const TOAST_MS = 6_000;
 /** How long the count must hold still before it's announced. */
 const ANNOUNCE_AFTER_MS = 2_000;
 
+/**
+ * Whether an incoming count should replace the one held: the count arrives
+ * three ways (a refetch, a write's answer, a push), in any order, so the
+ * newest by when the server counted it wins. Equal means the same moment,
+ * so the held one stays. A count without `countedAt` (an older server) is
+ * applied, as before.
+ *
+ * @example newer('2026-10-24T10:00:00.000002Z', '2026-10-24T10:00:00.000001Z') // false
+ */
+export function newer(
+  held: string | null | undefined,
+  incoming: string | null | undefined,
+): boolean {
+  if (!incoming || !held) return true;
+  // One fixed-width UTC form, so text order is time order.
+  return incoming > held;
+}
+
 /** The server's unread count, or `null` before it's known. Never counted here. */
 export function useUnreadCount(): number | null {
   const query = useNotificationsControllerUnreadCountV1({
-    query: { staleTime: Infinity },
+    query: {
+      staleTime: Infinity,
+      // EVERY write to the count goes through this, a refetch and each
+      // `setQueryData` alike: whichever arrives, the newer count stays.
+      structuralSharing: (held: unknown, fetched: unknown) =>
+        newer(
+          (held as ApiResponseUnreadCountResponseDto | undefined)?.data
+            ?.countedAt,
+          (fetched as ApiResponseUnreadCountResponseDto | undefined)?.data
+            ?.countedAt,
+        )
+          ? fetched
+          : held,
+    },
   });
   return query.data?.data?.count ?? null;
 }
 
-/** Puts the server's count in the cache: from the socket, or a write's answer. */
-function setCount(queryClient: QueryClient, count: number) {
+/**
+ * Puts the server's count in the cache, from the socket or a write's
+ * answer. The query's `structuralSharing` keeps the held count if it's newer.
+ */
+function setCount(queryClient: QueryClient, count: number, countedAt?: string) {
   queryClient.setQueryData<ApiResponseUnreadCountResponseDto>(
     getNotificationsControllerUnreadCountV1QueryKey(),
     (old) => ({
@@ -49,7 +83,7 @@ function setCount(queryClient: QueryClient, count: number) {
       message: 'OK',
       warning: null,
       ...old,
-      data: { count },
+      data: { count, countedAt: countedAt ?? '' },
     }),
   );
 }
@@ -69,7 +103,9 @@ export function useNotificationActions() {
   const queryClient = useQueryClient();
   const settle = useCallback(
     (answer: ApiResponseMarkReadResponseDto) => {
-      if (answer.data) setCount(queryClient, answer.data.unreadCount);
+      if (answer.data) {
+        setCount(queryClient, answer.data.unreadCount, answer.data.countedAt);
+      }
       refetchLists(queryClient);
     },
     [queryClient],
@@ -235,7 +271,7 @@ export function useNotificationsLive(): void {
     REALTIME_EVENTS.notificationRead,
     useCallback(
       (payload: NotificationReadPayload) => {
-        setCount(queryClient, payload.unreadCount);
+        setCount(queryClient, payload.unreadCount, payload.countedAt);
         refetchLists(queryClient);
       },
       [queryClient],
@@ -244,7 +280,8 @@ export function useNotificationsLive(): void {
   useRealtimeEvent(
     REALTIME_EVENTS.notificationUnreadCount,
     useCallback(
-      (payload: { count: number }) => setCount(queryClient, payload.count),
+      (payload: { count: number; countedAt?: string }) =>
+        setCount(queryClient, payload.count, payload.countedAt),
       [queryClient],
     ),
   );
