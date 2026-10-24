@@ -107,19 +107,25 @@ async function settledBell(page: Page): Promise<void> {
     })
     .first();
   if ((await bell.count()) === 0) return;
-  const count = await page.evaluate(async () => {
-    const answer = await fetch('/api/v1/notifications/unread-count');
-    if (!answer.ok) return null;
-    const body = (await answer.json()) as { data?: { count?: number } };
-    return body.data?.count ?? null;
-  });
-  if (count === null) return;
-  // Its label, not its accessible name: an open dialog hides the bell, and a
-  // hidden element's name is empty.
-  await expect(bell).toHaveAttribute(
-    'aria-label',
-    count > 0 ? `Notifications, ${count} unread` : 'Notifications',
-  );
+  // Asked again each time: the page marks a ticket's notices read just after
+  // it opens, so an early answer can be one the bell has already moved past.
+  await expect
+    .poll(async () => {
+      const count = await page.evaluate(async () => {
+        const answer = await fetch('/api/v1/notifications/unread-count');
+        if (!answer.ok) return null;
+        const body = (await answer.json()) as { data?: { count?: number } };
+        return body.data?.count ?? null;
+      });
+      if (count === null) return 'settled';
+      // Its label, not its accessible name: an open dialog hides the bell,
+      // and a hidden element's name is empty.
+      const label = await bell.getAttribute('aria-label');
+      const expected =
+        count > 0 ? `Notifications, ${count} unread` : 'Notifications';
+      return label === expected ? 'settled' : `${label} ≠ ${expected}`;
+    })
+    .toBe('settled');
 }
 
 /**
