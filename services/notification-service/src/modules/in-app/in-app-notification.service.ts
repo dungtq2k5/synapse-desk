@@ -318,6 +318,7 @@ export class InAppNotificationService {
   private async tryGroup(
     command: CreateInAppNotificationCommand,
     recipientId: string,
+    again = true,
   ): Promise<PersistOutcome | null> {
     // One statement, not a read-then-update, and the reason is the same one
     // `markTicketRead` gives: two deliveries racing would both read the row,
@@ -354,10 +355,12 @@ export class InAppNotificationService {
 
     if (updated) return { kind: 'grouped', notificationId: updated.id };
 
-    // No row came back for one of two reasons, and they need telling apart:
-    // either there was no open group to collapse onto — in which case the
-    // caller must INSERT — or there was one and this event had already been
-    // counted into it.
+    // No row came back for one of three reasons, and they need telling
+    // apart: there was no open group to collapse onto (the caller must
+    // INSERT); there was one and this event is already counted in it; or
+    // another event's group committed just after the UPDATE looked, so this
+    // event isn't in it yet. Only the event's own id says which of the last
+    // two: calling the third a duplicate loses the event.
     const open = await this.prisma.notification.findFirst({
       where: {
         recipientId,
@@ -365,12 +368,16 @@ export class InAppNotificationService {
         readAt: null,
         archivedAt: null,
       },
-      select: { id: true },
+      select: { groupEventIds: true },
     });
 
     if (!open) return null;
+    if (open.groupEventIds.includes(command.eventId)) {
+      return { kind: 'duplicate', notificationId: null };
+    }
 
-    return { kind: 'duplicate', notificationId: null };
+    // The group arrived after the UPDATE looked: collapse onto it, once.
+    return again ? this.tryGroup(command, recipientId, false) : null;
   }
 
   /**

@@ -454,6 +454,38 @@ describe('Ticket notifications (e2e)', () => {
       }
     });
 
+    it('**19c. A group that appears between the collapse and its check still counts the event**', async () => {
+      // The window two messages at once can land in: this event's UPDATE
+      // finds no open group, the other event's row commits, then the check
+      // finds that group. It must collapse onto it, not call the event
+      // already counted (which lost it: one row of 1 on CI).
+      const original = fx.prisma.$queryRaw.bind(fx.prisma);
+      jest.spyOn(fx.prisma, '$queryRaw').mockImplementationOnce(
+        // A plain promise where Prisma types its own: the spy only delays.
+        (async (...args: Parameters<typeof original>) => {
+          const missed = await original(...args);
+          await fx.prisma.notification.create({
+            data: {
+              organizationId: ORG,
+              recipientId: REQUESTER,
+              type: 'ticket.message_created',
+              title: 'The other message',
+              groupKey: ticketMessageGroupKey(TICKET_ID),
+              groupEventIds: ['the-other-event'],
+            },
+          });
+          return missed;
+        }) as never,
+      );
+
+      await consumer.messageCreated(
+        messageEvent({ messageId: 'msg-late', senderId: AGENT }),
+      );
+
+      const rows = await fx.prisma.notification.findMany();
+      expect(rows.map((row) => row.groupCount)).toEqual([2]);
+    });
+
     it('20. Groups PER RECIPIENT, not per ticket', async () => {
       // Two people watching one thread each get their own row: a shared counter
       // would mean one of them reading it hid the thread from the other.
