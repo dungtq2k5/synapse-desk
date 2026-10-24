@@ -127,7 +127,7 @@ describe('notifications', () => {
     async () => {
       peers.notification
         .on('NotificationService/GetUnreadCount')
-        .reply({ count: 7 });
+        .reply({ count: 7, countedAt: '2026-10-24T10:00:00.123456Z' });
 
       const response = await new Session(gateway.baseUrl).get(
         `${API}/notifications/unread-count`,
@@ -135,7 +135,9 @@ describe('notifications', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { count: 7 } });
+      expect(response.body).toMatchObject({
+        data: { count: 7, countedAt: '2026-10-24T10:00:00.123456Z' },
+      });
 
       const [call] = peers.notification.calls(
         'NotificationService/GetUnreadCount',
@@ -250,9 +252,11 @@ describe('notifications', () => {
   rowFor('Notifications')(
     'marking many read forwards either shape — ids, or a resource',
     async () => {
-      peers.notification
-        .on('NotificationService/MarkManyRead')
-        .reply({ updated: 3, unreadCount: 4 });
+      peers.notification.on('NotificationService/MarkManyRead').reply({
+        updated: 3,
+        unreadCount: 4,
+        countedAt: '2026-10-24T10:00:00.123456Z',
+      });
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/notifications/read`,
@@ -265,7 +269,11 @@ describe('notifications', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
-        data: { updated: 3, unreadCount: 4 },
+        data: {
+          updated: 3,
+          unreadCount: 4,
+          countedAt: '2026-10-24T10:00:00.123456Z',
+        },
       });
 
       const [call] = peers.notification.calls(

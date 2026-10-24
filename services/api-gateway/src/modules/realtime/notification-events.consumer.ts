@@ -65,6 +65,7 @@ export class NotificationEventsConsumer {
       // does not have to understand the read payload's shape.
       room.emit(REALTIME_EVENTS.notificationUnreadCount, {
         count: payload.unreadCount,
+        countedAt: payload.countedAt,
       });
     });
   }

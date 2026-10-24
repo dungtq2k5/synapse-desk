@@ -130,4 +130,10 @@ export class AiStreamErrorPayloadDto {
  */
 export class UnreadCountPayloadDto {
   count!: number;
+  /**
+   * When the database counted it (ISO 8601). A client keeps the newest count
+   * it has, from any answer, refetch or push, and drops an older one that
+   * arrives later.
+   */
+  countedAt!: string;
 }

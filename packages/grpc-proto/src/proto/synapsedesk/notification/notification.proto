@@ -147,7 +147,13 @@ message ListNotificationsResponse {
   bool has_more = 3;
 }
 
-message UnreadCountResponse { int32 count = 1; }
+message UnreadCountResponse {
+  int32 count = 1;
+  // When the database counted it (ISO 8601, the counting statement's own
+  // time): a client keeps the newest count it's been given, whichever way it
+  // came, and drops an older one that arrives later.
+  string counted_at = 2;
+}
 
 message NotificationIdRequest { string id = 1; }
 
@@ -166,6 +172,8 @@ message MarkReadResponse {
   int32 updated = 1;
   // Pushed back so the client never has to recompute a badge it can be told.
   int32 unread_count = 2;
+  // When `unread_count` was counted, as on `UnreadCountResponse`.
+  string counted_at = 3;
 }
 
 // Enums rather than the strings these used to be, per the rule `OrgStatus`

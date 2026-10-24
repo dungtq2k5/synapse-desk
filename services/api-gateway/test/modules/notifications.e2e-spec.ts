@@ -201,7 +201,9 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
       // `:id` would match `unread-count` and `ParseUUIDPipe` would turn it into
       // a 400 that reads as a client bug rather than a routing mistake — the
       // same hazard `documents/storage` and `bulk/status` each hit.
-      fx.stubs.notification.getUnreadCount.mockReturnValue(of({ count: 7 }));
+      fx.stubs.notification.getUnreadCount.mockReturnValue(
+        of({ count: 7, countedAt: '2026-10-24T10:00:00.000Z' }),
+      );
 
       const res = await authenticatedAgent(fx.app).get(
         `${API}/notifications/unread-count`,
@@ -223,7 +225,11 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
 
     it('12. `POST /notifications/read` is not swallowed by `:id/read`', async () => {
       fx.stubs.notification.markManyRead.mockReturnValue(
-        of({ updated: 12, unreadCount: 0 }),
+        of({
+          updated: 12,
+          unreadCount: 0,
+          countedAt: '2026-10-24T10:00:00.000Z',
+        }),
       );
 
       const res = await authenticatedAgent(fx.app)
@@ -242,7 +248,11 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
   describe('read and archive', () => {
     it('13. Marking read is 200, not 201 — nothing was created', async () => {
       fx.stubs.notification.markRead.mockReturnValue(
-        of({ updated: 1, unreadCount: 3 }),
+        of({
+          updated: 1,
+          unreadCount: 3,
+          countedAt: '2026-10-24T10:00:00.000Z',
+        }),
       );
 
       const res = await authenticatedAgent(fx.app).post(

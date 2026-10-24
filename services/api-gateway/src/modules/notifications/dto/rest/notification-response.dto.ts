@@ -70,12 +70,20 @@ export class NotificationFeedResponseDto {
 
 export class UnreadCountResponseDto {
   count!: number;
+  /**
+   * When the database counted it (ISO 8601). A client keeps the newest count
+   * it has, from any answer, refetch or push, and drops an older one that
+   * arrives later.
+   */
+  countedAt!: string;
 }
 
 export class MarkReadResponseDto {
   updated!: number;
   /** Pushed back so a client never recomputes a badge it can be told. */
   unreadCount!: number;
+  /** When `unreadCount` was counted, as on the unread count. */
+  countedAt!: string;
 }
 
 export class PreferenceResponseDto {

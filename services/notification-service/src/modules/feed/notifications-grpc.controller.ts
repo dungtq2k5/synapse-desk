@@ -101,9 +101,7 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     _request: ListNotificationsRequest,
     metadata?: Metadata,
   ): Promise<UnreadCountResponse> {
-    return {
-      count: await this.feed.unreadCount(unpackCallerContext(metadata)),
-    };
+    return this.feed.unreadCount(unpackCallerContext(metadata));
   }
 
   markRead(

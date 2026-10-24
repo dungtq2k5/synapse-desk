@@ -18,6 +18,9 @@ import { NotificationRealtimePublisher } from '../realtime/notification-realtime
 import { cursorPredicate, decodeCursor, encodeCursor } from './feed.cursor';
 import { toNotificationResponse } from './feed.mapper';
 
+/** An unread total, and the database's time of the statement that counted it. */
+export type UnreadCount = { count: number; countedAt: string };
+
 /** api-endpoints-plan §4b: 20 a page. */
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -97,12 +100,35 @@ export class FeedService {
    * applies it. Without it this degrades into a scan of every notification the
    * user has ever received, and nothing surfaces that except latency.
    */
-  async unreadCount(context: CallerContext): Promise<number> {
-    const recipientId = requireActor(context);
+  async unreadCount(context: CallerContext): Promise<UnreadCount> {
+    return this.countUnread(requireActor(context));
+  }
 
-    return this.prisma.notification.count({
-      where: { recipientId, readAt: null, archivedAt: null },
-    });
+  /**
+   * The unread total and when it was counted, in ONE statement:
+   * `statement_timestamp()` is the moment this statement's view of the data
+   * was taken (READ COMMITTED takes one per statement), so a later
+   * `countedAt` counted a later state. Not `now()`, the transaction's start,
+   * and not this process's clock. The bell keeps the newest count it's given,
+   * whichever way it arrives (an answer, a refetch, a push).
+   */
+  private async countUnread(recipientId: string): Promise<UnreadCount> {
+    // Microseconds, in UTC, at a fixed width: two counts a millisecond apart
+    // still order, and comparing the strings compares the times.
+    const [row] = await this.prisma.$queryRaw<
+      { count: number; counted_at: string }[]
+    >`
+      SELECT count(*)::int AS "count",
+        to_char(
+          statement_timestamp() AT TIME ZONE 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+        ) AS "counted_at"
+      FROM "notifications"
+      WHERE "recipient_id" = ${recipientId}::uuid
+        AND "read_at" IS NULL
+        AND "archived_at" IS NULL
+    `;
+    return { count: row.count, countedAt: row.counted_at };
   }
 
   /**
@@ -240,9 +266,8 @@ export class FeedService {
     notificationIds: string[],
     change: 'read' | 'archived',
   ): Promise<MarkReadResponse> {
-    const unreadCount = await this.prisma.notification.count({
-      where: { recipientId, readAt: null, archivedAt: null },
-    });
+    const { count: unreadCount, countedAt } =
+      await this.countUnread(recipientId);
 
     if (updated > 0) {
       // So a second tab stops showing a badge the user cleared. `read_at` is
@@ -253,11 +278,12 @@ export class FeedService {
         notificationIds,
         change,
         unreadCount,
+        countedAt,
       };
       this.realtime.publishRead(payload);
     }
 
-    return { updated, unreadCount };
+    return { updated, unreadCount, countedAt };
   }
 
   private baseFilter(
