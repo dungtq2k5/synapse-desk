@@ -265,6 +265,7 @@ test.describe('changing plan', () => {
 
   test('confirming, then the plan, with the done toast', async ({ page }) => {
     let paid = 'price_pro_monthly';
+    await page.clock.install();
     await open(page, {
       'GET /billing/subscription': (route) =>
         route.fulfill(
@@ -299,7 +300,10 @@ test.describe('changing plan', () => {
 
     paid = 'price_enterprise_monthly';
     await expect(page.getByText('You’re on Enterprise')).toBeVisible();
-    await look(page, 'plan-done', { viewportOnly: true });
+    // The toast leaves on a timer, sooner than a slow run's checks and
+    // captures take: the clock is held (a moment ahead) while they're drawn.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 100);
+    await look(page, 'plan-done', { viewportOnly: true, heldClock: true });
   });
 
   test('confirming, past a minute', async ({ page }) => {
