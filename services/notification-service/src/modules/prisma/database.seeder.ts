@@ -2,6 +2,12 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from './prisma.service';
 
+/** The idempotency key: one row per recipient and event. */
+export const EVENT_KEY = 'notifications_event_key';
+
+/** One open (unread, unarchived) group per recipient and group key. */
+export const OPEN_GROUP_KEY = 'notifications_open_group_key';
+
 /**
  * Bootstrap DDL for notification-service.
  *
@@ -170,21 +176,76 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // safety net. Without it a redelivered quota alert is a second
     // notification, and the quota alert is exactly the producer that retries.
     await this.prisma.$executeRawUnsafe(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "notifications_event_key"
+      CREATE UNIQUE INDEX IF NOT EXISTS "${EVENT_KEY}"
         ON "notifications" ("recipient_id", "event_id")
         WHERE "event_id" IS NOT NULL;
     `);
 
-    // Group collapse: "is there already an UNREAD row for this thread?".
-    //
-    // Scoped to unread deliberately. Once the user has read
-    // "3 new replies", the next reply is new information and starts a fresh
-    // row — an index covering read rows would serve a lookup that must not
-    // find anything.
-    await this.prisma.$executeRawUnsafe(`
-      CREATE INDEX IF NOT EXISTS "notifications_group_idx"
-        ON "notifications" ("recipient_id", "group_key")
-        WHERE "read_at" IS NULL AND "group_key" IS NOT NULL;
-    `);
+    await this.applyOpenGroupKey();
+  }
+
+  /**
+   * One OPEN group per person and group key, held by the database: "is there
+   * already an unread row for this thread?" has one answer.
+   *
+   * Scoped to unread and unarchived, the same predicate as the lookup in
+   * `tryGroup()`: once the user has read "3 new replies", the next reply is
+   * new information and starts a fresh row, and an archived row must not
+   * block one. UNIQUE because ticket events are handled as they arrive, so two
+   * replies at once both used to find no group and both insert; the index
+   * refuses the second, which then collapses onto the first.
+   *
+   * Applied once, by the schema step (`schema-apply.ts`, before a pod
+   * serves). Rows the race already made would stop the index building, so the
+   * older of each set is ungrouped first (kept in the feed as an ordinary
+   * notification, nothing deleted, no read state changed), with the table
+   * locked against writes so none lands between the clean-up and the build.
+   * Two schema steps at once queue on the lock; the second finds the index.
+   * The old non-unique `notifications_group_idx` goes in the same step.
+   */
+  private async applyOpenGroupKey(): Promise<void> {
+    const [present] = await this.prisma.$queryRawUnsafe<{ found: boolean }[]>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE tablename = 'notifications'
+           AND indexname = '${OPEN_GROUP_KEY}'
+       ) AS "found"`,
+    );
+    if (present?.found) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        'LOCK TABLE "notifications" IN SHARE ROW EXCLUSIVE MODE',
+      );
+      const ungrouped = await tx.$executeRawUnsafe(`
+        UPDATE "notifications" SET "group_key" = NULL
+        WHERE "id" IN (
+          SELECT "id" FROM (
+            SELECT "id", row_number() OVER (
+              PARTITION BY "recipient_id", "group_key"
+              ORDER BY "created_at" DESC, "id" DESC
+            ) AS "rank"
+            FROM "notifications"
+            WHERE "group_key" IS NOT NULL
+              AND "read_at" IS NULL
+              AND "archived_at" IS NULL
+          ) AS "open"
+          WHERE "rank" > 1
+        );
+      `);
+      await tx.$executeRawUnsafe(
+        'DROP INDEX IF EXISTS "notifications_group_idx"',
+      );
+      await tx.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "${OPEN_GROUP_KEY}"
+          ON "notifications" ("recipient_id", "group_key")
+          WHERE "group_key" IS NOT NULL
+            AND "read_at" IS NULL
+            AND "archived_at" IS NULL;
+      `);
+      this.logger.log(
+        `${OPEN_GROUP_KEY} created; ${ungrouped} duplicate open group row(s) ungrouped`,
+      );
+    });
   }
 }

@@ -18,6 +18,7 @@ import { InAppNotificationService } from '../../src/modules/in-app/in-app-notifi
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
 import { NotificationsController } from '../../src/modules/notifications.controller';
+import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 
 /**
  * Domain E's write path.
@@ -347,9 +348,89 @@ describe('In-app notification delivery (e2e)', () => {
           'notifications_feed_idx',
           'notifications_unread_idx',
           'notifications_event_key',
-          'notifications_group_idx',
+          'notifications_open_group_key',
         ]),
       );
+    });
+  });
+
+  describe('one open group per person', () => {
+    const grouped = (eventId: string) =>
+      quotaAlert(80, { eventId, groupKey: 'quota:org-1' });
+
+    it('13b. Two events for one group delivered together make ONE row each', async () => {
+      // Two parallel `persist()` calls: both find no open group, the unique
+      // open-group key refuses the second insert, and it collapses instead.
+      await Promise.all([
+        inApp.deliver(grouped('a')),
+        inApp.deliver(grouped('b')),
+      ]);
+
+      const rows = await fx.prisma.notification.findMany();
+      expect(rows.map((row) => row.groupCount)).toEqual([2, 2]);
+    });
+
+    it('13c. A redelivered event is still a duplicate, not a second count', async () => {
+      await inApp.deliver(grouped('a'));
+      await inApp.deliver(grouped('b'));
+      await inApp.deliver(grouped('a'));
+
+      const rows = await fx.prisma.notification.findMany();
+      expect(rows.map((row) => row.groupCount)).toEqual([2, 2]);
+    });
+
+    it('13d. An archived unread group doesn’t block a new one', async () => {
+      await inApp.deliver(grouped('a'));
+      await fx.prisma.notification.updateMany({
+        data: { archivedAt: new Date() },
+      });
+
+      await inApp.deliver(grouped('b'));
+
+      const open = await fx.prisma.notification.findMany({
+        where: { archivedAt: null },
+      });
+      expect(open.map((row) => row.groupCount)).toEqual([1, 1]);
+      await expect(fx.prisma.notification.count()).resolves.toBe(4);
+    });
+
+    it('13e. The clean-up ungroups the older duplicates, then the key builds', async () => {
+      // What the race left before the key existed: two open rows of one
+      // group. The schema step keeps the newest as the group.
+      await fx.prisma.$executeRawUnsafe(
+        'DROP INDEX IF EXISTS "notifications_open_group_key"',
+      );
+      const recipientId = ADMINS[0].userId;
+      const row = (title: string, createdAt: Date) => ({
+        organizationId: ORG,
+        recipientId,
+        type: NOTIFICATION_TYPES.ticketMessageCreated,
+        title,
+        groupKey: 'ticket:t1:message',
+        createdAt,
+      });
+      await fx.prisma.notification.createMany({
+        data: [
+          row('Older', new Date('2026-10-24T10:00:00Z')),
+          row('Newer', new Date('2026-10-24T10:00:01Z')),
+        ],
+      });
+
+      await fx.moduleRef.get(DatabaseSeeder).seed();
+
+      const rows = await fx.prisma.notification.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(rows.map((one) => [one.title, one.groupKey])).toEqual([
+        ['Older', null],
+        ['Newer', 'ticket:t1:message'],
+      ]);
+      const indexes = await fx.prisma.$queryRawUnsafe<{ indexname: string }[]>(
+        `SELECT indexname FROM pg_indexes WHERE tablename = 'notifications'`,
+      );
+      const names = indexes.map((one) => one.indexname);
+      expect(names).toContain('notifications_open_group_key');
+      expect(names).not.toContain('notifications_group_idx');
     });
   });
 
