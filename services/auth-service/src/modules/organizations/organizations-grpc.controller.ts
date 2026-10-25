@@ -13,6 +13,8 @@ import {
   GetOrganizationStatusRequest,
   ResolveOrgByInboundTokenRequest,
   ResolveOrgByInboundTokenResponse,
+  ResolveTenantAuditNamesRequest,
+  ResolveTenantAuditNamesResponse,
   OrganizationStatusResponse,
   OnboardingResponse,
   OrganizationResponse,
@@ -180,6 +182,16 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     metadata?: Metadata,
   ): Promise<DeleteOrganizationResponse> {
     return this.organizationsService.deleteOrganization(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  resolveTenantAuditNames(
+    request: ResolveTenantAuditNamesRequest,
+    metadata?: Metadata,
+  ): Promise<ResolveTenantAuditNamesResponse> {
+    return this.organizationsService.resolveTenantAuditNames(
       request,
       unpackCallerContext(metadata),
     );

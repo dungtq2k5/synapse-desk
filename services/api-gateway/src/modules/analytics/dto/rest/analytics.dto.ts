@@ -7,9 +7,11 @@ import {
   IsObject,
   IsOptional,
   IsUUID,
+  Matches,
   Max,
   Min,
 } from 'class-validator';
+import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import {
   EXPORT_KINDS,
   ANALYTICS_GRANULARITIES,
@@ -84,10 +86,10 @@ export class CreateExportDto {
   @IsIn(EXPORT_KINDS)
   readonly kind!: ExportKind;
 
-  @IsISO8601({ strict: true })
+  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
   readonly from!: string;
 
-  @IsISO8601({ strict: true })
+  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
   readonly to!: string;
 
   @IsOptional()

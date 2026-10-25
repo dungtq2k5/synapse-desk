@@ -4,6 +4,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import { AuditLogsService } from './audit-logs.service';
 import { PlatformGrpcClient } from '../platform/platform-grpc.client';
+import { OrganizationsGrpcClient } from '../organizations/organizations-grpc.client';
 import {
   AuditLogsController,
   PlatformAuditLogsController,
@@ -15,7 +16,12 @@ import {
   imports: [AuthModule, AnalyticsModule],
   controllers: [AuditLogsController, PlatformAuditLogsController],
   // The platform client, for the names on the platform trail.
-  providers: [AuditLogsGrpcClient, AuditLogsService, PlatformGrpcClient],
+  providers: [
+    AuditLogsGrpcClient,
+    AuditLogsService,
+    PlatformGrpcClient,
+    OrganizationsGrpcClient,
+  ],
   exports: [AuditLogsService],
 })
 export class AuditLogsModule {}

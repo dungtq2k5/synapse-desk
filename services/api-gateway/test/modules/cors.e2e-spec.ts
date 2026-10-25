@@ -193,4 +193,63 @@ describe('CORS (e2e)', () => {
     expect(response.headers['access-control-allow-origin']).toBeUndefined();
     expect(response.status).toBeLessThan(500);
   });
+
+  describe('the Origin check on a state-changing request', () => {
+    const login = (headers: Record<string, string>, body: unknown = {}) => {
+      const call = request(fx.app.getHttpServer()).post(`${API}/auth/login`);
+      for (const [name, value] of Object.entries(headers))
+        call.set(name, value);
+      return typeof body === 'string'
+        ? call.send(body)
+        : call.send(body as object);
+    };
+
+    beforeEach(() => fx.stubs.auth.login.mockClear());
+
+    it('**6. a foreign Origin is refused with 403, before any peer**', async () => {
+      // `SameSite=Lax` does not cover a sibling subdomain, and a bodiless
+      // cross-site POST passes the JSON-only rule; this is what refuses both.
+      const response = await login({ Origin: 'https://evil.example.com' });
+
+      expect(response.status).toBe(403);
+      expect(fx.stubs.auth.login).not.toHaveBeenCalled();
+    });
+
+    it('6b. a bodiless foreign POST is refused too', async () => {
+      const response = await request(fx.app.getHttpServer())
+        .post(`${API}/auth/logout`)
+        .set('Origin', 'https://evil.example.com');
+
+      expect(response.status).toBe(403);
+    });
+
+    it("7. an allowed origin, the gateway's own, and no Origin all pass it", async () => {
+      const statuses = [
+        (await login({ Origin: ORIGIN })).status,
+        (await login({ Host: 'gateway.test', Origin: 'http://gateway.test' }))
+          .status,
+        (await login({})).status,
+      ];
+
+      expect(statuses.filter((status) => status === 403)).toEqual([]);
+    });
+
+    it('8. a GET is never refused for its Origin', async () => {
+      const response = await request(fx.app.getHttpServer())
+        .get(`${API}/health`)
+        .set('Origin', 'https://evil.example.com');
+
+      expect(response.status).not.toBe(403);
+    });
+
+    it('9. a text/plain body from an allowed origin is still refused (415)', async () => {
+      const response = await request(fx.app.getHttpServer())
+        .post(`${API}/auth/login`)
+        .set('Origin', ORIGIN)
+        .set('Content-Type', 'text/plain')
+        .send('{"email":"a@example.test","password":"x"}');
+
+      expect(response.status).toBe(415);
+    });
+  });
 });

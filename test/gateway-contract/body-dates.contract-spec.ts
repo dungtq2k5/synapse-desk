@@ -1,12 +1,13 @@
 /**
  * @file **A date range in a request BODY is refused, before any peer, when it is not a
- * date Node's `@IsISO8601({ strict: true })` accepts, and accepted when it is.**
+ * date its route's rule accepts, and accepted when it is.**
  *
  * Four POST routes take a `from` and `to` in the body (the analytics, ticket and audit
- * exports, and the platform job backfill). All four are validated with the same rule
- * (see `date-rules.ts`), and it accepts more than a calendar date and a timestamp with an
- * offset: an offset-less timestamp, the basic form, a space for the `T`, `+0700`, a week
- * date, an ordinal date. Each form is a row, because a hand-written approximation of the
+ * exports, and the platform job backfill). The analytics and audit exports count whole
+ * days and take `PATTERN` (`YYYY-MM-DD`). The other two take Node's
+ * `@IsISO8601({ strict: true })` (`ISO`), which accepts more than a calendar date and a
+ * timestamp with an offset: an offset-less timestamp, the basic form, a space for the
+ * `T`, `+0700`, a week date, an ordinal date (see `date-rules.ts`). Each form is a row, because a hand-written approximation of the
  * rule refuses exactly these, and a client that sends one would get a 400.
  *
  * **Both directions are rows.** A refusal row alone would pass a gateway that refused
@@ -27,7 +28,7 @@
  * parity rule forbids; the other fields have no such second rule.
  */
 
-import { ISO } from './date-rules';
+import { ISO, PATTERN, type Rule } from './date-rules';
 import { type Gateway, startGateway } from './gateway';
 import { type Peers, startPeers } from './peers';
 import { rowFor } from './pending';
@@ -46,6 +47,12 @@ const NAMED = [
   'POST /api/v1/platform/jobs/{name}/backfill',
   'POST /api/v1/tickets/export',
 ];
+
+/** The two exports count whole days, so they take the `YYYY-MM-DD` pattern; the rest ISO. */
+const RULE: Record<string, Rule> = {
+  '/api/v1/analytics/export': PATTERN,
+  '/api/v1/audit-logs/export': PATTERN,
+};
 
 const routes = allOperations().filter((operation) => {
   if (operation.method === 'GET' || !operation.body) return false;
@@ -115,10 +122,10 @@ describe('a date range in a request body', () => {
 
   const rows = routes.flatMap((route) =>
     ['from', 'to'].flatMap((param) => [
-      ...ISO.refused.map(
+      ...(RULE[route.path] ?? ISO).refused.map(
         (value) => [route.path, 'refuses', param, value] as const,
       ),
-      ...ISO.accepted.map(
+      ...(RULE[route.path] ?? ISO).accepted.map(
         (value) => [route.path, 'accepts', param, value] as const,
       ),
     ]),

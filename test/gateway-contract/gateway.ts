@@ -32,6 +32,8 @@ export type Gateway = {
   /** `http://127.0.0.1:<port>` — no prefix; `client.ts` adds `/api/v1`. */
   baseUrl: string;
   metricsUrl: string;
+  /** Everything the gateway has printed so far, stdout and stderr. */
+  output: () => string;
   stop: () => Promise<void>;
 };
 
@@ -214,6 +216,7 @@ export async function startGateway(
     const gateway: Gateway = {
       baseUrl,
       metricsUrl: `http://127.0.0.1:${metricsPort}`,
+      output: () => output.join(''),
       stop: () => stop(child),
     };
 

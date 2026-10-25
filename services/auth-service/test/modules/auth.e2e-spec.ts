@@ -597,7 +597,7 @@ describe('Auth core (e2e)', () => {
       });
     });
 
-    it('/users/me says the organization’s status in every status, and nothing for a Super Admin', async () => {
+    it('/users/me says the organization’s status and name in every status, and nothing for a Super Admin', async () => {
       const users = fx.moduleRef.get(UsersService);
 
       for (const organizationStatus of [
@@ -605,25 +605,25 @@ describe('Auth core (e2e)', () => {
         OrgStatus.SUSPENDED_PAST_DUE,
         OrgStatus.FROZEN,
       ]) {
-        const { user } = await seedTenantWithUser(fx.prisma, {
+        const { user, org } = await seedTenantWithUser(fx.prisma, {
           organization: { status: organizationStatus },
         });
+        const current = await users.getCurrentUser(user.id);
 
-        expect(
-          fromProtoOrgStatus(
-            (await users.getCurrentUser(user.id)).organizationStatus,
-          ),
-        ).toBe(organizationStatus);
+        expect([
+          fromProtoOrgStatus(current.organizationStatus),
+          current.organizationName,
+        ]).toEqual([organizationStatus, org.name]);
       }
 
       const superAdmin = await fx.prisma.user.findFirstOrThrow({
         where: { organizationId: null },
       });
-      expect(
-        fromProtoOrgStatus(
-          (await users.getCurrentUser(superAdmin.id)).organizationStatus,
-        ),
-      ).toBeNull();
+      const current = await users.getCurrentUser(superAdmin.id);
+      expect([
+        fromProtoOrgStatus(current.organizationStatus),
+        current.organizationName,
+      ]).toEqual([null, undefined]);
     });
   });
 

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsISO8601, IsObject, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsObject, IsOptional, IsUUID, Matches } from 'class-validator';
+import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
@@ -55,10 +56,10 @@ export class ListAuditLogsQueryDto extends PaginationDto {
  * alone holds the line.
  */
 export class CreateAuditLogExportDto {
-  @IsISO8601({ strict: true })
+  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
   readonly from!: string;
 
-  @IsISO8601({ strict: true })
+  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
   readonly to!: string;
 
   /** `action`, `resourceType`, `userId` — refused per kind at the service. */

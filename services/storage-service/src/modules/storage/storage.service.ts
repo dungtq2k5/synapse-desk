@@ -23,6 +23,7 @@ import {
   fromProtoStoragePurpose,
 } from '@synapsedesk/grpc-proto';
 import {
+  EXTENSION_BY_MIME,
   organizationIdFromObjectPath,
   StoragePurpose,
 } from '@synapsedesk/contracts';
@@ -43,6 +44,13 @@ import {
   RemoteSourceError,
   RemoteSourceFetcher,
 } from './remote-source.fetcher';
+
+/** The `text/*` types' extensions, which object names end in. */
+const TEXT_EXTENSIONS: ReadonlySet<string> = new Set(
+  Object.entries(EXTENSION_BY_MIME)
+    .filter(([mime]) => mime.startsWith('text/'))
+    .map(([, extension]) => extension),
+);
 
 /**
  * Presign → upload → confirm, one mechanism for every file type.
@@ -440,6 +448,11 @@ export class StorageService {
             version: 'v4',
             action: 'read',
             expires,
+            // Text downloads rather than renders: on the storage origin,
+            // never ours, but a page of someone's text is still not a page.
+            ...(TEXT_EXTENSIONS.has(objectPath.split('.').pop() ?? '')
+              ? { responseDisposition: 'attachment' }
+              : {}),
           });
           return [objectPath, url] as const;
         } catch (error) {

@@ -54,6 +54,7 @@
   "POST /api/v1/chat/conversations/{id}/escalate": [],
   "GET /api/v1/chat/conversations/{id}/messages": [],
   "POST /api/v1/chat/conversations/{id}/messages": [],
+  "POST /api/v1/client-errors": [],
   "GET /api/v1/departments": ["department.read"],
   "POST /api/v1/departments": ["department.create"],
   "DELETE /api/v1/departments/{id}": ["department.delete"],

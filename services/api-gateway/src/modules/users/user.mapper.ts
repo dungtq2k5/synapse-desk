@@ -197,6 +197,7 @@ export function toCurrentUserResponseDto(
     departmentIds: response.departmentIds,
     hasPassword: response.hasPassword,
     organizationStatus: fromProtoOrgStatus(response.organizationStatus),
+    organizationName: response.organizationName ?? null,
     isSuperAdmin: response.isSuperAdmin,
   };
 }

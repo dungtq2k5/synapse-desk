@@ -372,6 +372,13 @@ enum WebhookDeliveryStatus {
   WEBHOOK_DELIVERY_STATUS_FAILED = 3;
 }
 
+// Mirrors `WebhookDisabledCode` in @synapsedesk/nest-common: why WE disabled an
+// endpoint, as data beside the reason's sentence.
+enum WebhookDisabledCode {
+  WEBHOOK_DISABLED_CODE_UNSPECIFIED = 0;
+  WEBHOOK_DISABLED_CODE_CONSECUTIVE_FAILURES = 1;
+}
+
 message WebhookEndpointResponse {
   string id = 1;
   string url = 2;
@@ -402,6 +409,11 @@ message WebhookEndpointResponse {
   optional string disabled_reason = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  // `disabled_reason` as data; UNSPECIFIED when the tenant disabled it, or it
+  // is active.
+  WebhookDisabledCode disabled_code = 9;
+  // Terminal failures in a row, reset by any delivered event.
+  int32 consecutive_failures = 10;
 }
 
 message CreateWebhookEndpointRequest {

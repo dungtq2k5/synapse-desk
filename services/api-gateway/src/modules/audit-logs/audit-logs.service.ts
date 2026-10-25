@@ -6,6 +6,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PlatformGrpcClient } from '../platform/platform-grpc.client';
+import { OrganizationsGrpcClient } from '../organizations/organizations-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import {
@@ -33,16 +34,81 @@ export class AuditLogsService {
   constructor(
     private readonly auditLogsGrpcClient: AuditLogsGrpcClient,
     private readonly platform: PlatformGrpcClient,
+    private readonly organizations: OrganizationsGrpcClient,
     // The export lifecycle is shared, so the RPC is too — this module owns the
     // ROUTE, not a second copy of the machinery.
     private readonly analytics: AnalyticsService,
   ) {}
 
-  /** @param platformScope Reads the platform's own rows instead of a tenant's. */
+  /** The tenant's log, each entry named through the tenant-scoped read. */
   async list(
     query: ListAuditLogsQueryDto,
     context: RequestContext,
-    platformScope = false,
+  ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
+    const page = await this.page(query, context, false);
+    const names = await this.organizations
+      .resolveAuditNames(
+        {
+          userIds: actorIds(page.items),
+          departmentIds: resourceIds(page.items, AuditResourceType.DEPARTMENT),
+          roleIds: resourceIds(page.items, AuditResourceType.ROLE),
+          invitationIds: resourceIds(page.items, AuditResourceType.INVITATION),
+          organizationIds: resourceIds(
+            page.items,
+            AuditResourceType.ORGANIZATION,
+          ),
+          planIds: resourceIds(page.items, AuditResourceType.SUBSCRIPTION_PLAN),
+        },
+        context,
+      )
+      .catch((error: unknown) => this.unnamed(error));
+    return named(
+      page,
+      names && {
+        users: names.users,
+        [AuditResourceType.DEPARTMENT]: names.departments,
+        [AuditResourceType.ROLE]: names.roles,
+        [AuditResourceType.INVITATION]: names.invitations,
+        [AuditResourceType.ORGANIZATION]: names.organizations,
+        [AuditResourceType.SUBSCRIPTION_PLAN]: names.plans,
+      },
+    );
+  }
+
+  /** The platform's log, named through the platform's read. */
+  async listPlatform(
+    query: ListAuditLogsQueryDto,
+    context: RequestContext,
+  ): Promise<PaginationResponseDto<PlatformAuditLogResponseDto>> {
+    const page = await this.page(query, context, true);
+    const names = await this.platform
+      .resolveAuditNames(
+        {
+          userIds: actorIds(page.items),
+          organizationIds: resourceIds(
+            page.items,
+            AuditResourceType.ORGANIZATION,
+          ),
+          planIds: resourceIds(page.items, AuditResourceType.SUBSCRIPTION_PLAN),
+        },
+        context,
+      )
+      .catch((error: unknown) => this.unnamed(error));
+    return named(
+      page,
+      names && {
+        users: names.users,
+        [AuditResourceType.ORGANIZATION]: names.organizations,
+        [AuditResourceType.SUBSCRIPTION_PLAN]: names.plans,
+      },
+    );
+  }
+
+  /** @param platformScope Reads the platform's own rows instead of a tenant's. */
+  private async page(
+    query: ListAuditLogsQueryDto,
+    context: RequestContext,
+    platformScope: boolean,
   ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
     return toAuditLogPageDto(
       await this.auditLogsGrpcClient.list(
@@ -52,60 +118,10 @@ export class AuditLogsService {
     );
   }
 
-  /**
-   * The platform's own trail, with names for its people, organizations and
-   * plans, read in one call to auth. A failed lookup leaves the names null:
-   * the trail still reads, by id.
-   */
-  async listPlatform(
-    query: ListAuditLogsQueryDto,
-    context: RequestContext,
-  ): Promise<PaginationResponseDto<PlatformAuditLogResponseDto>> {
-    const page = await this.list(query, context, true);
-    const ids = (type: AuditResourceType) => [
-      ...new Set(
-        page.items
-          .filter((entry) => entry.resourceType === type && entry.resourceId)
-          .map((entry) => entry.resourceId!),
-      ),
-    ];
-    const names = await this.platform
-      .resolveAuditNames(
-        {
-          userIds: [
-            ...new Set(
-              page.items.flatMap((entry) =>
-                entry.userId ? [entry.userId] : [],
-              ),
-            ),
-          ],
-          organizationIds: ids(AuditResourceType.ORGANIZATION),
-          planIds: ids(AuditResourceType.SUBSCRIPTION_PLAN),
-        },
-        context,
-      )
-      .catch((error: unknown) => {
-        this.logger.warn(`Audit names unavailable: ${formatErrorMsg(error)}`);
-        return null;
-      });
-    const resourceName = (entry: AuditLogResponseDto) => {
-      if (!names || !entry.resourceId) return null;
-      if (entry.resourceType === AuditResourceType.ORGANIZATION) {
-        return names.organizations[entry.resourceId] ?? null;
-      }
-      if (entry.resourceType === AuditResourceType.SUBSCRIPTION_PLAN) {
-        return names.plans[entry.resourceId] ?? null;
-      }
-      return null;
-    };
-    return {
-      ...page,
-      items: page.items.map((entry) => ({
-        ...entry,
-        actorName: (entry.userId && names?.users[entry.userId]) || null,
-        resourceName: resourceName(entry),
-      })),
-    };
+  /** Names are a courtesy: the page still answers, with ids, without them. */
+  private unnamed(error: unknown): null {
+    this.logger.warn(`Audit names unavailable: ${formatErrorMsg(error)}`);
+    return null;
   }
 
   /** The actions that actually occurred, for the filter dropdown. */
@@ -149,4 +165,42 @@ export class AuditLogsService {
   ): Promise<ExportResponseDto> {
     return this.analytics.getExport(id, context);
   }
+}
+
+type Names = Partial<
+  Record<'users' | AuditResourceType, Record<string, string>>
+>;
+
+const actorIds = (items: AuditLogResponseDto[]): string[] => [
+  ...new Set(items.flatMap((entry) => (entry.userId ? [entry.userId] : []))),
+];
+
+const resourceIds = (
+  items: AuditLogResponseDto[],
+  type: AuditResourceType,
+): string[] => [
+  ...new Set(
+    items.flatMap((entry) =>
+      entry.resourceType === type && entry.resourceId ? [entry.resourceId] : [],
+    ),
+  ),
+];
+
+/** Each entry with `actorName` and `resourceName` from `names`, or null. */
+function named(
+  page: PaginationResponseDto<AuditLogResponseDto>,
+  names: Names | null,
+): PaginationResponseDto<AuditLogResponseDto> {
+  return {
+    ...page,
+    items: page.items.map((entry) => ({
+      ...entry,
+      actorName: (entry.userId && names?.users?.[entry.userId]) || null,
+      resourceName:
+        (entry.resourceType &&
+          entry.resourceId &&
+          names?.[entry.resourceType]?.[entry.resourceId]) ||
+        null,
+    })),
+  };
 }

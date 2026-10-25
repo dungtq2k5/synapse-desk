@@ -13,7 +13,7 @@
     "db:generate": "prisma generate",
     "db:apply": "node dist/src/database-check.js && prisma migrate deploy && node dist/src/schema-apply.js",
     "db:apply:test": "dotenv -e .env.test -- npm run db:apply",
-    "db:migrate": "prisma migrate dev --create-only",
+    "db:migrate": "node ../../scripts/new-migration.mjs",
     "projection:backfill": "nest start --entryFile projection-backfill",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",

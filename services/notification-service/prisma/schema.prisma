@@ -401,6 +401,10 @@ model WebhookEndpoint {
   /// tenant's own PATCH — the distinction the UI renders.
   disabledReason String? @map("disabled_reason") @db.VarChar(500)
 
+  /// `disabledReason` as data: a `WebhookDisabledCode`. Null exactly when the
+  /// reason is.
+  disabledCode String? @map("disabled_code") @db.VarChar(40)
+
   /// Consecutive terminal failures, reset on any delivered event. At
   /// `WEBHOOK_DISABLE_AFTER_FAILURES` the endpoint is disabled, the reason
   /// written, and the tenant told at HIGH priority.

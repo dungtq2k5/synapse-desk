@@ -176,6 +176,16 @@ export enum WebhookDeliveryStatus {
   UNRECOGNIZED = -1,
 }
 
+/**
+ * Mirrors `WebhookDisabledCode` in @synapsedesk/nest-common: why WE disabled an
+ * endpoint, as data beside the reason's sentence.
+ */
+export enum WebhookDisabledCode {
+  WEBHOOK_DISABLED_CODE_UNSPECIFIED = 0,
+  WEBHOOK_DISABLED_CODE_CONSECUTIVE_FAILURES = 1,
+  UNRECOGNIZED = -1,
+}
+
 export interface NotificationResponse {
   id: string;
   organizationId: string;
@@ -449,7 +459,16 @@ export interface WebhookEndpointResponse {
    */
   disabledReason?: string | undefined;
   createdAt: Timestamp | undefined;
-  updatedAt: Timestamp | undefined;
+  updatedAt:
+    | Timestamp
+    | undefined;
+  /**
+   * `disabled_reason` as data; UNSPECIFIED when the tenant disabled it, or it
+   * is active.
+   */
+  disabledCode: WebhookDisabledCode;
+  /** Terminal failures in a row, reset by any delivered event. */
+  consecutiveFailures: number;
 }
 
 export interface CreateWebhookEndpointRequest {

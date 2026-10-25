@@ -34,7 +34,10 @@ import {
   TicketStatus,
   RetrievalDegradation,
 } from '@synapsedesk/contracts';
-import { WebhookDeliveryStatus } from '@synapsedesk/nest-common';
+import {
+  WebhookDeliveryStatus,
+  WebhookDisabledCode,
+} from '@synapsedesk/nest-common';
 import {
   AiModelTier as ProtoAiModelTier,
   Gender as ProtoGender,
@@ -50,6 +53,7 @@ import {
   NotificationResourceType as ProtoNotificationResourceType,
   NotificationType as ProtoNotificationType,
   WebhookDeliveryStatus as ProtoWebhookDeliveryStatus,
+  WebhookDisabledCode as ProtoWebhookDisabledCode,
   PreferenceSource as ProtoPreferenceSource,
 } from '../generated/synapsedesk/notification/notification';
 import {
@@ -410,6 +414,21 @@ const webhookDeliveryStatus = enumBridge<
 
 export const toProtoWebhookDeliveryStatus = webhookDeliveryStatus.toProto;
 export const fromProtoWebhookDeliveryStatus = webhookDeliveryStatus.fromProto;
+
+/** `webhook_endpoints.disabled_code` — why WE disabled an endpoint. */
+const webhookDisabledCode = enumBridge<
+  WebhookDisabledCode,
+  ProtoWebhookDisabledCode
+>(
+  {
+    [WebhookDisabledCode.CONSECUTIVE_FAILURES]:
+      ProtoWebhookDisabledCode.WEBHOOK_DISABLED_CODE_CONSECUTIVE_FAILURES,
+  },
+  ProtoWebhookDisabledCode.WEBHOOK_DISABLED_CODE_UNSPECIFIED,
+);
+
+export const toProtoWebhookDisabledCode = webhookDisabledCode.toProto;
+export const fromProtoWebhookDisabledCode = webhookDisabledCode.fromProto;
 
 /** `notifications.resource_type` — what the notification is ABOUT. */
 const notificationResourceType = enumBridge<

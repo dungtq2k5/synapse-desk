@@ -101,6 +101,8 @@ const UNREACHABLE: Record<string, string> = {
     'needs the tenant-selection token a successful first login hands back',
   'POST /api/v1/auth/logout':
     'asks its peer only when a refresh cookie is present, and answers 200 without it',
+  'POST /api/v1/client-errors':
+    'has no peer: it writes a log line (client-errors.contract-spec.ts covers it)',
 };
 
 /**

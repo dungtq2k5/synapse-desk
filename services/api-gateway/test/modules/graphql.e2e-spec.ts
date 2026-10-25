@@ -183,15 +183,17 @@ describe('The GraphQL surface (e2e)', () => {
           departmentIds: [],
           hasPassword: true,
           organizationStatus: toProtoOrgStatus(OrgStatus.ACTIVE),
+          organizationName: 'Acme Inc',
           isSuperAdmin: false,
         }),
       );
 
       // Anything but a 500 is the point: a 500 here is exactly the symptom the
-      // gap produced on the other transport, and the route's own body is the
-      // users suite's business.
+      // gap produced on the other transport.
       const rest = await agent.get(`${API}/users/me`);
       expect(rest.status).toBe(200);
+      // The name the frozen page shows, which the organization read refuses.
+      expect(rest.body.data.organizationName).toBe('Acme Inc');
 
       // And the GraphQL branch exists at all — the one line that was missing.
       // Asserted structurally rather than by calling a guarded resolver,

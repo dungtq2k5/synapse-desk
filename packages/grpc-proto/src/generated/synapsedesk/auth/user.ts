@@ -42,6 +42,11 @@ export interface CurrentUserResponse {
    * the platform console.
    */
   isSuperAdmin: boolean;
+  /**
+   * The caller's organization's name, answered in every status (the frozen
+   * page names it). Absent for a Super Admin.
+   */
+  organizationName?: string | undefined;
 }
 
 /**

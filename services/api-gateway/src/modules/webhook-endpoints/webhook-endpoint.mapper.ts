@@ -3,6 +3,7 @@ import {
   fromProtoTimestamp,
   fromProtoNotificationType,
   fromProtoWebhookDeliveryStatus,
+  fromProtoWebhookDisabledCode,
   requireProtoTimestamp,
   NotificationType as ProtoNotificationType,
   type ListWebhookDeliveriesResponse,
@@ -50,6 +51,8 @@ export function toWebhookEndpointResponseDto(
     eventTypes: toNotificationTypes(endpoint.eventTypes),
     isActive: endpoint.isActive,
     disabledReason: endpoint.disabledReason ?? null,
+    disabledCode: fromProtoWebhookDisabledCode(endpoint.disabledCode),
+    consecutiveFailures: endpoint.consecutiveFailures,
     createdAt: requireProtoTimestamp(endpoint.createdAt, 'createdAt'),
     updatedAt: requireProtoTimestamp(endpoint.updatedAt, 'updatedAt'),
   };

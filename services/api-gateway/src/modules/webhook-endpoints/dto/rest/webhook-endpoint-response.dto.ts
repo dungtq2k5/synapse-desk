@@ -1,7 +1,10 @@
 /** @file What the webhook management routes return. */
 
 import type { NotificationType } from '@synapsedesk/contracts';
-import type { WebhookDeliveryStatus } from '@synapsedesk/nest-common';
+import type {
+  WebhookDeliveryStatus,
+  WebhookDisabledCode,
+} from '@synapsedesk/nest-common';
 
 export class WebhookEndpointResponseDto {
   readonly id!: string;
@@ -19,6 +22,10 @@ export class WebhookEndpointResponseDto {
    * tenant disabled it themselves — the distinction a settings page renders.
    */
   readonly disabledReason!: string | null;
+  /** `disabledReason` as data. NULL exactly when the reason is. */
+  readonly disabledCode!: WebhookDisabledCode | null;
+  /** Terminal failures in a row, reset by any delivered event. */
+  readonly consecutiveFailures!: number;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
 }

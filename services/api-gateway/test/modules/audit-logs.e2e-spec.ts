@@ -75,6 +75,74 @@ describe('Audit logs at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items).toHaveLength(1);
     });
 
+    it('2b. names who acted and what was acted on, through the tenant-scoped read', async () => {
+      const actor = faker.string.uuid();
+      const department = faker.string.uuid();
+      const invitation = faker.string.uuid();
+      fx.stubs.audit.listAuditLogs.mockReturnValue(
+        of({
+          items: [
+            wireLog({
+              userId: actor,
+              resourceType:
+                ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_DEPARTMENT,
+              resourceId: department,
+            }),
+            wireLog({
+              userId: actor,
+              resourceType:
+                ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_INVITATION,
+              resourceId: invitation,
+            }),
+            wireLog({
+              userId: undefined,
+              resourceType: ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_EXPORT,
+              resourceId: faker.string.uuid(),
+            }),
+          ],
+          meta: wirePage([]).meta,
+        }),
+      );
+      fx.stubs.organization.resolveTenantAuditNames.mockReturnValue(
+        of({
+          users: { [actor]: 'Dana Admin' },
+          departments: { [department]: 'Billing' },
+          roles: {},
+          invitations: { [invitation]: 'new@example.test' },
+          organizations: {},
+          plans: {},
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['audit.read'],
+      }).get(`${API}/audit-logs`);
+
+      expect(res.status).toBe(200);
+      expect(
+        res.body.data.items.map(
+          (entry: { actorName: string; resourceName: string }) => [
+            entry.actorName,
+            entry.resourceName,
+          ],
+        ),
+      ).toEqual([
+        ['Dana Admin', 'Billing'],
+        ['Dana Admin', 'new@example.test'],
+        [null, null],
+      ]);
+      expect(
+        fx.stubs.organization.resolveTenantAuditNames.mock.calls[0][0],
+      ).toEqual({
+        userIds: [actor],
+        departmentIds: [department],
+        roleIds: [],
+        invitationIds: [invitation],
+        organizationIds: [],
+        planIds: [],
+      });
+    });
+
     it('3. REJECTS a platformScope query param outright', async () => {
       // The scope is part of the PATH, not a parameter, so `platformScope` is
       // simply not a field this DTO has — and `forbidNonWhitelisted` turns that

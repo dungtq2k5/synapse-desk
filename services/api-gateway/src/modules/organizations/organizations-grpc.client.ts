@@ -10,6 +10,8 @@ import {
   OrganizationSettingsResponse,
   OrganizationUsageResponse,
   DeleteOrganizationResponse,
+  ResolveTenantAuditNamesRequest,
+  ResolveTenantAuditNamesResponse,
   UpdateOrganizationRequest,
   UpdateOrganizationSettingsRequest,
 } from '@synapsedesk/grpc-proto';
@@ -52,6 +54,17 @@ export class OrganizationsGrpcClient
     await this.call(
       (metadata) =>
         this.organizationGrpcService.revokeInboundToken({}, metadata),
+      context,
+    );
+  }
+
+  resolveAuditNames(
+    request: ResolveTenantAuditNamesRequest,
+    context: RequestContext,
+  ): Promise<ResolveTenantAuditNamesResponse> {
+    return this.call(
+      (metadata) =>
+        this.organizationGrpcService.resolveTenantAuditNames(request, metadata),
       context,
     );
   }

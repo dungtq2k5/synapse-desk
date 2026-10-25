@@ -134,6 +134,9 @@ export class MetricsRegistry {
    */
   readonly inboundEmailWebhook: Counter<'outcome'>;
 
+  /** Browser errors reported to `POST /client-errors`, by kind. */
+  readonly clientErrors: Counter<'kind'>;
+
   /**
    * **The one worth building first**.
    *
@@ -193,6 +196,13 @@ export class MetricsRegistry {
       // `event` and NOT `ticket` — the event names are a fixed enum
       // (`REALTIME_EVENTS`), so the cardinality is the size of that object.
       labelNames: ['event'],
+    });
+
+    this.clientErrors = this.counter({
+      name: 'client_errors_total',
+      help: 'Browser errors reported by the web, by kind.',
+      // Bounded: `CLIENT_ERROR_KINDS`, validated before the increment.
+      labelNames: ['kind'],
     });
 
     this.inboundEmailWebhook = this.counter({

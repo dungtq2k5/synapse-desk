@@ -172,7 +172,7 @@ describe('audit-logs', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/audit-logs/export`,
-        { from: '2024-01-01T00:00:00Z', to: '2024-01-31T23:59:59Z' },
+        { from: '2024-01-01', to: '2024-01-31' },
         headers(['audit.export']),
       );
 
@@ -188,7 +188,7 @@ describe('audit-logs', () => {
     async () => {
       const response = await new Session(gateway.baseUrl).post(
         `${API}/audit-logs/export`,
-        { from: 'not-a-date', to: '2024-01-31T23:59:59Z' },
+        { from: 'not-a-date', to: '2024-01-31' },
         headers(['audit.export']),
       );
 

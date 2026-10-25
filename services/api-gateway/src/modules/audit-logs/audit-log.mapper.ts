@@ -39,6 +39,8 @@ export function toAuditLogResponseDto(
     userAgent: log.userAgent ?? null,
     metadata: parseAuditMetadata(log.metadata, log.id),
     createdAt: requireProtoTimestamp(log.createdAt, 'createdAt'),
+    actorName: null,
+    resourceName: null,
   };
 }
 

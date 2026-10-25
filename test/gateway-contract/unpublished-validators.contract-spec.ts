@@ -91,6 +91,9 @@ const MATCHES: Record<string, Sample> = {
   domain: { valid: 'acme.com', invalid: 'not a domain!' },
   stripePriceId: { valid: 'price_123', invalid: 'bad id!' },
   stripeProductId: { valid: 'prod_123', invalid: 'bad id!' },
+  // The exports' day ranges: a timestamp is the value the day pattern refuses.
+  from: { valid: '2026-01-01', invalid: '2026-01-01T00:00:00Z' },
+  to: { valid: '2026-01-31', invalid: '2026-01-31T00:00:00Z' },
 };
 
 type Unpublished = { schema: string; property: string; kind: string };

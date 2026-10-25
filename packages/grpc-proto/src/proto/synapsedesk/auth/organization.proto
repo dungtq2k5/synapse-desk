@@ -385,6 +385,29 @@ message IssueInboundTokenResponse { string inbound_token = 1; }
 message RevokeInboundTokenRequest {}
 message RevokeInboundTokenResponse {}
 
+// Names for the tenant audit log's ids, all in the caller's organization:
+// the people who acted, and the departments, roles, invitations (by address),
+// organization and plans acted on. Deleted rows are named too: the log
+// outlives what it names. An id with no row, or outside the caller's
+// organization, is left out.
+message ResolveTenantAuditNamesRequest {
+  repeated string user_ids = 1;
+  repeated string department_ids = 2;
+  repeated string role_ids = 3;
+  repeated string invitation_ids = 4;
+  repeated string organization_ids = 5;
+  repeated string plan_ids = 6;
+}
+
+message ResolveTenantAuditNamesResponse {
+  map<string, string> users = 1;
+  map<string, string> departments = 2;
+  map<string, string> roles = 3;
+  map<string, string> invitations = 4;
+  map<string, string> organizations = 5;
+  map<string, string> plans = 6;
+}
+
 service OrganizationService {
   rpc GetInboundToken(GetInboundTokenRequest) returns (GetInboundTokenResponse);
   rpc IssueInboundToken(IssueInboundTokenRequest) returns (IssueInboundTokenResponse);
@@ -415,4 +438,6 @@ service OrganizationService {
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (OrganizationResponse);
 
   rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse);
+
+  rpc ResolveTenantAuditNames(ResolveTenantAuditNamesRequest) returns (ResolveTenantAuditNamesResponse);
 }

@@ -7,6 +7,7 @@ import {
 } from '@synapsedesk/contracts';
 import { WEBHOOK_DELIVERY_LIMIT } from '@synapsedesk/nest-common';
 import {
+  WebhookDisabledCode as ProtoWebhookDisabledCode,
   NotificationType as ProtoNotificationType,
   WebhookDeliveryStatus as ProtoDeliveryStatus,
   toProtoNotificationType,
@@ -65,6 +66,8 @@ describe('Webhook endpoints at the HTTP boundary (e2e)', () => {
     ],
     isActive: true,
     disabledReason: undefined,
+    disabledCode: 0,
+    consecutiveFailures: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
     ...overrides,
@@ -175,6 +178,38 @@ describe('Webhook endpoints at the HTTP boundary (e2e)', () => {
           NOTIFICATION_TYPES.ticketEscalated,
         ],
       });
+    });
+
+    it('1b. an auto-disabled endpoint answers its reason as data', async () => {
+      fx.stubs.notification.listWebhookEndpoints.mockReturnValue(
+        of({
+          items: [
+            wireEndpoint({
+              isActive: false,
+              disabledReason:
+                'Auto-disabled after 10 consecutive failed deliveries',
+              disabledCode:
+                ProtoWebhookDisabledCode.WEBHOOK_DISABLED_CODE_CONSECUTIVE_FAILURES,
+              consecutiveFailures: 10,
+            }),
+            wireEndpoint(),
+          ],
+        }),
+      );
+
+      const res = await reader().get(`${API}/webhook-endpoints`);
+
+      expect(
+        res.body.data.items.map(
+          (item: {
+            disabledCode: string | null;
+            consecutiveFailures: number;
+          }) => [item.disabledCode, item.consecutiveFailures],
+        ),
+      ).toEqual([
+        ['CONSECUTIVE_FAILURES', 10],
+        [null, 0],
+      ]);
     });
 
     it('**2. …and NEVER a secret, which is a published promise**', async () => {

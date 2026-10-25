@@ -29,6 +29,9 @@ message CurrentUserResponse {
   // A platform Super Admin, who has no organization: the client sends them to
   // the platform console.
   bool is_super_admin = 6;
+  // The caller's organization's name, answered in every status (the frozen
+  // page names it). Absent for a Super Admin.
+  optional string organization_name = 7;
 }
 
 // ---------------------------------------------------------------------------

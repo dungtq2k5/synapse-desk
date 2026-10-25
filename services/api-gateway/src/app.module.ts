@@ -1,3 +1,4 @@
+import { OriginMiddleware } from './common/middleware/origin.middleware';
 import { JsonBodyMiddleware } from './common/middleware/json-body.middleware';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -26,6 +27,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { ClientErrorsModule } from './modules/client-errors/client-errors.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { IngestionJobsModule } from './modules/ingestion-jobs/ingestion-jobs.module';
@@ -101,6 +103,7 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
     TicketsModule,
     ChatModule,
     FeedbackModule,
+    ClientErrorsModule,
     AuditLogsModule,
     DocumentsModule,
     IngestionJobsModule,
@@ -140,6 +143,6 @@ export class AppModule implements NestModule {
    * module, so both get this.
    */
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(JsonBodyMiddleware).forRoutes('*');
+    consumer.apply(OriginMiddleware, JsonBodyMiddleware).forRoutes('*');
   }
 }

@@ -157,6 +157,7 @@ export class WebhookAdminService {
               // streak: re-enabling after a fix must not inherit nine strikes
               // from before it.
               disabledReason: null,
+              disabledCode: null,
               consecutiveFailures: 0,
             }),
       },

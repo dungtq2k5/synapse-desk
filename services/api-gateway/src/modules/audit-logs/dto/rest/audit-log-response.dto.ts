@@ -27,15 +27,17 @@ export class AuditLogResponseDto {
    */
   metadata!: Record<string, unknown>;
   createdAt!: Date;
-}
-
-/** A platform entry, with the names the page shows beside the ids. */
-export class PlatformAuditLogResponseDto extends AuditLogResponseDto {
-  /** The Super Admin who acted; null when it can't be read (or no one did). */
+  /** Who acted, by name; null when no one did, or when it can't be read. */
   actorName!: string | null;
-  /** The organization or plan acted on; null for anything else, or when it can't be read. */
+  /**
+   * What was acted on, by name (an invitation by its address); null for a type
+   * the log doesn't name, or when it can't be read.
+   */
   resourceName!: string | null;
 }
+
+/** A platform entry: the Super Admin who acted, and the organization or plan acted on. */
+export class PlatformAuditLogResponseDto extends AuditLogResponseDto {}
 
 /** The distinct actions present in the log, for a filter dropdown. */
 export class AuditActionsResponseDto {

@@ -71,6 +71,8 @@ export const ROUTE_THROTTLE = {
   invitationResend: { ttl: 60 * 60_000, limit: 3 },
   /** Brute-forcing the second factor. */
   twoFactorAuthenticate: { ttl: 15 * 60_000, limit: 10 },
+  /** Browser error reports, per address: a looping error must not flood the log. */
+  clientErrors: { ttl: 60_000, limit: 10 },
 
   // ---------------------------------------------------------------------
   // AI surfaces.

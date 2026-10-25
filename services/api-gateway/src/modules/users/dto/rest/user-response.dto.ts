@@ -159,6 +159,14 @@ export class CurrentUserResponseDto {
   @IsEnum(OrgStatus)
   readonly organizationStatus!: OrgStatus | null;
 
+  /**
+   * The caller's organization's name, answered in every status: the frozen
+   * page names it. Null for a Super Admin.
+   */
+  @IsNullable()
+  @IsString()
+  readonly organizationName!: string | null;
+
   /** A platform Super Admin, who has no organization and uses the console. */
   @IsBoolean()
   readonly isSuperAdmin!: boolean;
