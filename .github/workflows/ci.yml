@@ -389,13 +389,40 @@ jobs:
         # the traces. The job's limit kills it before any of that.
         run: npm run test:e2e:web -- --global-timeout=4200000
 
+      # Uploaded when rows failed too: the run writes it either way, and the
+      # `sonar` job reads it whatever this job's result.
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: coverage-web
           path: coverage-e2e/web/lcov.info
           # A run that wrote no lcov would read as uncovered code in Sonar;
           # failing here names the cause.
           if-no-files-found: error
+
+      # The screens rows that passed only on their retry, in the job summary
+      # and as warnings: one that's flaky run after run is a fault to find,
+      # not noise to live with.
+      - name: flaky rows
+        if: ${{ !cancelled() && hashFiles('test/e2e-web/results.json') != '' }}
+        run: |
+          flaky=$(jq -r '
+            [.suites[] | recurse(.suites[]?) | .specs[]? as $spec
+              | $spec.tests[] | select(.status == "flaky")
+              | "\(.projectName) › \($spec.file):\($spec.line) › \($spec.title)"]
+            | .[]' test/e2e-web/results.json)
+          if [ -z "$flaky" ]; then
+            echo "No flaky rows." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Flaky rows (passed only on their retry)"
+            echo
+            printf '%s\n' "$flaky" | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$flaky" | while IFS= read -r row; do
+            echo "::warning title=Flaky row::$row"
+          done
 
       # test-results holds each failed screenshot's -actual, -expected and
       # -diff images beside the trace.
@@ -409,6 +436,7 @@ jobs:
           path: |
             test/e2e-web/test-results/
             test/e2e-web/results.xml
+            test/e2e-web/results.json
             e2e-web-logs/
           if-no-files-found: warn
 
@@ -698,7 +726,17 @@ jobs:
     # SonarCloud's plan shows results for its main branch only, and that branch
     # is `main-java`. An analysis of any other ref, a pull request included,
     # is one the plan refuses, so it is not run.
-    if: github.ref_name == 'main-java'
+    #
+    # **Whatever e2e-web's result,** as long as it ran: one flaky screenshot
+    # must not hide the quality gate. e2e-web stays red on its own; its
+    # coverage is uploaded either way. Every other job must have passed.
+    if: >-
+      ${{ !cancelled() && github.ref_name == 'main-java'
+      && needs.unit.result == 'success' && needs.e2e.result == 'success'
+      && needs.python.result == 'success'
+      && needs.gateway-java-verify.result == 'success'
+      && needs.contract.result == 'success'
+      && needs.e2e-web.result != 'skipped' }}
     needs: [unit, e2e, e2e-web, python, gateway-java-verify, contract]
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

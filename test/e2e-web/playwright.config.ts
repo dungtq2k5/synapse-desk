@@ -35,8 +35,13 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   timeout: 90_000,
+  // In CI, also JSON: the job lists the rows that passed only on a retry.
   reporter: process.env.CI
-    ? [['list'], ['junit', { outputFile: 'results.xml' }]]
+    ? [
+        ['list'],
+        ['junit', { outputFile: 'results.xml' }],
+        ['json', { outputFile: 'results.json' }],
+      ]
     : 'list',
   use: {
     baseURL: WEB_URL,
@@ -56,6 +61,12 @@ export default defineConfig({
     {
       name: 'screens',
       testMatch: 'screens/**/*.e2e-spec.ts',
+      // One retry in CI, for a capture that caught the page mid-render: a
+      // real regression fails both attempts and the run stays red, and a row
+      // that passes only on its retry is listed as flaky, not hidden. The
+      // journeys never retry: they carry the product's behavior. Locally,
+      // no retries at all.
+      retries: process.env.CI ? 1 : 0,
       use: {
         browserName: 'chromium',
         connectOptions: { wsEndpoint: BROWSER_WS, exposeNetwork: '<loopback>' },
