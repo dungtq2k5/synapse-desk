@@ -177,7 +177,7 @@ Named from your point of view, and deliberately **coarser than the server's own 
 | `notification:new` | `user:` | the whole row — render and deep-link without a fetch |
 | `notification:updated` | `user:` | an existing notification **coalesced** — same group, higher count. Update the toast you are already showing rather than stacking a twelfth |
 | `notification:read` | `user:` | read or archived **on another device** |
-| `notification:unread-count` | `user:` | the authoritative total, pushed on every change |
+| `notification:unread-count` | `user:` | the authoritative total with `countedAt`, the database's time of the count. Keep the newest count from any source (this push, a refetch, a mark-read answer); an older one arriving later is dropped |
 
 **Do not increment a local unread counter.** It is always wrong eventually, because a notification can be read on another device. Take `notification:unread-count` as the truth and stop polling `GET /notifications/unread-count`.
 

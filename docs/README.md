@@ -74,7 +74,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0031](./decisions/0031-narrow-dtos-at-the-gateway-boundary.md) | The gateway defines narrow DTOs; it never republishes a proto type |
 | [0032](./decisions/0032-unversioned-breaking-changes-are-counted.md) | Breaking changes shipped unversioned while no client existed — and were counted. **Its mechanism is superseded by [0045](./decisions/0045-uri-versioning-under-the-same-paths.md)**; the count stands as a record of that era |
 | [0033](./decisions/0033-redis-noeviction.md) | One Redis instance, `noeviction`, and three connections that stay separate |
-| [0034](./decisions/0034-read-repopulate-race-is-accepted.md) | The cache read-repopulate race is accepted, not fixed |
+| [0034](./decisions/0034-read-repopulate-race-is-accepted.md) | The cache read-repopulate race was accepted. **Superseded by [0048](./decisions/0048-cache-entries-carry-their-scopes-generation.md)** |
 | [0035](./decisions/0035-ocr-language-cap-is-a-cpu-bound.md) | The OCR language cap is four, and it is a CPU bound |
 | [0036](./decisions/0036-scope-fanout-order-is-asymmetric.md) | Scope fan-out order is asymmetric, and restrictions are synchronous |
 | [0037](./decisions/0037-worklists-follow-the-document-boundary.md) | Operational worklists follow the document boundary |
@@ -87,6 +87,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0044](./decisions/0044-expand-and-contract-never-in-one-release.md) | Expand and contract, never in one release |
 | [0045](./decisions/0045-uri-versioning-under-the-same-paths.md) | URI versioning is on at `v1`, and no path moved to turn it on |
 | [0046](./decisions/0046-resend-for-both-directions.md) | Email is Resend in both directions; only the transport changed |
+| [0048](./decisions/0048-cache-entries-carry-their-scopes-generation.md) | A cached answer carries its scope's generation, so one produced before an invalidation is never read |
 
 ## `reference/` — what is true today
 

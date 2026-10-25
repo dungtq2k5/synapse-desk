@@ -1,6 +1,6 @@
 # 0034 — The cache read-repopulate race is accepted, not fixed
 
-**Status:** accepted · **Code:** `services/api-gateway/src/common/cache/cache.service.ts` (`wrap`)
+**Status:** superseded by [ADR 0048](./0048-cache-entries-carry-their-scopes-generation.md) · **Code:** `services/api-gateway/src/common/cache/cache.service.ts` (`wrap`)
 
 ## Decision
 
