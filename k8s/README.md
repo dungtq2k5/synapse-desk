@@ -59,7 +59,7 @@ npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script \
 
 **They deliberately contain none of the objects `schema-apply.ts` owns**, and that is structural rather than lucky: `schema.prisma` declares no `postgresqlExtensions`, so `migrate diff` cannot see `btree_gin`, and it has no syntax for a partial index at all. `schema-contract.spec.ts` check 4 keeps it that way — it derives the forbidden set from the seeders rather than carrying a list, and also refuses `CREATE EXTENSION`, `USING GIN` and any `WHERE`-clause index under a new name.
 
-**Baseline every database that already has the tables.** A development database was built by `db push` and has no `_prisma_migrations` row, so `migrate deploy` would try to run `0_init` and fail on the first `CREATE TABLE`. Record it as applied instead — this runs no SQL:
+**Baseline a database that already has the tables.** A database built by `db push` has no `_prisma_migrations` row, so `migrate deploy` would try to run `0_init` and fail on the first `CREATE TABLE` (the database check refuses it first, and names the fix). A development database is simply reset (`npm run db:reset`); a database whose data must stay is recorded as applied instead, which runs no SQL:
 
 ```sh
 # per service, from services/<service>, once per EXISTING database
@@ -88,14 +88,15 @@ That target is `FROM build` rather than `FROM runtime`, and it has to be: the Pr
 
 ## What the init container actually runs
 
-Two steps, one container, `&&`-chained so a failed migration never reaches the second:
+Three steps, one container, `&&`-chained so a failed step never reaches the next:
 
-1. `prisma migrate deploy` — [ADR 0042](../docs/decisions/0042-schema-reaches-production-through-migrate-deploy.md).
-2. `node dist/src/schema-apply.js` — the objects Prisma cannot express, which ran on every application boot until [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) moved them here.
+1. `node dist/src/database-check.js`: refuses a database that doesn't exist, or one with tables and no migration history. **`migrate deploy` would create a missing database** (measured, Prisma 7.9.1), so a typo'd `DATABASE_URL` would otherwise start the service on an empty one ([ADR 0049](../docs/decisions/0049-every-database-gets-the-production-schema-path.md)).
+2. `prisma migrate deploy`: the committed migrations ([ADR 0042](../docs/decisions/0042-schema-reaches-production-through-migrate-deploy.md)).
+3. `node dist/src/schema-apply.js` — the objects Prisma cannot express, which ran on every application boot until [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) moved them here.
 
-The second step is why the app pods no longer take a `ShareLock` on their own tables during startup. Measured: that lock queues behind any open write transaction (7.08 s behind an 8-second writer) and then blocks later writers behind it, and on the boot path the wait sat in front of readiness.
+The third step is why the app pods no longer take a `ShareLock` on their own tables during startup. Measured: that lock queues behind any open write transaction (7.08 s behind an 8-second writer) and then blocks later writers behind it, and on the boot path the wait sat in front of readiness.
 
-**Development runs the same step from the other side.** `npm run db:push` chains `db:schema` — the same entrypoint calling the same method — because `prisma db push` creates every table and none of the partial indexes, while the boot hook's `assertSchemaExists()` counts tables. Without that chaining a developer's database would look right and quietly permit what [ADR 0020](../docs/decisions/0020-email-uniqueness-is-per-tenant.md)'s partial index refuses.
+**Every environment runs the same steps.** Each service's `db:apply` is this init container's command (the database check, `migrate deploy`, `schema-apply`), and `schema-contract.spec` holds the two equal ([ADR 0049](../docs/decisions/0049-every-database-gets-the-production-schema-path.md)). So a development or test database has the same partial indexes, and the same migrations ran, as production's.
 
 ## When a migration fails
 

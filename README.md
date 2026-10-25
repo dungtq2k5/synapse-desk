@@ -171,16 +171,16 @@ npm run setup:py
 
 Creates `services/rag-service/.venv`, installs `requirements.lock` with every hash checked, then the development tools from `requirements-dev.txt`. `turbo run dev` launches rag-service from that venv, so it has to exist before step 8 — and `npm run format`, `format:check` and `check` run Ruff from it, so they need it too. After changing `requirements.txt`, `npm run lock:py` regenerates the lock; it needs [`uv`](https://docs.astral.sh/uv/).
 
-### 7. Build, then push the schema
+### 7. Build, then create the databases
 
 ```sh
-npm run build      # packages first — the services resolve them from their dist/
-npm run db:push    # prisma db push, then the objects Prisma cannot express
+npm run build      # packages first: the schema step runs each service's built dist/
+npm run db:reset   # creates every dev and test database (and its shadow), then db:apply
 ```
 
-**Build before pushing.** `db:push` chains `db:schema`, which boots a Nest entry point that imports the shared packages from their `dist/`. On a fresh clone those directories do not exist yet.
+**`db:apply` is production's schema step,** in every environment ([ADR 0049](docs/decisions/0049-every-database-gets-the-production-schema-path.md)): it checks the database exists and was built by migrations, runs `prisma migrate deploy`, then `schema-apply` (the partial indexes, `CHECK`s and extensions Prisma can't express). After pulling new migrations, `npm run db:apply` (and `db:apply:test`) brings each database up to date; one service: `npm run db:apply -w @synapsedesk/<service>`.
 
-`db:push` is two steps on purpose: `prisma db push` creates every table and **none** of the partial indexes, so `schema-apply` follows with the objects the schema language has no syntax for — extensions, GIN indexes, and the partial unique indexes that make email uniqueness per-tenant. A database with the tables and without those looks correct and quietly permits what they refuse.
+**A database built by `prisma db push`** has no migration history, so `db:apply` refuses it and names the fix: run `npm run db:reset` once. **Changing the schema:** edit `schema.prisma`, then `npm run db:migrate -w @synapsedesk/<service>` writes the migration (it uses the service's shadow database); CI fails when the schema and its migrations disagree. `npx prisma db push` is for trying something by hand only; no script or setup uses it.
 
 Then, once per ingestion database:
 
@@ -237,10 +237,10 @@ Tests print their results, not the services' logs. When a failure needs the logs
 
 CI's `sonar` job sends each analysis to SonarCloud, with the coverage the unit and Python jobs write. It runs on pushes to `main-java` only, SonarCloud's main branch: the organization's plan analyses no other branch, so on this branch the job is skipped; `sonar-project.properties` says what is analysed and what counts toward coverage.
 
-End-to-end suites need the stack up and their own databases. `prisma db push` creates a missing database on connect, so this is the whole preparation:
+End-to-end suites need the stack up and their own databases, made by the same schema step:
 
 ```sh
-npm run db:test:push
+npm run db:reset -- --test-only   # once, or after a migration you can't apply in place
 npm run test:e2e         # six suites, sequential
 ```
 

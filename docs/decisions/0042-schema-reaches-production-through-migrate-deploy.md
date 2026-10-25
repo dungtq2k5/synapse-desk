@@ -1,6 +1,6 @@
 # 0042 — Schema reaches production through `prisma migrate deploy`
 
-**Status:** accepted · **Mechanism lands with:** Phase 4 (a deploy needs somewhere to run) · **Code:** `services/*/prisma/schema.prisma`, `services/*/src/modules/prisma/database.seeder.ts` (`applySchemaObjects`)
+**Status:** superseded by [ADR 0049](./0049-every-database-gets-the-production-schema-path.md) · **Mechanism lands with:** Phase 4 (a deploy needs somewhere to run) · **Code:** `services/*/prisma/schema.prisma`, `services/*/src/modules/prisma/database.seeder.ts` (`applySchemaObjects`)
 
 ## Decision
 
