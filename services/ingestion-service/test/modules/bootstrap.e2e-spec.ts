@@ -1,3 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  missingObjects,
+  seederObjectNames,
+} from '@synapsedesk/testing/schema-objects';
 import { bootstrapE2eTest, E2eFixture } from '../utils';
 
 type IndexRow = { indexname: string };
@@ -123,5 +129,19 @@ describe('Ingestion-service foundations (e2e)', () => {
 
     await expect(seeder.seed()).resolves.toBeUndefined();
     expect(await indexesOn('documents')).toContain('documents_org_hash_key');
+  });
+
+  it('9. every object the seeder names exists, read from its SQL', async () => {
+    // The names come from the seeder itself, so an object added there is
+    // checked here without anyone listing it.
+    const names = seederObjectNames(
+      readFileSync(
+        join(__dirname, '../../src/modules/prisma/database.seeder.ts'),
+        'utf8',
+      ),
+    );
+
+    expect(names).not.toEqual([]);
+    await expect(missingObjects(fx.prisma, names)).resolves.toEqual([]);
   });
 });

@@ -98,7 +98,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * Every table this service cannot start without — COUNTED, not probed.
    *
    * A single probe answers "is the database empty", and that is not the only
-   * way a schema arrives incomplete: `prisma db push` interrupted partway
+   * way a schema arrives incomplete: a schema step interrupted partway
    * leaves `documents` present and the rest missing, which reads as success. The
    * expected set is small on purpose — the tables the seeder and the boot path
    * touch — because this is a smoke check, not a schema diff.
@@ -118,9 +118,9 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     if (missing.length) {
       throw new Error(
         `The database is missing ${missing.length} expected table(s): ` +
-          `${missing.join(', ')}. Nothing has been pushed to it, or a push ` +
-          'was interrupted. Run `npm run db:push` (dev) or ' +
-          '`npm run db:test:push` (test) and start again.',
+          `${missing.join(', ')}. Nothing has migrated it, or a migration ` +
+          'was interrupted. Run `npm run db:apply` (dev) or ' +
+          '`npm run db:apply:test` (test) and start again.',
       );
     }
   }

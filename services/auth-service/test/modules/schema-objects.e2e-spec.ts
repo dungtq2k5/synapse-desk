@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
 import {
   dropIndexes,
   missingIndexes,
+  missingObjects,
+  seederObjectNames,
 } from '@synapsedesk/testing/schema-objects';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -104,7 +108,7 @@ describe('Schema objects are not seeding (e2e)', () => {
     await expect(missingIndexes(fx.prisma, INDEXES)).resolves.toEqual(INDEXES);
 
     // And the step that DOES own them puts them back — which is what
-    // `src/schema-apply.ts` calls in the init container and what `db:push`
+    // `src/schema-apply.ts` calls in the init container and what `db:apply`
     // chains in development.
     await seeder.applySchemaObjects();
     await expect(missingIndexes(fx.prisma, INDEXES)).resolves.toEqual([]);
@@ -156,5 +160,19 @@ describe('Schema objects are not seeding (e2e)', () => {
     // The control: with the table back, the same call succeeds — so test 3
     // failed on the missing table and not on something the rename disturbed.
     await expect(seeder.onApplicationBootstrap()).resolves.toBeUndefined();
+  });
+
+  it('4. every object the seeder names exists, read from its SQL', async () => {
+    // The names come from the seeder itself, so an object added there is
+    // checked here without anyone listing it.
+    const names = seederObjectNames(
+      readFileSync(
+        join(__dirname, '../../src/modules/prisma/database.seeder.ts'),
+        'utf8',
+      ),
+    );
+
+    expect(names).not.toEqual([]);
+    await expect(missingObjects(fx.prisma, names)).resolves.toEqual([]);
   });
 });

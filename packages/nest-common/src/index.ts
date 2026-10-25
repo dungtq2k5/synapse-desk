@@ -15,3 +15,4 @@ export * from './net/guarded-target';
 export * from './utils/audit-publisher';
 export * from './utils/job-runs';
 export * from './utils/grpc-health';
+export * from './utils/database-check';

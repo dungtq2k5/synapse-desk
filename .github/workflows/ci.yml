@@ -11,7 +11,8 @@
 #                         collection, resets the JetStream streams — spawns
 #                         seven processes, and two of its steps need a live
 #                         paid API.
-#   npm run db:push       (no `:test:`) targets the DEV databases.
+#   npm run db:apply      (no `:test`) targets the DEV databases.
+#   npm run db:reset      without --test-only / --dev-only drops dev AND test.
 #   seed:demo / stripe:provision / plans:seed with `--apply`
 #                         write to a real Stripe sandbox and real databases.
 #                         Their dry-run forms are harmless. (e2e-web's setup
@@ -358,12 +359,19 @@ jobs:
           npm run keys:service-account
       - name: start the stack
         run: docker compose up -d --wait
-      # The services don't create their schemas, and these are this runner's
-      # own databases.
+      # `db:apply` runs each service's BUILT `schema-apply.js`, so the four
+      # schema services build first (turbo runs `db:generate` before each).
+      - name: build the schema services
+        run: >-
+          ./node_modules/.bin/turbo run build
+          --filter=@synapsedesk/auth-service...
+          --filter=@synapsedesk/ticket-service...
+          --filter=@synapsedesk/notification-service...
+          --filter=@synapsedesk/ingestion-service...
+      # This runner's own dev databases, created and given their schema the
+      # way production does (`db:apply`).
       - name: databases
-        run: |
-          npm run db:generate
-          npm run db:reset -- --dev-only
+        run: npm run db:reset -- --dev-only
       # The lockfile's Playwright, never `npx`: npx can fetch a package on
       # demand and run its install scripts.
       - run: ./node_modules/.bin/playwright install --with-deps chromium
@@ -572,16 +580,33 @@ jobs:
           npm run keys:service-account
           npm run keys:test-tls
 
-      # Creates all four test databases — `prisma db push` creates a missing database on connect.
-      #
-      # It does NOT generate the clients, which is worth stating because it
-      # used to: measured on a clean checkout, `db:test:push` leaves 0 of 4
-      # present. So `db:generate` is its own step, exactly as in `static` and
-      # `unit`, rather than something this one is assumed to carry.
+      # `db:apply` runs each service's BUILT `schema-apply.js`, as the
+      # `migrate` image does, so the four schema services build first (turbo
+      # runs `db:generate` before each build).
+      - name: build the schema services
+        run: >-
+          ./node_modules/.bin/turbo run build
+          --filter=@synapsedesk/auth-service...
+          --filter=@synapsedesk/ticket-service...
+          --filter=@synapsedesk/notification-service...
+          --filter=@synapsedesk/ingestion-service...
+
+      # Creates the four test databases and their shadows, then gives each its
+      # schema the way production does (`db:apply:test`: the database check,
+      # `migrate deploy`, `schema-apply.js`). So the suites below run on the
+      # migrations, and a broken migration fails here.
       - name: test databases
+        run: npm run db:reset -- --test-only
+
+      # **The migrations match `schema.prisma`.** Prisma replays each
+      # service's migrations into its shadow database and diffs the result
+      # with the schema file; `--exit-code` exits 2 on any difference, so a
+      # schema change committed without its migration fails the job.
+      - name: migrations match the schemas
         run: |
-          npm run db:generate
-          npm run db:test:push
+          for service in auth ticket notification ingestion; do
+            (cd "services/$service-service" && ../../node_modules/.bin/dotenv -e .env.test -- ../../node_modules/.bin/prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code) || exit 1
+          done
 
       # **`set -o pipefail` is not optional here.** GitHub Actions runs steps
       # under `bash -e` WITHOUT pipefail, so `npm run test:e2e | tee` would
@@ -682,13 +707,14 @@ jobs:
       - name: start the stores rag-service reads
         run: docker compose up -d --wait qdrant postgres-ingestion redis
 
-      # `npm ci` for the Prisma CLI alone. The `pool` fixture opens with
-      # `TRUNCATE TABLE documents CASCADE`, so the ingestion TEST database has
-      # to exist AND carry the schema — and the schema belongs to
-      # ingestion-service, whose `db:test:push` both creates the database on
-      # connect and applies it.
+      # The `pool` fixture opens with `TRUNCATE TABLE documents CASCADE`, so
+      # the ingestion TEST database has to exist AND carry the schema, which
+      # belongs to ingestion-service: built (its `db:apply` runs the built
+      # `schema-apply.js`), then reset and migrated the way the e2e job's are,
+      # for that one service.
       - run: npm ci --ignore-scripts
-      - run: npm run db:test:push:ingestion
+      - run: ./node_modules/.bin/turbo run build --filter=@synapsedesk/ingestion-service...
+      - run: npm run db:reset -- --test-only ingestion-service
 
       # The key is a repository secret, so it is absent on fork pull requests
       # and the acceptance test skips there. That is acceptable ONLY because

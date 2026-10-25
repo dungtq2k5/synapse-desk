@@ -10,6 +10,7 @@
 #
 # Documented and deliberately absent:
 #   INGESTION_OFFLINE_MODEL — production embeds with the real model; ingestion-service refuses to boot with the offline client under NODE_ENV=production
+#   SHADOW_DATABASE_URL — only `prisma migrate dev` and `migrate diff --from-migrations` use a shadow database; `migrate deploy` never reads it
 apiVersion: v1
 kind: ConfigMap
 metadata:

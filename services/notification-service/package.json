@@ -8,9 +8,9 @@
     "start:prod": "node dist/src/main.js",
     "dev": "nest start --watch",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push && npm run db:schema",
-    "db:schema": "nest start --entryFile schema-apply",
-    "db:test:push": "dotenv -e .env.test -- prisma db push",
+    "db:apply": "node dist/src/database-check.js && prisma migrate deploy && node dist/src/schema-apply.js",
+    "db:apply:test": "dotenv -e .env.test -- npm run db:apply",
+    "db:migrate": "prisma migrate dev --create-only",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"
   },
@@ -43,6 +43,7 @@
     "@nestjs/cli": "^11.0.24",
     "@nestjs/testing": "^11.1.28",
     "@synapsedesk/testing": "*",
+    "pg": "^8.22.0",
     "prisma": "^7.9.1",
     "typescript": "^6.0.3"
   }

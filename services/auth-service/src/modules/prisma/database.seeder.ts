@@ -104,7 +104,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       // against an unmigrated database.
       //
       // `assertSchemaExists()` was `applySchemaObjects()`'s own first line,
-      // for the same reason it is this hook's: `prisma db push` CREATES a
+      // for the same reason it is this hook's: Prisma CREATES a
       // missing database rather than failing, so a typo in `DATABASE_URL`
       // yields a real empty one that a service would otherwise boot against,
       // report healthy on, and fail every query against forever.
@@ -153,7 +153,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    */
   async applySchemaObjects(): Promise<void> {
     // **First, and outside the gate**, because the composition it guards
-    // against is only reachable when the gate is closed: `prisma db push`
+    // against is only reachable when the gate is closed: Prisma
     // CREATES a missing database rather than failing, so a typo in
     // `DATABASE_URL` yields a real empty one — and a service that skipped this
     // check would boot, report healthy, and fail on the first query forever.
@@ -341,8 +341,8 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    *
    * Run from the SEED rather than a one-off psql command: `db push --force-reset`
    * neither creates nor preserves them, so a reset would silently drop the
-   * constraint and leave a schema that looks correct. Idempotent, so
-   * `prisma db push && prisma db seed` reproduces a complete schema every time.
+   * constraint and leave a schema that looks correct. Idempotent, so every
+   * run of the schema step (`npm run db:apply`) reproduces a complete schema.
    */
   private async applyPartialIndexes(): Promise<void> {
     await this.prisma.$executeRawUnsafe(`
@@ -475,7 +475,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * Every table this service cannot start without — COUNTED, not probed.
    *
    * A single probe answers "is the database empty", and that is not the only
-   * way a schema arrives incomplete: `prisma db push` interrupted partway
+   * way a schema arrives incomplete: a schema step interrupted partway
    * leaves `roles` present and the rest missing, which reads as success. The
    * expected set is small on purpose — the tables the seeder and the boot path
    * touch — because this is a smoke check, not a schema diff.
@@ -495,9 +495,9 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     if (missing.length) {
       throw new Error(
         `The database is missing ${missing.length} expected table(s): ` +
-          `${missing.join(', ')}. Nothing has been pushed to it, or a push ` +
-          'was interrupted. Run `npm run db:push` (dev) or ' +
-          '`npm run db:test:push` (test) and start again.',
+          `${missing.join(', ')}. Nothing has migrated it, or a migration ` +
+          'was interrupted. Run `npm run db:apply` (dev) or ' +
+          '`npm run db:apply:test` (test) and start again.',
       );
     }
   }
@@ -510,7 +510,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * from deep inside a raw-SQL helper — a symptom that reads like a seeder bug
    * and takes a stack trace to trace back to the real cause, which is simply
    * that nothing ever pushed the schema here. The e2e suites cannot hit it
-   * (`test:e2e:auth` runs `db:test:push` first) and neither can a long-running
+   * (their databases come from `db:apply:test`) and neither can a long-running
    * environment, so the only people who ever see it are on a fresh clone or a
    * fresh Docker volume — exactly the audience least able to interpret it.
    */

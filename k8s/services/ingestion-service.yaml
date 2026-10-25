@@ -26,9 +26,10 @@ spec:
       initContainers:
         # ADR 0043. The pod cannot start its app container until this exits 0,
         # which is the ordering constraint ADR 0042 named — from the kubelet,
-        # with no sync-wave tooling. It runs TWO steps in one container:
-        # `prisma migrate deploy`, then `src/schema-apply.ts` for the objects
-        # Prisma cannot express. Both are idempotent — `migrate deploy` takes
+        # with no sync-wave tooling. It runs THREE steps in one container:
+        # `src/database-check.ts` (refuses a missing or `db push`-built
+        # database), `prisma migrate deploy`, then `src/schema-apply.ts` for the
+        # objects Prisma cannot express. The last two are idempotent — `migrate deploy` takes
         # Prisma's own advisory lock and the DDL is `IF NOT EXISTS`
         # throughout — so the N concurrent runs a multi-replica rollout
         # produces serialize and the losers no-op.

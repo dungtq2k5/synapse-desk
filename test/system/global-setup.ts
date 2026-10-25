@@ -81,6 +81,11 @@ export default async function globalSetup(): Promise<void> {
     stdio: 'inherit',
   });
 
+  // The dev databases get their schema the way production does, whatever state
+  // they are in: idempotent, a no-op once current. It refuses a database
+  // `prisma db push` built, naming `npm run db:reset`.
+  run('npm', ['run', 'db:apply']);
+
   // **Stripe is the fake, for every service and seed this run starts.** Set
   // before the spawn, since a child reads its environment once; the plans
   // seed below reads the fake's catalog the same way.
@@ -122,9 +127,8 @@ export default async function globalSetup(): Promise<void> {
  *   No rows in `subscription_plans`. Run `npm run plans:seed:apply` first
  *   No global system roles in `roles`. Start auth-service once …
  *
- * The permission catalogue, the system roles and the partial unique indexes are
- * written by `DatabaseSeeder` from `OnApplicationBootstrap`, and
- * `reset-databases.mjs` documents that a reset drops all of it. So the plan's
+ * The permission catalogue and the system roles are written by `DatabaseSeeder`
+ * from `OnApplicationBootstrap`, and a reset leaves the tables empty. So the plan's
  * `db:reset && seed && test` pipeline cannot work in that order after a reset:
  * the seed has nothing to derive from until something has booted.
  */
