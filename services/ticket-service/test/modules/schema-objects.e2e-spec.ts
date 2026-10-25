@@ -1,6 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   dropIndexes,
   missingIndexes,
+  missingObjects,
+  seederObjectNames,
 } from '@synapsedesk/testing/schema-objects';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -69,7 +73,7 @@ describe('Schema objects are not seeding (e2e)', () => {
     await seeder.onApplicationBootstrap();
 
     // Still missing. `src/schema-apply.ts` owns these now — the init container
-    // in a cluster, `npm run db:push` on a developer's machine.
+    // in a cluster, `npm run db:apply` on a developer's machine.
     await expect(missingIndexes(fx.prisma, INDEXES)).resolves.toEqual([
       ...INDEXES,
     ]);
@@ -107,5 +111,19 @@ describe('Schema objects are not seeding (e2e)', () => {
     // The control: with the table back the same call succeeds, so test 2 failed
     // on the missing table rather than on something the rename disturbed.
     await expect(seeder.onApplicationBootstrap()).resolves.toBeUndefined();
+  });
+
+  it('3. every object the seeder names exists, read from its SQL', async () => {
+    // The names come from the seeder itself, so an object added there is
+    // checked here without anyone listing it.
+    const names = seederObjectNames(
+      readFileSync(
+        join(__dirname, '../../src/modules/prisma/database.seeder.ts'),
+        'utf8',
+      ),
+    );
+
+    expect(names).not.toEqual([]);
+    await expect(missingObjects(fx.prisma, names)).resolves.toEqual([]);
   });
 });

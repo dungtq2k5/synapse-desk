@@ -146,6 +146,10 @@ const EXCLUDED = new Map([
     'production enrolls the Super Admin at first sign-in; auth-service refuses to boot with a known secret under NODE_ENV=production',
   ],
   [
+    'SHADOW_DATABASE_URL',
+    'only `prisma migrate dev` and `migrate diff --from-migrations` use a shadow database; `migrate deploy` never reads it',
+  ],
+  [
     'RAG_OFFLINE_MODEL',
     'production answers with the real model; rag-service refuses to boot with the offline one under APP_ENV=production',
   ],

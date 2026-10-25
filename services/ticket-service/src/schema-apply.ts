@@ -1,21 +1,13 @@
 /**
  * @file The schema-object step, as a process rather than a boot hook.
  *
- * **Where the objects Prisma cannot express get created.** They ran
- * on every application boot until ADR 0043's init container existed to run them
- * instead; this is that step's entrypoint, and it has exactly two callers:
+ * **Where the objects Prisma cannot express get created**, as the last of the
+ * schema step's three commands (`database-check`, `prisma migrate deploy`,
+ * this). The step has two callers that run the same three:
  *
- *   - the `migrate` init container, after `prisma migrate deploy` — production;
- *   - `npm run db:push`, right after the push — development.
- *
- * **Two callers, and the second one is not optional.** Moving this off the boot
- * path means nothing applies these objects to a developer's database any more,
- * and `assertSchemaExists()` would not catch it: that check counts TABLES, and
- * `db push` creates every table while creating none of the partial indexes or
- * CHECK constraints. A developer would get a database that boots, serves, and
- * silently permits the duplicate signup ADR 0020's partial index exists to
- * refuse. Chaining this onto `db:push` is what keeps the two environments
- * saying the same thing.
+ *   - the `migrate` init container — production;
+ *   - `npm run db:apply` (`db:apply:test` for `.env.test`) — development, CI
+ *     and `db:reset`.
  *
  * **Why the boot hook was the wrong place**, measured: `CREATE INDEX` takes a
  * `ShareLock` on its table even when `IF NOT EXISTS` makes it a no-op, and that
@@ -68,7 +60,7 @@ async function main(): Promise<void> {
 }
 
 // A non-zero exit is the whole contract: an init container that fails keeps its
-// pod out of the endpoint list, and `db:push` chains this with `&&`.
+// pod out of the endpoint list, and `db:apply` chains this with `&&`.
 main().catch((error: unknown) => {
   new Logger('schema-apply').error(
     `Failed to apply schema objects: ${(error as Error).message}`,

@@ -180,10 +180,8 @@ describe('The free tier (e2e)', () => {
   });
 
   it('**No quota column carries a schema default** — asserted against the database', async () => {
-    // Schema INTENT, and only that: this suite connects to the TEST database,
-    // so it cannot see a divergence between it and dev — in the incident that
-    // motivated this check, the test database was the one that succeeded.
-    // `npm run db:verify` is what compares the two. What this pins is that the
+    // Schema INTENT: dev and test are built from the same migrations, and CI's
+    // drift check holds those to `schema.prisma`. What this pins is that the
     // decision holds wherever the suite runs: a default here silently answers
     // "what does a new tenant get" for a reader who never opens the schema.
     const rows = await fx.prisma.$queryRawUnsafe<{ column_name: string }[]>(

@@ -7,6 +7,9 @@
 #     node scripts/generate-k8s-config.mjs
 #
 # ConfigMap: the non-secret half of the env contract.
+#
+# Documented and deliberately absent:
+#   SHADOW_DATABASE_URL — only `prisma migrate dev` and `migrate diff --from-migrations` use a shadow database; `migrate deploy` never reads it
 apiVersion: v1
 kind: ConfigMap
 metadata:

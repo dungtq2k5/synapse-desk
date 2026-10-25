@@ -39,6 +39,9 @@ describe('the environment contract', () => {
     // The stock Resend SDK reads this itself, so the gateway has no code to
     // validate it; the contract suite points it at a fake with it.
     'RESEND_BASE_URL',
+    // Read by `prisma.config.ts` for `migrate dev` and the drift check, never
+    // by a running service, so no service schema validates it.
+    'SHADOW_DATABASE_URL',
   ]);
 
   /**
@@ -334,6 +337,8 @@ describe('the environment contract', () => {
    * Copying the examples is how a machine (a developer's, or CI's e2e-web job)
    * gets its `.env` files, so a URL that disagrees fails the first connection
    * (`P1000: Authentication failed`), as `user:password` placeholders did.
+   * A `SHADOW_DATABASE_URL` names that database plus `_shadow`, which
+   * `db:reset` creates.
    */
   it('**every example database URL reaches the database compose creates**', () => {
     const root = parseEnvFile(
@@ -367,7 +372,10 @@ describe('the environment contract', () => {
           ({ where, url }) =>
             decodeURIComponent(url.username) !== root.DB_USER ||
             decodeURIComponent(url.password) !== root.DB_PASSWORD ||
-            url.pathname.slice(1) !== byPort.get(url.port) ||
+            url.pathname.slice(1) !==
+              (where.endsWith(' SHADOW_DATABASE_URL')
+                ? `${byPort.get(url.port)}_shadow`
+                : byPort.get(url.port)) ||
             // asyncpg refuses Prisma's `?schema=public` ("unrecognized
             // configuration parameter"), so rag-service's carries no query.
             (where.startsWith('rag-service') && url.search !== ''),

@@ -2,15 +2,17 @@
  * @file Reading a service's `DATABASE_URL` out of its `.env`, for the scripts
  * that act on databases directly.
  *
- * Shared rather than copied: `db:verify` and `db:reset` both need it, and the
- * regex below is not the obvious one — a second copy would be a second chance
- * to write `\s` where it matters.
+ * Shared rather than copied: `db:reset` (`reset-databases.mjs`) and the demo
+ * seed (`seed-demo/clients.ts`) both need it, and the regex below is not the
+ * obvious one — a second copy would be a second chance to write `\s` where it
+ * matters.
  */
 
 import { readFileSync } from 'node:fs';
 
 /**
- * One `DATABASE_URL = …` assignment, anywhere in the file.
+ * One `KEY = …` assignment (`DATABASE_URL`, `SHADOW_DATABASE_URL`), anywhere in
+ * the file. `key` is a literal from a caller, never input.
  *
  * **`[ \t]` rather than `\s`, and that is the point rather than a tidy-up.**
  * `\s` matches a NEWLINE, so in multiline mode `^\s*` can run past the start of
@@ -21,14 +23,17 @@ import { readFileSync } from 'node:fs';
  * The capture excludes `"`, so a closing quote can never be part of it and no
  * trailing `"?` is needed to strip one.
  */
-const DATABASE_URL_LINE = /^[ \t]*DATABASE_URL[ \t]*=[ \t]*"?([^"\n]*)/m;
+const lineFor = (key) =>
+  new RegExp(`^[ \\t]*${key}[ \\t]*=[ \\t]*"?([^"\\n]*)`, 'm');
 
 /**
  * @param fileUrl a `URL` pointing at the `.env` to read.
+ * @param key the variable, `DATABASE_URL` unless another is named (the reset
+ *   also reads `SHADOW_DATABASE_URL`).
  * @returns the URL, or `undefined` when the file or the variable is absent —
  *   which the caller reports rather than guessing at.
  */
-export function readDatabaseUrl(fileUrl) {
+export function readDatabaseUrl(fileUrl, key = 'DATABASE_URL') {
   let text;
 
   try {
@@ -39,7 +44,7 @@ export function readDatabaseUrl(fileUrl) {
 
   // `exec`, not `match`: with a non-global regex the two return the same shape,
   // and `exec` is the one that does not change meaning if `g` is ever added.
-  const match = DATABASE_URL_LINE.exec(text);
+  const match = lineFor(key).exec(text);
 
   return match?.[1]?.trim();
 }

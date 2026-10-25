@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DeliverySkipReason,
   DeliveryStatus,
@@ -13,6 +15,10 @@ import {
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import { UnprocessableMessage } from '@synapsedesk/nest-common';
+import {
+  missingObjects,
+  seederObjectNames,
+} from '@synapsedesk/testing/schema-objects';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InAppNotificationService } from '../../src/modules/in-app/in-app-notification.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
@@ -334,23 +340,24 @@ describe('In-app notification delivery (e2e)', () => {
       await expect(fx.prisma.notification.count()).resolves.toBe(2);
     });
 
-    it('13. All four PARTIAL indexes exist after seeding', async () => {
+    it('13. Every object the seeder names exists, read from its SQL', async () => {
       // Without this, the idempotency tests above pass on the service-layer
       // catch alone and prove nothing about the constraint they claim to
       // exercise — Prisma cannot express `WHERE`, so nothing else would.
-      const rows = await fx.prisma.$queryRawUnsafe<{ indexname: string }[]>(
-        `SELECT indexname FROM pg_indexes WHERE tablename = 'notifications'`,
+      const names = seederObjectNames(
+        readFileSync(
+          join(__dirname, '../../src/modules/prisma/database.seeder.ts'),
+          'utf8',
+        ),
       );
-      const names = rows.map((row) => row.indexname);
 
       expect(names).toEqual(
         expect.arrayContaining([
-          'notifications_feed_idx',
-          'notifications_unread_idx',
           'notifications_event_key',
           'notifications_open_group_key',
         ]),
       );
+      await expect(missingObjects(fx.prisma, names)).resolves.toEqual([]);
     });
   });
 

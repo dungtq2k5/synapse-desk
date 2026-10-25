@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
 import { parseEnvFile } from '@synapsedesk/testing/env-file';
 import { stripComments } from '@synapsedesk/testing/strip-comments';
+import { seederObjectNames } from '@synapsedesk/testing/schema-objects';
 import {
   readListed,
   readRepoFiles,
@@ -197,34 +198,11 @@ describe('the schema contract', () => {
         .map((file) => file.split('/')[1])
         .sort();
 
-    /**
-     * Every object `applySchemaObjects()` creates, by name, read from the code
-     * that creates it.
-     *
-     * **`stripComments` first, and it is not a formality — it was measured
-     * here.** A first version of this extractor ran over raw source and pulled
-     * the word `on` out of a prose comment (*"CREATE INDEX IF NOT EXISTS on an
-     * EXISTING index"*), which then "matched" every migration containing the
-     * letters `on`. A two-letter English word reported as a schema-object
-     * collision is the vacuity class arriving through a false POSITIVE rather
-     * than a false negative, which is rarer and reads as a real finding.
-     */
-    const seederObjects = (service: string): string[] => {
-      const source = stripComments(
+    /** Every object `applySchemaObjects()` creates, by name (`seederObjectNames`). */
+    const seederObjects = (service: string): string[] =>
+      seederObjectNames(
         read(`services/${service}/src/modules/prisma/database.seeder.ts`),
       );
-
-      return [
-        ...[
-          ...source.matchAll(
-            /CREATE (?:UNIQUE )?INDEX IF NOT EXISTS "?([a-z][a-z0-9_]*)"?/gi,
-          ),
-        ].map((match) => match[1]),
-        ...[...source.matchAll(/ADD CONSTRAINT "([a-z0-9_]+)"/gi)].map(
-          (match) => match[1],
-        ),
-      ];
-    };
 
     it('extracts twenty-four named objects plus one extension — the floor', () => {
       // auth 9, ticket 5, ingestion 7 (six indexes and `btree_gin`),
@@ -318,66 +296,138 @@ describe('the schema contract', () => {
     );
   });
 
-  // ------------------------- 3a. the schema step has TWO callers, always
+  // -------------------- 3a. one schema step, three commands, every environment
 
-  describe('**the schema step reaches both environments**', () => {
+  describe('**every database gets its schema the way production does**', () => {
     /**
-     * ADR 0043 moved `applySchemaObjects()` off the application boot path and
-     * into the deploy step. That is safe only while the step has BOTH callers,
-     * and the second is the one nothing else would notice was gone:
-     *
-     *   - production: the `migrate` init container, after `migrate deploy`;
-     *   - development: `npm run db:push`, which chains `db:schema`.
-     *
-     * **`assertSchemaExists()` cannot cover for a missing development caller.**
-     * It counts TABLES, and `prisma db push` creates every table while creating
-     * none of the partial indexes or CHECK constraints — so a developer's
-     * database would boot, serve, pass the assertion, and silently permit the
-     * duplicate signup ADR 0020's partial index refuses. Nothing goes red. That
-     * is the exact shape of ADR 0042's finding, one environment over.
+     * The schema step is three commands, in this order, `&&`-chained:
+     * `database-check.js` (refuses a missing or `db push`-built database),
+     * `prisma migrate deploy`, `schema-apply.js` (the objects Prisma cannot
+     * express). Production runs them as the `migrate` image's `CMD`; every
+     * other environment runs them as the service's `npm run db:apply`.
      */
     const withSchema = (): string[] =>
       repoFiles('services/*/prisma/schema.prisma')
         .map((file) => file.split('/')[1])
         .sort();
 
-    it('four services own a Prisma schema — the corpus floor', () => {
-      expect(withSchema()).toHaveLength(4);
-    });
-
-    it.each(withSchema())('%s', (service) => {
-      const entrypoint = `services/${service}/src/schema-apply.ts`;
-      expect(repoFiles(entrypoint)).toEqual([entrypoint]);
-
-      // The entrypoint must reach the DDL, not merely exist.
-      expect(
-        /applySchemaObjects\(\)/.test(stripComments(read(entrypoint))),
-      ).toBe(true);
-
-      // The development caller. `db:push` alone leaves a database with every
-      // table and none of the objects.
-      const scripts = (
-        JSON.parse(read(`services/${service}/package.json`)) as {
+    const scriptsOf = (pkg: string): Record<string, string> =>
+      (
+        JSON.parse(read(`${pkg}/package.json`)) as {
           scripts: Record<string, string>;
         }
       ).scripts;
 
-      expect(scripts['db:schema']).toContain('schema-apply');
-      expect(scripts['db:push']).toContain('db:schema');
+    const imageCmd = (): string =>
+      /^CMD \["sh", "-c", "([^"]+)"\]/m.exec(
+        read('docker/node-service.Dockerfile'),
+      )?.[1] ?? '';
+
+    it('four services own a Prisma schema — the corpus floor', () => {
+      expect(withSchema()).toHaveLength(4);
     });
 
-    it('the production caller is the migrate image, in one container', () => {
-      // `&&`, so a failed migration never reaches the DDL. Two init containers
-      // would work and would put an ordering the kubelet enforces into a place
-      // a future edit can reorder.
-      const dockerfile = read('docker/node-service.Dockerfile');
-      const cmd = /^CMD \["sh", "-c", "([^"]+)"\]/m.exec(dockerfile)?.[1] ?? '';
-
-      expect(cmd).toContain('prisma migrate deploy');
-      expect(cmd).toContain('schema-apply.js');
-      expect(cmd.indexOf('migrate deploy')).toBeLessThan(
-        cmd.indexOf('schema-apply.js'),
+    it('the migrate image runs the three commands, in order, in one container', () => {
+      expect(imageCmd()).toBe(
+        'node dist/src/database-check.js && npx prisma migrate deploy && node dist/src/schema-apply.js',
       );
+    });
+
+    it.each(withSchema())(
+      "%s: `db:apply` is the image's three commands",
+      (service) => {
+        for (const [entry, call] of [
+          ['database-check', /runDatabaseCheck\(\)/],
+          ['schema-apply', /applySchemaObjects\(\)/],
+        ] as const) {
+          const file = `services/${service}/src/${entry}.ts`;
+          expect([file, call.test(stripComments(read(file)))]).toEqual([
+            file,
+            true,
+          ]);
+        }
+
+        const scripts = scriptsOf(`services/${service}`);
+
+        // `npx` resolves the same binary `npm run` puts on the PATH.
+        expect(scripts['db:apply']).toBe(
+          imageCmd().replace('npx prisma', 'prisma'),
+        );
+        expect(scripts['db:apply:test']).toBe(
+          'dotenv -e .env.test -- npm run db:apply',
+        );
+        expect(
+          Object.keys(scripts)
+            .filter((name) => name.startsWith('db:'))
+            .sort(),
+        ).toEqual(
+          [
+            'db:apply',
+            'db:apply:test',
+            'db:generate',
+            'db:migrate',
+            // notification has no Studio script.
+            ...(service === 'notification-service' ? [] : ['db:studio']),
+          ].sort(),
+        );
+      },
+    );
+
+    it('the root has four database scripts, and the reset applies the schema', () => {
+      expect(
+        Object.keys(scriptsOf('.'))
+          .filter((name) => name.startsWith('db:'))
+          .sort(),
+      ).toEqual(['db:apply', 'db:apply:test', 'db:generate', 'db:reset']);
+
+      const reset = stripComments(read('scripts/reset-databases.mjs'));
+      expect([/'db:apply'/.test(reset), /'db:apply:test'/.test(reset)]).toEqual(
+        [true, true],
+      );
+    });
+
+    it("**the system suite's setup applies the schema to the dev databases**", () => {
+      expect(stripComments(read('test/system/global-setup.ts'))).toMatch(
+        /'db:apply'/,
+      );
+    });
+
+    it('**nothing that sets up a database calls `db push`**', () => {
+      // Package scripts, the root scripts, the test setups and CI: every
+      // place a database is created, reset or updated. `npx prisma db push`
+      // by hand stays possible for an experiment; no setup may use it.
+      const packages = repoFiles('package.json', '*/*/package.json');
+      const sources = repoFiles(
+        'scripts/*.mjs',
+        'scripts/**/*.ts',
+        'test/**/*.ts',
+        '.github/workflows/*.yml',
+      );
+      expect(packages.length).toBeGreaterThanOrEqual(10);
+      expect(sources.length).toBeGreaterThanOrEqual(20);
+
+      const PUSH = /\bdb\s+push\b|\bdb:(?:test:)?push\b/;
+      const offenders = [
+        ...readListed(packages)
+          .filter(({ text }) =>
+            Object.values(
+              (JSON.parse(text) as { scripts?: Record<string, string> })
+                .scripts ?? {},
+            ).some((script) => PUSH.test(script)),
+          )
+          .map(({ path }) => path),
+        ...readListed(sources)
+          .filter(({ path, text }) =>
+            PUSH.test(
+              path.endsWith('.yml')
+                ? text.replace(/^\s*#.*$/gm, '')
+                : stripComments(text),
+            ),
+          )
+          .map(({ path }) => path),
+      ];
+
+      expect(offenders).toEqual([]);
     });
   });
 

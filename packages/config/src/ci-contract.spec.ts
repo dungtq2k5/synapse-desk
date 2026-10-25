@@ -69,7 +69,7 @@ describe('the CI contract', () => {
      *
      * **The strip is the correction and it was measured.** `cd.yml` runs
      * `docker` and `kubectl` and no npm script at all — its only `npm run` is
-     * inside the must-never-run header comment, naming `db:push`. Over raw text
+     * inside the must-never-run header comment, naming `db:apply`. Over raw text
      * that comment satisfied the per-file floor below, so the floor was green
      * on a workflow it had not read a single step of. The destructive check a
      * few lines down already strips YAML comments for the mirror-image reason;
@@ -112,8 +112,8 @@ describe('the CI contract', () => {
      *
      * `test:system` flushes the entire dev Redis, drops the Qdrant collection
      * and resets the JetStream streams, in setup AND teardown, and two of its
-     * steps need a live paid API. `db:push` (no `:test:`) targets the DEV
-     * databases. The seeders' `--apply` forms write to a real Stripe sandbox
+     * steps need a live paid API. `db:apply` (no `:test`) targets the DEV
+     * databases, and a bare `db:reset` drops dev and test alike. The seeders' `--apply` forms write to a real Stripe sandbox
      * and real databases; their dry-run forms are harmless, which is why the
      * check is on the flag rather than on the script name for those two.
      */
@@ -123,16 +123,13 @@ describe('the CI contract', () => {
         why: 'DESTRUCTIVE to Redis, Qdrant and JetStream in setup and teardown',
       },
       {
-        // No lookahead. A `(?!:)` here looks like it prevents a false positive
-        // on `db:test:push` and cannot: that string does not CONTAIN
-        // `db:push`, so the plain pattern never matched it. Its only effect
-        // was to exempt the four per-service forms — and `db:push:auth` is
-        // literally `npm run db:push -w @synapsedesk/auth-service`, the same
-        // command with a workspace flag. Measured: `db:test:push` and
-        // `db:test:push:auth` both stay unmatched by the plain pattern, which
-        // is what makes the widening safe rather than merely defensible.
-        pattern: /npm run db:push\b/,
-        why: 'targets the DEV databases; CI wants db:test:push',
+        // `db:apply:test` is the test form; the bare one reads `.env`.
+        pattern: /npm run db:apply\b(?!:test)/,
+        why: 'targets the DEV databases; CI wants db:apply:test',
+      },
+      {
+        pattern: /npm run db:reset\b(?![^\n]*--(?:test|dev)-only)/,
+        why: 'resets the dev AND test databases; a job names the ones it owns (--test-only or --dev-only)',
       },
       {
         pattern: /npm run (seed:demo|stripe:provision|plans:seed)[^\n]*--apply/,

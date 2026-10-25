@@ -1,5 +1,7 @@
 /**
- * @file Dropping named INDEXES, so a test can watch the seeder put them back.
+ * @file The objects a service's seeder creates by name: reading the names from
+ * its SQL, checking they exist, and dropping indexes so a test can watch the
+ * seeder put them back.
  *
  * **Nothing could do this before, and that is part of why the gate survived.**
  * `SEED_ON_BOOTSTRAP=false` used to skip the whole DDL block — a defect no test
@@ -7,16 +9,14 @@
  * database it produces. A check for it needs to drop what the seeder creates,
  * run the boot hook, and look again.
  *
- * **Indexes only, and the name says so deliberately.** The seeder's DDL block
- * also holds `CHECK` constraints and extensions; `DROP INDEX IF EXISTS` on a
- * constraint name no-ops silently and `missingIndexes` then reports it missing
- * forever, so a caller who passed one would get a red test naming the wrong
- * thing. Teaching these functions about constraints (`ALTER TABLE … DROP
- * CONSTRAINT`, `pg_constraint`) is the better answer and is worth doing when a
- * test needs it — not before.
+ * **Dropping is indexes only**: `DROP INDEX IF EXISTS` on a constraint name
+ * no-ops silently, so `dropIndexes` takes index names and `missingIndexes`
+ * checks only them. `missingObjects` checks both catalogues.
  *
  * Test-only, and deliberately narrow: it drops named objects, never a schema.
  */
+
+import { stripComments } from './strip-comments';
 
 /** The subset of `PrismaClient` this needs — no import of a generated client,
  * which is per-service and cannot be named from here. */
@@ -56,4 +56,50 @@ export async function missingIndexes(
   const present = new Set(rows.map((row) => row.indexname));
 
   return indexNames.filter((name) => !present.has(name));
+}
+
+/**
+ * Every object a seeder creates by name — `CREATE [UNIQUE] INDEX IF NOT EXISTS`
+ * and `ADD CONSTRAINT` — read from its source.
+ *
+ * Comments are stripped first: a prose comment quoting `CREATE INDEX IF NOT
+ * EXISTS on …` would otherwise yield the "name" `on`. Names must be literals in
+ * the SQL; an interpolated name is invisible here.
+ *
+ * @example
+ *   seederObjectNames(readFileSync('src/modules/prisma/database.seeder.ts', 'utf8'))
+ *   // ['notifications_feed_idx', …]
+ */
+export function seederObjectNames(seederSource: string): string[] {
+  const source = stripComments(seederSource);
+
+  return [
+    ...[
+      ...source.matchAll(
+        /CREATE (?:UNIQUE )?INDEX IF NOT EXISTS "?([a-z][a-z0-9_]*)"?/gi,
+      ),
+    ].map((match) => match[1]),
+    ...[...source.matchAll(/ADD CONSTRAINT "([a-z0-9_]+)"/gi)].map(
+      (match) => match[1],
+    ),
+  ];
+}
+
+/**
+ * The named objects absent from the current schema, looking in both catalogues:
+ * `pg_indexes` for indexes, `pg_constraint` for constraints.
+ */
+export async function missingObjects(
+  prisma: RawExecutor,
+  names: readonly string[],
+): Promise<string[]> {
+  const rows = await prisma.$queryRawUnsafe<{ name: string }[]>(
+    `SELECT indexname AS name FROM pg_indexes WHERE schemaname = current_schema()
+     UNION
+     SELECT conname FROM pg_constraint
+      WHERE connamespace = current_schema()::regnamespace`,
+  );
+  const present = new Set(rows.map((row) => row.name));
+
+  return names.filter((name) => !present.has(name));
 }

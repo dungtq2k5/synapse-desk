@@ -10,5 +10,9 @@ export default defineConfig({
   },
   datasource: {
     url: process.env['DATABASE_URL'],
+    // Development and CI only: `migrate dev` and `migrate diff
+    // --from-migrations` replay the migrations into it. `migrate deploy` never
+    // reads it, so a deployed service has none.
+    shadowDatabaseUrl: process.env['SHADOW_DATABASE_URL'],
   },
 });

@@ -10,9 +10,9 @@
 # **What must never run here**, as a named list rather than an absence — the
 # same shape `ci.yml` uses, and `ci-contract.spec.ts` fails if one appears:
 #
-#   npm run db:push       targets a database DIRECTLY and creates it on a typo.
-#                         ADR 0042 replaced it for production; the init
-#                         container runs `migrate deploy` instead.
+#   npm run db:apply      targets a database DIRECTLY from a checkout. The
+#                         init container runs the same three commands from
+#                         the `migrate` image instead.
 #   kubectl apply k8s/generated/*.secret.example.yaml
 #                         those are SKELETONS with empty values. Applying one
 #                         over a real Secret empties it, and the pods that

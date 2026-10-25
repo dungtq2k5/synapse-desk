@@ -3,9 +3,8 @@
  *
  * **Never `process.env.DATABASE_URL`.** Three services name the same variable,
  * and in one process it means whichever file was read last — a seeder that
- * writes every service's rows into one database and reports success.
- * `verify-schema.mjs` hit this first and wrote the answer down: read each URL in
- * its own pass and hand it to that connection explicitly.
+ * writes every service's rows into one database and reports success. Each URL
+ * is read in its own pass and handed to that connection explicitly.
  */
 
 import { pathToFileURL } from 'node:url';
@@ -30,9 +29,8 @@ const ENV_FILES: Record<'auth' | 'ticket' | 'ingestion', string> = {
 /**
  * The safety helpers, from the module every destructive script already uses.
  *
- * Typed by `database-url.d.mts` rather than rewritten: `db:verify` and
- * `db:reset` are plain Node and have no reason to become TypeScript, and
- * re-deriving `isLocalDatabase` here would be a second copy of the one check
+ * Typed by `database-url.d.mts` rather than rewritten: `db:reset` is plain
+ * Node and has no reason to become TypeScript, and re-deriving `isLocalDatabase` here would be a second copy of the one check
  * standing between this script and a production database.
  */
 /** Reads a service's dev `DATABASE_URL`, refusing anything not on this machine. */

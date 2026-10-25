@@ -1,67 +1,39 @@
 #!/usr/bin/env node
 /**
- * Drops and recreates every service database, dev AND test, from the schema.
+ * Drops and recreates every local service database, dev AND test, then gives
+ * each its schema the way production does (`npm run db:apply`).
  *
  *   npm run db:reset
  *   npm run db:reset -- --test-only     # leave the dev databases alone
+ *   npm run db:reset -- --dev-only      # leave the test databases alone
+ *   npm run db:reset -- --test-only ingestion-service   # only the named services
  *
- * WHY THIS EXISTS
- * ---------------
- * `npm run db:push` is plain `prisma db push`: no `--accept-data-loss` and no
- * `--force-reset`, so it REFUSES a change that would drop data. That refusal is
- * the failure `db:verify` was written for — measured, the same push succeeded
- * against the empty test database and was rejected by dev, and each run reported
- * only on the database it touched.
+ * Per service and env file (`.env`, `.env.test`): `DROP DATABASE … WITH
+ * (FORCE)`, `CREATE DATABASE`, the same for its `SHADOW_DATABASE_URL`, then
+ * `db:apply` (or `db:apply:test`). Creating a database is this script's job
+ * only: `db:apply` refuses a missing one.
  *
- * Being able to reset is the remedy for that; it was never the detector, and
- * until this script there was no command for it. Now there is: `db:verify` tells
- * you the schemas disagree, and this puts them back.
+ * **Build first** (`npm run build`): `db:apply` runs each service's built
+ * `dist/src/schema-apply.js`, and a missing build is refused before anything is
+ * dropped.
  *
- * WHAT IT DOES NOT DO — READ THIS BEFORE RUNNING `db:verify` AFTER IT
- * ------------------------------------------------------------------
- * A reset drops the PARTIAL UNIQUE INDEXES and the seed rows, because Prisma
- * cannot express either: `DatabaseSeeder` creates them from
- * `OnApplicationBootstrap`. So immediately after a reset, `db:verify`'s "plan
- * names are unique among LIVE rows" check FAILS — it looks for
- * `subscription_plans_name_key`, which does not exist again until a service
- * boots. That is the documented order, not a defect:
- *
- *   npm run db:reset  ->  start the services (or run the e2e suites)  ->  npm run db:verify
- *
- * The e2e suites boot the app themselves, so they reseed the test databases as
- * a side effect of running.
- *
- * DESTRUCTIVE, AND ONLY FOR LOCAL DEVELOPMENT. Every row in every service
- * database goes. `--test-only` narrows it to `.env.test`, `--dev-only` to
- * `.env`; passing neither resets both, which is what a caller who owns the
- * whole machine wants and is the wrong default for a pipeline that runs beside
- * an e2e suite. It refuses any connection string that does not point at this
- * machine, and `--force` is deliberately NOT offered: a remote database is not
- * a thing this script should be able to reach at all.
+ * DESTRUCTIVE, AND ONLY FOR THIS MACHINE. Every row in every target goes. It
+ * refuses any connection string that does not point at this machine, checks
+ * every target before dropping any, and has no `--force`. The two flags are
+ * mutually exclusive; a pipeline that runs beside an e2e suite passes
+ * `--dev-only` so the suite's test databases survive.
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import pg from 'pg';
 import { isLocalDatabase, readDatabaseUrl, redact } from './database-url.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const testOnly = process.argv.includes('--test-only');
 
-/**
- * `--dev-only`, the counterpart `--test-only` implied and did not have.
- *
- * **Added for the system harness, and the gap it closes is a real one.** Plain
- * `db:reset` truncates `.env` AND `.env.test`, so a pipeline that resets the
- * dev databases before a run also destroys the test databases — and an e2e
- * suite running in another terminal fails for a reason nowhere near itself.
- * That is the shape known-gap #14 records: a run that tears down shared state
- * fails a victim who did not change anything.
- *
- * The two flags are mutually exclusive by construction below rather than by
- * documentation, because a caller passing both means one of them is a mistake.
- */
+const testOnly = process.argv.includes('--test-only');
 const devOnly = process.argv.includes('--dev-only');
 
 if (testOnly && devOnly) {
@@ -71,55 +43,113 @@ if (testOnly && devOnly) {
   process.exit(1);
 }
 
-// Discovered rather than listed, for the reason `reset-jetstream.mjs` reads the
-// live stream list: a service added later is included without anyone
-// remembering this file, and a service removed cannot leave a stale entry.
-const services = readdirSync(join(REPO_ROOT, 'services'))
+const fail = (message) => {
+  console.error(message);
+  process.exit(1);
+};
+
+// Discovered rather than listed: a service added later is included without
+// anyone remembering this file.
+const withSchema = readdirSync(join(REPO_ROOT, 'services'))
   .filter((name) =>
     existsSync(join(REPO_ROOT, 'services', name, 'prisma/schema.prisma')),
   )
   .sort();
 
-if (services.length === 0) {
-  console.error('No service has a prisma/schema.prisma. Nothing to reset.');
-  process.exit(1);
+if (withSchema.length === 0) {
+  fail('No service has a prisma/schema.prisma. Nothing to reset.');
 }
 
-// Every URL is resolved and checked BEFORE anything is dropped. A guard that
-// fires halfway leaves the tree in the one state this script exists to avoid:
-// some databases reset, some not, and no record of which.
+// A mistyped flag would otherwise reset dev AND test.
+const badFlags = process.argv
+  .slice(2)
+  .filter(
+    (arg) =>
+      arg.startsWith('--') && !['--test-only', '--dev-only'].includes(arg),
+  );
+
+if (badFlags.length > 0) {
+  fail(`Unknown flag ${badFlags.join(', ')}. Use --test-only or --dev-only.`);
+}
+
+// Services named on the command line, or every one.
+const named = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
+const unknown = named.filter((name) => !withSchema.includes(name));
+
+if (unknown.length > 0) {
+  fail(
+    `No schema service named ${unknown.join(', ')}. Choose from: ${withSchema.join(', ')}.`,
+  );
+}
+
+const services =
+  named.length > 0
+    ? withSchema.filter((name) => named.includes(name))
+    : withSchema;
+
+const envFiles = testOnly
+  ? ['.env.test']
+  : devOnly // NOSONAR
+    ? ['.env']
+    : ['.env', '.env.test'];
+
+// Every URL is resolved and checked BEFORE anything is dropped, so a refusal
+// never leaves some databases reset and some not.
 const targets = [];
 
 for (const service of services) {
-  const envFiles = testOnly
-    ? ['.env.test']
-    : devOnly // NOSONAR
-      ? ['.env']
-      : ['.env', '.env.test'];
+  if (
+    !existsSync(
+      join(REPO_ROOT, 'services', service, 'dist/src/schema-apply.js'),
+    )
+  ) {
+    fail(
+      `services/${service} is not built (no dist/src/schema-apply.js). Run \`npm run build\` first.`,
+    );
+  }
 
   for (const envFile of envFiles) {
     const fileUrl = new URL(
       `../services/${service}/${envFile}`,
       import.meta.url,
     );
-    const url = readDatabaseUrl(fileUrl);
+    const urls = ['DATABASE_URL', 'SHADOW_DATABASE_URL'].map((key) => {
+      const url = readDatabaseUrl(fileUrl, key);
 
-    if (!url) {
-      console.error(
-        `No DATABASE_URL in services/${service}/${envFile}. Refusing to guess.`,
-      );
-      process.exit(1);
-    }
+      if (!url) {
+        fail(`No ${key} in services/${service}/${envFile}. Refusing to guess.`);
+      }
+      if (!isLocalDatabase(url)) {
+        fail(
+          `services/${service}/${envFile} ${key} points at ${redact(url)}, which is not this machine.\n` +
+            'Refusing. This script has no --force: a remote database is not something it should reach.',
+        );
+      }
+      return url;
+    });
 
-    if (!isLocalDatabase(url)) {
-      console.error(
-        `services/${service}/${envFile} points at ${redact(url)}, which is not this machine.\n` +
-          'Refusing. This script has no --force: a remote database is not something it should reach.',
-      );
-      process.exit(1);
-    }
+    targets.push({ service, envFile, urls });
+  }
+}
 
-    targets.push({ service, envFile, url });
+/** Drops and creates the database `url` names, from the server's `postgres`. */
+async function recreate(url) {
+  const parsed = new URL(url);
+  const name = decodeURIComponent(parsed.pathname.slice(1));
+  parsed.pathname = '/postgres';
+  parsed.search = '';
+
+  const client = new pg.Client({ connectionString: parsed.toString() });
+  await client.connect();
+
+  try {
+    // Identifiers cannot be bind parameters; `name` comes from a tracked or
+    // local env file, and the quoting below escapes it.
+    const quoted = `"${name.replaceAll('"', '""')}"`;
+    await client.query(`DROP DATABASE IF EXISTS ${quoted} WITH (FORCE)`);
+    await client.query(`CREATE DATABASE ${quoted}`);
+  } finally {
+    await client.end();
   }
 }
 
@@ -127,20 +157,21 @@ console.log(
   `Resetting ${targets.length} database(s) across ${services.length} service(s):\n`,
 );
 
-for (const { service, envFile, url } of targets) {
-  console.log(`  ${service} ${envFile} — ${redact(url)}`);
+const recreated = new Set();
 
-  // No `--skip-generate`: this Prisma CLI reads its datasource from
-  // `prisma.config.ts` and does not accept that flag, so the client is
-  // regenerated once per database. Slower, and the only option offered.
-  const push = ['prisma', 'db', 'push', '--force-reset'];
-  const args =
-    envFile === '.env' ? push : ['dotenv', '-e', '.env.test', '--', ...push];
+for (const { service, envFile, urls } of targets) {
+  console.log(`  ${service} ${envFile} — ${redact(urls[0])}`);
 
   try {
+    // The shadow database is shared by `.env` and `.env.test`: once is enough.
+    for (const url of urls.filter((url) => !recreated.has(url))) {
+      await recreate(url);
+      recreated.add(url);
+    }
+
     execFileSync(
-      'npx', // NOSONAR
-      args,
+      'npm', // NOSONAR
+      ['run', envFile === '.env' ? 'db:apply' : 'db:apply:test'],
       {
         cwd: join(REPO_ROOT, 'services', service),
         stdio: ['ignore', 'ignore', 'pipe'],
@@ -149,13 +180,10 @@ for (const { service, envFile, url } of targets) {
     );
   } catch (error) {
     console.error(`\n  FAILED: ${service} ${envFile}`);
-    console.error(error.stderr || error.message);
-    process.exit(1);
+    fail(error.stderr || error.message);
   }
 }
 
 console.log(
-  '\nEvery database is back to the schema, and EMPTY.\n' +
-    'Partial indexes and seed rows are recreated when a service boots — start the\n' +
-    'services (or run the e2e suites) before `npm run db:verify`.',
+  '\nEvery database is migrated, with its schema objects, and EMPTY of rows.',
 );
