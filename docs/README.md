@@ -82,13 +82,14 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md) | The seeder's DDL block is the list of hand-written SQL |
 | [0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md) | A ticket's status history is a table, not an audit trail |
 | [0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md) | Durable subjects are the ones with nothing to reconcile against |
-| [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` |
+| [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` **Superseded by [0049](./decisions/0049-every-database-gets-the-production-schema-path.md)** |
 | [0043](./decisions/0043-the-cluster-shape.md) | The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx` |
 | [0044](./decisions/0044-expand-and-contract-never-in-one-release.md) | Expand and contract, never in one release |
 | [0045](./decisions/0045-uri-versioning-under-the-same-paths.md) | URI versioning is on at `v1`, and no path moved to turn it on |
 | [0046](./decisions/0046-resend-for-both-directions.md) | Email is Resend in both directions; only the transport changed |
 | [0047](./decisions/0047-the-web-server-is-a-renderer.md) | The web client's server renders pages and holds no session, no token and no rule |
 | [0048](./decisions/0048-cache-entries-carry-their-scopes-generation.md) | A cached answer carries its scope's generation, so one produced before an invalidation is never read |
+| [0049](./decisions/0049-every-database-gets-the-production-schema-path.md) | Every database gets its schema the way production does: a database check, `migrate deploy`, then `schema-apply` |
 
 ## `reference/` — what is true today
 
