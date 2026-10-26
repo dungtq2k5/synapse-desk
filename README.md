@@ -188,7 +188,7 @@ npm run db:reset   # creates every dev and test database (and its shadow), then 
 
 **`db:apply` is production's schema step,** in every environment ([ADR 0049](docs/decisions/0049-every-database-gets-the-production-schema-path.md)): it checks the database exists and was built by migrations, runs `prisma migrate deploy`, then `schema-apply` (the partial indexes, `CHECK`s and extensions Prisma can't express). After pulling new migrations, `npm run db:apply` (and `db:apply:test`) brings each database up to date; one service: `npm run db:apply -w @synapsedesk/<service>`.
 
-**A database built by `prisma db push`** has no migration history, so `db:apply` refuses it and names the fix: run `npm run db:reset` once. **Changing the schema:** edit `schema.prisma`, then `npm run db:migrate -w @synapsedesk/<service>` writes the migration (it uses the service's shadow database); CI fails when the schema and its migrations disagree. `npx prisma db push` is for trying something by hand only; no script or setup uses it.
+**A database built by `prisma db push`** has no migration history, so `db:apply` refuses it and names the fix: run `npm run db:reset` once. **Changing the schema:** edit `schema.prisma`, then `npm run db:migrate -w @synapsedesk/<service> -- <snake_case_name>` writes the migration from the shadow database alone (the dev database is never read); CI fails when the schema and its migrations disagree. `npx prisma db push` is for trying something by hand only; no script or setup uses it.
 
 Then, once per ingestion database:
 

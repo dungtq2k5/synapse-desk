@@ -2,7 +2,7 @@
 
 What is cached in the gateway, how the keys are shaped, and what evicts them. An **axis**, not a flow — every flow touches this and none of them owns it.
 
-The *decisions* are ADRs [0012](../decisions/0012-cache-keys-are-tenant-first.md), [0029](../decisions/0029-graphql-caches-entities-not-responses.md), [0033](../decisions/0033-redis-noeviction.md) and [0034](../decisions/0034-read-repopulate-race-is-accepted.md). This page is what is true today.
+The *decisions* are ADRs [0012](../decisions/0012-cache-keys-are-tenant-first.md), [0029](../decisions/0029-graphql-caches-entities-not-responses.md), [0033](../decisions/0033-redis-noeviction.md) and [0048](../decisions/0048-cache-entries-carry-their-scopes-generation.md) (which superseded 0034). This page is what is true today.
 
 ---
 
@@ -78,16 +78,20 @@ The gateway caches data three services own, so eviction arrives as events rather
 
 ---
 
-## The read-repopulate race is accepted, not fixed
+## The read-repopulate race is closed by generations
 
 ```text
-reader:  get (miss) ── produce() ────────────── set(stale)
+reader:  get (miss) ── produce() ────────────── set
 writer:                    └─ invalidate() ──┘
 ```
 
-A reader that missed, then produced, can write a value the writer's invalidation was meant to remove — because the invalidation happened while `produce()` was in flight. [ADR 0034](../decisions/0034-read-repopulate-race-is-accepted.md) accepts this rather than fixing it: the window is narrow, the damage is bounded by the TTL, and the alternatives (locking, versioned CAS) cost more on every read than the race costs on a rare one.
+A reader that missed, then produced, used to be able to write a value the writer's invalidation was meant to remove, and keep it for the whole TTL. [ADR 0048](../decisions/0048-cache-entries-carry-their-scopes-generation.md) closes it:
 
-**Knowing it is accepted is the point.** A stale entry that outlives a mutation by up to the TTL is not a bug to hunt; it is this race, and it resolves itself.
+- **Every tenant and scope has a generation** (`cache-gen:` in Redis). A read takes the generations of its scope **and each prefix of it** (`entity`, `entity:user`, `entity:user:{id}`) in one `MGET` before `produce()`, and stores its answer under a key carrying them.
+- **Invalidating a scope increments its generation and still deletes its keys.** An answer produced before the increment lands under the old key, which no read asks for again; the delete frees memory and is what an older instance understands mid-deploy.
+- **The organization-status cache** (`org-status:{id}`) has one level per organization and works the same way, so a status read just before a freeze can't keep a frozen organization working.
+- **Generations that can't be read mean no cache for that read,** never a stale answer.
+- **The cost is one more Redis round trip per cached read** (the generations' `MGET`).
 
 ---
 
@@ -105,7 +109,7 @@ The cache is therefore **not** the only tenant of this Redis, which is why `FLUS
 | :--- | :--- |
 | A mutation does not show up | the scope spelled at the read vs at the write — `CACHE_SCOPES` exists to make that one string |
 | A role's `userAssigned` is stale after an invitation is accepted | expected for up to `ENTITY_TTL_SECONDS` — that route is unauthenticated, so the interceptor has no tenant and evicts nothing |
-| A stale value outlives a mutation by minutes | the read-repopulate race, then the TTL — both are expected |
+| A stale value outlives a mutation by minutes | the invalidation never arrived (the NATS consumer, below), or the generation wasn't incremented for that scope; a read in flight across the invalidation can't cause it any more |
 | REST and GraphQL disagree about a shape | the two `permissions` scopes; they must not share a key |
 | One tenant sees another's data | the key's first segment — this should be structurally impossible |
 | Evictions stopped entirely | the NATS consumer, not the cache — these subjects are core, so a dropped one is silent |
