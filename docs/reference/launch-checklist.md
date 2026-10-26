@@ -28,5 +28,8 @@ so nothing here has been run.
 - **Browser errors:** WARN lines with `"event":"client_error"` (the
   `ClientErrors` logger on both gateways), and `client_errors_total{kind}` on
   the gateway's metrics port.
-- **Web Vitals:** CI's `web-vitals` job reports LCP, CLS and INP for the main
-  screens; its numbers set the gate.
+- **Web Vitals, measured in the lab:** CI's `web-vitals` job gates the main
+  screens at **LCP ≤ 1 s, CLS ≤ 0.1, INP ≤ 200 ms** (the worst of three
+  runner runs was 428 ms LCP and 16 ms INP). These are lab numbers on a local
+  stack with no network; real users will see slower ones, which nothing
+  measures yet.
