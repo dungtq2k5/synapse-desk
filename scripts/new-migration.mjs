@@ -16,14 +16,14 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { join, relative } from 'node:path';
+import { hasChanges, migrationFolder } from './lib/new-migration.cjs';
 
-const name = process.argv[2];
-
-if (!name || !/^[a-z][a-z0-9_]*$/.test(name)) {
-  console.error(
-    'Name the migration in snake_case: npm run db:migrate -- add_widget_color',
-  );
+let folder;
+try {
+  folder = migrationFolder(process.argv[2]);
+} catch (error) {
+  console.error(error.message);
   process.exit(1);
 }
 
@@ -42,23 +42,11 @@ const sql = execFileSync(
   { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
 );
 
-if (!/^\s*(CREATE|ALTER|DROP|COMMENT)\b/im.test(sql)) {
+if (!hasChanges(sql)) {
   console.error('schema.prisma matches the migrations: nothing to migrate.');
   process.exit(1);
 }
 
-const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
-const migrations = resolve('prisma/migrations');
-const entry = `${stamp}_${name}`;
-const folder = resolve(migrations, entry);
-
-// The name's pattern already keeps it a single folder; this says so where
-// the path is used.
-if (!folder.startsWith(migrations + sep)) {
-  console.error(`${folder} is outside ${migrations}.`);
-  process.exit(1);
-}
-
 mkdirSync(folder);
-writeFileSync(resolve(folder, 'migration.sql'), sql);
-console.log(`Wrote prisma/migrations/${entry}/migration.sql`);
+writeFileSync(join(folder, 'migration.sql'), sql);
+console.log(`Wrote ${relative(process.cwd(), folder)}/migration.sql`);
