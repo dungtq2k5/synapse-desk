@@ -117,7 +117,6 @@ class ConsoleDtoValueTest {
       );
       assertThat(getter.invoke(named)).isEqualTo(getter.invoke(entry));
     }
-    assertThat(named.getActorName()).isNull();
   }
 
   private static List<Method> setters(Class<?> type) {

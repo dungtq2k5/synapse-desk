@@ -141,6 +141,7 @@ export class UsersService {
       hasPassword: user.passwordHash !== null,
       // UNSPECIFIED for a Super Admin, who has no organization.
       organizationStatus: toProtoOrgStatus(user.organization?.status),
+      organizationName: user.organization?.name,
       isSuperAdmin: user.isSuperAdmin,
     };
   }

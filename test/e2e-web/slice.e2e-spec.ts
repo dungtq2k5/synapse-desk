@@ -221,6 +221,10 @@ test('the built app’s security headers, and its scripts carry the nonce', asyn
   expect(headers['x-content-type-options']).toBe('nosniff');
   expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   expect(headers['x-frame-options']).toBe('DENY');
+  expect(headers['permissions-policy']).toContain('camera=()');
+  expect(headers['permissions-policy']).toContain('clipboard-write=(self)');
+  // HSTS belongs to the TLS terminator (the Ingress), never the web.
+  expect(headers['strict-transport-security']).toBeUndefined();
 
   // Every script the page ships is allowed by that request's nonce.
   const html = await response.text();

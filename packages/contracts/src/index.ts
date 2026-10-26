@@ -28,3 +28,4 @@ export * from './configs/billing.config';
 export * from './configs/analytics.config';
 export * from './configs/scheduler.config';
 export * from './contracts/inbound-email.contract';
+export * from './configs/client-errors.config';

@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.modules.auditlogs.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.synapsedesk.gateway.common.validation.StrictIso8601;
+import com.synapsedesk.gateway.common.validation.CalendarDate;
 import jakarta.validation.constraints.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -73,7 +73,7 @@ public class CreateAuditLogExportDto {
    * @return from
    */
   @NotNull
-  @StrictIso8601
+  @CalendarDate
   @JsonProperty("from")
   public String getFrom() {
     return from;
@@ -94,7 +94,7 @@ public class CreateAuditLogExportDto {
    * @return to
    */
   @NotNull
-  @StrictIso8601
+  @CalendarDate
   @JsonProperty("to")
   public String getTo() {
     return to;

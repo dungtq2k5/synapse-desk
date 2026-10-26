@@ -9,6 +9,7 @@ import {
 import { REPO_ROOT } from '../system/services';
 import { sessionAs, signInAs, tenant, type Person } from './screens/tenant';
 import { api, clearThrottles } from './support';
+import { chooseMenuItem, expectFocusOn, pressOn, typeInto } from './keyboard';
 
 /**
  * The agent's workspace, end to end: each journey on a tenant of its own
@@ -379,4 +380,84 @@ test('an export: started, the page reloaded, resumed, downloaded', async ({
   const csv = await page.request.get(tab.url());
   expect(csv.ok()).toBe(true);
   expect(await csv.text()).toContain('ticket');
+});
+
+test.describe('by keyboard alone', () => {
+  test('a requester opens their ticket from the list and replies', async ({
+    browser,
+  }) => {
+    const { priya, tickets } = await tenant('k-reply');
+    const { context, page } = await personAt(browser, priya, '/requests');
+
+    await pressOn(
+      page,
+      page.getByRole('link', { name: /Can’t sign in on mobile/ }),
+    );
+    await expect(page).toHaveURL(new RegExp(`/tickets/${tickets.mobile}$`));
+    await typeInto(
+      page,
+      page.getByRole('textbox', { name: 'Message' }),
+      'It happens on the train too.',
+    );
+    await pressOn(
+      page,
+      page.getByRole('button', { name: 'Send', exact: true }),
+    );
+    await expect(
+      thread(page).getByText('It happens on the train too.'),
+    ).toBeVisible();
+
+    await context.close();
+  });
+
+  test('an agent takes a ticket, replies and resolves it', async ({
+    browser,
+  }) => {
+    const { maya, tickets } = await tenant('k-take');
+    const { context, page } = await personAt(
+      browser,
+      maya,
+      `/tickets/${tickets.mobile}`,
+    );
+
+    await pressOn(page, page.getByRole('button', { name: 'Assign to me' }));
+    await chooseMenuItem(page, 'Workplace');
+    await expect(
+      page.getByRole('main').getByText('Maya Chen').first(),
+    ).toBeVisible();
+
+    await typeInto(
+      page,
+      page.getByRole('textbox', { name: 'Reply to Priya' }),
+      'Sign out and in again on the app.',
+    );
+    await pressOn(page, page.getByRole('button', { name: 'Send reply' }));
+    await expect(
+      thread(page).getByText('Sign out and in again on the app.'),
+    ).toBeVisible();
+
+    for (const [from, move, confirm, to] of [
+      ['New', 'Mark as open…', 'Mark as open', 'Open'],
+      ['Open', 'Resolve…', 'Resolve', 'Resolved'],
+    ]) {
+      await pressOn(
+        page,
+        page.getByRole('button', { name: `Status: ${from}. Change status` }),
+      );
+      await chooseMenuItem(page, move);
+      await pressOn(
+        page,
+        page
+          .getByRole('dialog')
+          .getByRole('button', { name: confirm, exact: true }),
+      );
+      // Focus goes back to the status control, which now says the new one.
+      await expectFocusOn(
+        page.getByRole('button', { name: `Status: ${to}. Change status` }),
+      );
+    }
+    await expect(status(page, 'Resolved')).toBeVisible();
+
+    await context.close();
+  });
 });

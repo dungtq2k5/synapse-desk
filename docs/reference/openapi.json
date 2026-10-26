@@ -27399,6 +27399,201 @@
         ]
       }
     },
+    "/api/v1/client-errors": {
+      "post": {
+        "tags": ["Client errors"],
+        "summary": "Report a browser error",
+        "operationId": "ClientErrorsController_report_v1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportClientErrorDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Success."
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/v1/chat/conversations": {
       "get": {
         "tags": ["Chat"],
@@ -62852,6 +63047,16 @@
             "type": ["string", "null"],
             "description": "Why WE disabled it (auto-disable after sustained failure). NULL when the\ntenant disabled it themselves — the distinction a settings page renders."
           },
+          "disabledCode": {
+            "type": ["string", "null"],
+            "description": "`disabledReason` as data. NULL exactly when the reason is.",
+            "enum": ["CONSECUTIVE_FAILURES", null]
+          },
+          "consecutiveFailures": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Terminal failures in a row, reset by any delivered event."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -62862,8 +63067,10 @@
           }
         },
         "required": [
+          "consecutiveFailures",
           "createdAt",
           "description",
+          "disabledCode",
           "disabledReason",
           "eventTypes",
           "id",
@@ -66835,6 +67042,34 @@
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
+      "ReportClientErrorDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["error", "rejection", "boundary"]
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "stack": {
+            "type": ["string", "null"],
+            "description": "Kept truncated."
+          },
+          "path": {
+            "type": "string",
+            "description": "The page's path; its query and fragment are dropped before logging.",
+            "maxLength": 2000
+          },
+          "buildId": {
+            "type": ["string", "null"],
+            "description": "The web build that reported it (`GIT_SHA`).",
+            "maxLength": 64
+          }
+        },
+        "required": ["kind", "message", "path"]
+      },
       "StartConversationDto": {
         "type": "object",
         "properties": {
@@ -67630,11 +67865,11 @@
           },
           "from": {
             "type": "string",
-            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "to": {
             "type": "string",
-            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           }
         },
         "required": ["from", "to"]
@@ -67653,11 +67888,11 @@
           },
           "from": {
             "type": "string",
-            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "to": {
             "type": "string",
-            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "departmentId": {
             "type": ["string", "null"],
@@ -68837,6 +69072,10 @@
               null
             ]
           },
+          "organizationName": {
+            "type": ["string", "null"],
+            "description": "The caller's organization's name, answered in every status: the frozen\npage names it. Null for a Super Admin."
+          },
           "isSuperAdmin": {
             "type": "boolean",
             "description": "A platform Super Admin, who has no organization and uses the console."
@@ -68846,6 +69085,7 @@
           "departmentIds",
           "hasPassword",
           "isSuperAdmin",
+          "organizationName",
           "organizationStatus",
           "permissionCodes",
           "user"
@@ -71858,16 +72098,26 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "actorName": {
+            "type": ["string", "null"],
+            "description": "Who acted, by name; null when no one did, or when it can't be read."
+          },
+          "resourceName": {
+            "type": ["string", "null"],
+            "description": "What was acted on, by name (an invitation by its address); null for a type the log doesn't name, or when it can't be read."
           }
         },
         "required": [
           "action",
+          "actorName",
           "createdAt",
           "id",
           "ipAddress",
           "metadata",
           "organizationId",
           "resourceId",
+          "resourceName",
           "resourceType",
           "userAgent",
           "userId"

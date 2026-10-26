@@ -2,6 +2,7 @@ import {
   toProtoNotificationType,
   toProtoTimestamp,
   toProtoWebhookDeliveryStatus,
+  toProtoWebhookDisabledCode,
   type WebhookDeliveryResponse,
   type WebhookEndpointResponse,
 } from '@synapsedesk/grpc-proto';
@@ -32,6 +33,8 @@ export function toWebhookEndpointResponse(
     eventTypes: row.eventTypes.map(toProtoNotificationType),
     isActive: row.isActive,
     disabledReason: row.disabledReason ?? undefined,
+    disabledCode: toProtoWebhookDisabledCode(row.disabledCode),
+    consecutiveFailures: row.consecutiveFailures,
     createdAt: toProtoTimestamp(row.createdAt),
     updatedAt: toProtoTimestamp(row.updatedAt),
   };

@@ -13,7 +13,7 @@ import {
   LifeBuoyIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Lockup } from '@/components/brand/lockup';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -84,25 +84,45 @@ export function useOrganizationStatusRefusals(): void {
   }, [queryClient]);
 }
 
+/** Session storage's record that the banner has been announced. */
+const ANNOUNCED_KEY = 'synapsedesk:past-due-announced';
+
+/**
+ * True the first time it's asked in this session, then false: the banner is a
+ * live region only where it first appears. Each page renders its own header,
+ * so without this every navigation would announce it again. Without storage
+ * (a private window), every page load announces once.
+ */
+function claimAnnouncement(): boolean {
+  try {
+    if (sessionStorage.getItem(ANNOUNCED_KEY)) return false;
+    sessionStorage.setItem(ANNOUNCED_KEY, '1');
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Under the header on every page while a payment is overdue: worded for the
- * people who can pay (with Update payment) and for everyone else. Said once
- * as a status; not dismissible.
+ * people who can pay (with Update payment) and for everyone else. Announced
+ * once a session, as a status; not dismissible.
  */
 export function PastDueBanner() {
   const status = useOrganizationStatus();
-  const { can } = useViewer();
-  const organization = useOrganizationsControllerGetV1({
-    query: { retry: false },
-  });
+  const { can, organizationName } = useViewer();
   const { busy, open } = useOpenPortal();
+  // Claimed when the banner first shows on this mount, not at mount: the
+  // status can arrive after it.
+  const [announces, setAnnounces] = useState<boolean | null>(null);
   if (status !== 'SUSPENDED_PAST_DUE') return null;
+  if (announces === null) setAnnounces(claimAnnouncement());
 
-  const name = organization.data?.data?.name ?? 'Your organization';
+  const name = organizationName ?? 'Your organization';
   const admin = can('organization.update');
   return (
     <section
-      role="status"
+      role={announces ? 'status' : 'region'}
       aria-label="Payment overdue"
       className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b border-warning-border bg-warning-subtle px-4 py-2 text-sm text-warning-subtle-foreground"
     >
@@ -132,17 +152,15 @@ export function PastDueBanner() {
  * support address to write to, and Sign out. Focus goes to its heading.
  */
 export function FrozenPage() {
-  const { user } = useViewer();
-  const organization = useOrganizationsControllerGetV1({
-    query: { retry: false },
-  });
+  const { user, organizationName } = useViewer();
   const support = useSupportEmail();
   const signOut = useSignOut();
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => heading.current?.focus(), []);
 
-  const name = organization.data?.data?.name ?? 'Your organization';
+  // From `/users/me`: the organization read refuses a frozen organization.
+  const name = organizationName ?? 'Your organization';
   return (
     <main className="flex min-h-svh flex-col items-center gap-8 px-4 py-12 md:py-20">
       <Lockup />

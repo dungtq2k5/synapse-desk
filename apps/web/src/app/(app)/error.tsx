@@ -1,14 +1,24 @@
 'use client';
 
 import { CircleAlertIcon } from 'lucide-react';
+import { useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { reportClientError } from '@/lib/client-errors';
 
 /**
  * A signed-in page whose server render failed for a reason other than an
- * expired session (a 5xx, a timeout). The shell stays; the page says so.
+ * expired session (a 5xx, a timeout). The shell stays; the page says so, and
+ * the error is reported.
  */
-export default function AppError({ reset }: { reset: () => void }) {
+export default function AppError({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  useEffect(() => reportClientError('boundary', error), [error]);
   return (
     <main id="main" className="p-4 md:p-6">
       <Alert variant="destructive">

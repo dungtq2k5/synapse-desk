@@ -12,6 +12,7 @@ import { invitationLink, markVerified } from './emailed';
 import { WEB_URL } from './ingress';
 import { databaseUrl } from './screens/tenant';
 import { api, clearThrottles, DEMO_PASSWORD, signIn } from './support';
+import { expectFocusOn, pressOn, typeInto } from './keyboard';
 
 /**
  * Settings end to end: each journey founds its own organization through the
@@ -160,6 +161,30 @@ test('invite two, one already a member: the preview flags it, one is sent and ac
   await expect(
     page.getByRole('link', { name: 'Omar Haddad' }).first(),
   ).toBeVisible();
+});
+
+test('by keyboard alone: invite a person', async ({ page }) => {
+  const org = await organization('invite-keyboard');
+  const nia = `nia@${org.domain}`;
+  await asAdmin(page, org);
+  await page.goto('/settings/people');
+
+  const invite = page.getByRole('button', { name: 'Invite people' });
+  await pressOn(page, invite);
+  await typeInto(page, page.getByLabel('Email addresses'), nia);
+  await page.keyboard.press('Enter');
+  await pressOn(page, page.getByRole('button', { name: 'Preview' }));
+  const dialog = page.getByRole('dialog', { name: 'Check before sending' });
+  await pressOn(
+    page,
+    dialog.getByRole('button', { name: /^Send 1 invitation/ }),
+  );
+  await pressOn(page, page.getByRole('button', { name: 'Done' }));
+
+  // Back where it started, and the invitation is out.
+  await expectFocusOn(invite);
+  await page.goto('/settings/people/invitations');
+  await expect(page.getByText(nia).first()).toBeVisible();
 });
 
 test('no seats: inviting, accepting and restoring at the limit', async ({

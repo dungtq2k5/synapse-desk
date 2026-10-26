@@ -73,22 +73,20 @@ export function eventCount(count: number, total: number): string {
 }
 
 /**
- * Why SynapseDesk turned it off, in words: the server's reason carries the
- * failure count.
+ * Why SynapseDesk turned it off, in words, from the endpoint's data: the
+ * failures in a row for `CONSECUTIVE_FAILURES`, else the reason as given.
  *
- * @example failedInARow('Auto-disabled after 10 consecutive failed deliveries') // 'Deliveries failed 10 times in a row.'
+ * @example whyOff({ disabledCode: 'CONSECUTIVE_FAILURES', consecutiveFailures: 10, disabledReason: '…' }) // 'Deliveries failed 10 times in a row.'
  */
-export function failedInARow(reason: string): string {
-  // The digits just before " consecutive", read without a pattern.
-  const end = reason.indexOf(' consecutive');
-  let start = end;
-  while (start > 0 && reason[start - 1] >= '0' && reason[start - 1] <= '9') {
-    start -= 1;
-  }
-  const count = end > start ? reason.slice(start, end) : '';
-  return count
-    ? `Deliveries failed ${count} times in a row.`
-    : asSentence(reason);
+export function whyOff(
+  endpoint: Pick<
+    WebhookEndpointResponseDto,
+    'disabledCode' | 'consecutiveFailures' | 'disabledReason'
+  >,
+): string {
+  return endpoint.disabledCode === 'CONSECUTIVE_FAILURES'
+    ? `Deliveries failed ${endpoint.consecutiveFailures} times in a row.`
+    : asSentence(endpoint.disabledReason ?? '');
 }
 
 /** Settings › Webhooks: each endpoint, its events and its status. */
@@ -209,11 +207,11 @@ function StatusCell({ endpoint }: { endpoint: WebhookEndpointResponseDto }) {
     <div className="flex flex-col items-start gap-1">
       <EndpointStatus
         isActive={endpoint.isActive}
-        disabledReason={endpoint.disabledReason}
+        disabledCode={endpoint.disabledCode}
       />
-      {!endpoint.isActive && endpoint.disabledReason && (
+      {!endpoint.isActive && endpoint.disabledCode && (
         <span className="text-xs text-warning-subtle-foreground">
-          {failedInARow(endpoint.disabledReason)}
+          {whyOff(endpoint)}
         </span>
       )}
     </div>

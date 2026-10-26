@@ -29,6 +29,7 @@ export const CONSTRAINTS = [
   'NumberString',
   'FutureDate',
   'StrictIso8601',
+  'CalendarDate',
   'Matches',
 ] as const;
 

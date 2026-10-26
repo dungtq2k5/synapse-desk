@@ -1,5 +1,6 @@
 import { expect, request as newRequest, test, type Page } from './coverage';
 import { WEB_URL } from './ingress';
+import { expectFocusVisible, pressOn, typeInto } from './keyboard';
 import {
   api,
   clearThrottles,
@@ -137,4 +138,54 @@ test('an organization that requires two-step: setting it up signs you in', async
   await verifyLater(page);
   await expect(page).toHaveURL(/\/tickets$/);
   await expect(page.getByLabel('Verification code')).toHaveCount(0);
+});
+
+test('by keyboard alone: a password, then the two-step code, then the app', async ({
+  page,
+}) => {
+  const email = `robin@${domain('keyboard')}`;
+  const session = await founder(email);
+  const { otpauthUri } = await api<{ otpauthUri: string }>(
+    session,
+    'POST',
+    '/auth/2fa/setup',
+  );
+  const secret = new URL(otpauthUri).searchParams.get('secret')!;
+  const enabledWith = totp(secret);
+  await api(session, 'POST', '/auth/2fa/enable', { code: enabledWith });
+  await session.dispose();
+
+  await page.goto('/login');
+  await typeInto(page, page.getByLabel('Email'), email);
+  await typeInto(
+    page,
+    page.getByLabel('Password', { exact: true }),
+    DEMO_PASSWORD,
+  );
+  await pressOn(page, page.getByRole('button', { name: 'Sign in' }));
+
+  // The code field takes focus, and shows it.
+  const code = page.getByLabel('Verification code');
+  await expect(code).toBeFocused();
+  await expectFocusVisible(page);
+  // A code is good once: wait for the next one after the code that enabled it.
+  await expect
+    .poll(() => totp(secret), { timeout: 35_000, intervals: [1_000] })
+    .not.toBe(enabledWith);
+  await page.keyboard.type(totp(secret));
+
+  await expect(
+    page.getByRole('heading', { name: 'Verify your email' }),
+  ).toBeVisible();
+  await pressOn(page, page.getByRole('button', { name: 'Verify later' }));
+  await expect(page).toHaveURL(/\/tickets$/);
+  // The first stop on a page is the skip link, and it goes to the content.
+  await page.reload();
+  await page.keyboard.press('Tab');
+  await expect(
+    page.getByRole('link', { name: 'Skip to content' }),
+  ).toBeFocused();
+  await expectFocusVisible(page);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main')).toBeFocused();
 });

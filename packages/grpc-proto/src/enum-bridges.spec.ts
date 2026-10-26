@@ -34,7 +34,10 @@ import {
   TicketSource,
   TicketStatus,
 } from '@synapsedesk/contracts';
-import { WebhookDeliveryStatus } from '@synapsedesk/nest-common';
+import {
+  WebhookDeliveryStatus,
+  WebhookDisabledCode,
+} from '@synapsedesk/nest-common';
 import { AnswerStatus as ProtoRagAnswerStatus } from './generated/synapsedesk/rag/rag';
 import { MessageAnswerStatus as ProtoMessageAnswerStatus } from './generated/synapsedesk/ticket/message';
 import {
@@ -97,6 +100,8 @@ import {
   toProtoDevicePlatform,
   toProtoWebhookDeliveryStatus,
   fromProtoWebhookDeliveryStatus,
+  toProtoWebhookDisabledCode,
+  fromProtoWebhookDisabledCode,
   fromProtoDevicePlatform,
   toProtoPreferenceSource,
   toProtoNotificationType,
@@ -339,6 +344,12 @@ describe('every enum bridge round-trips', () => {
       Object.values(WebhookDeliveryStatus),
       toProtoWebhookDeliveryStatus,
       fromProtoWebhookDeliveryStatus,
+    ],
+    [
+      'WebhookDisabledCode',
+      Object.values(WebhookDisabledCode),
+      toProtoWebhookDisabledCode,
+      fromProtoWebhookDisabledCode,
     ],
   ];
 

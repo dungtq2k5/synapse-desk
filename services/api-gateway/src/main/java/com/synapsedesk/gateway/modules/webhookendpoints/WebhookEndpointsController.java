@@ -448,7 +448,17 @@ public class WebhookEndpointsController {
       endpoint.hasDisabledReason() ? endpoint.getDisabledReason() : null,
       toOffsetDateTime(endpoint.getCreatedAt()),
       toOffsetDateTime(endpoint.getUpdatedAt())
-    );
+    )
+      // UNSPECIFIED (the tenant disabled it, or it is active) reads null.
+      .disabledCode(
+        WebhookEndpointResponseDto.DisabledCodeEnum.fromValue(
+          endpoint
+            .getDisabledCode()
+            .name()
+            .replace("WEBHOOK_DISABLED_CODE_", "")
+        )
+      )
+      .consecutiveFailures(endpoint.getConsecutiveFailures());
   }
 
   private static WebhookEndpointWithSecretResponseDto toWithSecretDto(

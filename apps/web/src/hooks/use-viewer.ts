@@ -20,6 +20,8 @@ export function useViewer() {
     hasPassword: query.data?.data?.hasPassword ?? true,
     /** A Super Admin, who runs the platform and belongs to no organization. */
     isSuperAdmin: query.data?.data?.isSuperAdmin ?? false,
+    /** Their organization's name, in every status; null for a Super Admin. */
+    organizationName: query.data?.data?.organizationName ?? null,
     /** The departments they belong to, by id. */
     departmentIds: query.data?.data?.departmentIds ?? [],
     can: (code: PermissionCode) => codes.includes(code),

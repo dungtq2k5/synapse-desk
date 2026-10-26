@@ -100,6 +100,45 @@ describe('Organizations (e2e)', () => {
     });
   });
 
+  describe('resolveTenantAuditNames', () => {
+    it("names the caller's own people, departments, roles, invitations, organization and plans — deleted ones too — and nothing from another tenant", async () => {
+      const a = await seedTenantWithUser(fx.prisma);
+      const b = await seedTenantWithUser(fx.prisma);
+      const department = await createDepartment(fx.prisma, a.org.id);
+      const invitation = await createInvitation(fx.prisma, a.org.id);
+      const role = await fx.prisma.role.findFirstOrThrow({
+        where: { organizationId: null },
+      });
+      const plan = await fx.prisma.subscriptionPlan.findFirstOrThrow();
+      await fx.prisma.user.update({
+        where: { id: a.user.id },
+        data: { deletedAt: new Date() },
+      });
+      const foreignDepartment = await createDepartment(fx.prisma, b.org.id);
+
+      const names = await organizations.resolveTenantAuditNames(
+        {
+          userIds: [a.user.id, b.user.id],
+          departmentIds: [department.id, foreignDepartment.id],
+          roleIds: [role.id],
+          invitationIds: [invitation.row.id],
+          organizationIds: [a.org.id, b.org.id],
+          planIds: [plan.id],
+        },
+        ctx(a),
+      );
+
+      expect(names).toEqual({
+        users: { [a.user.id]: a.user.fullName },
+        departments: { [department.id]: department.name },
+        roles: { [role.id]: role.name },
+        invitations: { [invitation.row.id]: invitation.row.email },
+        organizations: { [a.org.id]: a.org.name },
+        plans: { [plan.id]: plan.name },
+      });
+    });
+  });
+
   describe('updateOrganizationSettings', () => {
     it('3. enabling enforce_two_factor does not lock out an unenrolled admin', async () => {
       // The setting is written, and the account keeps working — the door out is

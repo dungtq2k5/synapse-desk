@@ -33,9 +33,18 @@ describe('safeNext', () => {
     ['', '/'],
     ['//evil.example/x', '/'],
     ['/\\evil.example', '/'],
+    ['\\/evil.example', '/'],
+    ['/%2F%2Fevil.example', '/'],
+    ['/%5Cevil.example', '/'],
     ['https://evil.example', '/'],
+    ['javascript:alert(1)', '/'],
+    ['/\t/evil.example', '/'],
+    ['/\n/evil.example', '/'],
+    ['/\r/evil.example', '/'],
+    [`/tickets/${'x'.repeat(2001)}`, '/'],
     ['tickets', '/'],
-  ])('%s → %s', (next, expected) => {
+    ['/tickets/42#reply', '/tickets/42#reply'],
+  ])('%j → %s', (next, expected) => {
     expect(safeNext(next)).toBe(expected);
   });
 });

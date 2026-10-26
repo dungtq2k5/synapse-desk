@@ -68,6 +68,8 @@ const KINDS: Record<Kind, Sample> = {
     invalid: '2000-01-01T00:00:00.000Z',
   },
   StrictIso8601: { valid: ISO_VALID, invalid: 'not-a-date' },
+  // A day that does not exist: the shape is right, so only existence is broken.
+  CalendarDate: { valid: '2026-01-31', invalid: '2026-02-30' },
   OffsetDateTime: { valid: ISO_VALID, invalid: 'not-a-date' },
   Matches: { valid: '', invalid: '' },
 };
@@ -106,6 +108,7 @@ const PUBLISHED: Record<
 > = {
   Matches: (p) => typeof p.pattern === 'string',
   StrictIso8601: (p) => typeof p.pattern === 'string',
+  CalendarDate: (p) => typeof p.pattern === 'string',
   NumberString: (p) => typeof p.pattern === 'string',
   StrongPassword: (p) => typeof p.pattern === 'string',
   OffsetDateTime: (p) => p.format === 'date-time',
@@ -195,6 +198,7 @@ const MOST_RESTRICTIVE: Kind[] = [
   'ValidPhoneNumber',
   'NumberString',
   'Matches',
+  'CalendarDate',
   'StrictIso8601',
   'OffsetDateTime',
 ];
@@ -245,13 +249,13 @@ const document = JSON.parse(
 ) as { components: { schemas: Record<string, Schema> } };
 
 describe('the constraints the Java sources declare', () => {
-  it('include at least the 25 request fields measured when this was written, across all 7 kinds', () => {
+  it('include at least the 25 request fields measured when this was written, across all 8 kinds', () => {
     // A result of 19 is a finding about the scan, not a tidier number.
     const fields = new Set(constraints.map((c) => `${c.schema}.${c.property}`));
     const kinds = new Set(constraints.map((c) => c.kind));
 
     expect(fields.size).toBeGreaterThanOrEqual(25);
-    expect(kinds.size).toBe(7);
+    expect(kinds.size).toBe(8);
   });
 
   it('are each PUBLISHED: a pattern, a date-time format, or the fixed sentence', () => {

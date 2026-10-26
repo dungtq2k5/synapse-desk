@@ -28,7 +28,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
@@ -49,6 +52,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
+import synapsedesk.auth.Organization.ResolveTenantAuditNamesRequest;
+import synapsedesk.auth.Organization.ResolveTenantAuditNamesResponse;
+import synapsedesk.auth.OrganizationServiceGrpc;
 import synapsedesk.ticket.Analytics.CreateExportRequest;
 import synapsedesk.ticket.Analytics.ExportResponse;
 import synapsedesk.ticket.Analytics.GetExportRequest;
@@ -94,17 +100,20 @@ public class AuditLogsController {
 
   private final AuditServiceGrpc.AuditServiceBlockingStub stub;
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics;
+  private final OrganizationServiceGrpc.OrganizationServiceBlockingStub organizations;
   private final CurrentUser currentUser;
   private final ObjectMapper json;
 
   public AuditLogsController(
     AuditServiceGrpc.AuditServiceBlockingStub stub,
     AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
+    OrganizationServiceGrpc.OrganizationServiceBlockingStub organizations,
     CurrentUser currentUser,
     ObjectMapper json
   ) {
     this.stub = stub;
     this.analytics = analytics;
+    this.organizations = organizations;
     this.currentUser = currentUser;
     this.json = json;
   }
@@ -179,16 +188,114 @@ public class AuditLogsController {
       )
     );
 
+    List<AuditLogResponseDto> items = response
+      .getItemsList()
+      .stream()
+      .map(log -> toAuditLogResponseDto(log, json))
+      .toList();
+    name(items, context);
+
     PagedData<AuditLogResponseDto> data = new PagedData<>(
-      response
-        .getItemsList()
-        .stream()
-        .map(log -> toAuditLogResponseDto(log, json))
-        .toList(),
+      items,
       PageMeta.from(response.getMeta())
     );
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
+  }
+
+  /**
+   * Names each entry's actor and resource through the tenant-scoped read: the
+   * auth-owned types only (user, department, role, invitation by address,
+   * organization, plan). Names are a courtesy: when the read fails, the page
+   * still answers, with ids.
+   */
+  private void name(List<AuditLogResponseDto> items, RequestContext context) {
+    ResolveTenantAuditNamesRequest request =
+      ResolveTenantAuditNamesRequest.newBuilder()
+        .addAllUserIds(
+          new LinkedHashSet<>(
+            items
+              .stream()
+              .map(AuditLogResponseDto::getUserId)
+              .filter(Objects::nonNull)
+              .toList()
+          )
+        )
+        .addAllDepartmentIds(
+          resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.DEPARTMENT)
+        )
+        .addAllRoleIds(
+          resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.ROLE)
+        )
+        .addAllInvitationIds(
+          resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.INVITATION)
+        )
+        .addAllOrganizationIds(
+          resourceIds(items, AuditLogResponseDto.ResourceTypeEnum.ORGANIZATION)
+        )
+        .addAllPlanIds(
+          resourceIds(
+            items,
+            AuditLogResponseDto.ResourceTypeEnum.SUBSCRIPTION_PLAN
+          )
+        )
+        .build();
+
+    ResolveTenantAuditNamesResponse names;
+    try {
+      names = organizations
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+        )
+        .resolveTenantAuditNames(request);
+    } catch (RuntimeException unavailable) {
+      LOG.warn("Audit names unavailable: {}", unavailable.getMessage());
+      return;
+    }
+
+    Map<AuditLogResponseDto.ResourceTypeEnum, Map<String, String>> byType =
+      Map.of(
+        AuditLogResponseDto.ResourceTypeEnum.DEPARTMENT,
+        names.getDepartmentsMap(),
+        AuditLogResponseDto.ResourceTypeEnum.ROLE,
+        names.getRolesMap(),
+        AuditLogResponseDto.ResourceTypeEnum.INVITATION,
+        names.getInvitationsMap(),
+        AuditLogResponseDto.ResourceTypeEnum.ORGANIZATION,
+        names.getOrganizationsMap(),
+        AuditLogResponseDto.ResourceTypeEnum.SUBSCRIPTION_PLAN,
+        names.getPlansMap()
+      );
+
+    for (AuditLogResponseDto entry : items) {
+      if (entry.getUserId() != null) {
+        entry.setActorName(names.getUsersMap().get(entry.getUserId()));
+      }
+      Map<String, String> ofType =
+        entry.getResourceType() == null
+          ? null
+          : byType.get(entry.getResourceType());
+      if (ofType != null && entry.getResourceId() != null) {
+        entry.setResourceName(ofType.get(entry.getResourceId()));
+      }
+    }
+  }
+
+  private static List<String> resourceIds(
+    List<AuditLogResponseDto> items,
+    AuditLogResponseDto.ResourceTypeEnum type
+  ) {
+    return new LinkedHashSet<>(
+      items
+        .stream()
+        .filter(entry -> entry.getResourceType() == type)
+        .map(AuditLogResponseDto::getResourceId)
+        .filter(Objects::nonNull)
+        .toList()
+    )
+      .stream()
+      .toList();
   }
 
   @GetMapping(value = "/audit-logs/actions", produces = { "application/json" })

@@ -726,6 +726,9 @@
     },
     "DELETE /api/v1/platform/organizations/{id}/plan": {
       "summary": "Release an assigned plan (or dry-run it)"
+    },
+    "POST /api/v1/client-errors": {
+      "summary": "Report a browser error"
     }
   },
   "parameters": {
@@ -1673,6 +1676,30 @@
     },
     "ReleasePlanDto.reason": {
       "description": "Recorded in the audit log, with who released it. Required to release; a\ndry run may leave it out."
+    },
+    "AuditLogResponseDto.actorName": {
+      "description": "Who acted, by name; null when no one did, or when it can't be read."
+    },
+    "AuditLogResponseDto.resourceName": {
+      "description": "What was acted on, by name (an invitation by its address); null for a type the log doesn't name, or when it can't be read."
+    },
+    "CurrentUserResponseDto.organizationName": {
+      "description": "The caller's organization's name, answered in every status: the frozen\npage names it. Null for a Super Admin."
+    },
+    "WebhookEndpointResponseDto.disabledCode": {
+      "description": "`disabledReason` as data. NULL exactly when the reason is."
+    },
+    "WebhookEndpointResponseDto.consecutiveFailures": {
+      "description": "Terminal failures in a row, reset by any delivered event."
+    },
+    "ReportClientErrorDto.stack": {
+      "description": "Kept truncated."
+    },
+    "ReportClientErrorDto.path": {
+      "description": "The page's path; its query and fragment are dropped before logging."
+    },
+    "ReportClientErrorDto.buildId": {
+      "description": "The web build that reported it (`GIT_SHA`)."
     }
   }
 }

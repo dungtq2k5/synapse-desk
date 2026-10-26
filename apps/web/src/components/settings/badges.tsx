@@ -187,13 +187,13 @@ export function InvitationStatus({ status }: { status: string | null }) {
   }
 }
 
-/** A webhook endpoint: on, turned off by the system, or turned off. */
+/** A webhook endpoint: on, turned off by the system (a `disabledCode`), or turned off. */
 export function EndpointStatus({
   isActive,
-  disabledReason,
+  disabledCode,
 }: {
   isActive: boolean;
-  disabledReason: string | null;
+  disabledCode: string | null;
 }) {
   if (isActive) {
     return (
@@ -202,7 +202,7 @@ export function EndpointStatus({
       </Status>
     );
   }
-  return disabledReason ? (
+  return disabledCode ? (
     <Status tone="warning" icon={TriangleAlertIcon}>
       Turned off by SynapseDesk
     </Status>

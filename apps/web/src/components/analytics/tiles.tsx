@@ -97,10 +97,23 @@ function Change({ line }: { line: string }) {
   );
 }
 
-/** Tiles that are loading: skeletons in their shape, said once by the page. */
-export function TileSkeletons({ count }: { count: number }) {
+/**
+ * Tiles that are loading: skeletons in their shape, said once by the page.
+ * `className` is the tiles' own grid (as `StatTiles` takes it), so the page
+ * doesn't move when they arrive.
+ */
+export function TileSkeletons({
+  count,
+  className,
+}: {
+  count: number;
+  className?: string;
+}) {
   return (
-    <div aria-hidden className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div
+      aria-hidden
+      className={cn('grid grid-cols-2 gap-3 lg:grid-cols-4', className)}
+    >
       {Array.from({ length: count }, (_, index) => (
         <div key={index} className="space-y-3 rounded-xl border bg-card p-4">
           <Skeleton className="h-4 w-24" />

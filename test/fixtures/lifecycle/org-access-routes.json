@@ -54,6 +54,7 @@
   ["POST", "/api/v1/chat/conversations/{id}/escalate", "WRITE", true, false],
   ["GET", "/api/v1/chat/conversations/{id}/messages", "READ", true, false],
   ["POST", "/api/v1/chat/conversations/{id}/messages", "WRITE", true, false],
+  ["POST", "/api/v1/client-errors", "AUTH", false, false],
   ["GET", "/api/v1/departments", "READ", true, false],
   ["POST", "/api/v1/departments", "WRITE", true, false],
   ["DELETE", "/api/v1/departments/{id}", "WRITE", true, false],

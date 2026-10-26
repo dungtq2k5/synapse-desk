@@ -101,6 +101,15 @@ public class GatewayMetrics {
       .increment();
   }
 
+  /** A browser error reported to `POST /client-errors`, by kind. */
+  public void clientError(String kind) {
+    Counter.builder(PublishedSeries.CLIENT_ERRORS)
+      .description("Browser errors reported by the web, by kind.")
+      .tag("kind", kind)
+      .register(registry)
+      .increment();
+  }
+
   /** One scheduled job's last success: who owns it, and when, as a Unix timestamp. */
   public record JobSuccess(
     String scheduledJob,

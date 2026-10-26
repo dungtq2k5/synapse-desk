@@ -52,7 +52,14 @@ export default defineConfig({
     // The journeys: this machine's Chromium.
     {
       name: 'chromium',
-      testIgnore: 'screens/**',
+      testIgnore: ['screens/**', 'vitals/**'],
+      use: { browserName: 'chromium' },
+    },
+    // Core Web Vitals, reported (not gated): on the plain build only, so CI
+    // runs this project in a job of its own (the suite's build has coverage).
+    {
+      name: 'vitals',
+      testMatch: 'vitals/**/*.e2e-spec.ts',
       use: { browserName: 'chromium' },
     },
     // Every state, its look and its accessibility: the browser in the

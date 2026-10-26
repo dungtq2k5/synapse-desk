@@ -540,6 +540,23 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       }
     });
 
+    it('1b. signs text as a download, and an image as itself', async () => {
+      // Text could render as a page; on the storage origin, but still a page.
+      const text = `organizations/${organizationId}/attachments/${userId}/notes.txt`;
+      await putBytes(text, 'text/plain', 'hello');
+      const image = await seedObject();
+
+      const { urlsByPath } = await storage.getSignedReadUrls(
+        { objectPaths: [text, image] },
+        caller(),
+      );
+
+      expect([
+        urlsByPath[text].includes('response-content-disposition=attachment'),
+        urlsByPath[image].includes('response-content-disposition'),
+      ]).toEqual([true, false]);
+    });
+
     it('2. OMITS a missing path rather than failing the batch', async () => {
       // Partial success. One deleted file must not blank a whole page, and the
       // caller decides how to render a missing avatar.

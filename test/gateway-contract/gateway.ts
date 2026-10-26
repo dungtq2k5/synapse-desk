@@ -41,6 +41,8 @@ export type Gateway = {
    */
   wsUrl: string;
   metricsUrl: string;
+  /** Everything the gateway has printed so far, stdout and stderr. */
+  output: () => string;
   stop: () => Promise<void>;
 };
 
@@ -264,6 +266,7 @@ export async function startGateway(
       baseUrl,
       wsUrl: `http://127.0.0.1:${wsPort}`,
       metricsUrl: `http://127.0.0.1:${metricsPort}`,
+      output: () => output.join(''),
       stop: () => stop(child),
     };
 

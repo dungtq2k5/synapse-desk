@@ -53,6 +53,9 @@ const EVENTS: [string, string][] = [
  * mix and the billing events. Three reads, each failing on its own part; the
  * page is an error only when none of them answered.
  */
+/** The overview's six tiles: one column on a phone, three on a desktop. */
+const TILE_GRID = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+
 export function OverviewView() {
   const metrics = usePlatformControllerGetMetricsV1({
     query: { retry: false },
@@ -105,12 +108,9 @@ export function OverviewView() {
               onRetry={() => void metrics.refetch()}
             />
           ) : m && (f || finance.isError) ? (
-            <StatTiles
-              tiles={tiles(m, f ?? null)}
-              className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-            />
+            <StatTiles tiles={tiles(m, f ?? null)} className={TILE_GRID} />
           ) : (
-            <TileSkeletons count={6} />
+            <TileSkeletons count={6} className={TILE_GRID} />
           )}
           <div className="grid gap-6 lg:grid-cols-2">
             <NeedsAttention

@@ -12,6 +12,7 @@ export type Picked = { id: string; fullName: string };
  * Several people, found by typing: chips, each with its own remove button, and
  * a list of matches under the field. Arrow keys move through the matches and
  * Enter picks one. At `max` chosen the field stops offering more.
+ * `includeDeleted` also finds people who have left (an audit log's actors).
  *
  * @example <PeoplePicker id="holders" value={picked} onChange={setPicked} exclude={held} />
  */
@@ -21,6 +22,8 @@ export function PeoplePicker({
   onChange,
   exclude = [],
   max = 50,
+  label = 'People',
+  includeDeleted = false,
 }: {
   id: string;
   value: Picked[];
@@ -28,6 +31,8 @@ export function PeoplePicker({
   /** Ids not to offer: people already in. */
   exclude?: readonly string[];
   max?: number;
+  label?: string;
+  includeDeleted?: boolean;
 }) {
   const [text, setText] = useState('');
   const [search, setSearch] = useState('');
@@ -43,6 +48,7 @@ export function PeoplePicker({
   const found = useUserAdminControllerListV1(
     {
       searchTerm: search || undefined,
+      ...(includeDeleted ? { includeDeleted: true } : {}),
       limit: 8,
       sortBy: 'fullName',
       sortOrder: 'ASC',
@@ -88,8 +94,10 @@ export function PeoplePicker({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label htmlFor={id}>People</Label>
-        <span className="text-xs text-muted-foreground">Up to {max}</span>
+        <Label htmlFor={id}>{label}</Label>
+        {max > 1 && (
+          <span className="text-xs text-muted-foreground">Up to {max}</span>
+        )}
       </div>
       <div className="relative">
         <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-input px-2 py-1.5 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
@@ -140,7 +148,7 @@ export function PeoplePicker({
           <ul
             id={listId}
             role="listbox"
-            aria-label="People"
+            aria-label={label}
             className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
             {matches.map((user, index) => (

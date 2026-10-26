@@ -115,7 +115,10 @@ describe('the app shell', () => {
       'data-active',
       'true',
     );
-    expect(screen.getByRole('main')).toHaveTextContent('The page');
+    expect(screen.getByText('The page')).toBeInTheDocument();
+    // The page brings its own `main`; the shell adds none, or every page
+    // would have two.
+    expect(screen.queryByRole('main')).not.toBeInTheDocument();
   });
 
   it('gives an agent Tickets, Knowledge and Ask, and marks none elsewhere', async () => {

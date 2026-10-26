@@ -64,6 +64,10 @@ COPY --from=prune /app/docs/reference/openapi.json ./docs/reference/
 COPY --from=prune /app/tsconfig.json ./
 # `...` builds the app and the packages it depends on, generation first, with
 # the turbo `npm ci` installed from the lockfile.
+# The commit the browser reports its errors under (`NEXT_PUBLIC_BUILD_ID`,
+# inlined at build time by next.config.ts).
+ARG GIT_SHA
+ENV GIT_SHA=${GIT_SHA}
 RUN ./node_modules/.bin/turbo run build --filter="@synapsedesk/web..."
 
 # --------------------------------------------------------------- runtime

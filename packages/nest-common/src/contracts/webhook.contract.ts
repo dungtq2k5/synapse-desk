@@ -185,3 +185,13 @@ export const MAX_WEBHOOK_DESCRIPTION_LENGTH = 500;
  * one place they cannot.
  */
 export const WEBHOOK_DELIVERY_LIMIT = { DEFAULT: 50, MAX: 100 } as const;
+
+/**
+ * Why WE disabled an endpoint, as data beside `disabledReason`'s sentence.
+ * Persisted on `webhook_endpoints.disabled_code`; null when the tenant
+ * disabled it themselves.
+ */
+export enum WebhookDisabledCode {
+  /** `WEBHOOK_DISABLE_AFTER_FAILURES` deliveries in a row failed. */
+  CONSECUTIVE_FAILURES = 'CONSECUTIVE_FAILURES',
+}

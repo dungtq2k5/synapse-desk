@@ -5,5 +5,6 @@
   "websocket_connections": [],
   "websocket_events_total": ["event"],
   "inbound_email_webhook_total": ["outcome"],
+  "client_errors_total": ["kind"],
   "job_last_success_timestamp_seconds": ["owner_service", "scheduled_job"]
 }

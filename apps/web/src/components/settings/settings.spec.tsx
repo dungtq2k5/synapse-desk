@@ -16,11 +16,7 @@ import {
 import { RoleView } from './roles/role-view';
 import { escalationRefusal } from './roles/roles-view';
 import { meterLevel } from './usage-meter';
-import {
-  EndpointDialog,
-  eventCount,
-  failedInARow,
-} from './webhooks/webhooks-view';
+import { EndpointDialog, eventCount, whyOff } from './webhooks/webhooks-view';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }),
@@ -65,20 +61,22 @@ const viewer = (codes: string[]) => ({
 });
 
 describe('the words', () => {
-  it('reads a disabled endpoint’s failure count', () => {
+  it('says why an endpoint is off from its data, never from the sentence', () => {
     expect(
-      failedInARow('Auto-disabled after 10 consecutive failed deliveries'),
+      whyOff({
+        disabledCode: 'CONSECUTIVE_FAILURES',
+        consecutiveFailures: 10,
+        // The count comes from the data even when the sentence says another.
+        disabledReason: 'Auto-disabled after 3 consecutive failed deliveries',
+      }),
     ).toBe('Deliveries failed 10 times in a row.');
-    expect(failedInARow('Turned off by hand!')).toBe('Turned off by hand.');
-    expect(failedInARow('3 consecutive failures')).toBe(
-      'Deliveries failed 3 times in a row.',
-    );
-    expect(failedInARow('Many consecutive failures!')).toBe(
-      'Many consecutive failures.',
-    );
-    expect(failedInARow(`${'9'.repeat(50_000)}!`)).toBe(
-      `${'9'.repeat(50_000)}.`,
-    );
+    expect(
+      whyOff({
+        disabledCode: null,
+        consecutiveFailures: 0,
+        disabledReason: 'Turned off by hand!',
+      }),
+    ).toBe('Turned off by hand.');
   });
 
   it('counts events, all of them by name', () => {

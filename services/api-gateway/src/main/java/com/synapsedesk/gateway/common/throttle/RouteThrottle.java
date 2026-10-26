@@ -42,6 +42,10 @@ public final class RouteThrottle {
   public static final long TWO_FACTOR_AUTHENTICATE_TTL_MS = 15 * 60_000;
   public static final int TWO_FACTOR_AUTHENTICATE_LIMIT = 10;
 
+  /** Browser error reports, per address: a looping error must not flood the log. */
+  public static final long CLIENT_ERRORS_TTL_MS = 60_000;
+  public static final int CLIENT_ERRORS_LIMIT = 10;
+
   /** Token guessing here discloses the customer list. */
   public static final long INVITATION_PREVIEW_TTL_MS = 60 * 60_000;
   public static final int INVITATION_PREVIEW_LIMIT = 20;

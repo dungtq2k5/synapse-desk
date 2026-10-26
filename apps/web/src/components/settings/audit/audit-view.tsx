@@ -11,6 +11,7 @@ import {
 } from '@synapsedesk/api-client';
 import {
   CalendarIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   CircleCheckIcon,
   CircleXIcon,
@@ -26,10 +27,13 @@ import {
   Empty,
   FilterSelect,
   Pagination,
-  useDepartmentNames,
 } from '@/components/documents/parts';
 import { UserAvatar } from '@/components/shell/user-avatar';
-import { usePeople } from '@/components/ticket/use-directory';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +57,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SELECT_TRIGGER,
 } from '@/components/ui/select';
 import {
   Sheet,
@@ -72,9 +77,11 @@ import { useViewer } from '@/hooks/use-viewer';
 import { RESOURCE_TYPE_WORDS, auditActionWords } from '@/lib/administration';
 import { dayDate, logTime } from '@/lib/format';
 import { useStoredExport } from '@/lib/stored-export';
+import { cn } from '@/lib/utils';
 import { announce } from '@/lib/toast';
 import { refusalText } from '../people/person-dialogs';
-import { useOrganizationName, useRoles } from '../people/shared';
+import { PeoplePicker, type Picked } from '../people-picker';
+import { useOrganizationName } from '../people/shared';
 import {
   LoadError,
   Loading,
@@ -129,11 +136,11 @@ type Filters = {
 /** The filters in words, for the export's line: "Action: Locked a person". */
 function filterWords(
   filters: Filters,
-  people: ReadonlyMap<string, string>,
+  personName: string | undefined,
 ): string[] {
   return [
     filters.action && `Action: ${auditActionWords(filters.action)}`,
-    filters.userId && `Person: ${people.get(filters.userId) ?? 'Someone'}`,
+    filters.userId && `Person: ${personName ?? 'Someone'}`,
     filters.resourceType &&
       `Resource type: ${RESOURCE_TYPE_WORDS[filters.resourceType]}`,
   ].filter((word): word is string => Boolean(word));
@@ -146,7 +153,8 @@ type Requested = { id: string; from: string; to: string; filters: string[] };
 export function AuditView() {
   const { can, query: viewer } = useViewer();
   const organization = useOrganizationName();
-  const { names: people } = usePeople();
+  // The person filter's pick, found by search (people who have left too).
+  const [person, setPerson] = useState<Picked | null>(null);
   const actions = useAuditLogsControllerListActionsV1({
     query: { enabled: can('audit.read'), staleTime: 300_000 },
   });
@@ -188,6 +196,7 @@ export function AuditView() {
     range !== 'month';
   const clear = () => {
     change({});
+    setPerson(null);
     setRange('month');
   };
   const data = list.data?.data;
@@ -233,13 +242,12 @@ export function AuditView() {
             })
           }
         />
-        <FilterSelect
-          label="Person"
-          value={filters.userId}
-          options={Object.fromEntries(people)}
-          onValue={(value) =>
-            change({ ...filters, userId: value === ALL ? undefined : value })
-          }
+        <PersonFilter
+          value={person}
+          onChange={(next) => {
+            setPerson(next);
+            change({ ...filters, userId: next?.id });
+          }}
         />
         <FilterSelect
           label="Resource type"
@@ -296,19 +304,19 @@ export function AuditView() {
         />
       ) : (
         <>
-          <Entries items={data.items} people={people} onOpen={setOpen} />
+          <Entries items={data.items} onOpen={setOpen} />
           {data.meta.totalPages > 1 && (
             <Pagination meta={data.meta} onPage={setPage} noun="entries" />
           )}
         </>
       )}
-      <EntrySheet entry={open} people={people} onClose={() => setOpen(null)} />
+      <EntrySheet entry={open} onClose={() => setOpen(null)} />
       <ExportDialog
         open={exporting}
         onOpenChange={setExporting}
         filters={filters}
         range={bounds}
-        people={people}
+        personName={person?.fullName}
         onRequested={(next) => {
           setRequested(next);
           announce('Preparing your export');
@@ -318,37 +326,75 @@ export function AuditView() {
   );
 }
 
-/** A resource as "{type} · {name}", the name when this page can find it. */
-function useResourceName() {
-  const departments = useDepartmentNames();
-  const { names: roles } = useRoles();
-  const { names: people } = usePeople();
-  return (entry: AuditLogResponseDto): string => {
-    if (!entry.resourceType) return '—';
-    const type = RESOURCE_TYPE_WORDS[entry.resourceType];
-    const metadata = (entry.metadata ?? {}) as Record<string, unknown>;
-    const id = entry.resourceId ?? '';
-    const name =
-      (entry.resourceType === 'USER' && people.get(id)) ||
-      (entry.resourceType === 'DEPARTMENT' && departments.get(id)) ||
-      (entry.resourceType === 'ROLE' && roles.get(id)) ||
-      ['name', 'email', 'url', 'fileName']
-        .map((key) => metadata[key])
-        .find((value): value is string => typeof value === 'string');
-    return name ? `${type} · ${name}` : type;
-  };
+/**
+ * The Person filter: anyone in the organization, people who have left
+ * included, found by typing rather than listed (an organization can have more
+ * than a page of them). Picking one filters; removing the chip clears it.
+ */
+function PersonFilter({
+  value,
+  onChange,
+}: {
+  value: Picked | null;
+  onChange: (value: Picked | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        data-size="default"
+        className={cn(SELECT_TRIGGER, 'w-auto min-w-37 gap-2')}
+      >
+        {value ? (
+          <span className="flex gap-1">
+            <span className="text-muted-foreground">Person:</span>
+            {value.fullName}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Person</span>
+        )}
+        <ChevronDownIcon aria-hidden className="size-4 opacity-50" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 shadow-md">
+        <PeoplePicker
+          id="audit-person"
+          label="Person"
+          max={1}
+          includeDeleted
+          value={value ? [value] : []}
+          onChange={(picked) => {
+            onChange(picked[0] ?? null);
+            if (picked.length > 0) setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
-function Who({
-  entry,
-  people,
-}: {
-  entry: AuditLogResponseDto;
-  people: ReadonlyMap<string, string>;
-}) {
-  const name = entry.userId
-    ? (people.get(entry.userId) ?? 'Someone')
-    : 'SynapseDesk';
+/**
+ * A resource as "{type} · {name}": the name the log answers (`resourceName`),
+ * else one the entry's own details carry.
+ */
+function resourceWords(entry: AuditLogResponseDto): string {
+  if (!entry.resourceType) return '—';
+  const type = RESOURCE_TYPE_WORDS[entry.resourceType];
+  const metadata = (entry.metadata ?? {}) as Record<string, unknown>;
+  const name =
+    entry.resourceName ??
+    ['name', 'email', 'url', 'fileName']
+      .map((key) => metadata[key])
+      .find((value): value is string => typeof value === 'string');
+  return name ? `${type} · ${name}` : type;
+}
+
+/** Who acted: the name the log answers, "Someone" when it has none. */
+function actorWords(entry: AuditLogResponseDto): string {
+  return entry.userId ? (entry.actorName ?? 'Someone') : 'SynapseDesk';
+}
+
+function Who({ entry }: { entry: AuditLogResponseDto }) {
+  const name = actorWords(entry);
   return (
     <span className="flex items-center gap-2">
       <UserAvatar name={name} className="size-6 text-[10px]" />
@@ -359,14 +405,12 @@ function Who({
 
 function Entries({
   items,
-  people,
   onOpen,
 }: {
   items: AuditLogResponseDto[];
-  people: ReadonlyMap<string, string>;
   onOpen: (entry: AuditLogResponseDto) => void;
 }) {
-  const resource = useResourceName();
+  const resource = resourceWords;
   const action = (entry: AuditLogResponseDto) => (
     <button
       type="button"
@@ -398,7 +442,7 @@ function Entries({
                   </time>
                 </TableCell>
                 <TableCell>
-                  <Who entry={entry} people={people} />
+                  <Who entry={entry} />
                 </TableCell>
                 <TableCell className="max-w-56 whitespace-normal">
                   {action(entry)}
@@ -423,7 +467,7 @@ function Entries({
             {action(entry)}
             <span className="text-muted-foreground">{resource(entry)}</span>
             <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
-              <Who entry={entry} people={people} /> ·{' '}
+              <Who entry={entry} /> ·{' '}
               <time dateTime={entry.createdAt}>{logTime(entry.createdAt)}</time>
             </span>
           </li>
@@ -484,14 +528,12 @@ export function changes(
 
 function EntrySheet({
   entry,
-  people,
   onClose,
 }: {
   entry: AuditLogResponseDto | null;
-  people: ReadonlyMap<string, string>;
   onClose: () => void;
 }) {
-  const resource = useResourceName();
+  const resource = resourceWords;
   const rows = entry ? changes(entry.metadata) : [];
   return (
     <Sheet open={entry !== null} onOpenChange={(next) => !next && onClose()}>
@@ -513,11 +555,7 @@ function EntrySheet({
                   })}
                 </dd>
                 <dt className="text-muted-foreground">Who</dt>
-                <dd>
-                  {entry.userId
-                    ? (people.get(entry.userId) ?? 'Someone')
-                    : 'SynapseDesk'}
-                </dd>
+                <dd>{actorWords(entry)}</dd>
                 <dt className="text-muted-foreground">Action</dt>
                 <dd>{entry.action ? auditActionWords(entry.action) : '—'}</dd>
                 <dt className="text-muted-foreground">Code</dt>
@@ -527,7 +565,7 @@ function EntrySheet({
                 <dt className="text-muted-foreground">IP address</dt>
                 <dd className="font-mono text-xs">{entry.ipAddress ?? '—'}</dd>
                 <dt className="text-muted-foreground">Browser</dt>
-                <dd className="break-words">{entry.userAgent ?? '—'}</dd>
+                <dd className="wrap-break-word">{entry.userAgent ?? '—'}</dd>
               </dl>
               {rows.length > 0 && (
                 <section className="flex flex-col gap-2">
@@ -548,7 +586,7 @@ function EntrySheet({
                             <TableCell className="whitespace-normal">
                               {row.before}
                             </TableCell>
-                            <TableCell className="whitespace-normal break-words">
+                            <TableCell className="whitespace-normal wrap-break-word">
                               {row.after}
                             </TableCell>
                           </TableRow>
@@ -588,14 +626,14 @@ function ExportDialog({
   onOpenChange,
   filters,
   range,
-  people,
+  personName,
   onRequested,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   filters: Filters;
   range: { from: Date; to: Date };
-  people: ReadonlyMap<string, string>;
+  personName: string | undefined;
   onRequested: (requested: Requested) => void;
 }) {
   const [from, setFrom] = useState('');
@@ -620,7 +658,7 @@ function ExportDialog({
         id: created.data.id,
         from: `${from}T00:00:00`,
         to: `${to}T00:00:00`,
-        filters: filterWords(kept, people),
+        filters: filterWords(kept, personName),
       });
       onOpenChange(false);
     } catch (failure) {
@@ -636,7 +674,7 @@ function ExportDialog({
     .filter((key) => kept[key] !== undefined)
     .map((key) => ({
       key,
-      text: filterWords({ [key]: kept[key] }, people)[0],
+      text: filterWords({ [key]: kept[key] }, personName)[0],
     }));
 
   // Each opening starts afresh: a controlled dialog's onOpenChange

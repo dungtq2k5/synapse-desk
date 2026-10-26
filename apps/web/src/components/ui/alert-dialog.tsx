@@ -4,6 +4,7 @@ import * as React from 'react';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useReturnFocus } from './return-focus';
 
 function AlertDialog(
   props: React.ComponentProps<typeof AlertDialogPrimitive.Root>,
@@ -27,6 +28,7 @@ function AlertDialogContent({
   className,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
+  const returnFocus = useReturnFocus(props.onCloseAutoFocus);
   return (
     <AlertDialogPrimitive.Portal>
       <AlertDialogPrimitive.Overlay
@@ -41,6 +43,7 @@ function AlertDialogContent({
           className,
         )}
         {...props}
+        {...returnFocus}
       />
     </AlertDialogPrimitive.Portal>
   );

@@ -474,6 +474,61 @@ export interface RevokeInboundTokenRequest {
 export interface RevokeInboundTokenResponse {
 }
 
+/**
+ * Names for the tenant audit log's ids, all in the caller's organization:
+ * the people who acted, and the departments, roles, invitations (by address),
+ * organization and plans acted on. Deleted rows are named too: the log
+ * outlives what it names. An id with no row, or outside the caller's
+ * organization, is left out.
+ */
+export interface ResolveTenantAuditNamesRequest {
+  userIds: string[];
+  departmentIds: string[];
+  roleIds: string[];
+  invitationIds: string[];
+  organizationIds: string[];
+  planIds: string[];
+}
+
+export interface ResolveTenantAuditNamesResponse {
+  users: { [key: string]: string };
+  departments: { [key: string]: string };
+  roles: { [key: string]: string };
+  invitations: { [key: string]: string };
+  organizations: { [key: string]: string };
+  plans: { [key: string]: string };
+}
+
+export interface ResolveTenantAuditNamesResponse_UsersEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveTenantAuditNamesResponse_DepartmentsEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveTenantAuditNamesResponse_RolesEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveTenantAuditNamesResponse_InvitationsEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveTenantAuditNamesResponse_OrganizationsEntry {
+  key: string;
+  value: string;
+}
+
+export interface ResolveTenantAuditNamesResponse_PlansEntry {
+  key: string;
+  value: string;
+}
+
 export interface OrganizationServiceClient {
   getInboundToken(request: GetInboundTokenRequest, metadata?: Metadata): Observable<GetInboundTokenResponse>;
 
@@ -542,6 +597,11 @@ export interface OrganizationServiceClient {
   completeOnboarding(request: CompleteOnboardingRequest, metadata?: Metadata): Observable<OrganizationResponse>;
 
   deleteOrganization(request: DeleteOrganizationRequest, metadata?: Metadata): Observable<DeleteOrganizationResponse>;
+
+  resolveTenantAuditNames(
+    request: ResolveTenantAuditNamesRequest,
+    metadata?: Metadata,
+  ): Observable<ResolveTenantAuditNamesResponse>;
 }
 
 export interface OrganizationServiceController {
@@ -648,6 +708,14 @@ export interface OrganizationServiceController {
     request: DeleteOrganizationRequest,
     metadata?: Metadata,
   ): Promise<DeleteOrganizationResponse> | Observable<DeleteOrganizationResponse> | DeleteOrganizationResponse;
+
+  resolveTenantAuditNames(
+    request: ResolveTenantAuditNamesRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ResolveTenantAuditNamesResponse>
+    | Observable<ResolveTenantAuditNamesResponse>
+    | ResolveTenantAuditNamesResponse;
 }
 
 export function OrganizationServiceControllerMethods() {
@@ -669,6 +737,7 @@ export function OrganizationServiceControllerMethods() {
       "getOnboarding",
       "completeOnboarding",
       "deleteOrganization",
+      "resolveTenantAuditNames",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

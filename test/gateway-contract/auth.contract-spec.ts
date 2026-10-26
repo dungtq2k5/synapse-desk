@@ -162,6 +162,33 @@ describe('authentication', () => {
     },
   );
 
+  rowFor('Users')(
+    '**`/users/me` names the organization, and null for a Super Admin**',
+    async () => {
+      const me = async (organizationName?: string) => {
+        peers.auth.on('UserService/GetCurrentUser').reply({
+          user: wireUser(),
+          permissionCodes: [],
+          departmentIds: [],
+          hasPassword: true,
+          organizationStatus: toProtoOrgStatus(OrgStatus.FROZEN),
+          ...(organizationName === undefined ? {} : { organizationName }),
+        });
+        return new Session(gateway.baseUrl).get(`${API}/users/me`, {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+        });
+      };
+
+      // Answered while frozen: the frozen page names the organization from it.
+      expect((await me('Acme Inc')).body).toMatchObject({
+        data: { organizationName: 'Acme Inc' },
+      });
+      expect((await me()).body).toMatchObject({
+        data: { organizationName: null },
+      });
+    },
+  );
+
   rowFor('Users')('**`/users/me` says who is a Super Admin**', async () => {
     peers.auth.on('UserService/GetCurrentUser').reply({
       user: wireUser(),

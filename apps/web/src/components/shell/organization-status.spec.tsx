@@ -1,6 +1,6 @@
 import { organizationsControllerUpdateV1 } from '@synapsedesk/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
@@ -28,6 +28,8 @@ beforeAll(stubMatchMedia);
 afterEach(() => {
   push.mockReset();
   jest.mocked(leaveFor).mockClear();
+  // A new session for each row: the banner announces once a session.
+  sessionStorage.clear();
 });
 
 const me = (organizationStatus: string, permissionCodes: string[] = []) =>
@@ -36,7 +38,13 @@ const me = (organizationStatus: string, permissionCodes: string[] = []) =>
     permissionCodes,
     departmentIds: [],
     organizationStatus,
+    organizationName: 'Acme Inc',
   });
+
+/** The organization read, as a frozen organization answers it. */
+const refusedWhileFrozen = fail(403, 'This workspace is frozen!', undefined, {
+  organizationStatus: 'FROZEN',
+});
 
 function shell(routes: Record<string, Reply | (() => Reply)>) {
   const calls = stubApi({
@@ -85,6 +93,22 @@ describe('past due', () => {
     expect(calls.some((call) => call.url.endsWith('/portal-session'))).toBe(
       true,
     );
+  });
+
+  it('is announced once a session: the next page shows it, as a region', async () => {
+    shell({ 'GET /api/v1/users/me': me('SUSPENDED_PAST_DUE') });
+    await screen.findByRole('status', { name: 'Payment overdue' });
+    cleanup();
+
+    // The next page renders its own header, and its own banner.
+    shell({ 'GET /api/v1/users/me': me('SUSPENDED_PAST_DUE') });
+
+    expect(
+      await screen.findByRole('region', { name: 'Payment overdue' }),
+    ).toHaveTextContent('A payment failed.');
+    expect(
+      screen.queryByRole('status', { name: 'Payment overdue' }),
+    ).not.toBeInTheDocument();
   });
 
   it('everyone else is asked to tell their admin, with no button', async () => {
@@ -147,6 +171,8 @@ describe('frozen', () => {
   it('replaces the app with the frozen page: the address to write to and Sign out', async () => {
     shell({
       'GET /api/v1/users/me': me('FROZEN'),
+      // The name comes from `/users/me`; this read is refused when frozen.
+      'GET /api/v1/organizations/current': refusedWhileFrozen,
       'POST /api/v1/auth/logout': ok(null),
     });
     const heading = await screen.findByRole('heading', {

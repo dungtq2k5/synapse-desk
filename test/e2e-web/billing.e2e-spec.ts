@@ -10,6 +10,7 @@ import { FAKE_STRIPE_URL } from '../system/fake-stripe';
 import { markVerified } from './emailed';
 import { WEB_URL } from './ingress';
 import { api, clearThrottles, DEMO_PASSWORD, signIn } from './support';
+import { pressOn } from './keyboard';
 
 /**
  * Billing end to end, through the fake Stripe the stack runs: Checkout and
@@ -268,6 +269,29 @@ test('upgrade, switch to yearly, then a downgrade over a limit refuses and names
   expect((await refused.json()).details).toEqual({
     overLimit: [{ dimension: 'SEATS', inUse: 6, allowed: 5 }],
   });
+});
+
+test('by keyboard alone: change the plan', async ({ page }) => {
+  const org = await organization('billing-keyboard');
+  await subscribe(org, 'price_fake_pro_monthly');
+  await asAdmin(page, org);
+
+  await pressOn(
+    page,
+    card(page, 'Enterprise').getByRole('button', {
+      name: 'Upgrade to Enterprise',
+    }),
+  );
+  await pressOn(
+    page,
+    page.getByRole('dialog').getByRole('button', {
+      name: 'Upgrade to Enterprise',
+    }),
+  );
+  await expect(page.getByText('You’re on Enterprise')).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(card(page, 'Enterprise, your current plan')).toBeVisible();
 });
 
 async function planId(org: Org, name: string): Promise<string> {

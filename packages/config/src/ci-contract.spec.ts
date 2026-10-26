@@ -201,6 +201,10 @@ describe('the CI contract', () => {
       },
       { script: 'typecheck', why: 'the only whole-repo type check' },
       {
+        script: 'check:web-build',
+        why: 'the web bundle budgets and the client-bundle secret scan; a route that grows past its budget fails nowhere else',
+      },
+      {
         script: 'proto:lint',
         why: 'buf naming rules; the proto package has no version suffix to fall back on',
       },

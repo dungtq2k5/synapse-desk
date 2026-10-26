@@ -53,7 +53,7 @@ import { LoadError, SettingsFrame } from '../settings-frame';
 import {
   EndpointDialog,
   SecretDialog,
-  failedInARow,
+  whyOff,
   useWebhookCache,
 } from './webhooks-view';
 import { PageUnavailable } from '@/components/shell/page-unavailable';
@@ -152,7 +152,7 @@ function Endpoint({ endpoint }: { endpoint: WebhookEndpointResponseDto }) {
     value: string;
     until: Date;
   } | null>(null);
-  const systemOff = !endpoint.isActive && endpoint.disabledReason !== null;
+  const systemOff = !endpoint.isActive && endpoint.disabledCode !== null;
 
   const sendTest = async () => {
     setTesting(true);
@@ -242,7 +242,7 @@ function Endpoint({ endpoint }: { endpoint: WebhookEndpointResponseDto }) {
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <EndpointStatus
             isActive={endpoint.isActive}
-            disabledReason={endpoint.disabledReason}
+            disabledCode={endpoint.disabledCode}
           />
           {endpoint.description}
         </div>
@@ -253,9 +253,8 @@ function Endpoint({ endpoint }: { endpoint: WebhookEndpointResponseDto }) {
           <AlertTitle>SynapseDesk turned this endpoint off</AlertTitle>
           <AlertDescription>
             <p>
-              {failedInARow(endpoint.disabledReason ?? '').replace(/\.$/, '')},
-              so they stopped. Fix the receiver, send a test, then turn it on
-              again.
+              {whyOff(endpoint).replace(/\.$/, '')}, so they stopped. Fix the
+              receiver, send a test, then turn it on again.
             </p>
             {manage && (
               <div className="mt-2 flex flex-wrap gap-2">

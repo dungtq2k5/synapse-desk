@@ -24,6 +24,7 @@ import {
   WEBHOOK_DISABLE_AFTER_FAILURES,
   WEBHOOK_SIGNATURE_HEADER,
   WebhookDeliveryStatus,
+  WebhookDisabledCode,
   verifyWebhookSignature,
 } from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils/bootstrap';
@@ -647,6 +648,9 @@ describe('Outbound webhooks (e2e)', () => {
 
     expect(endpoint.isActive).toBe(false);
     expect(endpoint.disabledReason).toContain('Auto-disabled after');
+    expect(endpoint.disabledCode).toBe(
+      WebhookDisabledCode.CONSECUTIVE_FAILURES,
+    );
 
     // The disable NOTICE cannot be asserted here: the publisher stub records
     // core-NATS emits, and the JetStream publish the processor makes goes

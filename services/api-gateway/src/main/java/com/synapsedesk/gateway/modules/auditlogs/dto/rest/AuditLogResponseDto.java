@@ -235,6 +235,10 @@ public class AuditLogResponseDto {
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime createdAt;
 
+  private String actorName = null;
+
+  private String resourceName = null;
+
   public AuditLogResponseDto() {
     super();
   }
@@ -475,6 +479,44 @@ public class AuditLogResponseDto {
     this.createdAt = createdAt;
   }
 
+  public AuditLogResponseDto actorName(String actorName) {
+    this.actorName = actorName;
+    return this;
+  }
+
+  /**
+   * Get actorName
+   * @return actorName
+   */
+  @JsonProperty("actorName")
+  public String getActorName() {
+    return actorName;
+  }
+
+  @JsonProperty("actorName")
+  public void setActorName(String actorName) {
+    this.actorName = actorName;
+  }
+
+  public AuditLogResponseDto resourceName(String resourceName) {
+    this.resourceName = resourceName;
+    return this;
+  }
+
+  /**
+   * Get resourceName
+   * @return resourceName
+   */
+  @JsonProperty("resourceName")
+  public String getResourceName() {
+    return resourceName;
+  }
+
+  @JsonProperty("resourceName")
+  public void setResourceName(String resourceName) {
+    this.resourceName = resourceName;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -494,7 +536,9 @@ public class AuditLogResponseDto {
       Objects.equals(this.ipAddress, auditLogResponseDto.ipAddress) &&
       Objects.equals(this.userAgent, auditLogResponseDto.userAgent) &&
       Objects.equals(this.metadata, auditLogResponseDto.metadata) &&
-      Objects.equals(this.createdAt, auditLogResponseDto.createdAt)
+      Objects.equals(this.createdAt, auditLogResponseDto.createdAt) &&
+      Objects.equals(this.actorName, auditLogResponseDto.actorName) &&
+      Objects.equals(this.resourceName, auditLogResponseDto.resourceName)
     );
   }
 
@@ -510,7 +554,9 @@ public class AuditLogResponseDto {
       ipAddress,
       userAgent,
       metadata,
-      createdAt
+      createdAt,
+      actorName,
+      resourceName
     );
   }
 
@@ -539,6 +585,12 @@ public class AuditLogResponseDto {
     sb.append("    metadata: ").append(toIndentedString(metadata)).append("\n");
     sb.append("    createdAt: ")
       .append(toIndentedString(createdAt))
+      .append("\n");
+    sb.append("    actorName: ")
+      .append(toIndentedString(actorName))
+      .append("\n");
+    sb.append("    resourceName: ")
+      .append(toIndentedString(resourceName))
       .append("\n");
     sb.append("}");
     return sb.toString();

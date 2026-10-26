@@ -37,6 +37,9 @@ const entry = (over: Record<string, unknown> = {}) => ({
     note: { nested: 1 },
   },
   createdAt: '2026-10-18T09:00:00Z',
+  // Named by the gateway, whoever they are and however long ago they left.
+  actorName: 'Sam Okafor',
+  resourceName: 'Kai Brandt',
   ...over,
 });
 const person = (id: string, fullName: string) => ({
@@ -62,6 +65,8 @@ function open(extra: Record<string, unknown> = {}, codes = AUDITOR) {
         ipAddress: null,
         userAgent: null,
         metadata: null,
+        actorName: null,
+        resourceName: null,
       }),
       entry({
         id: 'a3',
@@ -69,6 +74,8 @@ function open(extra: Record<string, unknown> = {}, codes = AUDITOR) {
         resourceType: 'WEBHOOK_ENDPOINT',
         resourceId: 'w1',
         metadata: { url: 'https://hooks.test/x' },
+        actorName: null,
+        resourceName: null,
       }),
     ]),
     'GET /api/v1/audit-logs/actions': ok({
@@ -88,7 +95,7 @@ function open(extra: Record<string, unknown> = {}, codes = AUDITOR) {
 }
 
 describe('the log', () => {
-  it('names who, what and the resource; someone the list can’t name, and SynapseDesk', async () => {
+  it('names who, what and the resource as the log does; Someone when it can’t, and SynapseDesk', async () => {
     open();
     expect(
       (await screen.findAllByText('Person · Kai Brandt'))[0],
@@ -103,9 +110,24 @@ describe('the log', () => {
   it('filters by person and resource type, then clears', async () => {
     const calls = open();
     await screen.findAllByText('Person · Kai Brandt');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Person' }));
+    // Found by search, people who have left included: not a first page.
+    await userEvent.click(screen.getByRole('button', { name: 'Person' }));
+    await userEvent.type(
+      await screen.findByRole('combobox', { name: 'Person' }),
+      'Sam',
+    );
+    await waitFor(() =>
+      expect(
+        calls.some(
+          (call) =>
+            call.url.startsWith('/api/v1/users?') &&
+            call.url.includes('searchTerm=Sam') &&
+            call.url.includes('includeDeleted=true'),
+        ),
+      ).toBe(true),
+    );
     await userEvent.click(
-      await screen.findByRole('option', { name: 'Sam Okafor' }),
+      await screen.findByRole('option', { name: /Sam Okafor/ }),
     );
     await userEvent.click(
       screen.getByRole('combobox', { name: 'Resource type' }),

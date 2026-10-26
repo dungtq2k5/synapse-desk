@@ -304,12 +304,18 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
+/**
+ * The content column beside the sidebar. A `div`, not shadcn's `main`: every
+ * page renders its own `<main id="main">`, and a page has one main landmark.
+ */
+function SidebarInset({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
-        'relative flex w-full flex-1 flex-col bg-background',
+        // `min-w-0`: a flex child grows to its widest content (a table at
+        // 200% text), scrolling the whole page; this keeps the scroll inside.
+        'relative flex w-full min-w-0 flex-1 flex-col bg-background',
         'md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',
         className,
       )}

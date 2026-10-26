@@ -68,6 +68,8 @@ test('the signing secret, once', async ({ page }) => {
           id: 'w-new',
           isActive: true,
           disabledReason: null,
+          disabledCode: null,
+          consecutiveFailures: 0,
         },
         secret: SECRET,
       },

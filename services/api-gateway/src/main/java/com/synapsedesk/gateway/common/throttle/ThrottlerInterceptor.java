@@ -79,7 +79,7 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
     List<String> tiers = hasAuthThrottle(handlerMethod)
       ? List.of(ThrottlerTiers.AUTH)
       : ThrottlerTiers.GENERAL;
-    String tracker = tracker(request);
+    String tracker = tracker(request, handlerMethod);
     String route =
       handlerMethod.getBeanType().getSimpleName() +
       "." +
@@ -207,21 +207,33 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
    * `getTracker`, reproduced: `user:<sub>` for a VERIFIED token (full session
    * or not — {@link CurrentUser#verifiedSubject} matches
    * `subjectFromToken`'s own scope), else `ip:<ip>` or
-   * `ip:<ip>|acct:<email>`.
+   * `ip:<ip>|acct:<email>`. A {@link ThrottleByAddress} route is `ip:<ip>`
+   * whoever calls it.
    */
-  private String tracker(HttpServletRequest request) {
+  private String tracker(
+    HttpServletRequest request,
+    HandlerMethod handlerMethod
+  ) {
+    if (handlerMethod.getMethodAnnotation(ThrottleByAddress.class) != null) {
+      return "ip:" + ipOf(request);
+    }
+
     Optional<String> sub = currentUser.verifiedSubject(request);
     if (sub.isPresent()) {
       return "user:" + sub.get();
     }
 
-    String ip = ClientIp.of(
-      request.getHeader("X-Forwarded-For"),
-      request.getRemoteAddr()
-    );
+    String ip = ipOf(request);
     String account = accountIdentifier(request);
 
     return account != null ? "ip:" + ip + "|acct:" + account : "ip:" + ip;
+  }
+
+  private static String ipOf(HttpServletRequest request) {
+    return ClientIp.of(
+      request.getHeader("X-Forwarded-For"),
+      request.getRemoteAddr()
+    );
   }
 
   /** The `email` field of a JSON body, lower-cased — `extractAccountIdentifier`, reproduced. */

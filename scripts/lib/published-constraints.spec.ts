@@ -95,8 +95,8 @@ describe('the constraints the Java document publishes', () => {
     }
   });
 
-  it('CreateExportDto.from: the published ISO pattern accepts every date the library does, and refuses some', () => {
-    const pattern = new RegExp(patternOf('CreateExportDto', 'from'));
+  it('CreateTicketExportDto.from: the published ISO pattern accepts every date the library does, and refuses some', () => {
+    const pattern = new RegExp(patternOf('CreateTicketExportDto', 'from'));
     const rows = table.iso8601;
 
     for (const [input, accepted] of rows.filter(([, ok]) => ok)) {
@@ -108,6 +108,16 @@ describe('the constraints the Java document publishes', () => {
     expect(
       rows.filter(([input, ok]) => !ok && !pattern.test(input)).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('CreateExportDto.from: the published day pattern takes a day and nothing longer', () => {
+    const pattern = new RegExp(patternOf('CreateExportDto', 'from'));
+
+    expect(
+      ['2026-01-31', '2026-01-31T00:00:00Z', '20260131', '2026-1-31'].map(
+        (input) => pattern.test(input),
+      ),
+    ).toEqual([true, false, false, false]);
   });
 
   it('every published pattern compiles as ECMA-262, the dialect JSON Schema uses', () => {

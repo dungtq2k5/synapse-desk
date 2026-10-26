@@ -123,6 +123,9 @@ public class UsersController {
           response.getOrganizationStatus().name().replace("ORG_STATUS_", "")
         )
       )
+      .organizationName(
+        response.hasOrganizationName() ? response.getOrganizationName() : null
+      )
       .isSuperAdmin(response.getIsSuperAdmin());
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));

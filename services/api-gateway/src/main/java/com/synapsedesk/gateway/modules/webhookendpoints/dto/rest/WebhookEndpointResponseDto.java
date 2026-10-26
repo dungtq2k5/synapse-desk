@@ -81,6 +81,43 @@ public class WebhookEndpointResponseDto {
 
   private String disabledReason = null;
 
+  /**
+   * `disabledReason` as data. NULL exactly when the reason is.
+   */
+  public enum DisabledCodeEnum {
+    CONSECUTIVE_FAILURES("CONSECUTIVE_FAILURES");
+
+    private final String value;
+
+    DisabledCodeEnum(String value) {
+      this.value = value;
+    }
+
+    @JsonValue
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return String.valueOf(value);
+    }
+
+    @JsonCreator
+    public static DisabledCodeEnum fromValue(String value) {
+      for (DisabledCodeEnum b : DisabledCodeEnum.values()) {
+        if (b.value.equals(value)) {
+          return b;
+        }
+      }
+      return null;
+    }
+  }
+
+  private DisabledCodeEnum disabledCode = null;
+
+  private Integer consecutiveFailures;
+
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
   private OffsetDateTime createdAt;
 
@@ -246,6 +283,49 @@ public class WebhookEndpointResponseDto {
     this.disabledReason = disabledReason;
   }
 
+  public WebhookEndpointResponseDto disabledCode(
+    DisabledCodeEnum disabledCode
+  ) {
+    this.disabledCode = disabledCode;
+    return this;
+  }
+
+  /**
+   * Get disabledCode
+   * @return disabledCode
+   */
+  @JsonProperty("disabledCode")
+  public DisabledCodeEnum getDisabledCode() {
+    return disabledCode;
+  }
+
+  @JsonProperty("disabledCode")
+  public void setDisabledCode(DisabledCodeEnum disabledCode) {
+    this.disabledCode = disabledCode;
+  }
+
+  public WebhookEndpointResponseDto consecutiveFailures(
+    Integer consecutiveFailures
+  ) {
+    this.consecutiveFailures = consecutiveFailures;
+    return this;
+  }
+
+  /**
+   * Get consecutiveFailures
+   * @return consecutiveFailures
+   */
+  @NotNull
+  @JsonProperty("consecutiveFailures")
+  public Integer getConsecutiveFailures() {
+    return consecutiveFailures;
+  }
+
+  @JsonProperty("consecutiveFailures")
+  public void setConsecutiveFailures(Integer consecutiveFailures) {
+    this.consecutiveFailures = consecutiveFailures;
+  }
+
   public WebhookEndpointResponseDto createdAt(OffsetDateTime createdAt) {
     this.createdAt = createdAt;
     return this;
@@ -311,6 +391,14 @@ public class WebhookEndpointResponseDto {
         this.disabledReason,
         webhookEndpointResponseDto.disabledReason
       ) &&
+      Objects.equals(
+        this.disabledCode,
+        webhookEndpointResponseDto.disabledCode
+      ) &&
+      Objects.equals(
+        this.consecutiveFailures,
+        webhookEndpointResponseDto.consecutiveFailures
+      ) &&
       Objects.equals(this.createdAt, webhookEndpointResponseDto.createdAt) &&
       Objects.equals(this.updatedAt, webhookEndpointResponseDto.updatedAt)
     );
@@ -325,6 +413,8 @@ public class WebhookEndpointResponseDto {
       eventTypes,
       isActive,
       disabledReason,
+      disabledCode,
+      consecutiveFailures,
       createdAt,
       updatedAt
     );
@@ -345,6 +435,12 @@ public class WebhookEndpointResponseDto {
     sb.append("    isActive: ").append(toIndentedString(isActive)).append("\n");
     sb.append("    disabledReason: ")
       .append(toIndentedString(disabledReason))
+      .append("\n");
+    sb.append("    disabledCode: ")
+      .append(toIndentedString(disabledCode))
+      .append("\n");
+    sb.append("    consecutiveFailures: ")
+      .append(toIndentedString(consecutiveFailures))
       .append("\n");
     sb.append("    createdAt: ")
       .append(toIndentedString(createdAt))

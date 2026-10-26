@@ -88,6 +88,7 @@ class MetricsSeriesContractTest {
     metrics.grpcCall("auth-service", "OK", Duration.ofMillis(3));
     metrics.websocketEvent("ticket.created");
     metrics.inboundEmail("accepted");
+    metrics.clientError("error");
     metrics.replaceJobSuccesses(
       java.util.List.of(
         new GatewayMetrics.JobSuccess(
@@ -170,7 +171,7 @@ class MetricsSeriesContractTest {
     // A path that stopped resolving would compare an empty set to an empty set
     // and report agreement.
     assertThat(Files.exists(REGISTRY)).isTrue();
-    assertThat(registry()).hasSize(7);
+    assertThat(registry()).hasSize(8);
   }
 
   private String scrape() {

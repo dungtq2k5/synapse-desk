@@ -116,6 +116,90 @@ describe('audit-logs', () => {
   );
 
   rowFor('Audit Logs')(
+    '**`list` names who acted and what was acted on, through the tenant-scoped read**',
+    async () => {
+      const DEPARTMENT = 'ffffffff-8888-4888-8888-ffffffffffff';
+      peers.ticket.on('AuditService/ListAuditLogs').reply({
+        items: [
+          wireLog('log-1', {
+            resourceType: 'AUDIT_RESOURCE_TYPE_DEPARTMENT',
+            resourceId: DEPARTMENT,
+          }),
+          wireLog('log-2', {
+            userId: undefined,
+            resourceType: 'AUDIT_RESOURCE_TYPE_EXPORT',
+            resourceId: 'ffffffff-9999-4999-8999-ffffffffffff',
+          }),
+        ],
+        meta: {
+          totalItems: 2,
+          itemCount: 2,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+      peers.auth.on('OrganizationService/ResolveTenantAuditNames').reply({
+        users: { [USER]: 'Dana Admin' },
+        departments: { [DEPARTMENT]: 'Billing' },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/audit-logs`,
+        headers(['audit.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(
+        (
+          response.body as {
+            data: { items: { actorName: unknown; resourceName: unknown }[] };
+          }
+        ).data.items.map((item) => [item.actorName, item.resourceName]),
+      ).toEqual([
+        ['Dana Admin', 'Billing'],
+        [null, null],
+      ]);
+      const [call] = peers.auth.calls(
+        'OrganizationService/ResolveTenantAuditNames',
+      );
+      expect(call.request).toMatchObject({
+        userIds: [USER],
+        departmentIds: [DEPARTMENT],
+      });
+    },
+  );
+
+  rowFor('Audit Logs')(
+    '**`list` still answers, with null names, when the names cannot be read**',
+    async () => {
+      peers.ticket.on('AuditService/ListAuditLogs').reply({
+        items: [wireLog('log-1')],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+      peers.auth
+        .on('OrganizationService/ResolveTenantAuditNames')
+        .fail(14, 'unavailable');
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/audit-logs`,
+        headers(['audit.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { items: [{ id: 'log-1', actorName: null, resourceName: null }] },
+      });
+    },
+  );
+
+  rowFor('Audit Logs')(
     '**`list` refuses an unrecognized `action` rather than silently matching everything**',
     async () => {
       const response = await new Session(gateway.baseUrl).get(
@@ -172,7 +256,7 @@ describe('audit-logs', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/audit-logs/export`,
-        { from: '2024-01-01T00:00:00Z', to: '2024-01-31T23:59:59Z' },
+        { from: '2024-01-01', to: '2024-01-31' },
         headers(['audit.export']),
       );
 
@@ -188,7 +272,7 @@ describe('audit-logs', () => {
     async () => {
       const response = await new Session(gateway.baseUrl).post(
         `${API}/audit-logs/export`,
-        { from: 'not-a-date', to: '2024-01-31T23:59:59Z' },
+        { from: 'not-a-date', to: '2024-01-31' },
         headers(['audit.export']),
       );
 

@@ -30,6 +30,8 @@ import {
   type GetInboundTokenResponse,
   type ResolveOrgByInboundTokenRequest,
   type ResolveOrgByInboundTokenResponse,
+  type ResolveTenantAuditNamesRequest,
+  type ResolveTenantAuditNamesResponse,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
@@ -125,6 +127,65 @@ export class OrganizationsService {
     context: CallerContext,
   ): Promise<OrganizationResponse> {
     return toOrganizationResponse(await this.load(context));
+  }
+
+  /**
+   * Names for the tenant audit log's ids, deleted rows included: the trail
+   * outlives what it names. Every read is scoped to the caller's organization
+   * (roles also include the global system roles, plans are global), so an id
+   * from elsewhere is left out like an id with no row.
+   */
+  async resolveTenantAuditNames(
+    request: ResolveTenantAuditNamesRequest,
+    context: CallerContext,
+  ): Promise<ResolveTenantAuditNamesResponse> {
+    const organizationId = requireTenant(context);
+    const [users, departments, roles, invitations, organizations, plans] =
+      await Promise.all([
+        this.prisma.user.findMany({
+          where: { id: { in: request.userIds }, organizationId },
+          select: { id: true, fullName: true },
+        }),
+        this.prisma.department.findMany({
+          where: { id: { in: request.departmentIds }, organizationId },
+          select: { id: true, name: true },
+        }),
+        this.prisma.role.findMany({
+          where: {
+            id: { in: request.roleIds },
+            OR: [{ organizationId }, { organizationId: null }],
+          },
+          select: { id: true, name: true },
+        }),
+        this.prisma.userInvitation.findMany({
+          where: { id: { in: request.invitationIds }, organizationId },
+          select: { id: true, email: true },
+        }),
+        this.prisma.organization.findMany({
+          where: {
+            id: {
+              in: request.organizationIds.filter((id) => id === organizationId),
+            },
+          },
+          select: { id: true, name: true },
+        }),
+        this.prisma.subscriptionPlan.findMany({
+          where: { id: { in: request.planIds } },
+          select: { id: true, name: true },
+        }),
+      ]);
+    const named = (rows: { id: string; name: string }[]) =>
+      Object.fromEntries(rows.map((row) => [row.id, row.name]));
+    return {
+      users: Object.fromEntries(users.map((row) => [row.id, row.fullName])),
+      departments: named(departments),
+      roles: named(roles),
+      invitations: Object.fromEntries(
+        invitations.map((row) => [row.id, row.email]),
+      ),
+      organizations: named(organizations),
+      plans: named(plans),
+    };
   }
 
   /**

@@ -186,6 +186,8 @@ public class CurrentUserResponseDto {
 
   private OrganizationStatusEnum organizationStatus = null;
 
+  private String organizationName = null;
+
   private Boolean isSuperAdmin;
 
   public CurrentUserResponseDto() {
@@ -331,6 +333,25 @@ public class CurrentUserResponseDto {
     this.organizationStatus = organizationStatus;
   }
 
+  public CurrentUserResponseDto organizationName(String organizationName) {
+    this.organizationName = organizationName;
+    return this;
+  }
+
+  /**
+   * Get organizationName
+   * @return organizationName
+   */
+  @JsonProperty("organizationName")
+  public String getOrganizationName() {
+    return organizationName;
+  }
+
+  @JsonProperty("organizationName")
+  public void setOrganizationName(String organizationName) {
+    this.organizationName = organizationName;
+  }
+
   public CurrentUserResponseDto isSuperAdmin(Boolean isSuperAdmin) {
     this.isSuperAdmin = isSuperAdmin;
     return this;
@@ -375,6 +396,10 @@ public class CurrentUserResponseDto {
         this.organizationStatus,
         currentUserResponseDto.organizationStatus
       ) &&
+      Objects.equals(
+        this.organizationName,
+        currentUserResponseDto.organizationName
+      ) &&
       Objects.equals(this.isSuperAdmin, currentUserResponseDto.isSuperAdmin)
     );
   }
@@ -387,6 +412,7 @@ public class CurrentUserResponseDto {
       departmentIds,
       hasPassword,
       organizationStatus,
+      organizationName,
       isSuperAdmin
     );
   }
@@ -407,6 +433,9 @@ public class CurrentUserResponseDto {
       .append("\n");
     sb.append("    organizationStatus: ")
       .append(toIndentedString(organizationStatus))
+      .append("\n");
+    sb.append("    organizationName: ")
+      .append(toIndentedString(organizationName))
       .append("\n");
     sb.append("    isSuperAdmin: ")
       .append(toIndentedString(isSuperAdmin))

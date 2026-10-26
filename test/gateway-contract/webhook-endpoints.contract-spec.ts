@@ -87,6 +87,47 @@ describe('webhook-endpoints', () => {
   });
 
   rowFor('Webhook endpoints')(
+    '**an auto-disabled endpoint answers why as data: `disabledCode` and `consecutiveFailures`**',
+    async () => {
+      peers.notification.on('NotificationService/ListWebhookEndpoints').reply({
+        items: [
+          {
+            ...wireEndpoint('ep-1'),
+            isActive: false,
+            disabledReason:
+              'Auto-disabled after 10 consecutive failed deliveries',
+            disabledCode: 'WEBHOOK_DISABLED_CODE_CONSECUTIVE_FAILURES',
+            consecutiveFailures: 10,
+          },
+          wireEndpoint('ep-2'),
+        ],
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/webhook-endpoints`,
+        headers(['organization.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(
+        (
+          response.body as {
+            data: {
+              items: { disabledCode: unknown; consecutiveFailures: unknown }[];
+            };
+          }
+        ).data.items.map((item) => [
+          item.disabledCode,
+          item.consecutiveFailures,
+        ]),
+      ).toEqual([
+        ['CONSECUTIVE_FAILURES', 10],
+        [null, 0],
+      ]);
+    },
+  );
+
+  rowFor('Webhook endpoints')(
     '**`event-types` is never swallowed as an `:id` — declared first**',
     async () => {
       peers.notification.on('NotificationService/ListWebhookEventTypes').reply({

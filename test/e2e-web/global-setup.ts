@@ -1,4 +1,5 @@
 import { cpSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import systemSetup from '../system/global-setup';
 import systemTeardown from '../system/global-teardown';
@@ -78,6 +79,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   // ingestion-service's half: uploads embed with the same fixed vectors, so
   // an uploaded document reaches INDEXED offline and Ask finds it.
   process.env.INGESTION_OFFLINE_MODEL = 'true';
+  // The test-only pages (`apps/web/src/app/test-pages`), read per request.
+  process.env.WEB_TEST_PAGES = '1';
+  // Every service's output as a file, so a row can read the gateway's log
+  // (CI names its own directory, to upload).
+  if (!process.env.SYSTEM_LOG_DIR) {
+    process.env.SYSTEM_LOG_DIR = join(tmpdir(), 'synapsedesk-e2e-web-logs');
+    rmSync(process.env.SYSTEM_LOG_DIR, { recursive: true, force: true });
+  }
   if (COVERAGE_DIR) {
     // A previous run's raw files would be counted twice.
     rmSync(COVERAGE_DIR, { recursive: true, force: true });

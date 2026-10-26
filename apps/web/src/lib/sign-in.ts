@@ -13,17 +13,44 @@ import {
  */
 export const HOME = '/';
 
+/** A stand-in origin `next` is resolved against; it never leaves this file. */
+const SAME_ORIGIN = 'https://synapsedesk.invalid';
+
+/** The longest `next` kept; a longer one is the home page. */
+const NEXT_MAX = 2000;
+
 /**
- * The `next` a sign-in returns to, if it's a path on this origin. Anything
- * else (`//evil.example`, `/\evil.example`, `https://…`) is the home page, so
- * the sign-in page can't be used to send someone elsewhere.
+ * The `next` a sign-in returns to, if it's a path on this origin, so the
+ * sign-in page can't be used to send someone elsewhere.
+ *
+ * Resolved the way the browser will resolve it, and kept only when the origin
+ * is unchanged: the URL parser drops a tab or newline (`/\t/evil.example` is
+ * `//evil.example`) and reads `\` as `/`, which no prefix rule keeps up with.
+ * A path whose decoded form starts `//` or `/\`, and anything over
+ * {@link NEXT_MAX} characters, is the home page too.
  *
  * @example safeNext('/tickets/42?tab=notes') // '/tickets/42?tab=notes'
- * @example safeNext('//evil.example') // '/'
+ * @example safeNext('/\t/evil.example') // '/'
  */
 export function safeNext(next: string | null | undefined): string {
-  if (!next?.startsWith('/') || /^\/[/\\]/.test(next)) return HOME;
-  return next;
+  if (!next?.startsWith('/') || next.length > NEXT_MAX) return HOME;
+  let url: URL;
+  try {
+    url = new URL(next, SAME_ORIGIN);
+  } catch {
+    return HOME;
+  }
+  if (url.origin !== SAME_ORIGIN) return HOME;
+  if (/^\/[/\\]/.test(safeDecode(url.pathname))) return HOME;
+  return url.pathname + url.search + url.hash;
+}
+
+function safeDecode(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
 }
 
 /**

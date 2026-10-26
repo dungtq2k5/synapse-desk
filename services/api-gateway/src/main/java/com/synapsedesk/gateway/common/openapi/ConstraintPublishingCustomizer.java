@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.common.openapi;
 
+import com.synapsedesk.gateway.common.validation.CalendarDate;
 import com.synapsedesk.gateway.common.validation.FutureDate;
 import com.synapsedesk.gateway.common.validation.Matches;
 import com.synapsedesk.gateway.common.validation.NumberString;
@@ -65,6 +66,8 @@ public class ConstraintPublishingCustomizer
     for (Annotation annotation : annotations) {
       if (annotation instanceof Matches matches) {
         schema.setPattern(matches.regex());
+      } else if (annotation instanceof CalendarDate) {
+        schema.setPattern(CalendarDate.REGEX);
       } else if (annotation instanceof StrictIso8601) {
         schema.setPattern(StrictIso8601.REGEX);
       } else if (annotation instanceof NumberString) {

@@ -13,6 +13,7 @@ import {
   WEBHOOK_MAX_ATTEMPTS,
   WEBHOOK_QUEUE,
   WebhookDeliveryStatus,
+  WebhookDisabledCode,
   type WebhookEventPayload,
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -154,7 +155,11 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
     await this.prisma.webhookEndpoint.update({
       where: { id: endpointId },
-      data: { isActive: false, disabledReason: reason },
+      data: {
+        isActive: false,
+        disabledReason: reason,
+        disabledCode: WebhookDisabledCode.CONSECUTIVE_FAILURES,
+      },
     });
 
     this.logger.warn(`Endpoint ${endpointId} (${endpoint.url}): ${reason}`);

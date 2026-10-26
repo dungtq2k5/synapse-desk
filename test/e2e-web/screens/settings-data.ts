@@ -416,6 +416,9 @@ const endpoint = (
     eventTypes,
     isActive,
     disabledReason,
+    // A reason is ours exactly when a code is: the auto-disable after failures.
+    disabledCode: disabledReason ? 'CONSECUTIVE_FAILURES' : null,
+    consecutiveFailures: disabledReason ? 50 : 0,
     createdAt: '2026-09-01T09:00:00.000Z',
     updatedAt: '2026-10-01T09:00:00.000Z',
   }) as WebhookEndpointResponseDto;
@@ -517,6 +520,7 @@ const entry = (
   resourceId: string | null,
   createdAt: string,
   metadata: Record<string, unknown> = {},
+  names: { actor?: string; resource?: string } = {},
 ): AuditLogResponseDto =>
   ({
     id,
@@ -525,6 +529,9 @@ const entry = (
     action,
     resourceType,
     resourceId,
+    // As the gateway names them: the people, and the auth-owned resources.
+    actorName: names.actor ?? null,
+    resourceName: names.resource ?? null,
     ipAddress: userId ? '81.2.69.142' : null,
     userAgent: userId
       ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/141.0.0.0'
@@ -551,6 +558,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
           reason: 'Laptop reported stolen; waiting for IT to reissue.',
         },
       },
+      { actor: 'Maya Chen', resource: 'Alex Rivera' },
     ),
     entry(
       'a2',
@@ -559,6 +567,8 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       'ROLE',
       'r-billing',
       '2026-10-18T13:05:00.000Z',
+      {},
+      { actor: 'Maya Chen', resource: 'Billing Lead' },
     ),
     entry(
       'a3',
@@ -570,6 +580,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       {
         fileName: 'Remote Work Policy.pdf',
       },
+      { actor: 'Sam Okafor' },
     ),
     entry(
       'a4',
@@ -581,6 +592,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       {
         name: 'Northwind Health',
       },
+      { actor: 'Maya Chen', resource: 'Northwind Health' },
     ),
     entry(
       'a5',
@@ -589,6 +601,8 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       'DEPARTMENT',
       'hr',
       '2026-10-17T17:30:00.000Z',
+      {},
+      { actor: 'Maya Chen', resource: 'HR' },
     ),
     entry(
       'a6',
@@ -600,6 +614,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       {
         email: 'omar@northwind.health',
       },
+      { actor: 'Maya Chen', resource: 'omar@northwind.health' },
     ),
     entry(
       'a7',
@@ -611,6 +626,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       {
         url: 'https://hooks.slack.com/services/T0/B0',
       },
+      { actor: 'Maya Chen' },
     ),
     entry(
       'a8',
@@ -622,6 +638,7 @@ export function auditEntries(viewer: string): AuditLogResponseDto[] {
       {
         name: 'Business',
       },
+      { resource: 'Business' },
     ),
   ];
 }

@@ -10,6 +10,7 @@ import {
   type Person,
 } from './screens/tenant';
 import { api, clearThrottles } from './support';
+import { expectFocusOn, pressOn, typeInto } from './keyboard';
 
 /**
  * Managing the knowledge base, end to end, through the real services: files
@@ -113,6 +114,50 @@ test('three files, one of each type, are indexed live; Ask then cites one', asyn
       name: /^(remote-work-policy\.pdf|expenses-faq\.md)(, page \d+)?, source 1$/,
     }),
   ).toBeVisible();
+});
+
+test('by keyboard alone: upload a document, then ask and open its citation', async ({
+  page,
+}) => {
+  const { maya, priya } = await tenant('km-keyboard');
+  await signInAs(page, maya);
+  await page.goto('/knowledge/documents');
+
+  const upload = page.getByRole('button', { name: 'Upload', exact: true });
+  await pressOn(page, upload);
+  const dialog = page.getByRole('dialog', { name: 'Upload documents' });
+  const chooser = page.waitForEvent('filechooser');
+  await pressOn(page, dialog.getByRole('button', { name: 'Choose files' }));
+  await (await chooser).setFiles(join(FIXTURES, 'expenses-faq.md'));
+  await pressOn(
+    page,
+    dialog.getByRole('button', { name: /^Upload 1 document$/ }),
+  );
+  await expect(dialog.getByText('1 document uploaded')).toBeVisible();
+  await pressOn(page, dialog.getByRole('button', { name: 'Done' }));
+  // The dialog closed: focus is back where it was opened from.
+  await expectFocusOn(upload);
+  await expect(row(page, 'expenses-faq.md').getByText('Indexed')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  await page.context().clearCookies();
+  await signInAs(page, priya);
+  await page.goto('/ask');
+  await typeInto(
+    page,
+    page.getByRole('textbox', { name: 'Your question' }),
+    'How do I claim expenses?',
+  );
+  await pressOn(page, page.getByRole('button', { name: 'Ask' }));
+  const citation = page
+    .getByRole('log', { name: 'Conversation' })
+    .getByRole('link', { name: /^expenses-faq\.md(, page \d+)?, source 1$/ });
+  await expect(citation).toBeVisible({ timeout: 30_000 });
+  await pressOn(page, citation);
+  await expect(
+    page.getByRole('region', { name: 'Cited passage' }),
+  ).toBeFocused();
 });
 
 test('a document only for Facilities answers nobody outside it', async ({

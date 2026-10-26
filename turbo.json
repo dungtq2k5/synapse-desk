@@ -59,8 +59,9 @@
       "outputs": ["dist/**", "*.tsbuildinfo", ".next/**", "!.next/cache/**"],
       // The web's coverage build (source maps, for the e2e suite's coverage):
       // passed through, and part of the hash, so a cached plain build is never
-      // replayed for a coverage run or the reverse.
-      "env": ["WEB_COVERAGE"]
+      // replayed for a coverage run or the reverse. `GIT_SHA` is the web's build
+      // id, inlined into the client bundle.
+      "env": ["WEB_COVERAGE", "GIT_SHA"]
     },
     // The clients' own typecheck (the root program doesn't include apps/):
     // against their dependencies' built packages and their generated tokens.
