@@ -76,8 +76,10 @@ const SECRET_SHAPES = [
   /\brk_(?:live|test)_[A-Za-z0-9]{16,}/,
   /\bwhsec_[A-Za-z0-9+/]{16,}/,
   /\bre_[A-Za-z0-9]{8}_[A-Za-z0-9]{16,}/,
-  /postgres(?:ql)?:\/\/[^\s"'`]+:[^\s"'`@]+@/,
-  /redis:\/\/[^\s"'`]*:[^\s"'`@]+@/,
+  // A URL's user holds no `:`, `@` or `/`, and its password no `@` or `/`:
+  // classes that overlap backtrack on a long run without `@`.
+  /postgres(?:ql)?:\/\/[^\s"'`:@/]+:[^\s"'`@/]+@/,
+  /redis:\/\/[^\s"'`:@/]*:[^\s"'`@/]+@/,
 ];
 
 /**

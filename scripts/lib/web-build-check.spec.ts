@@ -45,8 +45,27 @@ describe('web-build-check', () => {
     ['a Stripe secret key', 'const k="sk_test_51ABCDEFGHIJKLMNOPQRSTUV"'],
     ['a webhook secret', '"whsec_ABCDEFGHIJKLMNOPQRSTUV"'],
     ['a database URL with a password', '"postgresql://app:hunter2@db:5432/x"'],
+    ['a postgres:// URL with a password', '"postgres://app:hunter2@db/x"'],
+    ['a Redis URL with a password', '"redis://default:hunter2@cache:6379"'],
+    ['a Redis URL with a password only', '"redis://:hunter2@cache:6379"'],
   ])('finds %s in a client file', (_what, text) => {
     expect(secretsIn(text, ['STRIPE_SECRET_KEY'])).not.toEqual([]);
+  });
+
+  it.each([
+    ['a database URL without a password', '"postgresql://db:5432/x"'],
+    ['a Redis URL without a password', '"redis://cache:6379"'],
+  ])('finds nothing in %s', (_what, text) => {
+    expect(secretsIn(text, [])).toEqual([]);
+  });
+
+  it.each([
+    ['postgres', `postgres://${':'.repeat(100_000)}`],
+    ['redis', `redis://${':'.repeat(100_000)}`],
+  ])('**finishes at once on a long %s URL with no `@`**', (_what, text) => {
+    const start = performance.now();
+    secretsIn(text, []);
+    expect(performance.now() - start).toBeLessThan(500);
   });
 
   it('finds nothing in ordinary client code', () => {
