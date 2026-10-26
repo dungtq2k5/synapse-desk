@@ -16,7 +16,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { resolve, sep } from 'node:path';
 
 const name = process.argv[2];
 
@@ -48,8 +48,17 @@ if (!/^\s*(CREATE|ALTER|DROP|COMMENT)\b/im.test(sql)) {
 }
 
 const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
-const folder = join('prisma/migrations', `${stamp}_${name}`);
+const migrations = resolve('prisma/migrations');
+const entry = `${stamp}_${name}`;
+const folder = resolve(migrations, entry);
+
+// The name's pattern already keeps it a single folder; this says so where
+// the path is used.
+if (!folder.startsWith(migrations + sep)) {
+  console.error(`${folder} is outside ${migrations}.`);
+  process.exit(1);
+}
 
 mkdirSync(folder);
-writeFileSync(join(folder, 'migration.sql'), sql);
-console.log(`Wrote ${folder}/migration.sql`);
+writeFileSync(resolve(folder, 'migration.sql'), sql);
+console.log(`Wrote prisma/migrations/${entry}/migration.sql`);
