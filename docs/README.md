@@ -101,6 +101,7 @@ A **fixed set**, describing what is true today — closed by intent rather than 
 | [known-gaps.md](./reference/known-gaps.md) | What is currently broken or inconsistent, with the file that proves it |
 | [flows/](./reference/flows/) | One document per end-to-end path — what happens, which components, which edge cases |
 | [caching.md](./reference/caching.md) | What is cached, keyed how, invalidated by what |
+| [launch-checklist.md](./reference/launch-checklist.md) | What a first deploy must do that the repository can't, and how to tell it's done |
 | [scheduling.md](./reference/scheduling.md) | The nine scheduled jobs — cadence, steps, owner, and how you know one stopped |
 | [erd/](./reference/erd/) | **Generated** — one entity-relationship diagram per service. Never hand-edit |
 | [openapi.json](./reference/openapi.json) | **Generated** — the gateway's OpenAPI document, exported from the built gateway by `npm run openapi:export`; CI fails when it drifts. Never hand-edit |

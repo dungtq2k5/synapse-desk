@@ -13,7 +13,7 @@
 The production image's `migrate` stage runs the same three commands; `schema-contract.spec` holds `db:apply` equal to it.
 
 - **Creating a database is `db:reset`'s job only** (`scripts/reset-databases.mjs`): it drops and creates each database and its shadow, then runs `db:apply`, and refuses any database not on this machine.
-- **A shadow database per service** (`SHADOW_DATABASE_URL`, development and CI only) serves `db:migrate` (`prisma migrate dev --create-only`, how a migration is written) and CI's drift check.
+- **A shadow database per service** (`SHADOW_DATABASE_URL`, development and CI only) serves `db:migrate` (`scripts/new-migration.mjs`: the migrations replayed into the shadow database and diffed with the schema file, how a migration is written) and CI's drift check. **Not `prisma migrate dev`:** it compares the development database too, and reads the objects `schema-apply` adds as drift.
 - **CI fails when the migrations and `schema.prisma` disagree** (`prisma migrate diff`, exit code 2).
 - **`prisma db push` is in no script and no setup.** Run it by hand to try something; nothing else may.
 
