@@ -17,3 +17,12 @@ export const CLIENT_ERROR_MESSAGE_MAX = 1000;
 
 /** How much of `stack` the log line keeps. */
 export const CLIENT_ERROR_STACK_KEPT = 2000;
+
+/** The longest `path` a report may carry. */
+export const CLIENT_ERROR_PATH_MAX = 2000;
+
+/** The longest `buildId` a report may carry. */
+export const CLIENT_ERROR_BUILD_ID_MAX = 64;
+
+/** How much of the `User-Agent` header the log line keeps. */
+export const CLIENT_ERROR_USER_AGENT_KEPT = 300;

@@ -12,6 +12,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   CLIENT_ERROR_STACK_KEPT,
+  CLIENT_ERROR_USER_AGENT_KEPT,
   OrgAccess,
   type RequestContext,
 } from '@synapsedesk/contracts';
@@ -73,7 +74,9 @@ export class ClientErrorsController {
         message: report.message,
         stack: report.stack?.slice(0, CLIENT_ERROR_STACK_KEPT),
         path: withoutQuery(report.path),
-        userAgent: request.get('user-agent')?.slice(0, 300),
+        userAgent: request
+          .get('user-agent')
+          ?.slice(0, CLIENT_ERROR_USER_AGENT_KEPT),
         buildId: report.buildId,
         userId: caller?.sub,
         organizationId: caller?.organizationId ?? undefined,

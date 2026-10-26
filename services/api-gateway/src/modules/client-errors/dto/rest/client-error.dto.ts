@@ -1,6 +1,8 @@
 import {
+  CLIENT_ERROR_BUILD_ID_MAX,
   CLIENT_ERROR_KINDS,
   CLIENT_ERROR_MESSAGE_MAX,
+  CLIENT_ERROR_PATH_MAX,
   type ClientErrorKind,
 } from '@synapsedesk/contracts';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
@@ -21,14 +23,12 @@ export class ReportClientErrorDto {
 
   /** The page's path; its query and fragment are dropped before logging. */
   @IsString()
-  // FIXME Do we have a constant for `2000`? If not consider create one.
-  @MaxLength(2000)
+  @MaxLength(CLIENT_ERROR_PATH_MAX)
   readonly path!: string;
 
   /** The web build that reported it (`GIT_SHA`). */
   @IsOptional()
   @IsString()
-  // FIXME Do we have a constant for `64`? If not consider create one.
-  @MaxLength(64)
+  @MaxLength(CLIENT_ERROR_BUILD_ID_MAX)
   readonly buildId?: string;
 }
