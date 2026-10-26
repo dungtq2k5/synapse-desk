@@ -89,6 +89,26 @@ describe('the Java contracts generator', () => {
       );
     });
 
+    it('emits a plain integer export as one `int`, named as the export is', () => {
+      const source = renderClass(
+        { className: 'Limits', purpose: 'p', exports: ['A_MAX'] },
+        { A_MAX: 2000 },
+      );
+      expect(source).toContain('public static final int A_MAX = 2000;');
+    });
+
+    it.each([[1.5], [true], [['a']], [null]])(
+      '**throws on %p rather than emitting an empty class**',
+      (value) => {
+        expect(() =>
+          renderClass(
+            { className: 'Limits', purpose: 'p', exports: ['ODD'] },
+            { ODD: value },
+          ),
+        ).toThrow('ODD is neither a string, an integer nor an object');
+      },
+    );
+
     it('says it is generated, so an edit is not mistaken for a source of truth', () => {
       expect(renderClass(group, common)).toContain('do not edit');
     });
@@ -127,6 +147,7 @@ describe('the Java contracts generator', () => {
 
     it('one file per group, named for its class', () => {
       expect(Object.keys(renderAll(complete)).sort()).toEqual([
+        'ClientErrors.java',
         'GrpcMetadata.java',
         'PasswordPolicy.java',
         'RealtimeEvents.java',

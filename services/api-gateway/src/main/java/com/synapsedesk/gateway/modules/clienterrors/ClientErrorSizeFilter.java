@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.modules.clienterrors;
 
+import com.synapsedesk.gateway.common.contracts.ClientErrors;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -26,7 +27,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 public class ClientErrorSizeFilter extends OncePerRequestFilter {
 
   /** A report's largest body, in bytes. */
-  static final long MAX_BYTES = 8 * 1024;
+  static final long MAX_BYTES = ClientErrors.CLIENT_ERROR_MAX_BYTES;
 
   private static final String PATH = ApiPaths.V1 + "/client-errors";
 

@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.clienterrors.dto.rest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.common.contracts.ClientErrors;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -68,7 +69,7 @@ public class ReportClientErrorDto {
   }
 
   @NotNull
-  @Size(max = 1000)
+  @Size(max = ClientErrors.CLIENT_ERROR_MESSAGE_MAX)
   @JsonProperty("message")
   public String getMessage() {
     return message;
@@ -92,7 +93,7 @@ public class ReportClientErrorDto {
 
   /** The page's path; its query and fragment are dropped before logging. */
   @NotNull
-  @Size(max = 2000)
+  @Size(max = ClientErrors.CLIENT_ERROR_PATH_MAX)
   @JsonProperty("path")
   public String getPath() {
     return path;
@@ -104,7 +105,7 @@ public class ReportClientErrorDto {
   }
 
   /** The web build that reported it (`GIT_SHA`). */
-  @Size(max = 64)
+  @Size(max = ClientErrors.CLIENT_ERROR_BUILD_ID_MAX)
   @JsonProperty("buildId")
   public String getBuildId() {
     return buildId;

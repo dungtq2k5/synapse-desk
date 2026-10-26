@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.clienterrors;
 import com.synapsedesk.gateway.common.auth.CurrentRequest;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.contracts.ClientErrors;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.common.metrics.GatewayMetrics;
@@ -52,9 +53,6 @@ public class ClientErrorsController {
 
   private static final Logger LOG = LoggerFactory.getLogger("ClientErrors");
 
-  /** How much of {@code stack} the log line keeps. */
-  static final int STACK_KEPT = 2000;
-
   private final CurrentUser currentUser;
   private final GatewayMetrics metrics;
   private final ObjectMapper json;
@@ -94,11 +92,17 @@ public class ClientErrorsController {
     line.put("kind", kind);
     line.put("message", report.getMessage());
     if (report.getStack() != null) {
-      line.put("stack", truncate(report.getStack(), STACK_KEPT));
+      line.put(
+        "stack",
+        truncate(report.getStack(), ClientErrors.CLIENT_ERROR_STACK_KEPT)
+      );
     }
     line.put("path", withoutQuery(report.getPath()));
     String userAgent = request.getHeader("User-Agent");
-    if (userAgent != null) line.put("userAgent", truncate(userAgent, 300));
+    if (userAgent != null) line.put(
+      "userAgent",
+      truncate(userAgent, ClientErrors.CLIENT_ERROR_USER_AGENT_KEPT)
+    );
     if (report.getBuildId() != null) line.put("buildId", report.getBuildId());
     caller.ifPresent(context -> {
       line.put("userId", context.sub());

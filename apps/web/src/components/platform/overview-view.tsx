@@ -100,7 +100,6 @@ export function OverviewView() {
               Loading the overview
             </span>
           )}
-          <Partial finance={f} jobs={j} />
           {metrics.isError ? (
             <Unavailable
               title="The platform’s numbers"
@@ -112,24 +111,37 @@ export function OverviewView() {
           ) : (
             <TileSkeletons count={6} className={TILE_GRID} />
           )}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <NeedsAttention
-              finance={f}
-              jobs={j}
-              failed={finance.isError && jobs.isError}
-              onRetry={retryAll}
-            />
-            {finance.isError ? (
-              <Unavailable
-                title="Plan mix"
-                what="The plan mix couldn’t be read"
-                onRetry={() => void finance.refetch()}
-              />
-            ) : (
-              <PlanMix finance={f} />
-            )}
-          </div>
-          <BillingEvents />
+          {/* Below the tiles, all at once when finance and jobs have
+              answered: the alert arriving later would push down what was
+              already painted. */}
+          {finance.isPending || jobs.isPending ? (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <ListSkeleton />
+              <ListSkeleton />
+            </div>
+          ) : (
+            <>
+              <Partial finance={f} jobs={j} />
+              <div className="grid gap-6 lg:grid-cols-2">
+                <NeedsAttention
+                  finance={f}
+                  jobs={j}
+                  failed={finance.isError && jobs.isError}
+                  onRetry={retryAll}
+                />
+                {finance.isError ? (
+                  <Unavailable
+                    title="Plan mix"
+                    what="The plan mix couldn’t be read"
+                    onRetry={() => void finance.refetch()}
+                  />
+                ) : (
+                  <PlanMix finance={f} />
+                )}
+              </div>
+              <BillingEvents />
+            </>
+          )}
         </>
       )}
     </ConsolePage>

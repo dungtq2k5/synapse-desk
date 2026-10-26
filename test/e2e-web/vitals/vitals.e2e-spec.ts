@@ -8,9 +8,11 @@ import { clearThrottles } from '../support';
 /**
  * Core Web Vitals on the main screens, from the browser's own performance
  * entries (no library): LCP, CLS, and INP from one interaction per load, the
- * median of three loads, at 1440 and 390 wide. **Reported, not gated** (yet):
- * the numbers go to `test-results/web-vitals.json` and the log, and Google's
- * "good" (LCP ≤ 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms) is marked beside each.
+ * median of three loads, at 1440 and 390 wide. The numbers go to
+ * `test-results/web-vitals.json` and the log, with Google's "good" (LCP ≤
+ * 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms) marked beside each. **CLS is gated** at 0.1
+ * on every screen: it measures the layout, not the machine. LCP and INP are
+ * reported only, since they depend on the machine's speed.
  *
  * Never on the coverage build: its source maps and V8 coverage slow every page.
  */
@@ -166,4 +168,13 @@ test('Core Web Vitals on the main screens, median of three, at 1440 and 390', as
   );
   // A measurement that read nothing is a broken observer, not a fast page.
   expect(report.every((row) => row.lcp > 0)).toBe(true);
+  // Every screen that shifts more than "good", with what moved.
+  expect(
+    report
+      .filter((row) => row.cls > 0.1)
+      .map(
+        (row) =>
+          `${row.screen} ${row.width}: ${row.cls} ${row.shifted.join(', ')}`,
+      ),
+  ).toEqual([]);
 });

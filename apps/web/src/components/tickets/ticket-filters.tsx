@@ -181,7 +181,12 @@ function FilterSelect({
     <Select value={value ?? ALL} onValueChange={onValue}>
       <SelectTrigger size="sm" aria-label={label} className="w-auto gap-2">
         <span className="text-muted-foreground">{label}:</span>
-        <SelectValue />
+        {/* Named here, not by Radix: its text arrives only once the options
+            mount in the browser, so the row would widen and wrap after the
+            first paint. */}
+        <SelectValue>
+          {value === undefined ? 'All' : options[value]}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent className="shadow-md">
         <SelectItem value={ALL}>All</SelectItem>

@@ -64,6 +64,19 @@ const GROUPS = [
     exports: ['PASSWORD_POLICY'],
   },
   {
+    className: 'ClientErrors',
+    purpose:
+      'The limits on a browser error report. A stale copy is a gateway refusing a report the web sends, and the report lost.',
+    exports: [
+      'CLIENT_ERROR_MAX_BYTES',
+      'CLIENT_ERROR_MESSAGE_MAX',
+      'CLIENT_ERROR_STACK_KEPT',
+      'CLIENT_ERROR_PATH_MAX',
+      'CLIENT_ERROR_BUILD_ID_MAX',
+      'CLIENT_ERROR_USER_AGENT_KEPT',
+    ],
+  },
+  {
     className: 'SessionKeys',
     purpose:
       'The Redis keys auth-service writes and the gateway reads. A stale prefix is a revoked session the gateway never refuses.',
@@ -120,6 +133,20 @@ function renderClass(group, common) {
         '',
       );
       continue;
+    }
+
+    // A plain integer too, so a limit reads the same in both languages.
+    if (Number.isInteger(value)) {
+      lines.push(`  public static final int ${exportName} = ${value};`, '');
+      continue;
+    }
+
+    // Anything else (a float, a boolean, an array) has no rendering here; an
+    // empty class would pass the drift check, so it fails the export instead.
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new Error(
+        `${exportName} is neither a string, an integer nor an object`,
+      );
     }
 
     for (const key of Object.keys(value).sort(byCodeUnit)) {

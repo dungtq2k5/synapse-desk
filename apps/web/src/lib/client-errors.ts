@@ -1,13 +1,13 @@
 import { clientErrorsControllerReportV1 } from '@synapsedesk/api-client';
-
-/** What reported the error: the window, a promise, or an error boundary. */
-export type ClientErrorKind = 'error' | 'rejection' | 'boundary';
+import {
+  CLIENT_ERROR_MESSAGE_MAX,
+  CLIENT_ERROR_PATH_MAX,
+  CLIENT_ERROR_STACK_KEPT,
+  type ClientErrorKind,
+} from '@synapsedesk/contracts';
 
 /** The most a page load reports; a loop of errors sends no more than this. */
 export const MAX_REPORTS = 5;
-
-const MESSAGE_MAX = 1000;
-const STACK_MAX = 4000;
 
 const reported = new Set<string>();
 
@@ -15,7 +15,9 @@ const reported = new Set<string>();
  * Reports a browser error to the gateway (`POST /api/v1/client-errors`), which
  * logs it and stores nothing. At most {@link MAX_REPORTS} a page load, and
  * the same error once. The path goes without its query or fragment, and
- * nothing from the page is sent. Never throws, and never waits.
+ * nothing from the page is sent. Each field is cut to what the gateway takes
+ * or keeps, so a long path or stack is still reported. Never throws, and
+ * never waits.
  *
  * `fetch` with `keepalive` rather than `navigator.sendBeacon`: it carries
  * JSON, which the gateway requires, and still survives the page unloading.
@@ -32,9 +34,12 @@ export function reportClientError(kind: ClientErrorKind, error: unknown): void {
     clientErrorsControllerReportV1(
       {
         kind,
-        message: message.slice(0, MESSAGE_MAX),
-        stack: stack?.slice(0, STACK_MAX),
-        path: globalThis.location?.pathname ?? '/',
+        message: message.slice(0, CLIENT_ERROR_MESSAGE_MAX),
+        stack: stack?.slice(0, CLIENT_ERROR_STACK_KEPT),
+        path: (globalThis.location?.pathname ?? '/').slice(
+          0,
+          CLIENT_ERROR_PATH_MAX,
+        ),
         buildId: process.env.NEXT_PUBLIC_BUILD_ID,
       },
       { keepalive: true },

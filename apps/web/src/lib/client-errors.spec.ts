@@ -1,3 +1,7 @@
+import {
+  CLIENT_ERROR_PATH_MAX,
+  CLIENT_ERROR_STACK_KEPT,
+} from '@synapsedesk/contracts';
 import { stubApi } from '@/test/api';
 import {
   installClientErrorReporting,
@@ -33,6 +37,30 @@ describe('client errors', () => {
       },
     ]);
     expect(JSON.stringify(calls)).not.toContain('secret');
+  });
+
+  it('**cuts a path one character over the cap**, so the report is still taken', () => {
+    const calls = stubApi({ [ROUTE]: { status: 204 } });
+    const path = `/${'a'.repeat(CLIENT_ERROR_PATH_MAX)}`;
+    window.history.replaceState(null, '', path);
+
+    reportClientError('error', new Error('long path'));
+
+    expect(calls[0].body).toMatchObject({
+      path: path.slice(0, CLIENT_ERROR_PATH_MAX),
+    });
+  });
+
+  it('sends no more stack than the gateway keeps', () => {
+    const calls = stubApi({ [ROUTE]: { status: 204 } });
+    const error = new Error('deep');
+    error.stack = 'x'.repeat(CLIENT_ERROR_STACK_KEPT * 2);
+
+    reportClientError('error', error);
+
+    expect(calls[0].body).toMatchObject({
+      stack: 'x'.repeat(CLIENT_ERROR_STACK_KEPT),
+    });
   });
 
   it(`sends at most ${MAX_REPORTS} a page load`, () => {

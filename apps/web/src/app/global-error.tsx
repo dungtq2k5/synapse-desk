@@ -6,15 +6,9 @@ import '@/styles/globals.css';
 
 /**
  * The root layout itself failed, so this replaces the whole document: no
- * shell, no providers. It says so, offers a reload, and reports the error.
+ * shell, no providers. It says so, offers a full reload, and reports the error.
  */
-export default function GlobalError({
-  error,
-  reset,
-}: {
-  error: Error;
-  reset: () => void;
-}) {
+export default function GlobalError({ error }: { error: Error }) {
   useEffect(() => reportClientError('boundary', error), [error]);
 
   return (
@@ -31,7 +25,9 @@ export default function GlobalError({
           <button
             type="button"
             className="rounded-md border px-3 py-1.5 text-sm"
-            onClick={reset}
+            // A full reload: re-rendering in place would likely fail the
+            // same way the root just did.
+            onClick={() => globalThis.location.reload()}
           >
             Reload
           </button>
