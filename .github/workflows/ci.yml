@@ -455,10 +455,11 @@ jobs:
   # ------------------------------------------------------------- web-vitals
   #
   # Core Web Vitals on the main screens, on the plain production build: the
-  # same stack setup as e2e-web, then the `vitals` project alone. Reported in
-  # the summary and an artifact; nothing gates on it yet.
+  # same stack setup as e2e-web, then the `vitals` project alone. Gated per
+  # screen (LCP ≤ 1 s, CLS ≤ 0.1, INP ≤ 200 ms), and reported in the summary
+  # and an artifact.
   web-vitals:
-    name: web vitals (reported)
+    name: web vitals
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

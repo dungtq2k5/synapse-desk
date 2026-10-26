@@ -9,10 +9,10 @@ import { clearThrottles } from '../support';
  * Core Web Vitals on the main screens, from the browser's own performance
  * entries (no library): LCP, CLS, and INP from one interaction per load, the
  * median of three loads, at 1440 and 390 wide. The numbers go to
- * `test-results/web-vitals.json` and the log, with Google's "good" (LCP ≤
- * 2.5 s, CLS ≤ 0.1, INP ≤ 200 ms) marked beside each. **CLS is gated** at 0.1
- * on every screen: it measures the layout, not the machine. LCP and INP are
- * reported only, since they depend on the machine's speed.
+ * `test-results/web-vitals.json` and the log, and **every screen is gated**
+ * on {@link LIMITS}: CLS and INP at Google's "good", LCP at 1 s rather than
+ * its 2.5 s, so a slowdown fails long before people feel it (the CI runner's
+ * worst LCP was 428 ms, varying about ±30% between runs).
  *
  * Never on the coverage build: its source maps and V8 coverage slow every page.
  */
@@ -21,6 +21,9 @@ test.skip(
   'the coverage build is instrumented; vitals run on the plain build',
 );
 test.beforeEach(clearThrottles);
+
+/** The most each vital may be, on every screen: ms, a score, ms. */
+const LIMITS = { lcp: 1000, cls: 0.1, inp: 200 } as const;
 
 type Vitals = { lcp: number; cls: number; inp: number; shifted: string[] };
 
@@ -162,19 +165,23 @@ test('Core Web Vitals on the main screens, median of three, at 1440 and 390', as
     report
       .map(
         (row) =>
-          `${row.screen.padEnd(20)} ${String(row.width).padStart(4)}  LCP ${String(row.lcp).padStart(5)} ms ${mark(row.lcp <= 2500)}  CLS ${row.cls.toFixed(3)} ${mark(row.cls <= 0.1)}  INP ${String(row.inp).padStart(4)} ms ${mark(row.inp <= 200)}${row.cls > 0.1 ? `\n    shifted: ${row.shifted.join(', ')}` : ''}`,
+          `${row.screen.padEnd(20)} ${String(row.width).padStart(4)}  LCP ${String(row.lcp).padStart(5)} ms ${mark(row.lcp <= LIMITS.lcp)}  CLS ${row.cls.toFixed(3)} ${mark(row.cls <= LIMITS.cls)}  INP ${String(row.inp).padStart(4)} ms ${mark(row.inp <= LIMITS.inp)}${row.cls > LIMITS.cls ? `\n    shifted: ${row.shifted.join(', ')}` : ''}`,
       )
       .join('\n'),
   );
   // A measurement that read nothing is a broken observer, not a fast page.
   expect(report.every((row) => row.lcp > 0)).toBe(true);
-  // Every screen that shifts more than "good", with what moved.
+  // Every vital over its limit, named; a shift with what moved.
   expect(
-    report
-      .filter((row) => row.cls > 0.1)
-      .map(
-        (row) =>
-          `${row.screen} ${row.width}: ${row.cls} ${row.shifted.join(', ')}`,
-      ),
+    report.flatMap((row) => {
+      const at = `${row.screen} ${row.width}`;
+      return [
+        ...(row.lcp > LIMITS.lcp ? [`${at}: LCP ${row.lcp} ms`] : []),
+        ...(row.cls > LIMITS.cls
+          ? [`${at}: CLS ${row.cls} ${row.shifted.join(', ')}`]
+          : []),
+        ...(row.inp > LIMITS.inp ? [`${at}: INP ${row.inp} ms`] : []),
+      ];
+    }),
   ).toEqual([]);
 });
