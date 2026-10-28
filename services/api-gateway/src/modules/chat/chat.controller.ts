@@ -25,7 +25,10 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { TicketsService } from '../tickets/tickets.service';
 import { MessagesService } from '../tickets/messages.service';
-import { TicketResponseDto } from '../tickets/dto/rest/ticket-response.dto';
+import {
+  CreateTicketResponseDto,
+  TicketResponseDto,
+} from '../tickets/dto/rest/ticket-response.dto';
 import {
   CreateMessageResponseDto,
   MessageResponseDto,
@@ -83,14 +86,18 @@ export class ChatController {
   @ApiOperation({
     summary: 'Start a Tier 1 conversation → creates a NEW ticket',
   })
-  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateTicketResponseDto, {
+    status: HttpStatus.CREATED,
+  })
   @ApiFilterErrors(['400', '401'])
   @Post('conversations')
   @ResponseMessage('Conversation started')
   async start(
     @CurrentUser() context: RequestContext,
     @Body() dto: StartConversationDto,
-  ): Promise<TicketResponseDto> {
+  ): Promise<CreateTicketResponseDto> {
+    // The question's files are bound with the ticket, so they are there by
+    // the time the first answer reads them below.
     const ticket = await this.tickets.create(
       {
         title: dto.title,
@@ -101,6 +108,7 @@ export class ChatController {
         // chat that reports itself as having arrived by email.
         source: TicketSource.CHAT,
         authorId: undefined,
+        attachments: dto.attachments,
       },
       context,
     );

@@ -28,7 +28,8 @@ export function toAttachmentResponseDto(
 ): AttachmentResponseDto {
   return {
     id: attachment.id,
-    messageId: attachment.messageId,
+    messageId: attachment.messageId ?? null,
+    ticketId: attachment.ticketId,
     fileName: attachment.fileName,
     fileUrl: attachment.fileUrl,
     fileSizeBytes: attachment.fileSizeBytes,

@@ -11,6 +11,7 @@ import { TicketsGrpcClient } from './tickets-grpc.client';
 import {
   toListTicketsRequest,
   toTicketPageDto,
+  toCreateTicketResponseDto,
   toTicketResponseDto,
   toTicketStatusChangeResponseDto,
 } from './ticket.mapper';
@@ -32,6 +33,7 @@ import {
   MarkTicketReadResponseDto,
   TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
+  CreateTicketResponseDto,
   TicketResponseDto,
 } from './dto/rest/ticket-response.dto';
 
@@ -70,8 +72,8 @@ export class TicketsService {
   async create(
     dto: CreateTicketDto,
     context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
+  ): Promise<CreateTicketResponseDto> {
+    return toCreateTicketResponseDto(
       await this.ticketsGrpcClient.create(
         {
           title: dto.title,
@@ -79,6 +81,7 @@ export class TicketsService {
           priority: toProtoTicketPriority(dto.priority),
           source: toProtoTicketSource(dto.source),
           authorId: dto.authorId,
+          attachments: dto.attachments ?? [],
         },
         context,
       ),

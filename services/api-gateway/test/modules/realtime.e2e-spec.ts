@@ -79,6 +79,7 @@ describe('the real-time relay (e2e)', () => {
       currentAssigneeId: agentId,
       currentDepartmentId: faker.string.uuid(),
       unreadCount: 0,
+      attachments: [],
       createdAt: timestamp(),
       updatedAt: timestamp(),
       ...overrides,
@@ -2332,6 +2333,7 @@ describe('the real-time relay (e2e)', () => {
         notificationIds: [faker.string.uuid()],
         change: 'read' as const,
         unreadCount: 3,
+        attachments: [],
       };
 
       const readEvent = waitForEvent<typeof payload>(

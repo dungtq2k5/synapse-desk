@@ -95,9 +95,43 @@ describe('chat', () => {
   });
 
   rowFor('Chat')(
+    '**starting a conversation binds the question’s files**, and names the skipped',
+    async () => {
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ ticket: wireTicket(), skippedAttachments: ['gone.png'] });
+      const files = [
+        {
+          objectPath: 'organizations/o/ticket-openings/u/pending/abc.png',
+          fileName: 'screen.png',
+        },
+      ];
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/chat/conversations`,
+        {
+          title: 'Printer is on fire',
+          message: 'See the screenshot',
+          attachments: files,
+        },
+        cookie(),
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        data: { source: 'CHAT', skippedAttachments: ['gone.png'] },
+      });
+      const [call] = peers.ticket.calls('TicketService/CreateTicket');
+      expect(call.request).toMatchObject({ attachments: files });
+    },
+  );
+
+  rowFor('Chat')(
     '**starting a conversation forces `source = CHAT`**, not a value the client sent',
     async () => {
-      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ ticket: wireTicket(), skippedAttachments: [] });
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/chat/conversations`,
@@ -121,7 +155,9 @@ describe('chat', () => {
   rowFor('Chat')(
     '**starting a conversation asks ticket-service to answer its opening question**',
     async () => {
-      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ ticket: wireTicket(), skippedAttachments: [] });
       peers.ticket.on('MessageService/AnswerOpening').reply({});
 
       const response = await new Session(gateway.baseUrl).post(
@@ -139,7 +175,9 @@ describe('chat', () => {
   rowFor('Chat')(
     '**a refusal to answer the opening question doesn’t undo the conversation**',
     async () => {
-      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ ticket: wireTicket(), skippedAttachments: [] });
       peers.ticket
         .on('MessageService/AnswerOpening')
         .fail(9, 'This conversation is already under way');

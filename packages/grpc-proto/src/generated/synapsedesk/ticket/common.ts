@@ -56,6 +56,40 @@ export enum ReassignmentReason {
   UNRECOGNIZED = -1,
 }
 
+/**
+ * A file on a message, or on the ticket's opening.
+ *
+ * Here rather than in message.proto because `TicketResponse` carries the
+ * opening's files, and message.proto already imports this file.
+ */
+export interface AttachmentResponse {
+  id: string;
+  /** Absent for a file on the ticket's opening, which has no message. */
+  messageId?: string | undefined;
+  fileName: string;
+  fileUrl: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  createdAt:
+    | Timestamp
+    | undefined;
+  /** The ticket the file belongs to, through its message or directly. */
+  ticketId: string;
+}
+
+/**
+ * One already-uploaded object, waiting to be bound to a message or a ticket's
+ * opening.
+ *
+ * No size or MIME type: both are read back from the OBJECT at confirm, never
+ * taken from the client — the rule `confirmAttachment` already follows, and the
+ * reason a row cannot record whatever the caller felt like claiming.
+ */
+export interface NewAttachment {
+  objectPath: string;
+  fileName: string;
+}
+
 /** A ticket as every read RPC returns it. */
 export interface TicketResponse {
   id: string;
@@ -99,4 +133,10 @@ export interface TicketResponse {
    * cannot mean 25 count requests.
    */
   unreadCount: number;
+  /**
+   * The files on the ticket's opening, uploaded with it; empty when none.
+   * Every read fills it in: a file is signed only when downloaded, so a list
+   * costs one join and no storage call.
+   */
+  attachments: AttachmentResponse[];
 }

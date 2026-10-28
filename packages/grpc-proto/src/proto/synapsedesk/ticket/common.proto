@@ -66,6 +66,34 @@ enum ReassignmentReason {
   REASSIGNMENT_REASON_MANUAL = 7;
 }
 
+// A file on a message, or on the ticket's opening.
+//
+// Here rather than in message.proto because `TicketResponse` carries the
+// opening's files, and message.proto already imports this file.
+message AttachmentResponse {
+  string id = 1;
+  // Absent for a file on the ticket's opening, which has no message.
+  optional string message_id = 2;
+  string file_name = 3;
+  string file_url = 4;
+  int64 file_size_bytes = 5;
+  string mime_type = 6;
+  google.protobuf.Timestamp created_at = 7;
+  // The ticket the file belongs to, through its message or directly.
+  string ticket_id = 8;
+}
+
+// One already-uploaded object, waiting to be bound to a message or a ticket's
+// opening.
+//
+// No size or MIME type: both are read back from the OBJECT at confirm, never
+// taken from the client — the rule `confirmAttachment` already follows, and the
+// reason a row cannot record whatever the caller felt like claiming.
+message NewAttachment {
+  string object_path = 1;
+  string file_name = 2;
+}
+
 // A ticket as every read RPC returns it.
 message TicketResponse {
   string id = 1;
@@ -104,4 +132,9 @@ message TicketResponse {
   // On the list rather than a route of its own: a queue screen showing 25 rows
   // cannot mean 25 count requests.
   int32 unread_count = 18;
+
+  // The files on the ticket's opening, uploaded with it; empty when none.
+  // Every read fills it in: a file is signed only when downloaded, so a list
+  // costs one join and no storage call.
+  repeated AttachmentResponse attachments = 19;
 }

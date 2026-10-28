@@ -33,6 +33,12 @@ export enum StoragePurpose {
    * object — see `PURPOSE_POLICY`.
    */
   EXPORT = 'EXPORT',
+  /**
+   * A file attached to a ticket's opening, uploaded before the ticket
+   * exists: owned by its uploader (the path names them, not a ticket), and
+   * bound by `CreateTicket`.
+   */
+  TICKET_OPENING = 'TICKET_OPENING',
 }
 
 export const STORAGE_PATTERNS = {

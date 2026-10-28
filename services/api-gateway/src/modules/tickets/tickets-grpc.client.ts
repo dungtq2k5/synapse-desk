@@ -10,6 +10,7 @@ import {
   BulkTicketStatusResponse,
   ChangeTicketStatusRequest,
   CreateTicketRequest,
+  CreateTicketResponse,
   ListTicketsRequest,
   ListTicketsResponse,
   TICKET_GRPC_CLIENT,
@@ -75,7 +76,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
   create(
     request: CreateTicketRequest,
     context: RequestContext,
-  ): Promise<TicketResponse> {
+  ): Promise<CreateTicketResponse> {
     return this.call(
       (metadata) => this.ticketGrpcService.createTicket(request, metadata),
       context,

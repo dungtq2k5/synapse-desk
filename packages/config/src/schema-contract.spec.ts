@@ -204,9 +204,9 @@ describe('the schema contract', () => {
         read(`services/${service}/src/modules/prisma/database.seeder.ts`),
       );
 
-    it('extracts twenty-four named objects plus one extension — the floor', () => {
-      // auth 9, ticket 5, ingestion 7 (six indexes and `btree_gin`),
-      // notification 4 = 25.
+    it('extracts twenty-five named objects plus one extension — the floor', () => {
+      // auth 9, ticket 6, ingestion 7 (six indexes and `btree_gin`),
+      // notification 4 = 26.
       //
       // **The prose said twenty-six for three ADRs, and this is why it is a
       // test now.** That figure came from a raw `grep -c` over the seeders,
@@ -237,7 +237,7 @@ describe('the schema contract', () => {
         .join('\n')
         .match(/CREATE EXTENSION/gi);
 
-      expect(named).toHaveLength(24);
+      expect(named).toHaveLength(25);
       expect(extensions?.length).toBe(1);
     });
 

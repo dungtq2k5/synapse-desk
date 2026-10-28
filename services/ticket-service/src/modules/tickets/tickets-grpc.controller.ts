@@ -9,6 +9,7 @@ import {
   BulkTicketStatusResponse,
   ChangeTicketStatusRequest,
   CreateTicketRequest,
+  CreateTicketResponse,
   DeleteTicketResponse,
   GetTicketByNumberRequest,
   GetTicketRequest,
@@ -41,7 +42,7 @@ export class TicketsGrpcController implements TicketServiceController {
   createTicket(
     request: CreateTicketRequest,
     metadata?: Metadata,
-  ): Promise<TicketResponse> {
+  ): Promise<CreateTicketResponse> {
     return this.ticketsService.createTicket(
       request,
       unpackCallerContext(metadata),

@@ -56,6 +56,7 @@ describe('The OpenAPI document', () => {
     description: 'It really is',
     currentDepartmentId: faker.string.uuid(),
     unreadCount: 0,
+    attachments: [],
     createdAt: timestamp(),
     updatedAt: timestamp(),
   });

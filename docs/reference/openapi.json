@@ -39600,7 +39600,7 @@
                       "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
-                      "$ref": "#/components/schemas/TicketResponseDto"
+                      "$ref": "#/components/schemas/CreateTicketResponseDto"
                     }
                   }
                 }
@@ -41097,6 +41097,279 @@
           }
         ],
         "summary": "Remove",
+        "tags": ["Tickets"]
+      }
+    },
+    "/api/v1/tickets/attachments/upload-url": {
+      "post": {
+        "operationId": "TicketsController_presignOpeningAttachment_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadAttachmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "statusCode", "message", "data"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/PresignAttachmentResponseDto"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session cookie, or the session has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ],
+        "summary": "Presign a file for a new ticket's opening: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }",
         "tags": ["Tickets"]
       }
     },
@@ -55002,7 +55275,7 @@
                       "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
-                      "$ref": "#/components/schemas/TicketResponseDto"
+                      "$ref": "#/components/schemas/CreateTicketResponseDto"
                     }
                   }
                 }
@@ -72462,6 +72735,50 @@
         },
         "required": ["reason", "from", "to"]
       },
+      "AttachmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null for a file on the ticket's opening, which has no message."
+          },
+          "ticketId": {
+            "type": "string",
+            "description": "The ticket the file belongs to, through its message or directly."
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "An internal object path today; a signed URL once storage-service lands."
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "messageId",
+          "ticketId",
+          "fileName",
+          "fileUrl",
+          "fileSizeBytes",
+          "mimeType",
+          "createdAt"
+        ]
+      },
       "TicketResponseDto": {
         "type": "object",
         "properties": {
@@ -72544,6 +72861,13 @@
           "deletedById": {
             "type": "string",
             "nullable": true
+          },
+          "attachments": {
+            "description": "The files uploaded with the ticket's opening (the description); empty\nwhen none. A message's files are on the message.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponseDto"
+            }
           }
         },
         "required": [
@@ -72564,8 +72888,146 @@
           "createdAt",
           "updatedAt",
           "deletedAt",
-          "deletedById"
+          "deletedById",
+          "attachments"
         ]
+      },
+      "CreateTicketResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ticketNumber": {
+            "type": "number",
+            "description": "A number, not a string: `longs: Number` keeps int64 exact to 2^53."
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "source": {
+            "nullable": true,
+            "enum": ["API", "CHAT", "EMAIL", "WEB"],
+            "type": "string"
+          },
+          "status": {
+            "nullable": true,
+            "enum": [
+              "CLOSED",
+              "ESCALATED",
+              "NEW",
+              "OPEN",
+              "PENDING_AGENT",
+              "RESOLVED"
+            ],
+            "type": "string"
+          },
+          "priority": {
+            "nullable": true,
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "currentAssigneeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentDepartmentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "escalatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "number",
+            "description": "Messages the caller has not read on this ticket.\n\nExcludes their own and any internal note they cannot see. A ticket never\nopened counts as ALL unread, not zero. Always `0` on a single-ticket read —\na badge is a list affordance, and a caller looking at one ticket is reading\nit."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "deletedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "attachments": {
+            "description": "The files uploaded with the ticket's opening (the description); empty\nwhen none. A message's files are on the message.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponseDto"
+            }
+          },
+          "skippedAttachments": {
+            "description": "File NAMES, never object paths: a path that failed its confirm (expired,\nnot the caller's, not an attachment). The ticket is created regardless.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "ticketNumber",
+          "organizationId",
+          "authorId",
+          "source",
+          "status",
+          "priority",
+          "title",
+          "description",
+          "currentAssigneeId",
+          "currentDepartmentId",
+          "escalatedAt",
+          "resolvedAt",
+          "unreadCount",
+          "createdAt",
+          "updatedAt",
+          "deletedAt",
+          "deletedById",
+          "attachments",
+          "skippedAttachments"
+        ]
+      },
+      "NewAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "objectPath": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": ["objectPath", "fileName"]
       },
       "CreateTicketDto": {
         "type": "object",
@@ -72575,6 +73037,14 @@
             "minLength": 1,
             "maxLength": 20000,
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
+          },
+          "attachments": {
+            "description": "Files already uploaded through `POST /tickets/attachments/upload-url`,\nbound to the ticket's opening as it is created. A path that fails its\nconfirm comes back in `skippedAttachments`; the ticket is created\nregardless.",
+            "default": [],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewAttachmentDto"
+            }
           },
           "title": {
             "type": "string",
@@ -72596,6 +73066,62 @@
           }
         },
         "required": ["description", "title"]
+      },
+      "PresignAttachmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string"
+          },
+          "uploadMethod": {
+            "type": "string",
+            "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
+            "enum": ["POST", "PUT"]
+          },
+          "objectPath": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": ["uploadUrl", "uploadMethod", "objectPath", "expiresAt"]
+      },
+      "UploadAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mimeType": {
+            "description": "An allowlist, never a denylist. A denylist is a promise to have thought of\nevery dangerous type, which is not a promise anyone can keep.",
+            "enum": [
+              "application/msword",
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "image/heic",
+              "image/heif",
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "text/csv",
+              "text/markdown",
+              "text/plain"
+            ],
+            "type": "string"
+          },
+          "fileSizeBytes": {
+            "type": "number",
+            "description": "Declared by the client and therefore not trustworthy on its own — the real\nenforcement is the signed URL's own size constraint. Checking it here still\nearns its place: it turns \"upload 2 GB, then be refused\" into an immediate\nrefusal, and it documents the cap in the API contract.",
+            "minimum": 1,
+            "maximum": 10485760
+          }
+        },
+        "required": ["fileName", "mimeType", "fileSizeBytes"]
       },
       "UpdateTicketDto": {
         "type": "object",
@@ -73014,43 +73540,6 @@
           "changedAt"
         ]
       },
-      "AttachmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "messageId": {
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileUrl": {
-            "type": "string",
-            "description": "An internal object path today; a signed URL once storage-service lands."
-          },
-          "fileSizeBytes": {
-            "type": "number"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "messageId",
-          "fileName",
-          "fileUrl",
-          "fileSizeBytes",
-          "mimeType",
-          "createdAt"
-        ]
-      },
       "CitationResponseDto": {
         "type": "object",
         "properties": {
@@ -73203,22 +73692,6 @@
         },
         "required": ["message", "skippedAttachments"]
       },
-      "NewAttachmentDto": {
-        "type": "object",
-        "properties": {
-          "objectPath": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          },
-          "fileName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          }
-        },
-        "required": ["objectPath", "fileName"]
-      },
       "CreateMessageDto": {
         "type": "object",
         "properties": {
@@ -73265,41 +73738,6 @@
           }
         },
         "required": ["content"]
-      },
-      "UploadAttachmentDto": {
-        "type": "object",
-        "properties": {
-          "fileName": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255
-          },
-          "mimeType": {
-            "description": "An allowlist, never a denylist. A denylist is a promise to have thought of\nevery dangerous type, which is not a promise anyone can keep.",
-            "enum": [
-              "application/msword",
-              "application/pdf",
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-              "image/heic",
-              "image/heif",
-              "image/jpeg",
-              "image/png",
-              "image/webp",
-              "text/csv",
-              "text/markdown",
-              "text/plain"
-            ],
-            "type": "string"
-          },
-          "fileSizeBytes": {
-            "type": "number",
-            "description": "Declared by the client and therefore not trustworthy on its own — the real\nenforcement is the signed URL's own size constraint. Checking it here still\nearns its place: it turns \"upload 2 GB, then be refused\" into an immediate\nrefusal, and it documents the cap in the API contract.",
-            "minimum": 1,
-            "maximum": 10485760
-          }
-        },
-        "required": ["fileName", "mimeType", "fileSizeBytes"]
       },
       "ConfirmAttachmentDto": {
         "type": "object",
@@ -74231,6 +74669,14 @@
       "StartConversationDto": {
         "type": "object",
         "properties": {
+          "attachments": {
+            "description": "The question's files, already uploaded through\n`POST /tickets/attachments/upload-url`. Bound before the first answer is\nasked for, so the answer reads them. A path that fails its confirm comes\nback in `skippedAttachments`; the conversation starts regardless.",
+            "default": [],
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewAttachmentDto"
+            }
+          },
           "title": {
             "type": "string",
             "minLength": 3,

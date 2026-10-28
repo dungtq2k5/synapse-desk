@@ -63,6 +63,7 @@ describe('The entity cache (e2e)', () => {
 
   /** Enum fields are NUMBERS on the wire — the generated proto types, not the DTO. */
   const wireTicket = (id: string, assigneeId: string) => ({
+    attachments: [],
     id,
     ticketNumber: 1,
     organizationId,

@@ -87,7 +87,13 @@ export class StorageReferenceService implements OnModuleInit {
   ): Promise<void> {
     await firstValueFrom(
       this.storageService
-        .confirmUpload({ objectPath }, packRequestContext(context))
+        .confirmUpload(
+          {
+            objectPath,
+            expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_AVATAR],
+          },
+          packRequestContext(context),
+        )
         .pipe(timeout(GRPC_DEADLINE_MS)),
     );
   }

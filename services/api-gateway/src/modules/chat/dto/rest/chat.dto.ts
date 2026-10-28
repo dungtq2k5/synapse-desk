@@ -1,17 +1,23 @@
-import { Transform } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_TICKET_DESCRIPTION_LENGTH,
   MAX_TICKET_TITLE_LENGTH,
   TicketPriority,
 } from '@synapsedesk/contracts';
 import { trimIfString } from '@synapsedesk/core';
+import { NewAttachmentDto } from '../../../tickets/dto/rest/message.dto';
 
 /**
  * Starting a conversation.
@@ -45,4 +51,18 @@ export class StartConversationDto {
   @IsOptional()
   @IsIn(Object.values(TicketPriority))
   readonly priority?: TicketPriority;
+
+  /**
+   * The question's files, already uploaded through
+   * `POST /tickets/attachments/upload-url`. Bound before the first answer is
+   * asked for, so the answer reads them. A path that fails its confirm comes
+   * back in `skippedAttachments`; the conversation starts regardless.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => NewAttachmentDto)
+  @ApiPropertyOptional()
+  readonly attachments: NewAttachmentDto[] = [];
 }

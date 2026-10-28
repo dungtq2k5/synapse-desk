@@ -18,7 +18,13 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { grpcError, timestamp, wirePage, wireTicket } from '../fixtures/wire';
+import {
+  grpcError,
+  timestamp,
+  wireAttachment,
+  wirePage,
+  wireTicket,
+} from '../fixtures/wire';
 
 /**
  * The tickets surface at the HTTP boundary.
@@ -195,6 +201,45 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
     });
   });
 
+  describe('POST /tickets/attachments/upload-url', () => {
+    const upload = {
+      fileName: 'screen.png',
+      fileSizeBytes: 2048,
+      mimeType: 'image/png',
+    };
+
+    it('**presigns with no ticket**, for the caller’s own opening, and answers 200', async () => {
+      fx.stubs.message.uploadAttachment.mockReturnValue(
+        of({
+          uploadUrl: 'https://storage.example/signed-put',
+          uploadMethod: 'PUT',
+          objectPath: 'organizations/o/ticket-openings/u/pending/abc.png',
+          expiresAt: timestamp(),
+        }),
+      );
+
+      // No `ticket.create`: Ask's question box uploads here too.
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/tickets/attachments/upload-url`)
+        .send(upload);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.objectPath).toContain('/ticket-openings/');
+      const [request] = fx.stubs.message.uploadAttachment.mock.calls[0];
+      expect(request.ticketId).toBeUndefined();
+      expect(request.messageId).toBeUndefined();
+    });
+
+    it('refuses a type outside the allowlist before asking anyone', async () => {
+      const res = await authenticatedAgent(fx.app)
+        .post(`${API}/tickets/attachments/upload-url`)
+        .send({ ...upload, mimeType: 'application/x-msdownload' });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.message.uploadAttachment).not.toHaveBeenCalled();
+    });
+  });
+
   describe('POST /tickets', () => {
     it('requires ticket.create', async () => {
       const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
@@ -205,7 +250,9 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
     });
 
     it('creates and returns 201 with the mapped ticket', async () => {
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: ['ticket.create'],
@@ -222,6 +269,47 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
 
       const [request] = fx.stubs.ticket.createTicket.mock.calls[0];
       expect(request.priority).toBe(ProtoTicketPriority.TICKET_PRIORITY_HIGH);
+    });
+
+    it('**binds the opening’s files**, answers the skipped by name, and keeps the ticket’s fields at the top level', async () => {
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({
+          ticket: wireTicket({
+            attachments: [
+              wireAttachment({ fileName: 'screen.png', messageId: undefined }),
+            ],
+          }),
+          skippedAttachments: ['gone.png'],
+        }),
+      );
+      const files = [
+        {
+          objectPath: 'organizations/o/ticket-openings/u/pending/a.png',
+          fileName: 'screen.png',
+        },
+      ];
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.create'],
+      })
+        .post(`${API}/tickets`)
+        .send({
+          title: 'Printer on fire',
+          description: 'It is',
+          attachments: files,
+        });
+
+      expect(res.status).toBe(201);
+      expect(fx.stubs.ticket.createTicket.mock.calls[0][0].attachments).toEqual(
+        files,
+      );
+      expect(res.body.data).toMatchObject({
+        title: expect.any(String),
+        skippedAttachments: ['gone.png'],
+        attachments: [
+          expect.objectContaining({ fileName: 'screen.png', messageId: null }),
+        ],
+      });
     });
 
     it('rejects a body with NO title', async () => {

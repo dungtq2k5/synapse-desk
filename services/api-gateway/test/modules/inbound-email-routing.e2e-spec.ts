@@ -84,6 +84,7 @@ describe('Inbound email routing (e2e)', () => {
   };
 
   const wireTicket = (overrides: Record<string, unknown> = {}) => ({
+    attachments: [],
     id: faker.string.uuid(),
     ticketNumber: 4211,
     organizationId,
@@ -197,7 +198,9 @@ describe('Inbound email routing (e2e)', () => {
       // The argument the RPC's shape exists for: the organization travels from
       // the token, never from the sender's domain.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await post(
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
@@ -214,7 +217,9 @@ describe('Inbound email routing (e2e)', () => {
   describe('threading', () => {
     it('1. a first message creates a ticket with `source = EMAIL`', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const response = await post(
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
@@ -257,7 +262,9 @@ describe('Inbound email routing (e2e)', () => {
       // The whole purpose of the HMAC. The number is legible in the address,
       // and the neighbouring tickets belong to other customers.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const legitimate = buildTicketReplyToken(organizationId, 4211, secret);
       const forged = `${(4212).toString(36)}-${legitimate.split('-')[1]}`;
@@ -277,7 +284,9 @@ describe('Inbound email routing (e2e)', () => {
       // Ticket numbers repeat across tenants, so without the tenant inside the
       // MAC this address would append to a stranger's #4211.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const foreign = buildTicketReplyToken(faker.string.uuid(), 4211, secret);
 
@@ -323,7 +332,9 @@ describe('Inbound email routing (e2e)', () => {
       fx.stubs.ticket.getTicketByNumber.mockReturnValue(
         throwError(() => ({ code: GrpcStatus.NOT_FOUND })),
       );
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const token = buildTicketReplyToken(organizationId, 4211, secret);
 
@@ -402,7 +413,9 @@ describe('Inbound email routing (e2e)', () => {
       // The header is controlled by the same sender as the address. Falling
       // through would hand back exactly the threading the MAC just refused.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const legitimate = buildTicketReplyToken(organizationId, 4211, secret);
       const forged = `${(4212).toString(36)}-${legitimate.split('-')[1]}`;
@@ -425,7 +438,9 @@ describe('Inbound email routing (e2e)', () => {
       fx.stubs.notification.resolveTicketByMessageId.mockReturnValue(
         of({ ticketId: undefined }),
       );
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const response = await post(
         plainEmail({
@@ -462,7 +477,9 @@ describe('Inbound email routing (e2e)', () => {
       // must be identical across the two, or the redelivery opens a second
       // ticket.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const message = {
         to: buildInboundAddress(INBOUND_DOMAIN, tenantToken),
@@ -490,7 +507,9 @@ describe('Inbound email routing (e2e)', () => {
       // customer's message, which is worse than the duplicate it avoids — so
       // the body is in the digest.
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const shared = {
         to: buildInboundAddress(INBOUND_DOMAIN, tenantToken),
@@ -549,7 +568,9 @@ describe('Inbound email routing (e2e)', () => {
 
     it('a plain reply becomes a ticket', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const response = await post(addressedHere('plain-reply.json')).expect(
         200,
@@ -560,7 +581,9 @@ describe('Inbound email routing (e2e)', () => {
 
     it('an HTML-only message is stored as readable text', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await post(addressedHere('html-only.json')).expect(200);
 
@@ -606,7 +629,9 @@ describe('Inbound email routing (e2e)', () => {
 
     it('and a dropped attachment is named in the ticket body', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await post(addressedHere('with-attachment.json')).expect(200);
 
@@ -622,7 +647,9 @@ describe('Inbound email routing (e2e)', () => {
   describe('what gets stored', () => {
     it('10. quoted history is stripped before the RPC', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await post(
         plainEmail({
@@ -644,7 +671,9 @@ describe('Inbound email routing (e2e)', () => {
 
     it('and dropped attachments are named in the body, not silently lost', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await post(
         plainEmail({

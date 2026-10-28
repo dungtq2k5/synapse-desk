@@ -207,6 +207,7 @@ describe('Realtime across two gateway replicas (e2e)', () => {
         currentAssigneeId: agentId,
         currentDepartmentId: departmentId,
         unreadCount: 0,
+        attachments: [],
         createdAt: timestamp(),
         updatedAt: timestamp(),
       };

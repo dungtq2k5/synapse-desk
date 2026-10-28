@@ -14,7 +14,12 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { wireCreatedMessage, wirePage, wireTicket } from '../fixtures/wire';
+import {
+  wireAttachment,
+  wireCreatedMessage,
+  wirePage,
+  wireTicket,
+} from '../fixtures/wire';
 import { StartConversationDto } from '../../src/modules/chat/dto/rest/chat.dto';
 
 /**
@@ -32,6 +37,7 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
   const start: StartConversationDto = {
     title: 'Cannot log in',
     message: 'It says bad password',
+    attachments: [],
   };
 
   beforeAll(async () => {
@@ -49,7 +55,10 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
   describe('POST /chat/conversations', () => {
     it('1. creates a ticket with source CHAT', async () => {
       fx.stubs.ticket.createTicket.mockReturnValue(
-        of(wireTicket({ source: ProtoTicketSource.TICKET_SOURCE_CHAT })),
+        of({
+          ticket: wireTicket({ source: ProtoTicketSource.TICKET_SOURCE_CHAT }),
+          skippedAttachments: [],
+        }),
       );
 
       const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
@@ -64,7 +73,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
       const ticket = wireTicket({
         source: ProtoTicketSource.TICKET_SOURCE_CHAT,
       });
-      fx.stubs.ticket.createTicket.mockReturnValue(of(ticket));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: ticket, skippedAttachments: [] }),
+      );
       fx.stubs.message.answerOpening.mockReturnValue(of({}));
 
       const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
@@ -79,7 +90,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
     });
 
     it("**1c. a refusal to answer doesn't undo the conversation**", async () => {
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
       fx.stubs.message.answerOpening.mockReturnValue(
         throwError(() => ({
           code: status.FAILED_PRECONDITION,
@@ -94,12 +107,54 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
       expect(res.status).toBe(201);
     });
 
+    it('**1d. binds the question’s files with the ticket, before the answer is asked for**, and names the skipped', async () => {
+      const ticket = wireTicket({
+        attachments: [
+          wireAttachment({ fileName: 'screen.png', messageId: undefined }),
+        ],
+      });
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket, skippedAttachments: ['old.png'] }),
+      );
+      fx.stubs.message.answerOpening.mockReturnValue(of({}));
+      const files = [
+        {
+          objectPath: 'organizations/o/ticket-openings/u/pending/a.png',
+          fileName: 'screen.png',
+        },
+        {
+          objectPath: 'organizations/o/ticket-openings/u/pending/b.png',
+          fileName: 'old.png',
+        },
+      ];
+
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/chat/conversations`)
+        .send({ ...start, attachments: files });
+
+      expect(res.status).toBe(201);
+      const [request] = fx.stubs.ticket.createTicket.mock.calls[0];
+      expect(request.attachments).toEqual(files);
+      expect(res.body.data.skippedAttachments).toEqual(['old.png']);
+      expect(res.body.data.attachments).toEqual([
+        expect.objectContaining({ fileName: 'screen.png', messageId: null }),
+      ]);
+      // Created first, answered second: the files are bound by then.
+      expect(
+        fx.stubs.ticket.createTicket.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        fx.stubs.message.answerOpening.mock.invocationCallOrder[0],
+      );
+    });
+
     it('2. needs NO ticket.create permission', async () => {
       // Starting a conversation IS the product's entry point. Requiring a grant
       // would mean a customer needed an administrator before asking a question.
       // `POST /tickets` keeps its permission because it can author on somebody
       // else's behalf; this route cannot.
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
         .post(`${API}/chat/conversations`)
@@ -111,7 +166,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
     it('3. FORCES source=CHAT rather than accepting it from the body', async () => {
       // Otherwise a client could open a conversation that reports itself as
       // having arrived by email, and every source-based report would be wrong.
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations`)
@@ -144,7 +201,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
     });
 
     it('6. sends NO authorId, so the service defaults to the caller', async () => {
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations`)
@@ -156,7 +215,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
 
     it('7. maps `message` onto the ticket DESCRIPTION', async () => {
       // The end-user field name differs; the ticket field it lands in must not.
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations`)
@@ -170,7 +231,9 @@ describe('Self-service chat at the HTTP boundary (e2e)', () => {
     it('8. produces a request IDENTICAL to POST /tickets but for the source', async () => {
       // Stated directly: "indistinguishable from a direct
       // POST /tickets except for that field".
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations`)

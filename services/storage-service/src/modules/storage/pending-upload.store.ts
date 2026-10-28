@@ -1,4 +1,5 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import type { StoragePurpose } from '@synapsedesk/contracts';
 import Redis from 'ioredis';
 
 export const STORAGE_REDIS = Symbol('STORAGE_REDIS');
@@ -25,13 +26,18 @@ export type PendingUpload = {
    * changed.
    *
    * Equal to `objectPath` for every purpose that does not segregate — only
-   * ticket attachments do, because they are the only ones a user can abandon
-   * before anything references them.
+   * ticket attachments and a ticket's opening files do, because they are the
+   * only ones a user can abandon before anything references them.
    */
   committedPath: string;
   organizationId: string;
-  /** The caller who was authorized to write here. */
+  /**
+   * The caller who was authorized to write here, and the only one who may
+   * confirm it.
+   */
   actorId: string;
+  /** What the object was uploaded for; a confirm may require it. */
+  purpose: StoragePurpose;
   contentType: string;
   sizeBytes: number;
   originalFileName: string;

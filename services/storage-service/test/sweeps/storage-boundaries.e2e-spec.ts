@@ -224,7 +224,7 @@ describe('Storage boundary sweeps (e2e)', () => {
           });
 
         const attempt = storage.confirmUpload(
-          { objectPath: presigned.objectPath },
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
           caller(faker.string.uuid()),
         );
 
@@ -246,12 +246,12 @@ describe('Storage boundary sweeps (e2e)', () => {
             resumable: false,
           });
         await storage.confirmUpload(
-          { objectPath: presigned.objectPath },
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
           caller(),
         );
 
         const attempt = storage.confirmUpload(
-          { objectPath: presigned.objectPath },
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
           caller(),
         );
 
@@ -279,7 +279,10 @@ describe('Storage boundary sweeps (e2e)', () => {
         'organizations/x/avatars/y/z.png',
       ]) {
         await storage
-          .confirmUpload({ objectPath: path }, caller(faker.string.uuid()))
+          .confirmUpload(
+            { objectPath: path, expectedPurposes: [] },
+            caller(faker.string.uuid()),
+          )
           .catch((error: unknown) => codes.push(rpcCode(error)));
       }
 

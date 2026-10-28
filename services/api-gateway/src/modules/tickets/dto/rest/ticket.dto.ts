@@ -15,9 +15,11 @@ import {
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import {
   DEFAULT_SEARCH,
+  MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_BULK_TICKET_IDS,
   MAX_STATUS_CHANGE_REASON_LENGTH,
   MAX_TICKET_DESCRIPTION_LENGTH,
@@ -32,6 +34,7 @@ import {
 import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { NewAttachmentDto } from './message.dto';
 
 export class CreateTicketDto {
   @IsString()
@@ -68,6 +71,20 @@ export class CreateTicketDto {
   @IsOptional()
   @IsUUID('4')
   readonly authorId?: string;
+
+  /**
+   * Files already uploaded through `POST /tickets/attachments/upload-url`,
+   * bound to the ticket's opening as it is created. A path that fails its
+   * confirm comes back in `skippedAttachments`; the ticket is created
+   * regardless.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => NewAttachmentDto)
+  @ApiPropertyOptional()
+  readonly attachments: NewAttachmentDto[] = [];
 }
 
 /**

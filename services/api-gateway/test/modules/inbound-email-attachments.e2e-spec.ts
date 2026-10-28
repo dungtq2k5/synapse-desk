@@ -96,6 +96,7 @@ describe('Inbound email attachments (e2e)', () => {
   };
 
   const wireTicket = () => ({
+    attachments: [],
     id: ticketId,
     ticketNumber: 4211,
     organizationId,
@@ -257,10 +258,16 @@ describe('Inbound email attachments (e2e)', () => {
   // ------------------------------------------------ what never reaches storage
 
   describe('what is declined without asking storage', () => {
-    it('**declines everything for a mail that would OPEN a ticket**, and names the eligible files', async () => {
-      // The new-ticket half, asserted absent: there is no message to attach to.
+    it('**a mail that OPENS a ticket ingests its files as the sender’s own**, and binds them to the opening', async () => {
       resolvable();
-      fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
+      fx.stubs.ticket.createTicket.mockReturnValue(
+        of({ ticket: wireTicket(), skippedAttachments: [] }),
+      );
+      fx.stubs.message.ingestAttachment.mockImplementation((req) =>
+        of({
+          objectPath: `organizations/${organizationId}/ticket-openings/${senderId}/pending/${req.fileName}`,
+        }),
+      );
 
       await deliver(
         plainEmail({
@@ -269,12 +276,19 @@ describe('Inbound email attachments (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(attachmentsList).not.toHaveBeenCalled();
-      expect(fx.stubs.message.ingestAttachment).not.toHaveBeenCalled();
+      // No ticket yet: ingested with none, so storage files it under the
+      // sender until `createTicket` binds it.
+      const [[ingested]] = fx.stubs.message.ingestAttachment.mock.calls;
+      expect(ingested.ticketId).toBeUndefined();
       const [[created]] = fx.stubs.ticket.createTicket.mock.calls;
-      expect(created.description).toContain(
-        'Attachments were not accepted by email: error.png',
-      );
+      expect(created.attachments).toEqual([
+        {
+          objectPath: `organizations/${organizationId}/ticket-openings/${senderId}/pending/error.png`,
+          fileName: 'error.png',
+        },
+      ]);
+      // Nothing was refused, so the note names nothing.
+      expect(created.description).not.toContain('Attachments were not');
     });
 
     it('an unroutable mail lists nothing and asks storage nothing', async () => {

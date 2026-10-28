@@ -15,12 +15,18 @@ export type MessageWithAttachments = TicketMessage & {
   attachments?: MessageAttachment[];
 };
 
+/**
+ * @param ticketId the file's ticket: its message's, or the ticket whose
+ *   opening it is on. A message's row doesn't carry it.
+ */
 export function toAttachmentResponse(
   attachment: MessageAttachment,
+  ticketId: string,
 ): AttachmentResponse {
   return {
     id: attachment.id,
-    messageId: attachment.messageId,
+    messageId: attachment.messageId ?? undefined,
+    ticketId,
     fileName: attachment.fileName,
     // An internal object PATH, not a public URL — the column holds a storage
     // key, and whatever resolves it to a signed URL does so per request. See
@@ -51,7 +57,9 @@ export function toMessageResponse(
     // `?? []` rather than leaving it undefined: proto3 repeated fields are
     // never null, and a caller that fetched without the relation should get an
     // empty list rather than a crash on `.map`.
-    attachments: (message.attachments ?? []).map(toAttachmentResponse),
+    attachments: (message.attachments ?? []).map((attachment) =>
+      toAttachmentResponse(attachment, message.ticketId),
+    ),
     // **On the read shape so the gateway can filter after fetching**
     // Its transcript builder drops these rows itself rather than asking for
     // a filtered list, because the same route serves the UI where a refused

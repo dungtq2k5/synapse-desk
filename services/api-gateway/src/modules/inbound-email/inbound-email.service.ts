@@ -181,7 +181,7 @@ export const INGEST_CONCURRENCY = 2;
 export type AcceptOptions = {
   /**
    * The signed sources of the mail's remote attachments, by Resend id. Called
-   * at most once, and only when routing has produced a ticket.
+   * at most once, and only for a mail that was routed.
    */
   fetchAttachmentUrls?: () => Promise<Map<string, RemoteAttachmentSource>>;
 };
@@ -281,15 +281,16 @@ export class InboundEmailService implements OnModuleInit {
     const { context, ticket, addressedToTicket, limits } = routing;
 
     // **Ingest BEFORE the note is written**, because the note names what ingest
-    // refuses. On a mail that opens a ticket there is no message to attach to
-    // — `createTicket` writes a ticket row and no message — so every eligible
-    // attachment is named as dropped, alongside the ones the mapper refused.
-    const ingested: IngestResult = ticket
-      ? await this.ingestAttachments(payload, ticket, limits, context, options)
-      : {
-          uploaded: [],
-          dropped: payload.remoteAttachments.map((file) => file.fileName),
-        };
+    // refuses. A reply's files go under its ticket; a mail that opens a ticket
+    // has none yet, so its files are ingested as the sender's own and bound to
+    // the new ticket's opening by `createTicket`.
+    const ingested: IngestResult = await this.ingestAttachments(
+      payload,
+      ticket,
+      limits,
+      context,
+      options,
+    );
     const storedBody = this.withTruncationNote(
       toStoredBody(payload.text, payload.html),
       payload.bodyTruncated,
@@ -299,6 +300,9 @@ export class InboundEmailService implements OnModuleInit {
     const dropped = [...payload.droppedAttachments, ...ingested.dropped];
     const inboundMessageId = this.idempotencyKeyFor(payload);
     let createNote = dropped;
+    // A new ticket's opening takes the files ingested for it; files ingested
+    // for a ticket that has since vanished are named instead (below).
+    let createFiles = ticket ? [] : ingested.uploaded;
 
     try {
       if (ticket) {
@@ -320,6 +324,7 @@ export class InboundEmailService implements OnModuleInit {
           ...dropped,
           ...ingested.uploaded.map((file) => file.fileName),
         ];
+        createFiles = [];
       } else if (addressedToTicket) {
         // The token verified but the ticket is gone. A new ticket is the safe
         // direction — because the alternative is discarding a
@@ -345,6 +350,9 @@ export class InboundEmailService implements OnModuleInit {
               // the only identity here that survived verification.
               authorId: context.sub,
               inboundMessageId,
+              // Skipped at confirm are logged by ticket-service, as a reply's
+              // are: the note was written before the confirm could name them.
+              attachments: createFiles,
             },
             metadata,
           ),
@@ -595,9 +603,9 @@ export class InboundEmailService implements OnModuleInit {
             //
             // This list is for a client that uploaded BEFORE the message
             // existed; ticket-service confirms each path as it writes the
-            // message. Empty from the Resend webhook, which names every
-            // attachment in `droppedAttachments` instead, and always empty for
-            // a mail that opens a NEW ticket — there is no message to attach to.
+            // message: what ingest stored for this reply, plus any paths the
+            // payload already carried. A mail that opens a NEW ticket binds its
+            // files to the ticket's opening through `createTicket` instead.
             attachments: attachments ?? [],
           },
           metadata,
@@ -763,7 +771,8 @@ export class InboundEmailService implements OnModuleInit {
    */
   private async ingestAttachments(
     payload: InboundEmailDto,
-    ticket: TicketResponse,
+    /** `null` for a mail that opens a ticket: the files are the sender's own. */
+    ticket: TicketResponse | null,
     limits: { maxBytes: number; maxPerMessage: number },
     context: RequestContext,
     options: AcceptOptions,
@@ -831,7 +840,7 @@ export class InboundEmailService implements OnModuleInit {
             (metadata) =>
               this.messages.ingestAttachment(
                 {
-                  ticketId: ticket.id,
+                  ticketId: ticket?.id,
                   fileName: file.fileName,
                   fileSizeBytes: file.sizeBytes,
                   mimeType: file.mimeType,

@@ -246,6 +246,7 @@
     true,
     false
   ],
+  ["POST", "/api/v1/tickets/attachments/upload-url", "WRITE", true, false],
   ["POST", "/api/v1/tickets/bulk/priority", "WRITE", true, false],
   ["POST", "/api/v1/tickets/bulk/status", "WRITE", true, false],
   ["GET", "/api/v1/tickets/by-number/{ticketNumber}", "READ", true, false],

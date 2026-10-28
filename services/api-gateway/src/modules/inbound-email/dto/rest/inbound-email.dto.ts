@@ -59,10 +59,10 @@ export class InboundUploadedAttachmentDto {
 /**
  * One eligible attachment, still held by Resend, for storage-service to fetch.
  *
- * **No URL here.** Resend's signed `download_url` is fetched only once routing
- * has produced a ticket (`fetchAttachmentUrls`), because a mail that turns out
- * unroutable or ticket-opening drops every attachment anyway, and the list call
- * would spend the account's rate limit on it. `id` is what that fetch joins on.
+ * **No URL here.** Resend's signed `download_url` is fetched only once the
+ * mail is routed (`fetchAttachmentUrls`), because a mail that turns out
+ * unroutable drops every attachment anyway, and the list call would spend the
+ * account's rate limit on it. `id` is what that fetch joins on.
  *
  * Every rule below is also checked by the mapper before the object is built:
  * a nested failure here would drop the WHOLE mail as `invalid_payload`, so

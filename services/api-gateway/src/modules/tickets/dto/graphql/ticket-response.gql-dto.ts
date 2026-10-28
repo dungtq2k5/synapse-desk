@@ -17,6 +17,10 @@ import '../../../../common/graphql/enums';
  * `number` cannot distinguish `Int` from `Float`, and both serialize
  * identically until a client generates types from the SDL.
  *
+ * **No `attachments`**: the opening's files are REST-only, as a message's are
+ * on `TicketMessage`. Their URLs are internal object paths resolved per
+ * request.
+ *
  * **`nullable` mirrors the REST DTO's `| null`.** They drift silently: a field
  * becomes nullable there, stays non-null here, and the first null row fails the
  * WHOLE query rather than returning one null field.

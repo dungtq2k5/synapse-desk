@@ -22,6 +22,11 @@ export enum StoragePurpose {
    * than reinvented.
    */
   STORAGE_PURPOSE_EXPORT = 4,
+  /**
+   * STORAGE_PURPOSE_TICKET_OPENING - A file on a ticket's opening, uploaded before the ticket exists: owned by
+   * its uploader, bound by CreateTicket.
+   */
+  STORAGE_PURPOSE_TICKET_OPENING = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -61,6 +66,11 @@ export interface PresignUploadResponse {
 
 export interface ConfirmUploadRequest {
   objectPath: string;
+  /**
+   * The purposes the caller binds this object as. Empty accepts any; a
+   * pending upload of another purpose answers NOT_FOUND, like a stranger's.
+   */
+  expectedPurposes: StoragePurpose[];
 }
 
 export interface ConfirmUploadResponse {

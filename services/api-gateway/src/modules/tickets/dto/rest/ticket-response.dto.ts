@@ -1,3 +1,4 @@
+import { AttachmentResponseDto } from './message-response.dto';
 import {
   TicketPriority,
   TicketSource,
@@ -39,6 +40,26 @@ export class TicketResponseDto {
   updatedAt!: Date;
   deletedAt!: Date | null;
   deletedById!: string | null;
+  /**
+   * The files uploaded with the ticket's opening (the description); empty
+   * when none. A message's files are on the message.
+   */
+  attachments!: AttachmentResponseDto[];
+}
+
+/**
+ * What `POST /tickets` and `POST /chat/conversations` answer: the ticket, and
+ * the opening's files that couldn't be attached.
+ *
+ * The ticket's own fields stay at the top level, so a client reading the
+ * created ticket reads it as before.
+ */
+export class CreateTicketResponseDto extends TicketResponseDto {
+  /**
+   * File NAMES, never object paths: a path that failed its confirm (expired,
+   * not the caller's, not an attachment). The ticket is created regardless.
+   */
+  skippedAttachments!: string[];
 }
 
 /**

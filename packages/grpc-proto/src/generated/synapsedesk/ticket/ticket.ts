@@ -10,7 +10,7 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
-import { TicketPriority, TicketResponse, TicketSource, TicketStatus } from "./common";
+import { NewAttachment, TicketPriority, TicketResponse, TicketSource, TicketStatus } from "./common";
 
 export interface CreateTicketRequest {
   title: string;
@@ -30,7 +30,27 @@ export interface CreateTicketRequest {
    * provider redelivery is a duplicate-key violation rather than a second
    * ticket. Absent for every other transport, and absent is not an error.
    */
-  inboundMessageId?: string | undefined;
+  inboundMessageId?:
+    | string
+    | undefined;
+  /**
+   * Files already uploaded under STORAGE_PURPOSE_TICKET_OPENING, bound to the
+   * ticket's opening in the same write. A path that fails its confirm is
+   * skipped and named; the ticket is created regardless.
+   */
+  attachments: NewAttachment[];
+}
+
+/**
+ * What `CreateTicket` answers with: the ticket, and the files it couldn't
+ * bind. A wrapper for the reason `CreateMessageResponse` is one.
+ */
+export interface CreateTicketResponse {
+  ticket:
+    | TicketResponse
+    | undefined;
+  /** File names, never object paths. */
+  skippedAttachments: string[];
 }
 
 export interface GetTicketRequest {
@@ -220,7 +240,7 @@ export interface ListTicketsByIdsResponse {
 export interface TicketServiceClient {
   listTicketsByIds(request: ListTicketsByIdsRequest, metadata?: Metadata): Observable<ListTicketsByIdsResponse>;
 
-  createTicket(request: CreateTicketRequest, metadata?: Metadata): Observable<TicketResponse>;
+  createTicket(request: CreateTicketRequest, metadata?: Metadata): Observable<CreateTicketResponse>;
 
   getTicket(request: GetTicketRequest, metadata?: Metadata): Observable<TicketResponse>;
 
@@ -265,7 +285,7 @@ export interface TicketServiceController {
   createTicket(
     request: CreateTicketRequest,
     metadata?: Metadata,
-  ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
+  ): Promise<CreateTicketResponse> | Observable<CreateTicketResponse> | CreateTicketResponse;
 
   getTicket(
     request: GetTicketRequest,

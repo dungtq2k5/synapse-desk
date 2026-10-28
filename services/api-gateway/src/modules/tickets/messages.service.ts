@@ -165,8 +165,13 @@ export class MessagesService {
     return toMessageResponseDto(message!);
   }
 
+  /**
+   * @param ticketId absent before the ticket exists: the file is presigned for
+   *   the caller's own ticket opening, for `POST /tickets` or
+   *   `POST /chat/conversations` to bind.
+   */
   async presignAttachment(
-    ticketId: string,
+    ticketId: string | undefined,
     messageId: string | undefined,
     dto: UploadAttachmentDto,
     context: RequestContext,

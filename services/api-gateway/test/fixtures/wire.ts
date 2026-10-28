@@ -17,6 +17,7 @@ import {
   AssignmentResponse,
   AttachmentResponse,
   CreateMessageResponse,
+  CreateTicketResponse,
   MessageResponse,
   ReassignmentReason as ProtoReassignmentReason,
   Gender as ProtoGender,
@@ -238,6 +239,7 @@ export function wireTicket(
     createdAt: timestamp(),
     updatedAt: timestamp(),
     deletedAt: undefined,
+    attachments: [],
     deletedById: undefined,
     ...overrides,
   };
@@ -307,12 +309,24 @@ export function wireCreatedMessage(
   return { message: wireMessage(overrides), skippedAttachments };
 }
 
+/**
+ * `CreateTicket`'s answer: a ticket, and the opening's files it skipped
+ * (none by default).
+ */
+export function wireCreatedTicket(
+  overrides: Partial<TicketResponse> = {},
+  skippedAttachments: string[] = [],
+): CreateTicketResponse {
+  return { ticket: wireTicket(overrides), skippedAttachments };
+}
+
 export function wireAttachment(
   overrides: Partial<AttachmentResponse> = {},
 ): AttachmentResponse {
   return {
     id: faker.string.uuid(),
     messageId: faker.string.uuid(),
+    ticketId: faker.string.uuid(),
     fileName: 'screenshot.png',
     // An object PATH, not a URL — what the column actually holds.
     fileUrl: 'organizations/org/tickets/t/attachments/m/abc.png',

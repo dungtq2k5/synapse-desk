@@ -1,4 +1,6 @@
 import {
+  CreateTicketResponse,
+  requireField,
   TicketStatusChangeResponse,
   fromProtoTicketPriority,
   fromProtoTicketSource,
@@ -16,7 +18,9 @@ import {
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { ListTicketsQueryDto } from './dto/rest/ticket.dto';
+import { toAttachmentResponseDto } from './message.mapper';
 import {
+  CreateTicketResponseDto,
   TicketResponseDto,
   TicketStatusChangeResponseDto,
 } from './dto/rest/ticket-response.dto';
@@ -58,6 +62,17 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     updatedAt: requireProtoTimestamp(ticket.updatedAt, 'updatedAt'),
     deletedAt: fromProtoTimestamp(ticket.deletedAt) ?? null,
     deletedById: ticket.deletedById ?? null,
+    attachments: ticket.attachments.map(toAttachmentResponseDto),
+  };
+}
+
+/** `CreateTicket`'s answer: the ticket, and the files it couldn't bind. */
+export function toCreateTicketResponseDto(
+  created: CreateTicketResponse,
+): CreateTicketResponseDto {
+  return {
+    ...toTicketResponseDto(requireField(created.ticket, 'ticket')),
+    skippedAttachments: created.skippedAttachments,
   };
 }
 

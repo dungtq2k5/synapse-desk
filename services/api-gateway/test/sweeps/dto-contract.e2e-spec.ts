@@ -47,6 +47,9 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       restClass: 'TicketResponseDto',
       gqlPath: join(SRC, 'tickets/dto/graphql/ticket-response.gql-dto.ts'),
       gqlClass: 'TicketResponseGqlDto',
+      // The opening's files, REST-only for the reason a message's are: their
+      // URLs are internal object paths resolved per request.
+      restOnly: ['attachments'],
     },
     {
       name: 'TicketMessage',
@@ -279,6 +282,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     // them by id, which is what a GraphQL type is for.
     AttachmentResponseDto: 'nested inside MessageResponse, not queried alone',
     CreateMessageResponseDto: 'a write RESULT, not an entity',
+    CreateTicketResponseDto: 'a write RESULT, not an entity',
     PresignAttachmentResponseDto: 'a short-lived credential, never a query',
     DownloadAttachmentResponseDto: 'a short-lived credential, never a query',
     BulkTicketStatusResponseDto: 'a write RESULT, not an entity',

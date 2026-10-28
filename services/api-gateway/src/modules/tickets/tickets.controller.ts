@@ -30,6 +30,9 @@ import { PaginationResponseDto } from '../../common/dto/rest/pagination-response
 import { TicketsService } from './tickets.service';
 import { AssignmentsService } from './assignments.service';
 import { AiService } from './ai.service';
+import { MessagesService } from './messages.service';
+import { UploadAttachmentDto } from './dto/rest/message.dto';
+import { PresignAttachmentResponseDto } from './dto/rest/message-response.dto';
 import {
   BulkTicketPriorityDto,
   BulkTicketStatusDto,
@@ -46,6 +49,7 @@ import {
   MarkTicketReadResponseDto,
   TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
+  CreateTicketResponseDto,
   TicketResponseDto,
 } from './dto/rest/ticket-response.dto';
 import {
@@ -86,6 +90,7 @@ export class TicketsController {
     private readonly tickets: TicketsService,
     private readonly assignments: AssignmentsService,
     private readonly ai: AiService,
+    private readonly messages: MessagesService,
   ) {}
 
   @ApiOperation({ summary: 'Queue view' })
@@ -141,7 +146,9 @@ export class TicketsController {
   }
 
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateTicketResponseDto, {
+    status: HttpStatus.CREATED,
+  })
   @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('ticket.create')
@@ -149,8 +156,32 @@ export class TicketsController {
   create(
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateTicketDto,
-  ): Promise<TicketResponseDto> {
+  ): Promise<CreateTicketResponseDto> {
     return this.tickets.create(dto, context);
+  }
+
+  /**
+   * Presigns a file for a ticket that doesn't exist yet: its opening, sent
+   * with `POST /tickets` or `POST /chat/conversations` as `attachments`.
+   *
+   * The file is the caller's own until a create binds it, and only theirs can
+   * bind it, so the caller is all there is to authorize: the tenant's size
+   * limit is checked, and no ticket is loaded. 200, not 201: nothing exists
+   * yet but permission to upload.
+   */
+  @ApiOperation({
+    summary:
+      "Presign a file for a new ticket's opening: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }",
+  })
+  @ApiWrappedResponse(PresignAttachmentResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @Post('attachments/upload-url')
+  @HttpCode(HttpStatus.OK)
+  presignOpeningAttachment(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: UploadAttachmentDto,
+  ): Promise<PresignAttachmentResponseDto> {
+    return this.messages.presignAttachment(undefined, undefined, dto, context);
   }
 
   @ApiOperation({ summary: 'Update' })

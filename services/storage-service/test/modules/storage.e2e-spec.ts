@@ -2,13 +2,18 @@ import { ConfigService } from '@nestjs/config';
 import { Socket } from 'node:net';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { faultInjector } from '@synapsedesk/testing/fault';
-import { status } from '@grpc/grpc-js';
+import { Metadata, status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
+import {
+  StoragePurpose as ProtoStoragePurpose,
+  packRequestContext,
+  unpackCallerContext,
+} from '@synapsedesk/grpc-proto';
 import {
   INGEST_TIMEOUT_MS,
   MAX_ATTACHMENT_BYTES,
   organizationIdFromObjectPath,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import {
@@ -144,7 +149,7 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
         ),
       ).toBe(200);
       const confirmed = await storage.confirmUpload(
-        { objectPath: presigned.objectPath },
+        { objectPath: presigned.objectPath, expectedPurposes: [] },
         caller(),
       );
       expect(confirmed.sizeBytes).toBe(bytesFor('image/png').length);
@@ -343,7 +348,7 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       const presigned = await presignAndUpload();
 
       const confirmed = await storage.confirmUpload(
-        { objectPath: presigned.objectPath },
+        { objectPath: presigned.objectPath, expectedPurposes: [] },
         caller(),
       );
 
@@ -359,7 +364,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
 
       await expectRpc(
         storage.confirmUpload(
-          { objectPath: 'organizations/x/avatars/y/rogue.png' },
+          {
+            objectPath: 'organizations/x/avatars/y/rogue.png',
+            expectedPurposes: [],
+          },
           caller(),
         ),
         status.NOT_FOUND,
@@ -373,7 +381,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       await fx.redis.del(`storage:pending:${presigned.objectPath}`);
 
       await expectRpc(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
         status.NOT_FOUND,
       );
     });
@@ -385,11 +396,100 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
 
       await expectRpc(
         storage.confirmUpload(
-          { objectPath: presigned.objectPath },
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
           caller(faker.string.uuid()),
         ),
         status.NOT_FOUND,
       );
+    });
+
+    it('4b. **answers NOT_FOUND to ANOTHER PERSON in the same tenant**, and the uploader can still confirm', async () => {
+      // Nobody binds another person's upload: same tenant, different sub.
+      const presigned = await presignAndUpload();
+
+      await expectRpc(
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(organizationId, faker.string.uuid()),
+        ),
+        status.NOT_FOUND,
+      );
+      await expect(
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
+      ).resolves.toMatchObject({ objectPath: presigned.objectPath });
+    });
+
+    it('4c. **answers NOT_FOUND to a confirm expecting another PURPOSE**, and accepts the right one', async () => {
+      // An avatar's pending path handed in as a ticket attachment.
+      const presigned = await presignAndUpload();
+
+      await expectRpc(
+        storage.confirmUpload(
+          {
+            objectPath: presigned.objectPath,
+            expectedPurposes: [
+              ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+              ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING,
+            ],
+          },
+          caller(),
+        ),
+        status.NOT_FOUND,
+      );
+      await expect(
+        storage.confirmUpload(
+          {
+            objectPath: presigned.objectPath,
+            expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_AVATAR],
+          },
+          caller(),
+        ),
+      ).resolves.toMatchObject({ objectPath: presigned.objectPath });
+    });
+
+    it('4d. **a background job confirms its own upload**: its identity arrives the same both times', async () => {
+      // The analytics export presigns and confirms under `systemContext`,
+      // whose `sub` is null. Node's http2 sends every header value through
+      // `String()`, so the null arrives as the text "null": the same value at
+      // presign and at confirm, which is what lets the uploader check hold for
+      // a job. Emulated here exactly as the wire does it.
+      const overTheWire = () => {
+        const headers = packRequestContext(
+          systemContext(organizationId),
+        ).toHttp2Headers();
+        const sent = Object.fromEntries(
+          Object.entries(headers).map(([key, values]) => [
+            key,
+            (values as unknown[]).map(String),
+          ]),
+        );
+        return unpackCallerContext(Metadata.fromHttp2Headers(sent));
+      };
+      const presigned = await storage.presignUpload(
+        {
+          purpose: ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT,
+          ownerId: faker.string.uuid(),
+          secondaryOwnerId: '',
+          contentType: 'text/csv',
+          sizeBytes: 64,
+          originalFileName: 'analytics.csv',
+        },
+        overTheWire(),
+      );
+      await putBytes(presigned.objectPath, 'text/csv', 'day,tickets_created\n');
+
+      await expect(
+        storage.confirmUpload(
+          {
+            objectPath: presigned.objectPath,
+            expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT],
+          },
+          overTheWire(),
+        ),
+      ).resolves.toMatchObject({ contentType: 'text/csv' });
     });
 
     it('5. is NOT idempotent — a second confirm fails', async () => {
@@ -398,12 +498,15 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       // response from the first call.
       const presigned = await presignAndUpload();
       await storage.confirmUpload(
-        { objectPath: presigned.objectPath },
+        { objectPath: presigned.objectPath, expectedPurposes: [] },
         caller(),
       );
 
       await expectRpc(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
         status.NOT_FOUND,
       );
     });
@@ -415,7 +518,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       const presigned = await storage.presignUpload(avatarRequest(), caller());
 
       await expectRpc(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
         status.FAILED_PRECONDITION,
       );
     });
@@ -425,14 +531,20 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       // would turn a recoverable ordering mistake into a permanent one.
       const presigned = await storage.presignUpload(avatarRequest(), caller());
       await storage
-        .confirmUpload({ objectPath: presigned.objectPath }, caller())
+        .confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        )
         .catch(() => undefined);
 
       expect(await pendingStore.get(presigned.objectPath)).not.toBeNull();
 
       await putBytes(presigned.objectPath, 'image/png');
       await expect(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
       ).resolves.toBeDefined();
     });
 
@@ -454,7 +566,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       await putBytes(presigned.objectPath, 'text/plain', DISGUISED_BYTES);
 
       await expectRpc(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
         status.INVALID_ARGUMENT,
       );
 
@@ -483,7 +598,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
         await putBytes(presigned.objectPath, contentType);
 
         await expect(
-          storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+          storage.confirmUpload(
+            { objectPath: presigned.objectPath, expectedPurposes: [] },
+            caller(),
+          ),
         ).resolves.toEqual(expect.objectContaining({ contentType }));
       }
     });
@@ -498,7 +616,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       );
       await putBytes(presigned.objectPath, 'text/plain', DISGUISED_BYTES);
       await storage
-        .confirmUpload({ objectPath: presigned.objectPath }, caller())
+        .confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        )
         .catch(() => undefined);
 
       expect(await pendingStore.get(presigned.objectPath)).not.toBeNull();
@@ -506,7 +627,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       // Same path, correct bytes this time.
       await putBytes(presigned.objectPath, 'text/plain');
       await expect(
-        storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: presigned.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
       ).resolves.toBeDefined();
     });
   });
@@ -695,6 +819,43 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
     expect(messageBound.objectPath).toContain('/attachments/pending/');
   });
 
+  it('**a ticket opening file is segregated under its UPLOADER**, and confirm moves it out', async () => {
+    const presigned = await storage.presignUpload(
+      {
+        purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING,
+        ownerId: userId,
+        contentType: 'application/pdf',
+        sizeBytes: 4096,
+        originalFileName: 'invoice.pdf',
+        secondaryOwnerId: '',
+      },
+      caller(),
+    );
+    expect(presigned.objectPath).toMatch(
+      new RegExp(`/ticket-openings/${userId}/pending/[^/]+\\.pdf$`),
+    );
+    await fx.firebase.bucket
+      .file(presigned.objectPath)
+      .save(bytesFor('application/pdf'), {
+        contentType: 'application/pdf',
+        resumable: false,
+      });
+
+    const confirmed = await storage.confirmUpload(
+      {
+        objectPath: presigned.objectPath,
+        expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING],
+      },
+      caller(),
+    );
+
+    expect(confirmed.objectPath).toBe(
+      presigned.objectPath.replace('/pending/', '/'),
+    );
+    await expect(exists(presigned.objectPath)).resolves.toBe(false);
+    await expect(exists(confirmed.objectPath)).resolves.toBe(true);
+  });
+
   it('1. **after confirm, nothing remains under `pending/`**', async () => {
     // The invariant the lifecycle rule depends on, and the reason the lifecycle rule is a
     // code change rather than a console change.
@@ -707,7 +868,7 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
       });
 
     const confirmed = await storage.confirmUpload(
-      { objectPath: presigned.objectPath },
+      { objectPath: presigned.objectPath, expectedPurposes: [] },
       caller(),
     );
 
@@ -735,7 +896,10 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
       });
 
     await expectRpc(
-      storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+      storage.confirmUpload(
+        { objectPath: presigned.objectPath, expectedPurposes: [] },
+        caller(),
+      ),
       status.INVALID_ARGUMENT,
     );
 
@@ -810,7 +974,7 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
 
     // The retry the caller would make.
     const confirmed = await storage.confirmUpload(
-      { objectPath: presigned.objectPath },
+      { objectPath: presigned.objectPath, expectedPurposes: [] },
       caller(),
     );
 
@@ -826,7 +990,10 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
     const presigned = await presign();
 
     await expectRpc(
-      storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+      storage.confirmUpload(
+        { objectPath: presigned.objectPath, expectedPurposes: [] },
+        caller(),
+      ),
       status.FAILED_PRECONDITION,
     );
   });
@@ -937,7 +1104,7 @@ describe('Ingesting an object from a URL (e2e)', () => {
       expect(ingested.sizeBytes).toBe(PNG_BYTES.length);
 
       const confirmed = await storage.confirmUpload(
-        { objectPath: ingested.objectPath },
+        { objectPath: ingested.objectPath, expectedPurposes: [] },
         caller(),
       );
 
@@ -1281,7 +1448,10 @@ describe('Ingesting an object from a URL (e2e)', () => {
 
       expect(organizationIdFromObjectPath(ingested.objectPath)).toBe(other);
       await expectRpc(
-        storage.confirmUpload({ objectPath: ingested.objectPath }, caller()),
+        storage.confirmUpload(
+          { objectPath: ingested.objectPath, expectedPurposes: [] },
+          caller(),
+        ),
         status.NOT_FOUND,
       );
     });

@@ -22,7 +22,10 @@ export class CitationResponseDto {
 
 export class AttachmentResponseDto {
   id!: string;
-  messageId!: string;
+  /** Null for a file on the ticket's opening, which has no message. */
+  messageId!: string | null;
+  /** The ticket the file belongs to, through its message or directly. */
+  ticketId!: string;
   fileName!: string;
   /** An internal object path today; a signed URL once storage-service lands. */
   fileUrl!: string;
