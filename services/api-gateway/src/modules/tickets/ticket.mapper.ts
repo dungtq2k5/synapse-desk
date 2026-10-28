@@ -63,6 +63,8 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     deletedAt: fromProtoTimestamp(ticket.deletedAt) ?? null,
     deletedById: ticket.deletedById ?? null,
     attachments: ticket.attachments.map(toAttachmentResponseDto),
+    openingFilesDeletableUntil:
+      fromProtoTimestamp(ticket.openingFilesDeletableUntil) ?? null,
   };
 }
 

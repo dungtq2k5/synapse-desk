@@ -139,11 +139,14 @@ describe('permission coverage — every documented operation is gated as the tab
     }).toEqual({ missingFromTheTable: [], namingNothing: [] });
   });
 
-  it('gates at least the 124 operations it was frozen with', () => {
+  it('gates at least the 123 operations it was frozen with', () => {
     // A table emptied of codes would pass every row below as "open".
+    // 123, not 124: `DELETE /attachments/{id}` is decided by ticket-service
+    // (a file's sender may remove it while they may still edit), so the
+    // gateway no longer requires `ticket.message.moderate` there.
     expect(
       Object.values(TABLE).filter((codes) => codes.length > 0).length,
-    ).toBeGreaterThanOrEqual(124);
+    ).toBeGreaterThanOrEqual(123);
   });
 
   for (const [key, codes] of Object.entries(TABLE)) {

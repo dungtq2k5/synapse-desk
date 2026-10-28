@@ -63,7 +63,9 @@ import { AiService } from '../ai/ai.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { exceedsLimit } from '@synapsedesk/core';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, Ticket } from '../../generated/prisma/client';
+import { editWindowEnd } from '../../common/utils/edit-window';
 import {
   assertKnownStatus,
   assertTransition,
@@ -92,7 +94,15 @@ export class TicketsService {
     private readonly access: TicketAccessService,
     private readonly ai: AiService,
     private readonly binder: AttachmentBinder,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.editWindowMinutes = configService.getOrThrow<number>(
+      'MESSAGE_EDIT_WINDOW_MINUTES',
+    );
+  }
+
+  /** The message edit window, which the opening's files share. */
+  private readonly editWindowMinutes: number;
 
   // ------------------------------------------------------------------------- Read
 
@@ -100,7 +110,10 @@ export class TicketsService {
     request: GetTicketRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return this.respond(await this.access.loadForReading(request.id, context));
+    return this.respond(
+      await this.access.loadForReading(request.id, context),
+      context,
+    );
   }
 
   /**
@@ -129,7 +142,7 @@ export class TicketsService {
       });
     }
 
-    return this.respond(ticket);
+    return this.respond(ticket, context);
   }
 
   async listTickets(
@@ -173,7 +186,7 @@ export class TicketsService {
     );
 
     return {
-      items: await this.respondAll(items, unread),
+      items: await this.respondAll(items, context, unread),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -219,7 +232,7 @@ export class TicketsService {
     });
 
     // A SET, in the database's order. The caller aligns it to its keys.
-    return { items: await this.respondAll(items) };
+    return { items: await this.respondAll(items, context) };
   }
 
   /**
@@ -333,7 +346,7 @@ export class TicketsService {
     }
     // Written WITH the ticket, so no instant has the ticket without its files.
     const data = {
-      ...this.newTicketData(organizationId, authorId, request),
+      ...this.newTicketData(organizationId, authorId, actorId, request),
       openingAttachments: { create: confirmed },
     };
 
@@ -376,7 +389,7 @@ export class TicketsService {
       title: ticket.title,
     });
 
-    return { ticket: await this.respond(ticket), skippedAttachments };
+    return { ticket: await this.respond(ticket, context), skippedAttachments };
   }
 
   async updateTicket(
@@ -404,7 +417,7 @@ export class TicketsService {
       data,
     });
 
-    return this.respond(ticket);
+    return this.respond(ticket, context);
   }
 
   // ----------------------------------------------------------- The state machine — one validator, five entry points
@@ -424,6 +437,7 @@ export class TicketsService {
 
     return this.respond(
       await this.transition(request.id, to, context, request.reason),
+      context,
     );
   }
 
@@ -465,7 +479,7 @@ export class TicketsService {
     // failed escalation.
     void this.ai.generateSummaryOnEscalation(ticket.id, context);
 
-    return this.respond(ticket);
+    return this.respond(ticket, context);
   }
 
   async resolveTicket(
@@ -479,6 +493,7 @@ export class TicketsService {
         context,
         request.reason,
       ),
+      context,
     );
   }
 
@@ -493,6 +508,7 @@ export class TicketsService {
         context,
         request.reason,
       ),
+      context,
     );
   }
 
@@ -507,6 +523,7 @@ export class TicketsService {
         context,
         request.reason,
       ),
+      context,
     );
   }
 
@@ -675,6 +692,7 @@ export class TicketsService {
         where: { id: existing.id },
         data: restoreData(),
       }),
+      context,
     );
   }
 
@@ -772,11 +790,14 @@ export class TicketsService {
   private newTicketData(
     organizationId: string,
     authorId: string,
+    raisedById: string,
     request: CreateTicketRequest,
   ) {
     return {
       organizationId,
       authorId,
+      // The caller: the author, or the agent raising it for them.
+      raisedById,
       title: request.title.trim(),
       description: request.description.trim(),
       source: fromProtoTicketSource(request.source) ?? TicketSource.WEB,
@@ -916,8 +937,11 @@ export class TicketsService {
   }
 
   /** One ticket on the wire, with its opening's files. */
-  private async respond(ticket: Ticket): Promise<TicketResponse> {
-    const [response] = await this.respondAll([ticket]);
+  private async respond(
+    ticket: Ticket,
+    context: CallerContext,
+  ): Promise<TicketResponse> {
+    const [response] = await this.respondAll([ticket], context);
     return response;
   }
 
@@ -930,6 +954,7 @@ export class TicketsService {
    */
   private async respondAll(
     tickets: Ticket[],
+    context: CallerContext,
     unread?: Map<string, number>,
   ): Promise<TicketResponse[]> {
     const files =
@@ -948,8 +973,29 @@ export class TicketsService {
           ),
         },
         unread?.get(ticket.id) ?? 0,
+        this.openingFilesDeletableUntil(ticket, context),
       ),
     );
+  }
+
+  /**
+   * Until when this caller may delete the opening's files: the author, when
+   * they raised the ticket themselves, inside the edit window from its
+   * creation. `null` for anyone else, a moderator included (who may always),
+   * and for a ticket raised before `raised_by_id` was recorded.
+   */
+  openingFilesDeletableUntil(
+    ticket: Ticket,
+    context: CallerContext,
+  ): Date | null {
+    if (
+      !context.sub ||
+      ticket.authorId !== context.sub ||
+      ticket.raisedById !== ticket.authorId
+    ) {
+      return null;
+    }
+    return editWindowEnd(ticket.createdAt, this.editWindowMinutes);
   }
 }
 

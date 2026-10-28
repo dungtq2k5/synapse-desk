@@ -10,7 +10,7 @@
   "GET /api/v1/analytics/response-times": ["analytics.read"],
   "GET /api/v1/analytics/satisfaction": ["analytics.read"],
   "GET /api/v1/analytics/volume": ["analytics.read"],
-  "DELETE /api/v1/attachments/{id}": ["ticket.message.moderate"],
+  "DELETE /api/v1/attachments/{id}": [],
   "GET /api/v1/attachments/{id}/download": [],
   "GET /api/v1/audit-logs": ["audit.read"],
   "GET /api/v1/audit-logs/actions": ["audit.read"],

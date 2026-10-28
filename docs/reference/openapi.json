@@ -72868,6 +72868,12 @@
             "items": {
               "$ref": "#/components/schemas/AttachmentResponseDto"
             }
+          },
+          "openingFilesDeletableUntil": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Until when YOU may delete the opening's files: the ticket's author, when\nthey raised it themselves, inside the edit window from its creation. Null\nfor anyone else, a moderator included (who may always)."
           }
         },
         "required": [
@@ -72889,7 +72895,8 @@
           "updatedAt",
           "deletedAt",
           "deletedById",
-          "attachments"
+          "attachments",
+          "openingFilesDeletableUntil"
         ]
       },
       "CreateTicketResponseDto": {
@@ -72982,6 +72989,12 @@
               "$ref": "#/components/schemas/AttachmentResponseDto"
             }
           },
+          "openingFilesDeletableUntil": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "Until when YOU may delete the opening's files: the ticket's author, when\nthey raised it themselves, inside the edit window from its creation. Null\nfor anyone else, a moderator included (who may always)."
+          },
           "skippedAttachments": {
             "description": "File NAMES, never object paths: a path that failed its confirm (expired,\nnot the caller's, not an attachment). The ticket is created regardless.",
             "type": "array",
@@ -73010,6 +73023,7 @@
           "deletedAt",
           "deletedById",
           "attachments",
+          "openingFilesDeletableUntil",
           "skippedAttachments"
         ]
       },

@@ -139,4 +139,11 @@ export interface TicketResponse {
    * costs one join and no storage call.
    */
   attachments: AttachmentResponse[];
+  /**
+   * Until when the CALLER may delete the opening's files: the ticket's author,
+   * when they raised it themselves, inside the message edit window from the
+   * ticket's creation. Absent for anyone else, a moderator included (who may
+   * always). Like `unread_count`, it depends on who asks.
+   */
+  openingFilesDeletableUntil?: Timestamp | undefined;
 }

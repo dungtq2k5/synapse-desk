@@ -48,8 +48,9 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       gqlPath: join(SRC, 'tickets/dto/graphql/ticket-response.gql-dto.ts'),
       gqlClass: 'TicketResponseGqlDto',
       // The opening's files, REST-only for the reason a message's are: their
-      // URLs are internal object paths resolved per request.
-      restOnly: ['attachments'],
+      // URLs are internal object paths resolved per request. Until when the
+      // caller may delete them goes with them.
+      restOnly: ['attachments', 'openingFilesDeletableUntil'],
     },
     {
       name: 'TicketMessage',

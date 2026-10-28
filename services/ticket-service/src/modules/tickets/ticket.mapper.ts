@@ -48,6 +48,7 @@ export {
 export function toTicketResponse(
   ticket: TicketWithOpening,
   unreadCount: number = 0,
+  openingFilesDeletableUntil: Date | null = null,
 ): TicketResponse {
   return {
     id: ticket.id,
@@ -71,6 +72,7 @@ export function toTicketResponse(
     updatedAt: toProtoTimestamp(ticket.updatedAt),
     deletedAt: toProtoTimestamp(ticket.deletedAt),
     deletedById: ticket.deletedById ?? undefined,
+    openingFilesDeletableUntil: toProtoTimestamp(openingFilesDeletableUntil),
     attachments: ticket.openingAttachments.map((attachment) =>
       toAttachmentResponse(attachment, ticket.id),
     ),

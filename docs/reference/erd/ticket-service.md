@@ -6,6 +6,7 @@ erDiagram
     BigInt ticket_number 
     String organization_id 
     String author_id 
+    String raised_by_id "❓"
     String source 
     String status 
     String priority 

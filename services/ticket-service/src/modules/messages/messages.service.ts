@@ -46,6 +46,7 @@ import {
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
 import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
+import { editWindowEnd } from '../../common/utils/edit-window';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 import { isAtCap, isDraftRefusal } from '../ai-client/refusal';
@@ -69,6 +70,7 @@ import { StorageReferenceService } from '../storage-client/storage-reference.ser
 import {
   MessageAttachment,
   Prisma,
+  Ticket,
   TicketMessage,
 } from '../../generated/prisma/client';
 import {
@@ -907,7 +909,10 @@ export class MessagesService {
     request: DownloadAttachmentRequest,
     context: CallerContext,
   ): Promise<DownloadAttachmentResponse> {
-    const attachment = await this.loadAttachment(request.attachmentId, context);
+    const { attachment } = await this.loadAttachment(
+      request.attachmentId,
+      context,
+    );
 
     const urls = await this.storage.resolveReadUrls(
       [attachment.fileUrl],
@@ -937,18 +942,33 @@ export class MessagesService {
    * message, and a "deleted" attachment row that every listing had to remember
    * to filter would be a filter waiting to be forgotten. The FILE goes through
    * the same at-most-once supersede event everything else uses.
+   *
+   * **Who may:** a moderator, always; a message's sender while they may still
+   * edit it (`editableUntil`), so not on a redacted or generated message; the
+   * ticket's author for the opening's files, when they raised it themselves,
+   * inside the same window (`openingFilesDeletableUntil`). Anyone else is
+   * refused, after the window too: 403 rather than an edit's 400, because it
+   * is a question of who, not of a request that came too late to be valid.
    */
   async deleteAttachment(
     request: DeleteAttachmentRequest,
     context: CallerContext,
   ): Promise<DeleteAttachmentResponse> {
-    const attachment = await this.loadAttachment(request.attachmentId, context);
+    const { attachment, message, ticket } = await this.loadAttachment(
+      request.attachmentId,
+      context,
+    );
 
-    if (!this.canModerate(context)) {
+    const mayDelete =
+      this.canModerate(context) ||
+      (message
+        ? this.editableUntil(message, context) !== null
+        : this.tickets.openingFilesDeletableUntil(ticket, context) !== null);
+    if (!mayDelete) {
       throw new RpcException({
         code: status.PERMISSION_DENIED,
         message:
-          'Removing an attachment requires the ticket.message.moderate permission',
+          'Only a moderator, or its sender while they may still edit, can remove this file',
       });
     }
 
@@ -1243,10 +1263,7 @@ export class MessagesService {
     }
     if (!context.sub || message.senderId !== context.sub) return null;
 
-    const deadline = new Date(
-      message.createdAt.getTime() + this.editWindowMinutes * 60_000,
-    );
-    return deadline > new Date() ? deadline : null;
+    return editWindowEnd(message.createdAt, this.editWindowMinutes);
   }
 
   /**
@@ -1268,10 +1285,7 @@ export class MessagesService {
       });
     }
 
-    const deadline = new Date(
-      message.createdAt.getTime() + this.editWindowMinutes * 60_000,
-    );
-    if (new Date() > deadline) {
+    if (!editWindowEnd(message.createdAt, this.editWindowMinutes)) {
       throw new RpcException({
         code: status.FAILED_PRECONDITION,
         message: `A message can only be edited within ${this.editWindowMinutes} minutes of posting`,
@@ -1417,12 +1431,15 @@ export class MessagesService {
   private async loadAttachment(
     attachmentId: string,
     context: CallerContext,
-  ): Promise<MessageAttachment> {
+  ): Promise<{
+    attachment: MessageAttachment;
+    /** Its message, or `null` for a file on the ticket's opening. */
+    message: TicketMessage | null;
+    ticket: Ticket;
+  }> {
     const attachment = await this.prisma.messageAttachment.findUnique({
       where: { id: attachmentId },
-      include: {
-        message: { select: { ticketId: true, isInternalNote: true } },
-      },
+      include: { message: true },
     });
     const ticketId = attachment?.message?.ticketId ?? attachment?.ticketId;
 
@@ -1438,8 +1455,8 @@ export class MessagesService {
     }
 
     // Throws NOT_FOUND if the caller may not see the ticket it hangs off.
-    await this.tickets.load(ticketId, context);
+    const ticket = await this.tickets.load(ticketId, context);
 
-    return attachment;
+    return { attachment, message: attachment.message, ticket };
   }
 }

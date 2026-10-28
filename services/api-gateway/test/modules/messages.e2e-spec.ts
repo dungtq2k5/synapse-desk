@@ -632,13 +632,22 @@ describe('Ticket messages at the HTTP boundary (e2e)', () => {
   });
 
   describe('DELETE /attachments/:id', () => {
-    it('1. requires ticket.message.moderate', async () => {
+    it('1. **forwards a caller with no permission**: ticket-service decides who, and its 403 is relayed', async () => {
+      fx.stubs.message.deleteAttachment.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            GrpcStatus.PERMISSION_DENIED,
+            'Only a moderator, or its sender while they may still edit, can remove this file',
+          ),
+        ),
+      );
+
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: [],
       }).delete(`${API}/attachments/${attachmentId}`);
 
       expect(res.status).toBe(403);
-      expect(fx.stubs.message.deleteAttachment).not.toHaveBeenCalled();
+      expect(fx.stubs.message.deleteAttachment).toHaveBeenCalled();
     });
 
     it('2. answers 204 for a moderator', async () => {

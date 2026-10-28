@@ -45,6 +45,12 @@ export class TicketResponseDto {
    * when none. A message's files are on the message.
    */
   attachments!: AttachmentResponseDto[];
+  /**
+   * Until when YOU may delete the opening's files: the ticket's author, when
+   * they raised it themselves, inside the edit window from its creation. Null
+   * for anyone else, a moderator included (who may always).
+   */
+  openingFilesDeletableUntil!: Date | null;
 }
 
 /**

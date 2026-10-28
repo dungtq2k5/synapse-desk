@@ -11,7 +11,6 @@ import {
 import { RequestContext } from '@synapsedesk/contracts';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
-import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -72,6 +71,10 @@ export class AttachmentsController {
    * message — so a "deleted" row that every listing had to filter would be a
    * filter waiting to be forgotten. The FILE goes through the same
    * at-most-once supersede event everything else uses.
+   *
+   * **No permission here: ticket-service decides who.** A moderator always;
+   * a message's sender while they may still edit it; the ticket's author for
+   * the opening's files, inside the same window. Anyone else gets its 403.
    */
   @ApiOperation({
     summary:
@@ -80,7 +83,6 @@ export class AttachmentsController {
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
-  @RequirePermission('ticket.message.moderate')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @CurrentUser() context: RequestContext,
