@@ -142,6 +142,8 @@ AND ( is_organization_wide == True
       OR department_ids ∩ ctx.department_ids )
 ```
 
+**A fifth clause rides beside them, and it isn't a boundary:** `is_staged` excluded (Qdrant `must_not: is_staged == true`, so a point written before the field existed passes; `is_staged = FALSE` in SQL). It hides a document's version that is still being built, so a replace or reindex never answers from half a version ([ADR 0051](../../decisions/0051-a-documents-new-version-is-staged-then-swapped.md)). Hydration reads rows by id without it, on purpose: in the swap's window a new point is live before its row goes live.
+
 Its own docblock names the failure mode:
 
 > Its failure mode is silent cross-tenant disclosure inside an otherwise correct-looking answer: nothing errors, nothing logs, and the response reads exactly as it should apart from containing somebody else's document.

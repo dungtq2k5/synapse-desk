@@ -57,7 +57,7 @@ npm run projection:backfill -w @synapsedesk/ingestion-service
 It resets in `PROJECTION_RESET_BATCH` batches, projects in `PROJECTION_BACKFILL_WINDOW_DAYS` windows from the oldest generation, and commits a cursor per window — interrupted, it resumes; complete, it is a no-op.
 
 The read side (`ai-analytics.service.ts`) has no date predicate: the counters are a lifetime total **since the document's last reindex**, because
-`writeChunkRows` deletes and recreates chunk rows and old generations then name
+a new version's swap deletes the live chunk rows and old generations then name
 ids that no longer exist.
 
 ---
