@@ -708,9 +708,11 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **ticket_number** | BIGINT | NOT NULL, UNIQUE, Autoincrement | Human-friendly ticket number (e.g., #1042). |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation key. |
 | **author_id** | UUID | NOT NULL, FK ➔ users.id | End-user who created the ticket. |
+| **raised_by_id** | UUID | Nullable, FK ➔ users.id | Who called create: the author, or an agent raising the ticket on their behalf. The author may delete the opening's files inside the edit window only when the two are equal; NULL (rows from before the column) counts as not equal. |
 | **source** | ENUM | NOT NULL, Default: 'WEB' | Ticket origin channel: `WEB` (form submission), `CHAT` (escalated from chat), `EMAIL` (inbound email), `API` (third-party integration). Enables deflection analytics by channel. |
 | **title** | VARCHAR(255) | NOT NULL | Brief subject line summarizing the issue. |
-| **description** | TEXT | NOT NULL | Detailed problem statement supplied by the user. |
+| **description** | TEXT | NOT NULL | Detailed problem statement supplied by the user. Its files are `message_attachments` rows with this ticket's `ticket_id` ([ADR 0050](./decisions/0050-a-tickets-opening-carries-its-own-files.md)). |
+| **opening_excluded_from_ai_context** | BOOLEAN | NOT NULL, Default: false | Set when an AI answer is refused with no user message to mark; the opening's files then reach no prompt ([ADR 0030](./decisions/0030-refused-turns-exclude-their-attachments.md)). |
 | **status** | ENUM | NOT NULL, Default: 'NEW' | Options: NEW, OPEN, PENDING_AGENT, ESCALATED, RESOLVED, CLOSED. |
 | **priority** | ENUM | NOT NULL, Default: 'MEDIUM' | Urgency rating: LOW, MEDIUM, HIGH, URGENT. |
 | **current_assignee_id** | UUID | Nullable, FK ➔ users.id, Indexed | Currently assigned agent (denormalized from latest `ticket_assignments` row where `is_current=true` for fast lookup). |
@@ -751,12 +753,13 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 
 #### **Table 15: message_attachments**
 
-*Files uploaded inside ticket chat threads (e.g., error screenshots, logs).*
+*Files uploaded inside ticket chat threads (e.g., error screenshots, logs), and the files a ticket was opened with. Exactly one owner per row: `message_attachments_one_owner_check`.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique attachment identifier. |
-| **message_id** | UUID | NOT NULL, FK ➔ ticket_messages.id | Parent chat message containing this file. |
+| **message_id** | UUID | Nullable, FK ➔ ticket_messages.id | Parent chat message containing this file; NULL for an opening file. |
+| **ticket_id** | UUID | Nullable, FK ➔ tickets.id, Indexed | The ticket whose opening this file belongs to; NULL for a message's file. |
 | **file_name** | VARCHAR(255) | NOT NULL | Original filename uploaded by user (e.g., screenshot.png). |
 | **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path, same discipline as `users.avatar_url` — see [ADR 0024](./decisions/0024-one-upload-mechanism.md). Not a URL despite the name; resolved to a signed URL only at the moment `GET /attachments/:id/download` (or a message-thread fetch) actually needs one. |
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes, capped at `MAX_ATTACHMENT_BYTES` = **10 MB** — an order of magnitude below the document cap, because an attachment rides a chat turn rather than a deliberate upload. |
@@ -1397,7 +1400,7 @@ To prevent accidental database corruption or orphaned child records:
    * ticket_read_states ➔ tickets (a watermark into a thread that no longer exists is dead weight).
    * ticket_messages ➔ tickets (If a ticket is hard-deleted, drop its messages).
    * ticket_assignments ➔ tickets (If a ticket is hard-deleted, drop its assignment history).
-   * message_attachments ➔ ticket_messages.
+   * message_attachments ➔ ticket_messages, and ➔ tickets for an opening's files.
    * document_chunks ➔ documents.
    * device_sessions ➔ users.
    * two_factor_backup_codes ➔ users.
