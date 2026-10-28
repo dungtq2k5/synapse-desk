@@ -103,7 +103,7 @@ export class MessagesController {
    * controller rather than an edit in place.
    */
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(CreateMessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateMessageResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post()
   @ResponseMessage('Message posted')
@@ -221,7 +221,7 @@ export class MessagesController {
   @ApiOperation({
     summary: '{ objectPath } — confirms, writes the message_attachments row',
   })
-  @ApiWrappedResponse(AttachmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(AttachmentResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post(':messageId/attachments/confirm')
   @ResponseMessage('Attachment added')

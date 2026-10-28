@@ -95,7 +95,7 @@ export class MessageFeedbackController {
   // `(messageId, callerId)`, so there is no parameter through which one user
   // could withdraw another's opinion.
   @ApiOperation({ summary: 'Withdraw feedback' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '404'])
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)

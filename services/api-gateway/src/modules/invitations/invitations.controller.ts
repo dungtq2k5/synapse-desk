@@ -82,9 +82,7 @@ export class InvitationsController {
    * unverified inviter would let an unproven address spray invitations.
    */
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(CreateInvitationsResponseDto, {
-    status: HttpStatus.CREATED,
-  })
+  @ApiWrappedResponse(CreateInvitationsResponseDto)
   @ApiFilterErrors(['400', '401', '402', '403'], {
     descriptions: {
       '402':

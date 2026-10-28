@@ -75,7 +75,7 @@ export class IngestionJobsController {
   }
 
   @ApiOperation({ summary: 'Cancel an ingestion job' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('document.reindex')

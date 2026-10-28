@@ -86,9 +86,7 @@ export class ChatController {
   @ApiOperation({
     summary: 'Start a Tier 1 conversation → creates a NEW ticket',
   })
-  @ApiWrappedResponse(CreateTicketResponseDto, {
-    status: HttpStatus.CREATED,
-  })
+  @ApiWrappedResponse(CreateTicketResponseDto)
   @ApiFilterErrors(['400', '401'])
   @Post('conversations')
   @ResponseMessage('Conversation started')
@@ -189,7 +187,7 @@ export class ChatController {
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
   @ApiOperation({ summary: 'Ask a question' })
-  @ApiWrappedResponse(CreateMessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateMessageResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post('conversations/:id/messages')
   @ResponseMessage('Message sent')

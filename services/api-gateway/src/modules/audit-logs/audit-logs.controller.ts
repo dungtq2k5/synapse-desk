@@ -89,9 +89,7 @@ export class AuditLogsController {
    * the log it exports.
    */
   @ApiOperation({ summary: 'Request an audit-log export' })
-  @ApiWrappedResponse(ExportResponseDto, {
-    status: HttpStatus.ACCEPTED,
-  })
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.export })
   @Post('export')

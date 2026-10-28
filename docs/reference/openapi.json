@@ -62935,7 +62935,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Success.",
             "content": {
               "application/json": {
@@ -64465,7 +64465,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "201": {
             "description": "Success.",
             "content": {
               "application/json": {
@@ -64780,7 +64780,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "201": {
             "description": "Success.",
             "content": {
               "application/json": {

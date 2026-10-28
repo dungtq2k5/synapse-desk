@@ -71,7 +71,7 @@ export class OtpController {
     summary:
       'Issue an otps row (purpose = EMAIL_VERIFICATION, target = users.email) and mail the 6-digit code',
   })
-  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse(RequestOtpResponseDto)
   @ApiFilterErrors(['401'])
   @Post('email/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
@@ -104,7 +104,7 @@ export class OtpController {
     summary:
       'Issue an otps row (purpose = PHONE_VERIFICATION) and SMS the code',
   })
-  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse(RequestOtpResponseDto)
   @ApiFilterErrors(['400', '401'])
   @Post('phone/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })

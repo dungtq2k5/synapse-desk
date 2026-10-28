@@ -126,7 +126,7 @@ export class UserAdminController {
    * instead of requiring one to be handed over out of band.
    */
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(UserSummaryResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '402', '403'], {
     descriptions: {
       '402':

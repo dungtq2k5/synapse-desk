@@ -146,9 +146,7 @@ export class TicketsController {
   }
 
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(CreateTicketResponseDto, {
-    status: HttpStatus.CREATED,
-  })
+  @ApiWrappedResponse(CreateTicketResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('ticket.create')
@@ -216,9 +214,7 @@ export class TicketsController {
    * the widest possible leak of it.
    */
   @ApiOperation({ summary: 'Request a ticket export' })
-  @ApiWrappedResponse(ExportResponseDto, {
-    status: HttpStatus.ACCEPTED,
-  })
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.export })
   @Post('export')
@@ -506,7 +502,7 @@ export class TicketsController {
   }
 
   @ApiOperation({ summary: 'Unassign' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id/assign')
   @RequirePermission('ticket.assign')
@@ -605,7 +601,7 @@ export class TicketsController {
   // -------------------------------------------------------------------------
 
   @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('ticket.delete')

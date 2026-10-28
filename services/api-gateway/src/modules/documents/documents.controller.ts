@@ -231,7 +231,7 @@ export class DocumentsController {
    * Dismiss is what makes a finding go away.
    */
   @ApiOperation({ summary: 'Delete a quality flag' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete('flags/:flagId')
   @RequirePermission('document.delete')
@@ -278,7 +278,7 @@ export class DocumentsController {
    * at an object that never arrived.
    */
   @ApiOperation({ summary: 'Confirm' })
-  @ApiWrappedResponse(DocumentResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @Post('confirm')
   @RequirePermission('document.create')
@@ -318,7 +318,7 @@ export class DocumentsController {
   }
 
   @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('document.delete')
@@ -356,7 +356,7 @@ export class DocumentsController {
    * 400 means the document is not indexed, or a run is already in flight.
    */
   @ApiOperation({ summary: 'Reindex' })
-  @ApiWrappedResponse(IngestionJobResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse(IngestionJobResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/reindex')
   @RequirePermission('document.reindex')
@@ -384,7 +384,7 @@ export class DocumentsController {
    * 409 means that presign was already confirmed.
    */
   @ApiOperation({ summary: 'Replace the file' })
-  @ApiWrappedResponse(DocumentResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404', '409'])
   @Post(':id/replace')
   @RequirePermission('document.update')

@@ -115,7 +115,7 @@ export class DepartmentsController {
   }
 
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(DepartmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(DepartmentResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @InvalidateCache(CACHE_SCOPES.departments)
   @Post()

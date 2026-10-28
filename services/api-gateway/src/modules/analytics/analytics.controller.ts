@@ -182,9 +182,7 @@ export class AnalyticsController {
    * 202, because the work has been accepted and has not happened.
    */
   @ApiOperation({ summary: 'Create export' })
-  @ApiWrappedResponse(ExportResponseDto, {
-    status: HttpStatus.ACCEPTED,
-  })
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403'], {
     descriptions: {
       '400':

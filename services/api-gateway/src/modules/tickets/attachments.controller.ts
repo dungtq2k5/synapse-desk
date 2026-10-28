@@ -77,7 +77,7 @@ export class AttachmentsController {
     summary:
       'Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object',
   })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('ticket.message.moderate')

@@ -97,7 +97,7 @@ export class RolesController {
    * hold; that check does not care which permission opened the route.
    */
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @InvalidateCache(CACHE_SCOPES.roles)
   @Post()

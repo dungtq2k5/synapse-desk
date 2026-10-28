@@ -98,9 +98,7 @@ export class PlatformController {
 
   /** Tenant + its first Org Admin, in one transaction. Half of it is useless. */
   @ApiOperation({ summary: 'Create organization' })
-  @ApiWrappedResponse(CreatePlatformOrganizationResponseDto, {
-    status: HttpStatus.CREATED,
-  })
+  @ApiWrappedResponse(CreatePlatformOrganizationResponseDto)
   @ApiFilterErrors(['400', '401', '409'], {
     descriptions: {
       '409':
@@ -331,7 +329,7 @@ export class PlatformController {
 
   /** A role visible in EVERY tenant, which is why only the platform mints one. */
   @ApiOperation({ summary: 'Create global role' })
-  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401'])
   @Post('roles')
   createGlobalRole(
@@ -355,9 +353,7 @@ export class PlatformController {
   }
 
   @ApiOperation({ summary: 'Create a plan' })
-  @ApiWrappedResponse(SubscriptionPlanResponseDto, {
-    status: HttpStatus.CREATED,
-  })
+  @ApiWrappedResponse(SubscriptionPlanResponseDto)
   @ApiFilterErrors(['400', '401', '503'], {
     descriptions: {
       '400':

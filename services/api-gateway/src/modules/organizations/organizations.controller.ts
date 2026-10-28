@@ -103,7 +103,6 @@ export class OrganizationsController {
    */
   @ApiOperation({ summary: 'Enable or rotate the inbound email address' })
   @ApiWrappedResponse(InboundAddressResponseDto, {
-    status: HttpStatus.CREATED,
     description:
       'The new address. Any previous one stops routing immediately — mail ' +
       'already in flight to it is dropped as unroutable, which is the point ' +
@@ -128,7 +127,6 @@ export class OrganizationsController {
    */
   @ApiOperation({ summary: 'Disable the inbound email address' })
   @ApiWrappedResponse(undefined, {
-    status: HttpStatus.NO_CONTENT,
     description: 'Inbound mail is off. The address stops routing immediately.',
   })
   @ApiFilterErrors(['401', '403'])

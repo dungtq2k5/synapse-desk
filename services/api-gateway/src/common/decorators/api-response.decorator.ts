@@ -1,5 +1,14 @@
-import { applyDecorators, HttpStatus, type Type } from '@nestjs/common';
-import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import {
+  applyDecorators,
+  HttpStatus,
+  RequestMethod,
+  type Type,
+} from '@nestjs/common';
+import {
+  HTTP_CODE_METADATA,
+  METHOD_METADATA,
+  ROUTE_ARGS_METADATA,
+} from '@nestjs/common/constants';
 import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
 import {
   ApiExtraModels,
@@ -175,16 +184,27 @@ const PAGINATION_META: SchemaObject = {
  * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })  // data: [ … ]
  * ```
  *
- * **The status is derived, not hardcoded.** Reaching for `ApiOkResponse` makes
- * every `@Post` document a 200 while returning 201, and a client generator emits
- * it — so every successful create reads as an error.
+ * **The status is derived, not hardcoded**, from what Nest will answer: the
+ * route's `@HttpCode` when it has one, else 201 for a `@Post` and 200 for
+ * everything else. Reaching for `ApiOkResponse` makes every `@Post` document a
+ * 200 while returning 201, and a client generator emits it — so every
+ * successful create reads as an error. Pass `status` only to document
+ * something Nest does not decide, such as a handler that sets the code itself.
+ *
+ * **Place it ABOVE `@Post()` and `@HttpCode()`**, as every route does:
+ * decorators run bottom-up, so those two have written their metadata by the
+ * time this reads it. `openapi.e2e-spec.ts` fails any POST whose documented
+ * status is not the one it answers.
  *
  * See `docs/decisions/0028-swagger-envelope-is-a-per-route-decorator.md`.
  */
 export function ApiWrappedResponse(
   model?: Type<unknown> | Type<unknown>[] | PaginatedModel<unknown>,
   options: {
-    /** Defaults to 200, or 201 when the route is a `@Post` — see `status`. */
+    /**
+     * Overrides the derived status: the route's `@HttpCode`, else 201 for a
+     * `@Post`, else 200.
+     */
     status?: HttpStatus | number;
     isArray?: boolean;
     description?: string;
@@ -226,21 +246,43 @@ export function ApiWrappedResponse(
     return options.isArray ? { type: 'array', items: one } : one;
   })();
 
-  return applyDecorators(
-    // Required for a `$ref` to resolve when the model is not otherwise
-    // reachable from a handler signature — the classic cause of a dangling
-    // reference in a `oneOf`.
-    ApiExtraModels(...models),
-    ApiResponse({
-      status: options.status ?? HttpStatus.OK,
-      description: options.description ?? 'Success.',
-      schema: {
-        type: 'object',
-        required: ['success', 'statusCode', 'message', 'data'],
-        properties: { ...ENVELOPE_PROPERTIES, data },
-      },
-    }),
-  );
+  return (
+    target: object,
+    key?: string | symbol,
+    descriptor?: PropertyDescriptor,
+  ): void => {
+    applyDecorators(
+      // Required for a `$ref` to resolve when the model is not otherwise
+      // reachable from a handler signature — the classic cause of a dangling
+      // reference in a `oneOf`.
+      ApiExtraModels(...models),
+      ApiResponse({
+        status: options.status ?? answeredStatus(descriptor),
+        description: options.description ?? 'Success.',
+        schema: {
+          type: 'object',
+          required: ['success', 'statusCode', 'message', 'data'],
+          properties: { ...ENVELOPE_PROPERTIES, data },
+        },
+      }),
+    )(target, key as string, descriptor as PropertyDescriptor);
+  };
+}
+
+/**
+ * The status Nest answers a handler with: its `@HttpCode`, else 201 for a
+ * `@Post`, else 200. A class-level application has no handler to ask, and
+ * documents 200.
+ */
+function answeredStatus(descriptor?: PropertyDescriptor): number {
+  const handler = descriptor?.value as object | undefined;
+  if (!handler) return HttpStatus.OK;
+  const code = Reflect.getMetadata(HTTP_CODE_METADATA, handler) as
+    number | undefined;
+  if (code !== undefined) return code;
+  return Reflect.getMetadata(METHOD_METADATA, handler) === RequestMethod.POST
+    ? HttpStatus.CREATED
+    : HttpStatus.OK;
 }
 
 /**

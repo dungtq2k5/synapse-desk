@@ -85,7 +85,7 @@ export class AuthController {
     summary: 'Sign up',
     security: [],
   })
-  @ApiWrappedResponse(RegisterResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(RegisterResponseDto)
   @ApiFilterErrors(['400', '401'])
   @Post('register')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.register })
@@ -411,7 +411,7 @@ export class AuthController {
       'Create a password_reset_tokens row (hashed token, ip_address, user_agent, 1h expires_at) and email the reset link',
     security: [],
   })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401'])
   @Post('password/forgot')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.forgotPassword })

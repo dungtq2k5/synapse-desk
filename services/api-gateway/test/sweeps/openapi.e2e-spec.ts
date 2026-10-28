@@ -7,6 +7,10 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { faker } from '@faker-js/faker';
 import { ConfigService } from '@nestjs/config';
+import { RequestMethod } from '@nestjs/common';
+import { HTTP_CODE_METADATA, METHOD_METADATA } from '@nestjs/common/constants';
+import { ModulesContainer } from '@nestjs/core';
+import { DECORATORS } from '@nestjs/swagger';
 import type {
   OpenAPIObject,
   SchemaObject,
@@ -1097,6 +1101,47 @@ describe('The OpenAPI document', () => {
   });
 
   // ------------------------------------------------------------------
+
+  it('**every route documents the success status it answers**: its `@HttpCode`, else 201 for a POST, else 200', () => {
+    // `ApiWrappedResponse` derives the status from the same metadata Nest
+    // answers with, but only when it sits ABOVE `@Post()`/`@HttpCode()`.
+    // Placed below, it reads nothing and documents 200 for a 201: a client
+    // generator then reads every successful create as an error.
+    const found: string[] = [];
+    let routes = 0;
+    for (const module of fx.app.get(ModulesContainer).values()) {
+      for (const { metatype } of module.controllers.values()) {
+        if (!metatype) continue;
+        for (const name of Object.getOwnPropertyNames(metatype.prototype)) {
+          const handler: unknown = metatype.prototype[name];
+          if (typeof handler !== 'function') continue;
+          const method = Reflect.getMetadata(METHOD_METADATA, handler) as
+            RequestMethod | undefined;
+          if (method === undefined) continue;
+          routes++;
+          const answered =
+            (Reflect.getMetadata(HTTP_CODE_METADATA, handler) as
+              number | undefined) ??
+            (method === RequestMethod.POST ? 201 : 200);
+          const documented = Object.keys(
+            (Reflect.getMetadata(DECORATORS.API_RESPONSE, handler) ??
+              {}) as Record<string, unknown>,
+          ).filter((code) => code.startsWith('2'));
+          // A route that documents no success (a redirect, a stream) has
+          // nothing to compare.
+          if (documented.length > 0 && !documented.includes(String(answered))) {
+            found.push(
+              `${metatype.name}.${name}: answers ${answered}, documents ${documented.join(',')}`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(found).toEqual([]);
+    // A floor, so a container that stopped yielding controllers can't pass.
+    expect(routes).toBeGreaterThan(200);
+  });
 
   describe('Exposure', () => {
     it('**is gated on `SWAGGER_ENABLED`, not on an inline NODE_ENV check**', () => {

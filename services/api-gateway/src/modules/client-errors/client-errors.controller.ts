@@ -50,7 +50,7 @@ export class ClientErrorsController {
   constructor(private readonly metrics: MetricsRegistry) {}
 
   @ApiOperation({ summary: 'Report a browser error', security: [] })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiWrappedResponse()
   @ApiFilterErrors(['400'])
   @Post()
   @HttpCode(HttpStatus.NO_CONTENT)
