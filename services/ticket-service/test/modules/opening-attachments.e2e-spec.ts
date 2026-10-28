@@ -303,6 +303,108 @@ describe('Files on the opening (e2e)', () => {
     });
   });
 
+  describe('who may delete them', () => {
+    const remaining = (ticketId: string) =>
+      fx.prisma.messageAttachment.count({ where: { ticketId } });
+    /** Moves the ticket's creation back, so its window has closed. */
+    const age = (ticketId: string, minutes: number) =>
+      fx.prisma.ticket.update({
+        where: { id: ticketId },
+        data: { createdAt: new Date(Date.now() - minutes * 60_000) },
+      });
+
+    it('**the author who raised it deletes inside the window**, and the ticket says until when', async () => {
+      const { ticket } = await open([uploaded('screen.png')]);
+      expect(ticket?.openingFilesDeletableUntil).toBeDefined();
+
+      await messages.deleteAttachment(
+        { attachmentId: ticket!.attachments[0].id },
+        requester(),
+      );
+
+      expect(await remaining(ticket!.id)).toBe(0);
+    });
+
+    it('**after the window, the author is refused**, and the ticket no longer offers it', async () => {
+      const { ticket } = await open([uploaded('screen.png')]);
+      await age(ticket!.id, 16);
+
+      await expectRpc(
+        messages.deleteAttachment(
+          { attachmentId: ticket!.attachments[0].id },
+          requester(),
+        ),
+        status.PERMISSION_DENIED,
+      );
+      const read = await tickets.getTicket({ id: ticket!.id }, requester());
+      expect(read.openingFilesDeletableUntil).toBeUndefined();
+    });
+
+    it('**an agent-raised ticket’s author is refused**: the agent uploaded them', async () => {
+      // auth-service is a peer, not running here: the requester exists.
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'assertUserExists')
+        .mockResolvedValue(undefined);
+      const agentRaised = await tickets.createTicket(
+        {
+          title: 'Raised for Priya',
+          description: 'She called about it.',
+          priority: TicketPriority.TICKET_PRIORITY_UNSPECIFIED,
+          source: TicketSource.TICKET_SOURCE_WEB,
+          authorId: tenant.userId,
+          attachments: [uploaded('call-notes.png')],
+        },
+        agent(),
+      );
+      const ticket = agentRaised.ticket!;
+      expect(ticket.authorId).toBe(tenant.userId);
+
+      await expectRpc(
+        messages.deleteAttachment(
+          { attachmentId: ticket.attachments[0].id },
+          requester(),
+        ),
+        status.PERMISSION_DENIED,
+      );
+      expect(ticket.openingFilesDeletableUntil).toBeUndefined();
+    });
+
+    it('**an emailed ticket’s author deletes inside the window**: the routed sender raised it', async () => {
+      const { ticket } = await open([uploaded('screen.png')], {
+        source: TicketSource.TICKET_SOURCE_EMAIL,
+        inboundMessageId: '<deletable@mail.test>',
+      });
+
+      await messages.deleteAttachment(
+        { attachmentId: ticket!.attachments[0].id },
+        requester(),
+      );
+
+      expect(await remaining(ticket!.id)).toBe(0);
+    });
+
+    it('a ticket from before `raised_by_id` (NULL): moderators only', async () => {
+      const { ticket } = await open([uploaded('screen.png')]);
+      await fx.prisma.ticket.update({
+        where: { id: ticket!.id },
+        data: { raisedById: null },
+      });
+
+      await expectRpc(
+        messages.deleteAttachment(
+          { attachmentId: ticket!.attachments[0].id },
+          requester(),
+        ),
+        status.PERMISSION_DENIED,
+      );
+      await messages.deleteAttachment(
+        { attachmentId: ticket!.attachments[0].id },
+        agent(['ticket.message.moderate']),
+      );
+      expect(await remaining(ticket!.id)).toBe(0);
+    });
+  });
+
   describe('the AI reads them', () => {
     it('**the first answer sends the opening’s files**', async () => {
       const { ticket } = await open([uploaded('screen.png')]);

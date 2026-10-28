@@ -137,4 +137,10 @@ message TicketResponse {
   // Every read fills it in: a file is signed only when downloaded, so a list
   // costs one join and no storage call.
   repeated AttachmentResponse attachments = 19;
+
+  // Until when the CALLER may delete the opening's files: the ticket's author,
+  // when they raised it themselves, inside the message edit window from the
+  // ticket's creation. Absent for anyone else, a moderator included (who may
+  // always). Like `unread_count`, it depends on who asks.
+  optional google.protobuf.Timestamp opening_files_deletable_until = 20;
 }

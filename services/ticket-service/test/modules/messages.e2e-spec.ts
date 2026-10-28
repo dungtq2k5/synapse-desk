@@ -1341,6 +1341,72 @@ describe('Ticket messages & attachments (e2e)', () => {
       ).toBe(1);
     });
 
+    describe('14b. its sender may delete it, while they may still edit', () => {
+      /** A file on a message the ticket's author sent `minutesAgo` ago. */
+      const sentFile = async (minutesAgo: number, extra = {}) => {
+        const ticket = await createTicket(fx.prisma, tenant);
+        const message = await createMessage(fx.prisma, ticket.id, {
+          senderId: tenant.userId,
+          createdAt: new Date(Date.now() - minutesAgo * 60_000),
+          ...extra,
+        });
+        return createAttachment(fx.prisma, message.id);
+      };
+      const remaining = (id: string) =>
+        fx.prisma.messageAttachment.count({ where: { id } });
+
+      it('**inside the window, the sender deletes it**', async () => {
+        const attachment = await sentFile(1);
+
+        await messages.deleteAttachment(
+          { attachmentId: attachment.id },
+          author(),
+        );
+
+        expect(await remaining(attachment.id)).toBe(0);
+      });
+
+      it('**just after the window, the sender is refused**, 403 rather than an edit’s 400', async () => {
+        // The window is 15 minutes (.env.test); a second past it.
+        const attachment = await sentFile(15 + 1 / 60);
+
+        await expectRpc(
+          messages.deleteAttachment({ attachmentId: attachment.id }, author()),
+          status.PERMISSION_DENIED,
+        );
+        expect(await remaining(attachment.id)).toBe(1);
+      });
+
+      it('a moderator deletes it after the window', async () => {
+        const attachment = await sentFile(60);
+
+        await messages.deleteAttachment(
+          { attachmentId: attachment.id },
+          moderator(),
+        );
+
+        expect(await remaining(attachment.id)).toBe(0);
+      });
+
+      it('another person is refused inside the window', async () => {
+        const attachment = await sentFile(1);
+
+        await expectRpc(
+          messages.deleteAttachment({ attachmentId: attachment.id }, agent()),
+          status.PERMISSION_DENIED,
+        );
+      });
+
+      it('the sender of a REDACTED message is refused: it can’t be edited either', async () => {
+        const attachment = await sentFile(1, { redactedAt: new Date() });
+
+        await expectRpc(
+          messages.deleteAttachment({ attachmentId: attachment.id }, author()),
+          status.PERMISSION_DENIED,
+        );
+      });
+    });
+
     it('15. listing attachments is scoped through the MESSAGE', async () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const message = await createMessage(fx.prisma, ticket.id);

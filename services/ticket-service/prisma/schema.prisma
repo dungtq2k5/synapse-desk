@@ -45,7 +45,11 @@ model Ticket {
   /// No FK: `users` lives in postgres_auth. Validated at write time via
   /// UserService.GetUser, never re-validated afterwards — Domain A only ever
   /// SOFT-deletes users, so this reference can never dangle.
-  authorId String @map("author_id") @db.Uuid
+  authorId   String  @map("author_id") @db.Uuid
+  /// Who created the ticket: its author, or the agent who raised it on the
+  /// author's behalf. Decides who may delete the opening's files: the author
+  /// only when they raised it. NULL on tickets created before it was recorded.
+  raisedById String? @map("raised_by_id") @db.Uuid
 
   // Enumerated columns are plain strings, per conventions §7.3. The legal
   // values live in TicketSource / TicketStatus / TicketPriority in

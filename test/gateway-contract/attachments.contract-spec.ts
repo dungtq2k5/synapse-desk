@@ -4,6 +4,7 @@
  * channel/stub `Chat` already pays for.
  */
 
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -86,8 +87,33 @@ describe('attachments', () => {
   );
 
   rowFor('Attachments')(
-    '**removing refuses a caller without `ticket.message.moderate`**',
+    '**removing is decided by ticket-service**: a sender with no permission is forwarded, and its 204 answered',
     async () => {
+      peers.ticket.on('MessageService/DeleteAttachment').reply({});
+
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/attachments/${ATTACHMENT}`,
+        { headers: cookie([]) },
+      );
+
+      expect(response.status).toBe(204);
+      expect(response.text).toBe('');
+      const [call] = peers.ticket.calls('MessageService/DeleteAttachment');
+      expect(call.request).toMatchObject({ attachmentId: ATTACHMENT });
+    },
+  );
+
+  rowFor('Attachments')(
+    '**after the window, ticket-service’s refusal is relayed**: 403, its message kept',
+    async () => {
+      peers.ticket
+        .on('MessageService/DeleteAttachment')
+        .fail(
+          GrpcStatus.PERMISSION_DENIED,
+          'Only a moderator, or its sender while they may still edit, can remove this file',
+        );
+
       const response = await new Session(gateway.baseUrl).request(
         'DELETE',
         `${API}/attachments/${ATTACHMENT}`,
@@ -95,28 +121,11 @@ describe('attachments', () => {
       );
 
       expect(response.status).toBe(403);
-      expect(
-        peers.ticket.calls('MessageService/DeleteAttachment'),
-      ).toHaveLength(0);
-    },
-  );
-
-  rowFor('Attachments')(
-    'a caller WITH `ticket.message.moderate` hard-deletes the attachment (204)',
-    async () => {
-      peers.ticket.on('MessageService/DeleteAttachment').reply({});
-
-      const response = await new Session(gateway.baseUrl).request(
-        'DELETE',
-        `${API}/attachments/${ATTACHMENT}`,
-        { headers: cookie(['ticket.message.moderate']) },
-      );
-
-      expect(response.status).toBe(204);
-      expect(response.text).toBe('');
-
-      const [call] = peers.ticket.calls('MessageService/DeleteAttachment');
-      expect(call.request).toMatchObject({ attachmentId: ATTACHMENT });
+      expect(response.body).toMatchObject({
+        error: expect.stringContaining(
+          'Only a moderator, or its sender while they may still edit, can remove this file',
+        ),
+      });
     },
   );
 });
