@@ -3,11 +3,11 @@ package com.synapsedesk.gateway.modules.tickets.dto.rest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.ArrayList;
 import java.util.List;
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -221,7 +221,10 @@ public class CreateTicketDto {
   public void setAuthorId(@Nullable UUID authorId) {
     this.authorId = authorId;
   }
-  public CreateTicketDto attachments(List<@Valid NewAttachmentDto> attachments) {
+
+  public CreateTicketDto attachments(
+    List<@Valid NewAttachmentDto> attachments
+  ) {
     this.attachments = attachments;
     return this;
   }
@@ -242,7 +245,6 @@ public class CreateTicketDto {
   public void setAttachments(List<@Valid NewAttachmentDto> attachments) {
     this.attachments = attachments;
   }
-
 
   @Override
   public boolean equals(Object o) {

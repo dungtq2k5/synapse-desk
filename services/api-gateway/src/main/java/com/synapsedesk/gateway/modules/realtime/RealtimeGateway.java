@@ -28,9 +28,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
-import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.MessageServiceGrpc;
 
 /**

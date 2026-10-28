@@ -1,14 +1,14 @@
 package com.synapsedesk.gateway.modules.chat.dto.rest;
 
-import com.synapsedesk.gateway.modules.tickets.dto.rest.NewAttachmentDto;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.NewAttachmentDto;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.ArrayList;
 import java.util.List;
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.Valid;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -138,7 +138,10 @@ public class StartConversationDto {
   public void setPriority(@Nullable PriorityEnum priority) {
     this.priority = priority;
   }
-  public StartConversationDto attachments(List<@Valid NewAttachmentDto> attachments) {
+
+  public StartConversationDto attachments(
+    List<@Valid NewAttachmentDto> attachments
+  ) {
     this.attachments = attachments;
     return this;
   }
@@ -159,7 +162,6 @@ public class StartConversationDto {
   public void setAttachments(List<@Valid NewAttachmentDto> attachments) {
     this.attachments = attachments;
   }
-
 
   @Override
   public boolean equals(Object o) {

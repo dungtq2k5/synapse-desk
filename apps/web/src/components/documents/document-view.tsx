@@ -77,13 +77,15 @@ import {
 import { useViewer } from '@/hooks/use-viewer';
 import {
   OCR_LANGUAGE_LABEL,
+  RUNNING,
   STAGES,
   STAGE_LABEL,
   UPDATING,
   failure,
   fileTypeLabel,
+  isUpdating,
   isWorking,
-  latestRun,
+  updateFailed,
   updatedLabel,
   visibilityLabel,
   type Stage,
@@ -110,7 +112,6 @@ import { useDocumentLive } from './use-document-live';
 import { VisibilityField, andList } from './visibility-field';
 
 const PASSAGES_PAGE = 4;
-const UNFINISHED = new Set(['QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING']);
 /** How often a document being processed looks again. */
 const WORKING_POLL_MS = 4000;
 
@@ -129,9 +130,7 @@ export function DocumentView({ documentId }: { documentId: string }) {
       enabled: readable,
       retry: false,
       refetchInterval: (query) =>
-        isWorking(query.state.data?.data?.status ?? null)
-          ? WORKING_POLL_MS
-          : false,
+        isWorking(query.state.data?.data) ? WORKING_POLL_MS : false,
     },
   });
   const doc = document.data?.data;
@@ -236,14 +235,14 @@ function Loaded({
   const { can } = useViewer();
   const { names } = usePeople();
   const departments = useDepartmentNames();
-  const working = isWorking(document.status);
+  const working = isWorking(document);
   const jobs = useDocumentsControllerListIngestionJobsV1(document.id, {
     query: {
       // While the document works, and until its latest attempt has finished:
       // the document can settle between two looks, leaving the job unread.
       refetchInterval: (query) =>
         working ||
-        UNFINISHED.has(query.state.data?.data?.items.at(-1)?.status ?? '')
+        RUNNING.has(query.state.data?.data?.items.at(-1)?.status ?? '')
           ? WORKING_POLL_MS
           : false,
     },
@@ -261,9 +260,10 @@ function Loaded({
   const { restore, reindex } = useDocumentActions();
   const deleted = Boolean(document.deletedAt);
   const items = jobs.data?.data?.items ?? [];
-  const { latest, updating } = latestRun(items);
+  const latest = items.at(-1) ?? null;
+  const updating = isUpdating(document);
   const uploader = names.get(document.createdById);
-  const notSearchable = document.status !== 'INDEXED' && !(working && updating);
+  const notSearchable = document.status !== 'INDEXED';
 
   return (
     <Frame title={document.title}>
@@ -299,7 +299,7 @@ function Loaded({
             {notSearchable && !deleted && (
               <span className="text-muted-foreground">Not searchable yet</span>
             )}
-            {working && updating && (
+            {updating && (
               <span className="text-muted-foreground">{UPDATING}</span>
             )}
             <span aria-hidden className="text-muted-foreground">
@@ -608,7 +608,8 @@ function Processing({
   const refresh = useDocumentCache();
   const [stopping, setStopping] = useState(false);
   const state = steps(document, latest);
-  const working = isWorking(document.status);
+  const working = isWorking(document);
+  const failedUpdate = updateFailed(document);
   const waitingForAllowance =
     latest?.status === 'QUEUED' && latest.waitingReason === 'AI_ALLOWANCE';
   const running =
@@ -706,7 +707,7 @@ function Processing({
           <Trash2Icon aria-hidden className="size-4" />
           {`Was indexed on ${dayDate(indexedAt)}. Not searchable while deleted.`}
         </p>
-      ) : document.status === 'INDEXED' && !working ? (
+      ) : document.status === 'INDEXED' && !working && !failedUpdate ? (
         <p className="flex items-center gap-2 text-sm">
           <CircleCheckIcon aria-hidden className="size-4 text-primary" />
           {`${
@@ -729,6 +730,7 @@ function Processing({
           <AlertDescription className="text-info-subtle-foreground">
             This month’s AI allowance ran out, so processing waits. It starts
             again by itself once the allowance resets or the plan changes.
+            {updating && ' Answers use the current version meanwhile.'}
             {can('organization.update') && <PlanLink canChange />}
           </AlertDescription>
         </Alert>
@@ -736,10 +738,6 @@ function Processing({
         <Alert className="border-info-border bg-info-subtle text-info-subtle-foreground">
           <RefreshCwIcon aria-hidden />
           <AlertTitle className="line-clamp-none">{UPDATING}</AlertTitle>
-          <AlertDescription className="text-info-subtle-foreground">
-            Near the end, while the new passages are prepared, it briefly
-            answers nothing.
-          </AlertDescription>
         </Alert>
       ) : running || (working && !latest) ? (
         <Alert className="border-info-border bg-info-subtle text-info-subtle-foreground">
@@ -768,8 +766,16 @@ function Processing({
       ) : failed ? (
         <Alert variant="destructive" role="alert">
           <CircleAlertIcon aria-hidden />
-          <AlertTitle>Processing failed</AlertTitle>
+          <AlertTitle>
+            {failedUpdate ? 'The update failed' : 'Processing failed'}
+          </AlertTitle>
           <AlertDescription>
+            {failedUpdate && (
+              <p>
+                Answers still use the previous version. Retry to process the new
+                file again.
+              </p>
+            )}
             <p>{failed.sentence}</p>
             {latest?.errorLog && (
               <Collapsible className="w-full">

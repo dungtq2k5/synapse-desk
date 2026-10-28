@@ -1,8 +1,8 @@
 package com.synapsedesk.gateway.modules.inboundemail;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,6 +46,7 @@ import synapsedesk.auth.UserServiceGrpc.UserServiceBlockingStub;
 import synapsedesk.notification.Notification.ResolveTicketByMessageIdRequest;
 import synapsedesk.notification.Notification.ResolveTicketByMessageIdResponse;
 import synapsedesk.notification.NotificationServiceGrpc.NotificationServiceBlockingStub;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Common.TicketPriority;
 import synapsedesk.ticket.Common.TicketResponse;
 import synapsedesk.ticket.Common.TicketSource;
@@ -55,7 +56,6 @@ import synapsedesk.ticket.Message.IngestAttachmentRequest;
 import synapsedesk.ticket.Message.IngestAttachmentResponse;
 import synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
-import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Ticket.CreateTicketResponse;
 import synapsedesk.ticket.Ticket.GetTicketByNumberRequest;
 import synapsedesk.ticket.Ticket.TicketStatusActionRequest;

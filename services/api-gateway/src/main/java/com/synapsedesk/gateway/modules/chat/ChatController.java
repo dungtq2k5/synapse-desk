@@ -14,9 +14,9 @@ import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.modules.chat.dto.rest.StartConversationDto;
 import com.synapsedesk.gateway.modules.tickets.TicketReferences;
 import com.synapsedesk.gateway.modules.tickets.TicketsCrudService;
-import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.MessageResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.TicketPriorityFilter;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.TicketResponseDto;
@@ -51,12 +51,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
+import synapsedesk.ticket.Common.AttachmentResponse;
 import synapsedesk.ticket.Common.TicketPriority;
 import synapsedesk.ticket.Common.TicketResponse;
 import synapsedesk.ticket.Common.TicketSource;
 import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.Message.AnswerOpeningRequest;
-import synapsedesk.ticket.Common.AttachmentResponse;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
 import synapsedesk.ticket.Message.ListMessagesRequest;
@@ -484,7 +484,6 @@ public class ChatController {
     return TicketsCrudService.toTicketResponseDto(ticket);
   }
 
-
   private static MessageResponseDto toMessageDto(MessageResponse message) {
     List<CitationResponseDto> citations = message.hasCitations()
       ? message
@@ -538,7 +537,6 @@ public class ChatController {
       .answerStatus(toAnswerStatusEnum(message.getAnswerStatus()))
       .citations(citations);
   }
-
 
   private static CitationResponseDto toCitationDto(
     synapsedesk.ticket.Ai.DraftCitation citation

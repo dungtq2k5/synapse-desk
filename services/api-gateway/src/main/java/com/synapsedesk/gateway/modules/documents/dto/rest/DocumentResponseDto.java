@@ -181,6 +181,8 @@ public class DocumentResponseDto {
 
   private String deletedById = null;
 
+  private LatestIngestionJobResponseDto latestJob = null;
+
   public DocumentResponseDto() {
     super();
   }
@@ -204,7 +206,8 @@ public class DocumentResponseDto {
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt,
     OffsetDateTime deletedAt,
-    String deletedById
+    String deletedById,
+    LatestIngestionJobResponseDto latestJob
   ) {
     this.id = id;
     this.organizationId = organizationId;
@@ -222,6 +225,7 @@ public class DocumentResponseDto {
     this.updatedAt = updatedAt;
     this.deletedAt = deletedAt;
     this.deletedById = deletedById;
+    this.latestJob = latestJob;
   }
 
   public DocumentResponseDto id(String id) {
@@ -566,6 +570,28 @@ public class DocumentResponseDto {
     this.deletedById = deletedById;
   }
 
+  public DocumentResponseDto latestJob(
+    LatestIngestionJobResponseDto latestJob
+  ) {
+    this.latestJob = latestJob;
+    return this;
+  }
+
+  /**
+   * The newest ingestion attempt, `null` when there is none.
+   * @return latestJob
+   */
+  @Valid
+  @JsonProperty("latestJob")
+  public LatestIngestionJobResponseDto getLatestJob() {
+    return latestJob;
+  }
+
+  @JsonProperty("latestJob")
+  public void setLatestJob(LatestIngestionJobResponseDto latestJob) {
+    this.latestJob = latestJob;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -594,7 +620,8 @@ public class DocumentResponseDto {
       Objects.equals(this.createdAt, documentResponseDto.createdAt) &&
       Objects.equals(this.updatedAt, documentResponseDto.updatedAt) &&
       Objects.equals(this.deletedAt, documentResponseDto.deletedAt) &&
-      Objects.equals(this.deletedById, documentResponseDto.deletedById)
+      Objects.equals(this.deletedById, documentResponseDto.deletedById) &&
+      Objects.equals(this.latestJob, documentResponseDto.latestJob)
     );
   }
 
@@ -616,7 +643,8 @@ public class DocumentResponseDto {
       createdAt,
       updatedAt,
       deletedAt,
-      deletedById
+      deletedById,
+      latestJob
     );
   }
 
@@ -661,6 +689,9 @@ public class DocumentResponseDto {
       .append("\n");
     sb.append("    deletedById: ")
       .append(toIndentedString(deletedById))
+      .append("\n");
+    sb.append("    latestJob: ")
+      .append(toIndentedString(latestJob))
       .append("\n");
     sb.append("}");
     return sb.toString();

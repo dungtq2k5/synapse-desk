@@ -51,6 +51,7 @@ import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ticket.Ai.DraftCitation;
 import synapsedesk.ticket.Common.AttachmentResponse;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Message.ConfirmAttachmentRequest;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
@@ -59,7 +60,6 @@ import synapsedesk.ticket.Message.ListMessagesRequest;
 import synapsedesk.ticket.Message.ListMessagesResponse;
 import synapsedesk.ticket.Message.MessageAnswerStatus;
 import synapsedesk.ticket.Message.MessageResponse;
-import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Message.PresignAttachmentResponse;
 import synapsedesk.ticket.Message.RedactMessageRequest;
 import synapsedesk.ticket.Message.RedactMessageResponse;
@@ -383,7 +383,11 @@ public class MessagesController {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      ApiResponse.of(201, "Attachment added", TicketsCrudService.toAttachmentResponseDto(response))
+      ApiResponse.of(
+        201,
+        "Attachment added",
+        TicketsCrudService.toAttachmentResponseDto(response)
+      )
     );
   }
 
@@ -482,7 +486,6 @@ public class MessagesController {
         : null
     );
   }
-
 
   private static CitationResponseDto toCitationResponseDto(
     DraftCitation citation

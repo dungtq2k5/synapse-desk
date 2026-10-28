@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { RealtimeProvider } from '@/components/realtime/realtime-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { failure } from '@/lib/documents';
 import { fail, ok, stubApi } from '@/test/api';
 import { lastSocket } from '@/test/socket';
 import { DocumentView } from './document-view';
@@ -68,6 +69,16 @@ const doc = (over: Partial<DocumentResponseDto> = {}): DocumentResponseDto => ({
   updatedAt: '2026-10-02T14:08:00Z',
   deletedAt: null,
   deletedById: null,
+  latestJob: null,
+  ...over,
+});
+
+const latest = (
+  over: Partial<NonNullable<DocumentResponseDto['latestJob']>> = {},
+) => ({
+  status: 'COMPLETED' as const,
+  waitingReason: null,
+  errorCode: null,
   ...over,
 });
 
@@ -183,25 +194,16 @@ describe('the documents list', () => {
   it('a replace in progress reads "Updating"; a job at the AI cap says it waits', async () => {
     show(<DocumentsView />, MANAGER, {
       'GET /api/v1/documents': page([
-        doc({ id: 'd1', status: 'PROCESSING' }),
+        doc({ id: 'd1', latestJob: latest({ status: 'PARSING' }) }),
         doc({
           id: 'd2',
           title: 'IT Returns.txt',
           status: 'PENDING',
           fileType: 'txt',
-        }),
-      ]),
-      'GET /api/v1/documents/d1/ingestion-jobs': page([
-        job({ id: 'a' }),
-        job({ id: 'b', status: 'PARSING', processedAt: null }),
-      ]),
-      'GET /api/v1/documents/d2/ingestion-jobs': page([
-        job({
-          id: 'c',
-          documentId: 'd2',
-          status: 'QUEUED',
-          waitingReason: 'AI_ALLOWANCE',
-          processedAt: null,
+          latestJob: latest({
+            status: 'QUEUED',
+            waitingReason: 'AI_ALLOWANCE',
+          }),
         }),
       ]),
     });
@@ -218,6 +220,25 @@ describe('the documents list', () => {
         .length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText('Not searchable yet').length).toBeGreaterThan(0);
+  });
+
+  it('a failed update reads "Update failed" and stays Indexed', async () => {
+    show(<DocumentsView />, MANAGER, {
+      'GET /api/v1/documents': page([
+        doc({
+          latestJob: latest({
+            status: 'FAILED',
+            errorCode: 'PROVIDER_FAILURE',
+          }),
+        }),
+      ]),
+    });
+
+    expect(
+      (await screen.findAllByText('Update failed')).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Indexed').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Not searchable yet')).not.toBeInTheDocument();
   });
 
   it('at full storage, Upload is off and points at why; billing only for organization.update', async () => {
@@ -304,6 +325,94 @@ describe('uploading', () => {
 });
 
 describe('one document', () => {
+  it('an update in progress keeps answering, and says nothing about a gap', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({ latestJob: latest({ status: 'EMBEDDING' }) }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ id: 'a' }),
+        job({ id: 'b', status: 'EMBEDDING', processedAt: null }),
+      ]),
+    });
+
+    const processing = await screen.findByRole('region', {
+      name: 'Processing',
+    });
+    expect(
+      await within(processing).findByText(
+        'Updating — answers use the current version until the new one is ready',
+      ),
+    ).toBeInTheDocument();
+    expect(processing).not.toHaveTextContent('briefly answers nothing');
+  });
+
+  it('an update waiting for the allowance says answers use the current version', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({
+          latestJob: latest({
+            status: 'QUEUED',
+            waitingReason: 'AI_ALLOWANCE',
+          }),
+        }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ id: 'a' }),
+        job({
+          id: 'b',
+          status: 'QUEUED',
+          waitingReason: 'AI_ALLOWANCE',
+          processedAt: null,
+        }),
+      ]),
+    });
+
+    const processing = await screen.findByRole('region', {
+      name: 'Processing',
+    });
+    expect(
+      await within(processing).findByText(
+        /Answers use the current version meanwhile\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('a failed update says answers still use the previous version, with the reason and Retry', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({
+          latestJob: latest({
+            status: 'FAILED',
+            errorCode: 'PROVIDER_FAILURE',
+          }),
+        }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({ id: 'a' }),
+        job({
+          id: 'b',
+          status: 'FAILED',
+          errorCode: 'PROVIDER_FAILURE',
+          failedStage: 'EMBEDDING',
+          processedAt: null,
+        }),
+      ]),
+    });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The update failed');
+    expect(alert).toHaveTextContent(
+      'Answers still use the previous version. Retry to process the new file again.',
+    );
+    expect(alert).toHaveTextContent(
+      failure('PROVIDER_FAILURE', 'pdf').sentence,
+    );
+    expect(
+      within(alert).getByRole('button', { name: 'Retry' }),
+    ).toBeInTheDocument();
+  });
+
   it('a failure stops the stepper at its stage and says it plainly, with only the actions that help', async () => {
     show(<DocumentView documentId="d1" />, MANAGER, {
       'GET /api/v1/documents/d1': ok(doc({ status: 'FAILED', chunkCount: 0 })),

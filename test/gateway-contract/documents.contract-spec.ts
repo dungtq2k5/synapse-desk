@@ -282,6 +282,48 @@ describe('documents', () => {
   );
 
   rowFor('Documents')(
+    'relays the newest job as `latestJob`, and none as `null`',
+    async () => {
+      peers.ingestion.on('DocumentService/ListDocuments').reply({
+        items: [
+          wireDocument({
+            latestJob: {
+              status: 6, // INGESTION_JOB_STATUS_FAILED
+              waitingReason: 0,
+              errorCode: 4, // INGESTION_ERROR_CODE_PROVIDER_FAILURE
+            },
+          }),
+          wireDocument(),
+        ],
+        meta: {
+          totalItems: 2,
+          itemCount: 2,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        // Its own query string, so the cached first listing is not reused.
+        `${API}/documents?limit=11`,
+        cookie([]),
+      );
+
+      expect(response.status).toBe(200);
+      const { items } = (
+        response.body as { data: { items: { latestJob: unknown }[] } }
+      ).data;
+      expect(items[0].latestJob).toEqual({
+        status: 'FAILED',
+        waitingReason: null,
+        errorCode: 'PROVIDER_FAILURE',
+      });
+      expect(items[1].latestJob).toBeNull();
+    },
+  );
+
+  rowFor('Documents')(
     '**update refuses a caller without `document.update`**',
     async () => {
       const response = await new Session(gateway.baseUrl).request(

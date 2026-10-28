@@ -26,6 +26,7 @@ import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentResponseDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DocumentStatusFilter;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DownloadDocumentResponseDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.FlagSeverityFilter;
+import com.synapsedesk.gateway.modules.documents.dto.rest.LatestIngestionJobResponseDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.PresignDocumentDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.PresignDocumentResponseDto;
 import com.synapsedesk.gateway.modules.documents.dto.rest.ReplaceDocumentDto;
@@ -84,6 +85,7 @@ import synapsedesk.ingestion.Document.DocumentStatus;
 import synapsedesk.ingestion.Document.DownloadDocumentResponse;
 import synapsedesk.ingestion.Document.GetDocumentChunkRequest;
 import synapsedesk.ingestion.Document.IngestionJobResponse;
+import synapsedesk.ingestion.Document.LatestIngestionJob;
 import synapsedesk.ingestion.Document.ListDocumentChunksRequest;
 import synapsedesk.ingestion.Document.ListDocumentChunksResponse;
 import synapsedesk.ingestion.Document.ListDocumentDepartmentsResponse;
@@ -1005,9 +1007,26 @@ public class DocumentsController {
           ? toOffsetDateTime(document.getDeletedAt())
           : null
       )
-      .deletedById(
-        document.hasDeletedById() ? document.getDeletedById() : null
+      .deletedById(document.hasDeletedById() ? document.getDeletedById() : null)
+      .latestJob(
+        document.hasLatestJob() ? toLatestJobDto(document.getLatestJob()) : null
       );
+  }
+
+  private static LatestIngestionJobResponseDto toLatestJobDto(
+    LatestIngestionJob job
+  ) {
+    return new LatestIngestionJobResponseDto(
+      LatestIngestionJobResponseDto.StatusEnum.fromValue(
+        job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+      ),
+      LatestIngestionJobResponseDto.WaitingReasonEnum.fromValue(
+        job.getWaitingReason().name().replace("INGESTION_WAITING_REASON_", "")
+      ),
+      LatestIngestionJobResponseDto.ErrorCodeEnum.fromValue(
+        job.getErrorCode().name().replace("INGESTION_ERROR_CODE_", "")
+      )
+    );
   }
 
   private static DocumentFlagResponseDto toFlagDto(DocumentFlagResponse flag) {

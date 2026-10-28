@@ -995,6 +995,18 @@
     "DocumentResponseDto.fileUrl": {
       "description": "An internal object path today; a signed URL only via `/download`."
     },
+    "DocumentResponseDto.latestJob": {
+      "description": "The newest ingestion attempt, `null` when there is none. A document that\nalready answers stays `INDEXED` while an update runs and after one fails,\nso this is what says an update is running, waiting or failed."
+    },
+    "LatestIngestionJobResponseDto.status": {
+      "description": "`null` only if the peer sent a member this build does not know."
+    },
+    "LatestIngestionJobResponseDto.waitingReason": {
+      "description": "Why a `QUEUED` attempt waits; `null` is an ordinary queue."
+    },
+    "LatestIngestionJobResponseDto.errorCode": {
+      "description": "Why a `FAILED` attempt failed; `null` on one that hasn't failed."
+    },
     "DocumentResponseDto.ocrLanguages": {
       "description": "ISO 639-1 codes the uploader declared for OCR.\n\n`[]` means \"not specified\" — never `null`, so absent and empty are one\nvalue all the way to the client."
     },

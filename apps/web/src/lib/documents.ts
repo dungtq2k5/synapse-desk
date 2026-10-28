@@ -81,27 +81,38 @@ export function ocrLanguageAllowed(
   );
 }
 
-/** Where a document is in its pipeline, as one word the list and header use. */
-export function isWorking(status: DocumentStatus | null): boolean {
-  return status === 'PENDING' || status === 'PROCESSING';
-}
+/** The job statuses a document is still being processed in. */
+export const RUNNING: ReadonlySet<string> = new Set(STAGES);
+
+type WithLatestJob = Pick<DocumentResponseDto, 'status' | 'latestJob'>;
 
 /**
- * The latest attempt on a document, and whether an earlier one indexed it:
- * a document processing again after an indexed run (a replace or a reindex)
- * keeps answering from the version it has.
+ * Whether a document is being processed: its newest attempt hasn't finished.
+ * The job says it, not the status: a document that already answers stays
+ * `INDEXED` while a replace or reindex runs.
  *
- * @param jobs the document's attempts, oldest first (as the API lists them)
+ * @example isWorking({ status: 'INDEXED', latestJob: { status: 'PARSING', … } }) // true
  */
-export function latestRun(jobs: readonly IngestionJobResponseDto[]) {
-  return {
-    latest: jobs.at(-1) ?? null,
-    updating: jobs.slice(0, -1).some((job) => job.status === 'COMPLETED'),
-  };
+export function isWorking(document: WithLatestJob | undefined): boolean {
+  return RUNNING.has(document?.latestJob?.status ?? '');
+}
+
+/** Processing again while it answers from the version it has. */
+export function isUpdating(document: WithLatestJob): boolean {
+  return document.status === 'INDEXED' && isWorking(document);
+}
+
+/** Its newest attempt failed, and it still answers from the previous version. */
+export function updateFailed(document: WithLatestJob): boolean {
+  return (
+    document.status === 'INDEXED' && document.latestJob?.status === 'FAILED'
+  );
 }
 
 /** The stage a running job is in, for the list's caption. */
-export function stageCaption(job: IngestionJobResponseDto | null): string {
+export function stageCaption(
+  job: Pick<IngestionJobResponseDto, 'status' | 'waitingReason'> | null,
+): string {
   if (job?.status === 'QUEUED' && job.waitingReason === 'AI_ALLOWANCE') {
     return 'Waiting for the AI allowance to reset';
   }
@@ -119,6 +130,8 @@ export function stageCaption(job: IngestionJobResponseDto | null): string {
 
 export const UPDATING =
   'Updating — answers use the current version until the new one is ready';
+
+export const UPDATE_FAILED = 'Update failed';
 
 /** What a failed attempt's code means, and what may help. */
 export function failure(

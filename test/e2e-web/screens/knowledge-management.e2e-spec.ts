@@ -53,7 +53,24 @@ const DEPARTMENTS = [
 
 type Doc = Record<string, unknown> & { id: string; title: string };
 let owner = '';
+/** The newest job's state, as `latestJob` carries it. */
+const latest = (status: string, over: object = {}) => ({
+  status,
+  waitingReason: null,
+  errorCode: null,
+  ...over,
+});
+/** The newest job a status implies, unless a row says otherwise. */
+const LATEST_FOR: Record<string, string> = {
+  INDEXED: 'COMPLETED',
+  PENDING: 'QUEUED',
+  PROCESSING: 'PARSING',
+  FAILED: 'FAILED',
+};
 const doc = (id: string, title: string, over: object = {}): Doc => ({
+  latestJob: latest(
+    LATEST_FOR[(over as { status?: string }).status ?? 'INDEXED'],
+  ),
   id,
   organizationId: 'o1',
   createdById: owner,
@@ -85,6 +102,7 @@ const documents = (): Doc[] => [
     fileType: 'docx',
     fileSizeBytes: 348_160,
     status: 'PROCESSING',
+    latestJob: latest('EMBEDDING'),
     isOrganizationWide: false,
     departmentIds: ['hr'],
     chunkCount: 0,
@@ -102,6 +120,7 @@ const documents = (): Doc[] => [
   doc('d5', 'Travel and Expenses Policy.pdf', {
     fileSizeBytes: 3_355_443,
     status: 'FAILED',
+    latestJob: latest('FAILED', { errorCode: 'NO_READABLE_TEXT' }),
     isOrganizationWide: false,
     departmentIds: ['billing', 'finance'],
     chunkCount: 0,
@@ -476,9 +495,18 @@ test.describe('documents', () => {
     await look(page, 'documents-show-deleted');
   });
 
-  test('updating and waiting', async ({ page }) => {
+  test('updating, waiting, and an update that failed', async ({ page }) => {
     const list = documents();
-    list[0] = { ...list[0], status: 'PROCESSING', updatedAt: ago(5) };
+    // A replace keeps the document INDEXED; its newest job says it runs.
+    list[0] = { ...list[0], latestJob: latest('PARSING'), updatedAt: ago(5) };
+    list[1] = {
+      ...list[1],
+      latestJob: latest('FAILED', { errorCode: 'PROVIDER_FAILURE' }),
+    };
+    list[3] = {
+      ...list[3],
+      latestJob: latest('QUEUED', { waitingReason: 'AI_ALLOWANCE' }),
+    };
     await open(page, { list: paged(list, 23) });
     await page.unroute('**/api/v1/documents/d*/ingestion-jobs');
     await page.route('**/api/v1/documents/d*/ingestion-jobs', (route) => {
@@ -526,6 +554,7 @@ test.describe('documents', () => {
     await expect(
       page.getByText('Waiting for the AI allowance to reset').first(),
     ).toBeVisible();
+    await expect(page.getByText('Update failed').first()).toBeVisible();
     await look(page, 'documents-updating-waiting');
   });
 });
@@ -751,6 +780,7 @@ test.describe('one document', () => {
       document: ok(
         doc('d1', 'Parental Leave Policy.docx', {
           status: 'PROCESSING',
+          latestJob: latest('CHUNKING'),
           chunkCount: 0,
           isOrganizationWide: false,
           departmentIds: ['hr'],
@@ -769,7 +799,7 @@ test.describe('one document', () => {
   test('updating', async ({ page }) => {
     await open(page, {
       document: ok(
-        doc('d1', 'Remote Work Policy.pdf', { status: 'PROCESSING' }),
+        doc('d1', 'Remote Work Policy.pdf', { latestJob: latest('PARSING') }),
       ),
       jobs: paged([
         ...HISTORY,
@@ -781,12 +811,61 @@ test.describe('one document', () => {
         }),
       ]),
     });
+    const processing = page.getByRole('region', { name: 'Processing' });
     await expect(
-      page.getByText(
-        'Near the end, while the new passages are prepared, it briefly answers nothing.',
+      processing.getByText(
+        'Updating — answers use the current version until the new one is ready',
       ),
     ).toBeVisible();
     await look(page, 'document-updating');
+  });
+
+  test('updating, waiting for the AI allowance', async ({ page }) => {
+    await open(page, {
+      document: ok(
+        doc('d1', 'Remote Work Policy.pdf', {
+          latestJob: latest('QUEUED', { waitingReason: 'AI_ALLOWANCE' }),
+        }),
+      ),
+      jobs: paged([
+        ...HISTORY,
+        job({
+          id: 'j10',
+          status: 'QUEUED',
+          waitingReason: 'AI_ALLOWANCE',
+          processedAt: null,
+          createdAt: ago(60),
+        }),
+      ]),
+    });
+    await expect(
+      page.getByText(/Answers use the current version meanwhile\./),
+    ).toBeVisible();
+    await look(page, 'document-updating-allowance');
+  });
+
+  test('update failed', async ({ page }) => {
+    await open(page, {
+      document: ok(
+        doc('d1', 'Remote Work Policy.pdf', {
+          latestJob: latest('FAILED', { errorCode: 'PROVIDER_FAILURE' }),
+        }),
+      ),
+      jobs: paged([
+        ...HISTORY,
+        job({
+          id: 'j10',
+          status: 'FAILED',
+          errorCode: 'PROVIDER_FAILURE',
+          failedStage: 'EMBEDDING',
+          errorLog: 'The embedding provider did not respond.',
+          processedAt: ago(1),
+          createdAt: ago(3),
+        }),
+      ]),
+    });
+    await expect(page.getByText('The update failed')).toBeVisible();
+    await look(page, 'document-update-failed');
   });
 
   for (const [name, code, stage, words] of [
@@ -836,6 +915,7 @@ test.describe('one document', () => {
       document: ok(
         doc('d1', 'Travel and Expenses Policy.pdf', {
           status: 'FAILED',
+          latestJob: latest('CANCELLED'),
           chunkCount: 0,
         }),
       ),
@@ -877,6 +957,7 @@ test.describe('one document', () => {
       document: ok(
         doc('d1', 'IT Equipment Returns.txt', {
           status: 'PENDING',
+          latestJob: latest('QUEUED', { waitingReason: 'AI_ALLOWANCE' }),
           chunkCount: 0,
         }),
       ),
@@ -1043,6 +1124,7 @@ test.describe('one document', () => {
       document: ok(
         doc('d1', 'Parental Leave Policy.docx', {
           status: 'PROCESSING',
+          latestJob: latest('CHUNKING'),
           chunkCount: 0,
         }),
       ),

@@ -2,7 +2,6 @@
 
 import {
   useDocumentsControllerListFlagsV1,
-  useDocumentsControllerListIngestionJobsV1,
   useDocumentsControllerListV1,
   useDocumentsControllerStorageUsageV1,
   type DocumentResponseDto,
@@ -58,12 +57,14 @@ import { useViewer } from '@/hooks/use-viewer';
 import {
   DOCUMENT_STATUS_LABEL,
   FILE_TYPE_LABEL,
+  UPDATE_FAILED,
   UPDATING,
   fileTypeLabel,
+  isUpdating,
   isWorking,
-  latestRun,
   stageCaption,
   storageLevel,
+  updateFailed,
   updatedLabel,
   visibilityLabel,
 } from '@/lib/documents';
@@ -130,9 +131,7 @@ export function DocumentsView() {
         enabled: readable,
         placeholderData: keepPreviousData,
         refetchInterval: (query) =>
-          query.state.data?.data?.items.some((document) =>
-            isWorking(document.status),
-          )
+          query.state.data?.data?.items.some((document) => isWorking(document))
             ? WORKING_POLL_MS
             : false,
       },
@@ -514,23 +513,20 @@ function Toolbar({
 }
 
 /**
- * Where a document is: its status, and, while it's worked on, the latest
- * attempt's stage (or why it waits) and whether it still answers from its
- * last version.
+ * Where a document is: while it's worked on, the latest attempt's stage (or
+ * why it waits) and whether it still answers from its last version; after a
+ * failed update, that the update failed.
  */
-function useProgress(document: DocumentResponseDto) {
-  const working = isWorking(document.status);
-  const jobs = useDocumentsControllerListIngestionJobsV1(document.id, {
-    query: {
-      enabled: working,
-      refetchInterval: working ? WORKING_POLL_MS : false,
-    },
-  });
-  const { latest, updating } = latestRun(jobs.data?.data?.items ?? []);
+function progressOf(document: DocumentResponseDto) {
+  const working = isWorking(document);
   return {
     working,
-    caption: working ? stageCaption(latest) : null,
-    updating: working && updating,
+    caption: working
+      ? stageCaption(document.latestJob)
+      : updateFailed(document)
+        ? UPDATE_FAILED
+        : null,
+    updating: isUpdating(document),
   };
 }
 
@@ -576,7 +572,7 @@ function DocumentRow({
   visibility: string;
   flags: number;
 }) {
-  const progress = useProgress(document);
+  const progress = progressOf(document);
   const notSearchable =
     document.status !== 'INDEXED' && !progress.updating
       ? 'Not searchable yet'
@@ -638,7 +634,7 @@ function DocumentCard({
   visibility: string;
   flags: number;
 }) {
-  const progress = useProgress(document);
+  const progress = progressOf(document);
   return (
     <li
       className={cn(

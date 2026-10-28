@@ -63103,6 +63103,17 @@
           },
           "deletedById": {
             "type": ["string", "null"]
+          },
+          "latestJob": {
+            "description": "The newest ingestion attempt, `null` when there is none. A document that\nalready answers stays `INDEXED` while an update runs and after one fails,\nso this is what says an update is running, waiting or failed.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LatestIngestionJobResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -63117,12 +63128,50 @@
           "fileUrl",
           "id",
           "isOrganizationWide",
+          "latestJob",
           "ocrLanguages",
           "organizationId",
           "status",
           "title",
           "updatedAt"
         ]
+      },
+      "LatestIngestionJobResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": ["string", "null"],
+            "description": "`null` only if the peer sent a member this build does not know.",
+            "enum": [
+              "CANCELLED",
+              "CHUNKING",
+              "COMPLETED",
+              "EMBEDDING",
+              "FAILED",
+              "PARSING",
+              "QUEUED",
+              null
+            ]
+          },
+          "waitingReason": {
+            "type": ["string", "null"],
+            "description": "Why a `QUEUED` attempt waits; `null` is an ordinary queue.",
+            "enum": ["AI_ALLOWANCE", null]
+          },
+          "errorCode": {
+            "type": ["string", "null"],
+            "description": "Why a `FAILED` attempt failed; `null` on one that hasn't failed.",
+            "enum": [
+              "NO_READABLE_TEXT",
+              "OCR_UNAVAILABLE",
+              "OTHER",
+              "PROVIDER_FAILURE",
+              "TOO_LONG",
+              null
+            ]
+          }
+        },
+        "required": ["errorCode", "status", "waitingReason"]
       },
       "ApiResponseStripeWebhookAcknowledgementDto": {
         "type": "object",

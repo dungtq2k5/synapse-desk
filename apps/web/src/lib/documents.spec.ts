@@ -3,10 +3,12 @@ import {
   asSentence,
   checkFile,
   failure,
-  latestRun,
+  isUpdating,
+  isWorking,
   ocrLanguageAllowed,
   stageCaption,
   storageLevel,
+  updateFailed,
   updatedLabel,
 } from './documents';
 
@@ -68,14 +70,33 @@ describe('document wording', () => {
     ).toBe('Waiting for the AI allowance to reset');
   });
 
-  it('is "updating" only when an earlier attempt indexed it', () => {
-    expect(latestRun([job({ status: 'PARSING' })]).updating).toBe(false);
-    const replaced = latestRun([
-      job({ id: 'a', status: 'COMPLETED' }),
-      job({ id: 'b', status: 'PARSING' }),
-    ]);
-    expect(replaced.latest?.id).toBe('b');
-    expect(replaced.updating).toBe(true);
+  it('reads working, updating and a failed update off the newest job', () => {
+    const latest = (status: IngestionJobResponseDto['status']) => ({
+      status,
+      waitingReason: null,
+      errorCode: null,
+    });
+
+    expect(isWorking({ status: 'PENDING', latestJob: null })).toBe(false);
+    expect(isWorking({ status: 'INDEXED', latestJob: latest('QUEUED') })).toBe(
+      true,
+    );
+    expect(
+      isWorking({ status: 'INDEXED', latestJob: latest('COMPLETED') }),
+    ).toBe(false);
+    // A first ingestion works without updating; a replace updates.
+    expect(
+      isUpdating({ status: 'PROCESSING', latestJob: latest('PARSING') }),
+    ).toBe(false);
+    expect(
+      isUpdating({ status: 'INDEXED', latestJob: latest('PARSING') }),
+    ).toBe(true);
+    expect(
+      updateFailed({ status: 'INDEXED', latestJob: latest('FAILED') }),
+    ).toBe(true);
+    expect(
+      updateFailed({ status: 'FAILED', latestJob: latest('FAILED') }),
+    ).toBe(false);
   });
 
   it('levels the storage bar: under 90%, from 90%, full', () => {
