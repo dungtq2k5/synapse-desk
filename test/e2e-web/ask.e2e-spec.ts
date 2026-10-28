@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page } from './coverage';
+import { REPO_ROOT } from '../system/services';
 import {
   knowledgeDocument,
   sessionAs,
@@ -97,6 +100,108 @@ test('a member opens a ticket from New request', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: /Badge doesn’t open the side door/ }),
   ).toBeVisible();
+});
+
+const SCREENSHOT = join(REPO_ROOT, 'test/fixtures/images/avatar.png');
+
+/** The thread's first entry: the question or description, with its files. */
+const opening = (page: Page, text: string) =>
+  thread(page).getByRole('article').filter({ hasText: text });
+
+test('**an end user asks with a screenshot**: the answer comes, and the file is in the thread under the question', async ({
+  page,
+}) => {
+  const { priya } = await tenant('j-ask-file');
+  await signInAs(page, priya);
+  await page.goto('/ask');
+
+  await page
+    .getByRole('textbox', { name: 'Your question' })
+    .fill('Why does the expenses page show this error?');
+  await page.locator('form input[type="file"]').setInputFiles(SCREENSHOT);
+  const files = page.getByRole('list', { name: 'Attachments' });
+  await expect(files.getByText('avatar.png')).toBeVisible();
+  await expect(files.getByText('Uploading…', { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ask' }).click();
+  await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
+
+  const question = opening(page, 'Why does the expenses page show this error?');
+  await expect(
+    question.getByRole('button', { name: /^avatar\.png/ }),
+  ).toBeVisible();
+  // The first answer was asked for with the file bound: it arrives (a miss,
+  // with no documents in this tenant) rather than failing.
+  await expect(
+    thread(page).getByText(
+      'Not what you needed? A person from the support team can take over.',
+    ),
+  ).toBeVisible({ timeout: 30_000 });
+});
+
+test('**a member opens a ticket with a file**, and it is under the description', async ({
+  page,
+}) => {
+  const { priya } = await tenant('j-open-file');
+  await signInAs(page, priya);
+  await page.goto('/tickets/new');
+
+  await page.getByLabel('Title').fill('Dock flickers');
+  await page.getByLabel('Description').fill('See the photo of the dock.');
+  await page.locator('form input[type="file"]').setInputFiles(SCREENSHOT);
+  await expect(
+    page.getByRole('list', { name: 'Attachments' }).getByText('avatar.png'),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Wait for your files to finish uploading.'),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create ticket' }).click();
+  await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
+
+  await expect(
+    opening(page, 'See the photo of the dock.').getByRole('button', {
+      name: /^avatar\.png/,
+    }),
+  ).toBeVisible();
+});
+
+test('**an upload made for something else can’t be bound to a ticket**: its name comes back skipped', async () => {
+  const { priya } = await tenant('j-open-purpose');
+  const session = await sessionAs(priya);
+  try {
+    const file = readFileSync(SCREENSHOT);
+    // A pending avatar, uploaded by the same person: same tenant, same
+    // uploader, another purpose.
+    const avatar = await api<{
+      uploadUrl: string;
+      uploadMethod: string;
+      objectPath: string;
+    }>(session, 'POST', '/users/me/avatar/upload-url', {
+      contentType: 'image/png',
+      sizeBytes: file.length,
+      fileName: 'me.png',
+    });
+    const sent = await fetch(avatar.uploadUrl, {
+      method: avatar.uploadMethod,
+      headers: { 'Content-Type': 'image/png' },
+      body: new Uint8Array(file),
+    });
+    expect(sent.ok).toBe(true);
+
+    const created = await api<{
+      id: string;
+      attachments: unknown[];
+      skippedAttachments: string[];
+    }>(session, 'POST', '/chat/conversations', {
+      title: 'A question with the wrong file',
+      message: 'A question with the wrong file attached.',
+      attachments: [{ objectPath: avatar.objectPath, fileName: 'me.png' }],
+    });
+
+    expect(created.skippedAttachments).toEqual(['me.png']);
+    expect(created.attachments).toEqual([]);
+  } finally {
+    await session.dispose();
+  }
 });
 
 test('an agent asks from Ask, and finds it under their latest questions', async ({

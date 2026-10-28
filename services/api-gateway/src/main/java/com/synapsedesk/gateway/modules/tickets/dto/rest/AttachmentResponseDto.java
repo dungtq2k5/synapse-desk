@@ -17,7 +17,9 @@ public class AttachmentResponseDto {
 
   private String id;
 
-  private String messageId;
+  private String messageId = null;
+
+  private String ticketId;
 
   private String fileName;
 
@@ -40,6 +42,7 @@ public class AttachmentResponseDto {
   public AttachmentResponseDto(
     String id,
     String messageId,
+    String ticketId,
     String fileName,
     String fileUrl,
     BigDecimal fileSizeBytes,
@@ -48,6 +51,7 @@ public class AttachmentResponseDto {
   ) {
     this.id = id;
     this.messageId = messageId;
+    this.ticketId = ticketId;
     this.fileName = fileName;
     this.fileUrl = fileUrl;
     this.fileSizeBytes = fileSizeBytes;
@@ -81,10 +85,9 @@ public class AttachmentResponseDto {
   }
 
   /**
-   * Get messageId
+   * Null for a file on the ticket's opening, which has no message.
    * @return messageId
    */
-  @NotNull
   @JsonProperty("messageId")
   public String getMessageId() {
     return messageId;
@@ -93,6 +96,26 @@ public class AttachmentResponseDto {
   @JsonProperty("messageId")
   public void setMessageId(String messageId) {
     this.messageId = messageId;
+  }
+
+  public AttachmentResponseDto ticketId(String ticketId) {
+    this.ticketId = ticketId;
+    return this;
+  }
+
+  /**
+   * The ticket the file belongs to, through its message or directly.
+   * @return ticketId
+   */
+  @NotNull
+  @JsonProperty("ticketId")
+  public String getTicketId() {
+    return ticketId;
+  }
+
+  @JsonProperty("ticketId")
+  public void setTicketId(String ticketId) {
+    this.ticketId = ticketId;
   }
 
   public AttachmentResponseDto fileName(String fileName) {
@@ -209,6 +232,7 @@ public class AttachmentResponseDto {
     return (
       Objects.equals(this.id, attachmentResponseDto.id) &&
       Objects.equals(this.messageId, attachmentResponseDto.messageId) &&
+      Objects.equals(this.ticketId, attachmentResponseDto.ticketId) &&
       Objects.equals(this.fileName, attachmentResponseDto.fileName) &&
       Objects.equals(this.fileUrl, attachmentResponseDto.fileUrl) &&
       Objects.equals(this.fileSizeBytes, attachmentResponseDto.fileSizeBytes) &&
@@ -222,6 +246,7 @@ public class AttachmentResponseDto {
     return Objects.hash(
       id,
       messageId,
+      ticketId,
       fileName,
       fileUrl,
       fileSizeBytes,
@@ -238,6 +263,7 @@ public class AttachmentResponseDto {
     sb.append("    messageId: ")
       .append(toIndentedString(messageId))
       .append("\n");
+    sb.append("    ticketId: ").append(toIndentedString(ticketId)).append("\n");
     sb.append("    fileName: ").append(toIndentedString(fileName)).append("\n");
     sb.append("    fileUrl: ").append(toIndentedString(fileUrl)).append("\n");
     sb.append("    fileSizeBytes: ")

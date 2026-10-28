@@ -20,6 +20,15 @@ import com.synapsedesk.gateway.modules.tickets.dto.rest.BulkTicketStatusDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.BulkTicketStatusResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.ChangeTicketStatusDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.PresignAttachmentResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.UploadAttachmentDto;
+import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import io.grpc.stub.MetadataUtils;
+import java.util.concurrent.TimeUnit;
+import synapsedesk.ticket.Message.PresignAttachmentResponse;
+import synapsedesk.ticket.Message.UploadAttachmentRequest;
+import synapsedesk.ticket.MessageServiceGrpc;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketExportDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.MarkTicketReadDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.MarkTicketReadResponseDto;
@@ -97,19 +106,22 @@ public class TicketsController {
   private final TicketsStatusService status;
   private final TicketsAssignmentService assignment;
   private final TicketsExportAndAiService exportAndAi;
+  private final MessageServiceGrpc.MessageServiceBlockingStub messages;
 
   public TicketsController(
     CurrentUser currentUser,
     TicketsCrudService crud,
     TicketsStatusService status,
     TicketsAssignmentService assignment,
-    TicketsExportAndAiService exportAndAi
+    TicketsExportAndAiService exportAndAi,
+    MessageServiceGrpc.MessageServiceBlockingStub messages
   ) {
     this.currentUser = currentUser;
     this.crud = crud;
     this.status = status;
     this.assignment = assignment;
     this.exportAndAi = exportAndAi;
+    this.messages = messages;
   }
 
   private RequestContext context() {
@@ -225,11 +237,50 @@ public class TicketsController {
   @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.TICKET_CREATE)
   public ResponseEntity<
-    ApiResponse<TicketResponseDto>
+    ApiResponse<CreateTicketResponseDto>
   > ticketsControllerCreateV1(
     @Valid @RequestBody CreateTicketDto createTicketDto
   ) {
     return crud.create(context(), createTicketDto);
+  }
+
+  /**
+   * Presigns a file for a ticket that doesn't exist yet: its opening, sent
+   * with {@code POST /tickets} or {@code POST /chat/conversations} as
+   * {@code attachments}.
+   *
+   * <p>The file is the caller's own until a create binds it, and only theirs
+   * can bind it, so the caller is all there is to authorize: the tenant's size
+   * limit is checked, and no ticket is loaded. 200, not 201: nothing exists
+   * yet but permission to upload.
+   */
+  @PostMapping(
+    value = "/tickets/attachments/upload-url",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<PresignAttachmentResponseDto>
+  > ticketsControllerPresignOpeningAttachmentV1(
+    @Valid @RequestBody UploadAttachmentDto uploadAttachmentDto
+  ) {
+    PresignAttachmentResponse response = messages
+      .withDeadlineAfter(5, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context()))
+      )
+      .uploadAttachment(
+        UploadAttachmentRequest.newBuilder()
+          .setFileName(uploadAttachmentDto.getFileName())
+          .setFileSizeBytes(uploadAttachmentDto.getFileSizeBytes().longValue())
+          .setMimeType(uploadAttachmentDto.getMimeType().getValue())
+          .build()
+      );
+
+    return ResponseEntity.ok(
+      ApiResponse.of(200, "OK", MessagesController.toPresignData(response))
+    );
   }
 
   @PatchMapping(

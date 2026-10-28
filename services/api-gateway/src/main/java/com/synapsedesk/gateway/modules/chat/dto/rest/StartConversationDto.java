@@ -1,9 +1,14 @@
 package com.synapsedesk.gateway.modules.chat.dto.rest;
 
+import com.synapsedesk.gateway.modules.tickets.dto.rest.NewAttachmentDto;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.constraints.*;
+import java.util.ArrayList;
+import java.util.List;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -57,6 +62,8 @@ public class StartConversationDto {
   }
 
   private @Nullable PriorityEnum priority;
+
+  private List<@Valid NewAttachmentDto> attachments = new ArrayList<>();
 
   public StartConversationDto() {
     super();
@@ -131,6 +138,28 @@ public class StartConversationDto {
   public void setPriority(@Nullable PriorityEnum priority) {
     this.priority = priority;
   }
+  public StartConversationDto attachments(List<@Valid NewAttachmentDto> attachments) {
+    this.attachments = attachments;
+    return this;
+  }
+
+  /**
+   * Files already uploaded through `POST /tickets/attachments/upload-url`,
+   * bound to the ticket's opening as it is created.
+   * @return attachments
+   */
+  @Valid
+  @Schema(defaultValue = "[]")
+  @JsonProperty("attachments")
+  public List<@Valid NewAttachmentDto> getAttachments() {
+    return attachments;
+  }
+
+  @JsonProperty("attachments")
+  public void setAttachments(List<@Valid NewAttachmentDto> attachments) {
+    this.attachments = attachments;
+  }
+
 
   @Override
   public boolean equals(Object o) {

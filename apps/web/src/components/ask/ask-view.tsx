@@ -14,6 +14,7 @@ import {
   CircleAlertIcon,
   InfoIcon,
   MessageCircleIcon,
+  PaperclipIcon,
   SendIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -28,6 +29,16 @@ import {
   type SubmitEvent,
 } from 'react';
 import { ArticleRow } from '@/components/knowledge/article-row';
+import {
+  AttachmentList,
+  DropOverlay,
+  useFileDrop,
+} from '@/components/ticket/attachment-list';
+import {
+  leaveOpeningSkipped,
+  presignOpening,
+  useAttachments,
+} from '@/components/ticket/use-attachments';
 import { SourceLabel, StatusBadge } from '@/components/tickets/badges';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -38,6 +49,7 @@ import { minutesFrom } from '@/lib/sign-in';
 import { titleFrom } from '@/lib/tickets';
 import { announce } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { ALLOWED_ATTACHMENT_MIME_TYPES } from '@synapsedesk/contracts';
 
 const MESSAGE_MAX = 20_000;
 /** Where Knowledge leaves a question for "Ask as a conversation". */
@@ -82,7 +94,11 @@ export function AskView() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const files = useAttachments(presignOpening);
+  const drop = useFileDrop((dropped) => !files.full && files.add(dropped));
   const titleId = useId();
+  const limitId = useId();
   const errorId = useId();
   const title = titleFrom(question);
   const mac = useMac();
@@ -105,7 +121,7 @@ export function AskView() {
 
   const submit = async (event?: SubmitEvent<HTMLFormElement>) => {
     event?.preventDefault();
-    if (busy) return;
+    if (busy || files.uploading) return;
     if (!title) {
       setTooShort(true);
       box.current?.focus();
@@ -117,8 +133,10 @@ export function AskView() {
       const answer = await chatControllerStartV1({
         title,
         message: question.trim(),
+        attachments: files.ready,
       });
       if (!answer.data) throw new Error('No conversation');
+      leaveOpeningSkipped(answer.data.id, answer.data.skippedAttachments);
       void queryClient.invalidateQueries({ queryKey: ['/api/v1/tickets'] });
       router.push(`/tickets/${answer.data.id}`);
     } catch (error) {
@@ -182,8 +200,9 @@ export function AskView() {
         className="flex flex-col gap-2"
       >
         <div
+          {...drop.handlers}
           className={cn(
-            'flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50',
+            'relative flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50',
             tooShort &&
               'border-destructive focus-within:border-destructive focus-within:ring-destructive/20',
           )}
@@ -212,19 +231,56 @@ export function AskView() {
             }}
             className="min-h-24 resize-none border-0 p-0 text-base shadow-none focus-visible:ring-0 aria-invalid:ring-0 dark:bg-transparent"
           />
+          <AttachmentList
+            items={files.items}
+            onRetry={files.retry}
+            onRemove={files.remove}
+          />
           <div className="flex items-center gap-3">
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              hidden
+              accept={ALLOWED_ATTACHMENT_MIME_TYPES.join(',')}
+              onChange={(event) => {
+                files.add([...(event.target.files ?? [])]);
+                event.target.value = '';
+              }}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Attach files"
+              aria-describedby={files.full ? limitId : undefined}
+              disabled={files.full || busy}
+              onClick={() => fileInput.current?.click()}
+            >
+              <PaperclipIcon aria-hidden />
+              Attach
+            </Button>
             <span className="text-xs text-muted-foreground">
-              {mac ? '⌘+Enter to send' : 'Ctrl+Enter to send'}
+              {files.full ? (
+                <span id={limitId}>
+                  5 of 5 files. Remove one to attach another.
+                </span>
+              ) : mac ? (
+                '⌘+Enter to send'
+              ) : (
+                'Ctrl+Enter to send'
+              )}
             </span>
             <Button
               type="submit"
               className="ml-auto"
-              disabled={busy || !question.trim()}
+              disabled={busy || !question.trim() || files.uploading}
             >
               <SendIcon aria-hidden />
               {busy ? 'Sending…' : 'Ask'}
             </Button>
           </div>
+          {drop.dragging && <DropOverlay />}
         </div>
         {tooShort && (
           <p id={errorId} className="text-sm text-destructive">

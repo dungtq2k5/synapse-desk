@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.inboundemail;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -54,6 +55,8 @@ import synapsedesk.ticket.Message.IngestAttachmentRequest;
 import synapsedesk.ticket.Message.IngestAttachmentResponse;
 import synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
+import synapsedesk.ticket.Common.NewAttachment;
+import synapsedesk.ticket.Ticket.CreateTicketResponse;
 import synapsedesk.ticket.Ticket.GetTicketByNumberRequest;
 import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
 import synapsedesk.ticket.TicketServiceGrpc.TicketServiceBlockingStub;
@@ -263,6 +266,11 @@ class InboundEmailServiceTest {
     admittedSender();
   }
 
+  /** {@code CreateTicket}'s answer: the ticket, nothing skipped. */
+  private static CreateTicketResponse created(TicketResponse ticket) {
+    return CreateTicketResponse.newBuilder().setTicket(ticket).build();
+  }
+
   private static TicketResponse ticket(TicketStatus status) {
     return TicketResponse.newBuilder().setId(TICKET).setStatus(status).build();
   }
@@ -421,7 +429,7 @@ class InboundEmailServiceTest {
   void theSenderIsResolvedForTheTenantTheAddressNamedNotTheSendersDomain() {
     routable();
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
 
     service.accept(mail(), AcceptOptions.none());
@@ -488,7 +496,7 @@ class InboundEmailServiceTest {
   void anAdmittedSenderOpensATicketAuthoredByThemKeyedByTheMessageId() {
     routable();
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
     InboundEmail email = mail(
       address(""),
@@ -524,7 +532,7 @@ class InboundEmailServiceTest {
   void aShortenedBodySaysSoInTheTicketAndAFullOneDoesNot() {
     routable();
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
     InboundEmail whole = mail();
     InboundEmail cut = new InboundEmail(
@@ -565,7 +573,7 @@ class InboundEmailServiceTest {
   void aBlankSubjectBecomesNoSubject() {
     routable();
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
 
     service.accept(
@@ -713,7 +721,7 @@ class InboundEmailServiceTest {
       ResolveTicketByMessageIdResponse.getDefaultInstance()
     );
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
     List<String> references = new ArrayList<>();
     for (int i = 1; i <= 20; i++) references.add("<r" + i + ">");
@@ -734,7 +742,7 @@ class InboundEmailServiceTest {
     repliesTo("<ours>");
     when(tickets.getTicket(any())).thenThrow(failure(Status.NOT_FOUND));
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
 
     assertThat(
@@ -806,7 +814,7 @@ class InboundEmailServiceTest {
       ticket(TicketStatus.TICKET_STATUS_OPEN)
     );
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
     String forged = replyToken(42).replaceAll("[0-9a-f]$", "0");
     String valid = replyToken(42);
@@ -843,7 +851,7 @@ class InboundEmailServiceTest {
     routable();
     when(tickets.getTicketByNumber(any())).thenThrow(failure(Status.NOT_FOUND));
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
 
     assertThat(
@@ -1109,12 +1117,12 @@ class InboundEmailServiceTest {
   }
 
   @Test
-  void aMailThatOpensATicketNamesEveryRemoteAttachmentAsDroppedWithoutFetchingAnyUrl() {
+  void aMailThatOpensATicketIngestsItsFilesAsTheSendersOwnAndBindsThemToTheOpening() {
     routable();
+    ingests();
     when(tickets.createTicket(any())).thenReturn(
-      ticket(TicketStatus.TICKET_STATUS_NEW)
+      created(ticket(TicketStatus.TICKET_STATUS_NEW))
     );
-    AtomicInteger fetched = new AtomicInteger();
     InboundEmail email = mail(
       address(""),
       "customer@acme.test",
@@ -1125,18 +1133,30 @@ class InboundEmailServiceTest {
       List.of(),
       null,
       List.of("mapper.exe"),
-      List.of(file("a", "a.png", 1), file("b", "b.png", 1))
+      List.of(file("a", "a.png", 1))
     );
 
-    assertThat(service.accept(email, sources(Map.of(), fetched))).isEqualTo(
-      InboundOutcome.TICKET_CREATED
-    );
+    assertThat(
+      service.accept(
+        email,
+        sources(Map.of("a", at("https://files.test/a")), new AtomicInteger())
+      )
+    ).isEqualTo(InboundOutcome.TICKET_CREATED);
 
+    // No ticket yet: ingested with none, so storage files it under the sender
+    // until createTicket binds it.
+    ArgumentCaptor<IngestAttachmentRequest> ingested = ArgumentCaptor.forClass(
+      IngestAttachmentRequest.class
+    );
+    verify(messages).ingestAttachment(ingested.capture());
+    assertThat(ingested.getValue().hasTicketId()).isFalse();
+    assertThat(created().getAttachmentsList())
+      .extracting(NewAttachment::getObjectPath, NewAttachment::getFileName)
+      .containsExactly(tuple("pending/a.png", "a.png"));
+    // Only what the mapper refused is named; the file that arrived is not.
     assertThat(created().getDescription()).isEqualTo(
-      "see attached\n\n---\nAttachments were not accepted by email: mapper.exe, a.png, b.png"
+      "see attached\n\n---\nAttachments were not accepted by email: mapper.exe"
     );
-    assertThat(fetched.get()).isZero();
-    verify(messages, never()).ingestAttachment(any());
   }
 
   @Test

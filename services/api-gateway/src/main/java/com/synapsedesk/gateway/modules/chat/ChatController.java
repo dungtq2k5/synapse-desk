@@ -13,7 +13,8 @@ import com.synapsedesk.gateway.common.web.PagedData;
 import com.synapsedesk.gateway.common.web.SortDirection;
 import com.synapsedesk.gateway.modules.chat.dto.rest.StartConversationDto;
 import com.synapsedesk.gateway.modules.tickets.TicketReferences;
-import com.synapsedesk.gateway.modules.tickets.dto.rest.AttachmentResponseDto;
+import com.synapsedesk.gateway.modules.tickets.TicketsCrudService;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateMessageResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.MessageResponseDto;
@@ -55,7 +56,7 @@ import synapsedesk.ticket.Common.TicketResponse;
 import synapsedesk.ticket.Common.TicketSource;
 import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.Message.AnswerOpeningRequest;
-import synapsedesk.ticket.Message.AttachmentResponse;
+import synapsedesk.ticket.Common.AttachmentResponse;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
 import synapsedesk.ticket.Message.ListMessagesRequest;
@@ -64,6 +65,7 @@ import synapsedesk.ticket.Message.MessageAnswerStatus;
 import synapsedesk.ticket.Message.MessageResponse;
 import synapsedesk.ticket.MessageServiceGrpc;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
+import synapsedesk.ticket.Ticket.CreateTicketResponse;
 import synapsedesk.ticket.Ticket.ListTicketsRequest;
 import synapsedesk.ticket.Ticket.ListTicketsResponse;
 import synapsedesk.ticket.Ticket.TicketStatusActionRequest;
@@ -139,7 +141,9 @@ public class ChatController {
   )
   @ApiErrors({ "400", "401" })
   @ResponseStatus(HttpStatus.CREATED)
-  public ResponseEntity<ApiResponse<TicketResponseDto>> chatControllerStartV1(
+  public ResponseEntity<
+    ApiResponse<CreateTicketResponseDto>
+  > chatControllerStartV1(
     @Valid @RequestBody StartConversationDto startConversationDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
@@ -156,8 +160,16 @@ public class ChatController {
     if (priority != null) {
       wire.setPriority(toProtoPriority(priority.getValue()));
     }
+    // The question's files are bound with the ticket, so they are there by
+    // the time the first answer reads them below.
+    wire.addAllAttachments(
+      TicketsCrudService.toNewAttachments(startConversationDto.getAttachments())
+    );
 
-    TicketResponse response = ticketsWith(context).createTicket(wire.build());
+    CreateTicketResponse created = ticketsWith(context).createTicket(
+      wire.build()
+    );
+    TicketResponse response = created.getTicket();
     // The question is the description, so ticket-service answers it: the
     // answer arrives as the thread's first message. The conversation exists
     // either way, so a refusal to answer doesn't undo it.
@@ -177,7 +189,11 @@ public class ChatController {
       ApiResponse.of(
         201,
         "Conversation started",
-        withNames(context, toTicketDto(response))
+        TicketsCrudService.toCreateTicketResponseDto(
+          references,
+          context,
+          created
+        )
       ),
       HttpStatus.CREATED
     );
@@ -465,38 +481,9 @@ public class ChatController {
   }
 
   private static TicketResponseDto toTicketDto(TicketResponse ticket) {
-    return new TicketResponseDto()
-      .id(ticket.getId())
-      .ticketNumber(BigDecimal.valueOf(ticket.getTicketNumber()))
-      .organizationId(ticket.getOrganizationId())
-      .authorId(ticket.getAuthorId())
-      .source(toSourceEnum(ticket.getSource()))
-      .status(toStatusEnum(ticket.getStatus()))
-      .priority(toPriorityEnum(ticket.getPriority()))
-      .title(ticket.getTitle())
-      .description(ticket.getDescription())
-      .currentAssigneeId(
-        ticket.hasCurrentAssigneeId() ? ticket.getCurrentAssigneeId() : null
-      )
-      .currentDepartmentId(
-        ticket.hasCurrentDepartmentId() ? ticket.getCurrentDepartmentId() : null
-      )
-      .escalatedAt(
-        ticket.hasEscalatedAt()
-          ? toOffsetDateTime(ticket.getEscalatedAt())
-          : null
-      )
-      .resolvedAt(
-        ticket.hasResolvedAt() ? toOffsetDateTime(ticket.getResolvedAt()) : null
-      )
-      .unreadCount(BigDecimal.valueOf(ticket.getUnreadCount()))
-      .createdAt(toOffsetDateTime(ticket.getCreatedAt()))
-      .updatedAt(toOffsetDateTime(ticket.getUpdatedAt()))
-      .deletedAt(
-        ticket.hasDeletedAt() ? toOffsetDateTime(ticket.getDeletedAt()) : null
-      )
-      .deletedById(ticket.hasDeletedById() ? ticket.getDeletedById() : null);
+    return TicketsCrudService.toTicketResponseDto(ticket);
   }
+
 
   private static MessageResponseDto toMessageDto(MessageResponse message) {
     List<CitationResponseDto> citations = message.hasCitations()
@@ -544,7 +531,7 @@ public class ChatController {
         message
           .getAttachmentsList()
           .stream()
-          .map(ChatController::toAttachmentDto)
+          .map(TicketsCrudService::toAttachmentResponseDto)
           .toList()
       )
       .excludedFromAiContext(message.getExcludedFromAiContext())
@@ -552,18 +539,6 @@ public class ChatController {
       .citations(citations);
   }
 
-  private static AttachmentResponseDto toAttachmentDto(
-    AttachmentResponse attachment
-  ) {
-    return new AttachmentResponseDto()
-      .id(attachment.getId())
-      .messageId(attachment.getMessageId())
-      .fileName(attachment.getFileName())
-      .fileUrl(attachment.getFileUrl())
-      .fileSizeBytes(BigDecimal.valueOf(attachment.getFileSizeBytes()))
-      .mimeType(attachment.getMimeType())
-      .createdAt(toOffsetDateTime(attachment.getCreatedAt()));
-  }
 
   private static CitationResponseDto toCitationDto(
     synapsedesk.ticket.Ai.DraftCitation citation
@@ -578,31 +553,6 @@ public class ChatController {
           : null
       )
       .vectorPointId(citation.getVectorPointId());
-  }
-
-  /** `TICKET_SOURCE_CHAT` -> `CHAT` — `fromValue` answers null for UNSPECIFIED, matching `fromProtoTicketSource`. */
-  private static TicketResponseDto.SourceEnum toSourceEnum(
-    TicketSource source
-  ) {
-    return TicketResponseDto.SourceEnum.fromValue(
-      source.name().replace("TICKET_SOURCE_", "")
-    );
-  }
-
-  private static TicketResponseDto.StatusEnum toStatusEnum(
-    TicketStatus status
-  ) {
-    return TicketResponseDto.StatusEnum.fromValue(
-      status.name().replace("TICKET_STATUS_", "")
-    );
-  }
-
-  private static TicketResponseDto.PriorityEnum toPriorityEnum(
-    TicketPriority priority
-  ) {
-    return TicketResponseDto.PriorityEnum.fromValue(
-      priority.name().replace("TICKET_PRIORITY_", "")
-    );
   }
 
   private static TicketPriority toProtoPriority(String value) {

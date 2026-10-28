@@ -9,6 +9,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -180,6 +182,8 @@ public class TicketResponseDto {
   private OffsetDateTime deletedAt = null;
 
   private String deletedById = null;
+
+  private List<@Valid AttachmentResponseDto> attachments = new ArrayList<>();
 
   private UserReferenceResponseDto author = null;
 
@@ -598,6 +602,30 @@ public class TicketResponseDto {
     this.deletedById = deletedById;
   }
 
+  public TicketResponseDto attachments(
+    List<@Valid AttachmentResponseDto> attachments
+  ) {
+    this.attachments = attachments;
+    return this;
+  }
+
+  /**
+   * The files uploaded with the ticket's opening (the description); empty when
+   * none. A message's files are on the message.
+   * @return attachments
+   */
+  @NotNull
+  @Valid
+  @JsonProperty("attachments")
+  public List<@Valid AttachmentResponseDto> getAttachments() {
+    return attachments;
+  }
+
+  @JsonProperty("attachments")
+  public void setAttachments(List<@Valid AttachmentResponseDto> attachments) {
+    this.attachments = attachments;
+  }
+
   public TicketResponseDto author(UserReferenceResponseDto author) {
     this.author = author;
     return this;
@@ -678,7 +706,8 @@ public class TicketResponseDto {
       Objects.equals(this.createdAt, ticketResponseDto.createdAt) &&
       Objects.equals(this.updatedAt, ticketResponseDto.updatedAt) &&
       Objects.equals(this.deletedAt, ticketResponseDto.deletedAt) &&
-      Objects.equals(this.deletedById, ticketResponseDto.deletedById)
+      Objects.equals(this.deletedById, ticketResponseDto.deletedById) &&
+      Objects.equals(this.attachments, ticketResponseDto.attachments)
     );
   }
 
@@ -702,7 +731,8 @@ public class TicketResponseDto {
       createdAt,
       updatedAt,
       deletedAt,
-      deletedById
+      deletedById,
+      attachments
     );
   }
 
@@ -751,6 +781,9 @@ public class TicketResponseDto {
       .append("\n");
     sb.append("    deletedById: ")
       .append(toIndentedString(deletedById))
+      .append("\n");
+    sb.append("    attachments: ")
+      .append(toIndentedString(attachments))
       .append("\n");
     sb.append("}");
     return sb.toString();

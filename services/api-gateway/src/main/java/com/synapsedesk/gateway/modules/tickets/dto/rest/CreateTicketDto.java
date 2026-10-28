@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import java.util.ArrayList;
+import java.util.List;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -102,6 +105,8 @@ public class CreateTicketDto {
   private @Nullable SourceEnum source;
 
   private @Nullable UUID authorId;
+
+  private List<@Valid NewAttachmentDto> attachments = new ArrayList<>();
 
   public CreateTicketDto() {
     super();
@@ -216,6 +221,28 @@ public class CreateTicketDto {
   public void setAuthorId(@Nullable UUID authorId) {
     this.authorId = authorId;
   }
+  public CreateTicketDto attachments(List<@Valid NewAttachmentDto> attachments) {
+    this.attachments = attachments;
+    return this;
+  }
+
+  /**
+   * Files already uploaded through `POST /tickets/attachments/upload-url`,
+   * bound to the ticket's opening as it is created.
+   * @return attachments
+   */
+  @Valid
+  @Schema(defaultValue = "[]")
+  @JsonProperty("attachments")
+  public List<@Valid NewAttachmentDto> getAttachments() {
+    return attachments;
+  }
+
+  @JsonProperty("attachments")
+  public void setAttachments(List<@Valid NewAttachmentDto> attachments) {
+    this.attachments = attachments;
+  }
+
 
   @Override
   public boolean equals(Object o) {

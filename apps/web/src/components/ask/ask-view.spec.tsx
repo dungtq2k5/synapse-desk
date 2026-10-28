@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { sendFile } from '@/lib/upload';
 import { fail, ok, stubApi, type Reply } from '@/test/api';
 import { AskView, handOffQuestion } from './ask-view';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+jest.mock('@/lib/upload', () => ({ sendFile: jest.fn() }));
+const upload = jest.mocked(sendFile);
 
 const PRIYA = { id: 'priya', fullName: 'Priya Shah', email: 'priya@acme.test' };
 const UPDATED = new Date(Date.now() - 5 * 60_000).toISOString();
@@ -42,7 +45,7 @@ function show({
   codes = [],
   requests = [REQUEST],
   articles = [ARTICLE],
-  start = ok({ id: 't-9', ticketNumber: 1090 }, 201),
+  start = ok({ id: 't-9', ticketNumber: 1090, skippedAttachments: [] }, 201),
 }: {
   codes?: string[];
   requests?: unknown[];
@@ -59,6 +62,12 @@ function show({
     'GET /api/v1/tickets': paged(requests),
     'GET /api/v1/knowledge/articles': paged(articles),
     'POST /api/v1/chat/conversations': start,
+    'POST /api/v1/tickets/attachments/upload-url': ok({
+      uploadUrl: 'https://storage.test/put',
+      uploadMethod: 'PUT',
+      objectPath: 'organizations/o1/ticket-openings/priya/pending/a.png',
+      expiresAt: '2026-10-28T10:00:00Z',
+    }),
   });
   render(
     <QueryClientProvider
@@ -101,8 +110,77 @@ describe('Ask', () => {
       {
         title: 'When does the allowance reset?',
         message: 'When does the allowance reset? I started in March.',
+        attachments: [],
       },
     ]);
+  });
+
+  it('**attaches a file, holds Ask while it uploads**, sends its path, and leaves what didn’t attach for the thread', async () => {
+    let finish = () => undefined as void;
+    upload.mockImplementation(
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    );
+    const { calls, user } = show({
+      start: ok(
+        { id: 't-9', ticketNumber: 1090, skippedAttachments: ['old.png'] },
+        201,
+      ),
+    });
+    await user.type(
+      screen.getByRole('textbox', { name: 'Your question' }),
+      'Why does this screen crash?',
+    );
+    await user.upload(
+      document.querySelector<HTMLInputElement>('input[type="file"]')!,
+      new File(['png'], 'screen.png', { type: 'image/png' }),
+    );
+
+    // Uploading: the file's row shows, and Ask waits for it.
+    expect(await screen.findByText('screen.png')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
+    expect(calls.map(({ method, url }) => `${method} ${url}`)).toContain(
+      'POST /api/v1/tickets/attachments/upload-url',
+    );
+
+    finish();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/tickets/t-9'));
+    expect(started(calls).at(-1)?.body).toMatchObject({
+      attachments: [
+        {
+          objectPath: 'organizations/o1/ticket-openings/priya/pending/a.png',
+          fileName: 'screen.png',
+        },
+      ],
+    });
+    // Left for the ticket page, which shows it under the question.
+    expect(
+      JSON.parse(sessionStorage.getItem('synapsedesk.opening-skipped')!),
+    ).toEqual({ ticketId: 't-9', names: ['old.png'] });
+  });
+
+  it('refuses a file of a type it can’t take, without uploading it', async () => {
+    const { calls } = show();
+    // The picker filters by `accept`; a drop doesn't, so the check is ours.
+    fireEvent.change(
+      document.querySelector<HTMLInputElement>('input[type="file"]')!,
+      {
+        target: {
+          files: [
+            new File(['exe'], 'tool.exe', { type: 'application/x-msdownload' }),
+          ],
+        },
+      },
+    );
+
+    expect(await screen.findByText('tool.exe')).toBeInTheDocument();
+    expect(calls.map(({ url }) => url)).not.toContain(
+      '/api/v1/tickets/attachments/upload-url',
+    );
   });
 
   it('refuses a question too short to title, and sends nothing', async () => {

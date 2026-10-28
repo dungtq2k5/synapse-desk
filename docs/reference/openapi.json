@@ -7166,7 +7166,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTicketResponseDto"
+                  "$ref": "#/components/schemas/ApiResponseCreateTicketResponseDto"
                 }
               }
             }
@@ -14901,6 +14901,255 @@
                     "statusCode": {
                       "type": "number",
                       "example": 403
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request carried a body in something other than `application/json`. Added automatically to every route that reads a body, and to no other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 415
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/tickets/attachments/upload-url": {
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Presign a file for a new ticket's opening: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }",
+        "operationId": "TicketsController_presignOpeningAttachment_v1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadAttachmentDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePresignAttachmentResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or the request is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session cookie, or the session has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 401
                     },
                     "path": {
                       "type": "string",
@@ -27896,7 +28145,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseTicketResponseDto"
+                  "$ref": "#/components/schemas/ApiResponseCreateTicketResponseDto"
                 }
               }
             }
@@ -63778,11 +64027,35 @@
             "type": ["string", "null"],
             "format": "uuid",
             "description": "Raising a ticket on behalf of an end user. Only an agent may (a super\nadmin, or a holder of `ticket.read.all` or `ticket.message.moderate`);\nanyone else naming someone other than themselves gets a 403.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database."
+          },
+          "attachments": {
+            "type": ["array", "null"],
+            "default": [],
+            "description": "Files already uploaded through `POST /tickets/attachments/upload-url`,\nbound to the ticket's opening as it is created. A path that fails its\nconfirm comes back in `skippedAttachments`; the ticket is created\nregardless.",
+            "items": {
+              "$ref": "#/components/schemas/NewAttachmentDto"
+            }
           }
         },
         "required": ["description", "title"]
       },
-      "ApiResponseTicketResponseDto": {
+      "NewAttachmentDto": {
+        "type": "object",
+        "properties": {
+          "objectPath": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1
+          }
+        },
+        "required": ["fileName", "objectPath"]
+      },
+      "ApiResponseCreateTicketResponseDto": {
         "type": "object",
         "properties": {
           "success": {
@@ -63802,32 +64075,62 @@
             "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
-            "$ref": "#/components/schemas/TicketResponseDto"
+            "$ref": "#/components/schemas/CreateTicketResponseDto"
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
-      "DepartmentReferenceResponseDto": {
+      "AttachmentResponseDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
+          "messageId": {
+            "type": ["string", "null"],
+            "description": "Null for a file on the ticket's opening, which has no message."
+          },
+          "ticketId": {
+            "type": "string",
+            "description": "The ticket the file belongs to, through its message or directly."
+          },
+          "fileName": {
             "type": "string"
+          },
+          "fileUrl": {
+            "type": "string",
+            "description": "An internal object path today; a signed URL once storage-service lands."
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
-        "required": ["id", "name"]
+        "required": [
+          "createdAt",
+          "fileName",
+          "fileSizeBytes",
+          "fileUrl",
+          "id",
+          "messageId",
+          "mimeType",
+          "ticketId"
+        ]
       },
-      "TicketResponseDto": {
+      "CreateTicketResponseDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
           "ticketNumber": {
-            "type": "number",
-            "description": "A number, not a string: `longs: Number` keeps int64 exact to 2^53."
+            "type": "number"
           },
           "organizationId": {
             "type": "string"
@@ -63876,8 +64179,7 @@
             "format": "date-time"
           },
           "unreadCount": {
-            "type": "number",
-            "description": "Messages the caller has not read on this ticket.\n\nExcludes their own and any internal note they cannot see. A ticket never\nopened counts as ALL unread, not zero. Always `0` on a single-ticket read —\na badge is a list affordance, and a caller looking at one ticket is reading\nit."
+            "type": "number"
           },
           "createdAt": {
             "type": "string",
@@ -63894,8 +64196,13 @@
           "deletedById": {
             "type": ["string", "null"]
           },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponseDto"
+            }
+          },
           "author": {
-            "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/UserReferenceResponseDto"
@@ -63906,7 +64213,6 @@
             ]
           },
           "assignee": {
-            "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the ticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/UserReferenceResponseDto"
@@ -63917,7 +64223,6 @@
             ]
           },
           "department": {
-            "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null when it is in none, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/DepartmentReferenceResponseDto"
@@ -63926,10 +64231,18 @@
                 "type": "null"
               }
             ]
+          },
+          "skippedAttachments": {
+            "type": "array",
+            "description": "File NAMES, never object paths: a path that failed its confirm (expired,\nnot the caller's, not an attachment). The ticket is created regardless.",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "assignee",
+          "attachments",
           "author",
           "authorId",
           "createdAt",
@@ -63944,6 +64257,7 @@
           "organizationId",
           "priority",
           "resolvedAt",
+          "skippedAttachments",
           "source",
           "status",
           "ticketNumber",
@@ -63951,6 +64265,18 @@
           "unreadCount",
           "updatedAt"
         ]
+      },
+      "DepartmentReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"]
       },
       "UserReferenceResponseDto": {
         "type": "object",
@@ -64002,22 +64328,6 @@
         },
         "required": ["content"]
       },
-      "NewAttachmentDto": {
-        "type": "object",
-        "properties": {
-          "objectPath": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 1
-          },
-          "fileName": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1
-          }
-        },
-        "required": ["fileName", "objectPath"]
-      },
       "ApiResponseCreateMessageResponseDto": {
         "type": "object",
         "properties": {
@@ -64042,43 +64352,6 @@
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
-      },
-      "AttachmentResponseDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "messageId": {
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileUrl": {
-            "type": "string",
-            "description": "An internal object path today; a signed URL once storage-service lands."
-          },
-          "fileSizeBytes": {
-            "type": "number"
-          },
-          "mimeType": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "createdAt",
-          "fileName",
-          "fileSizeBytes",
-          "fileUrl",
-          "id",
-          "messageId",
-          "mimeType"
-        ]
       },
       "CitationResponseDto": {
         "type": "object",
@@ -64664,6 +64937,172 @@
           }
         },
         "required": ["status"]
+      },
+      "ApiResponseTicketResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": ["string", "null"],
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketResponseDto"
+          }
+        },
+        "required": ["data", "message", "statusCode", "success", "warning"]
+      },
+      "TicketResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ticketNumber": {
+            "type": "number",
+            "description": "A number, not a string: `longs: Number` keeps int64 exact to 2^53."
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "authorId": {
+            "type": "string"
+          },
+          "source": {
+            "type": ["string", "null"],
+            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
+          },
+          "status": {
+            "type": ["string", "null"],
+            "enum": [
+              "CLOSED",
+              "ESCALATED",
+              "NEW",
+              "OPEN",
+              "PENDING_AGENT",
+              "RESOLVED",
+              null
+            ]
+          },
+          "priority": {
+            "type": ["string", "null"],
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "currentAssigneeId": {
+            "type": ["string", "null"]
+          },
+          "currentDepartmentId": {
+            "type": ["string", "null"]
+          },
+          "escalatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "unreadCount": {
+            "type": "number",
+            "description": "Messages the caller has not read on this ticket.\n\nExcludes their own and any internal note they cannot see. A ticket never\nopened counts as ALL unread, not zero. Always `0` on a single-ticket read —\na badge is a list affordance, and a caller looking at one ticket is reading\nit."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "deletedById": {
+            "type": ["string", "null"]
+          },
+          "attachments": {
+            "type": "array",
+            "description": "The files uploaded with the ticket's opening (the description); empty\nwhen none. A message's files are on the message.",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponseDto"
+            }
+          },
+          "author": {
+            "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assignee": {
+            "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the ticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "department": {
+            "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null when it is in none, or when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DepartmentReferenceResponseDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "assignee",
+          "attachments",
+          "author",
+          "authorId",
+          "createdAt",
+          "currentAssigneeId",
+          "currentDepartmentId",
+          "deletedAt",
+          "deletedById",
+          "department",
+          "description",
+          "escalatedAt",
+          "id",
+          "organizationId",
+          "priority",
+          "resolvedAt",
+          "source",
+          "status",
+          "ticketNumber",
+          "title",
+          "unreadCount",
+          "updatedAt"
+        ]
       },
       "TicketStatusActionDto": {
         "type": "object",
@@ -67087,6 +67526,14 @@
           "priority": {
             "type": ["string", "null"],
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+          },
+          "attachments": {
+            "type": ["array", "null"],
+            "default": [],
+            "description": "The question's files, already uploaded through\n`POST /tickets/attachments/upload-url`. Bound before the first answer is\nasked for, so the answer reads them. A path that fails its confirm comes\nback in `skippedAttachments`; the conversation starts regardless.",
+            "items": {
+              "$ref": "#/components/schemas/NewAttachmentDto"
+            }
           }
         },
         "required": ["message", "title"]

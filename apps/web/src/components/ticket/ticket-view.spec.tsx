@@ -54,6 +54,7 @@ const ticketOf = (
   updatedAt: AT,
   deletedAt: null,
   deletedById: null,
+  attachments: [],
   ...over,
 });
 
@@ -398,6 +399,83 @@ describe('the ticket page', () => {
       ).toBeInTheDocument();
       expect(within(log).getAllByText('Unknown user').length).toBeGreaterThan(
         0,
+      );
+    });
+
+    it('**the opening shows its files, and the ones that didn’t attach**; only a moderator may delete them', async () => {
+      sessionStorage.setItem(
+        'synapsedesk.opening-skipped',
+        JSON.stringify({ ticketId: 't1', names: ['old.png'] }),
+      );
+      setup({
+        ticket: ticketOf({
+          attachments: [
+            {
+              id: 'o1',
+              messageId: null,
+              ticketId: 't1',
+              fileName: 'screen.png',
+              fileUrl: 'organizations/o/ticket-openings/priya/a.png',
+              fileSizeBytes: 2048,
+              mimeType: 'image/png',
+              createdAt: AT,
+            },
+          ],
+        }),
+      });
+      await loaded();
+      const log = await screen.findByRole('log', { name: 'Conversation' });
+
+      expect(
+        within(log).getByRole('button', { name: /^screen\.png/ }),
+      ).toBeInTheDocument();
+      expect(
+        within(log).getByText(
+          'We couldn’t attach old.png, so the answer doesn’t use it. You can attach it again below.',
+        ),
+      ).toBeInTheDocument();
+      // The requester isn't a moderator: the server would refuse the delete.
+      expect(
+        within(log).queryByRole('button', { name: 'Delete screen.png' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('a moderator may delete a file on the opening', async () => {
+      setup({
+        viewer: ANA,
+        agent: true,
+        codes: ['ticket.read.all', 'ticket.message.moderate'],
+        ticket: ticketOf({
+          attachments: [
+            {
+              id: 'o1',
+              messageId: null,
+              ticketId: 't1',
+              fileName: 'screen.png',
+              fileUrl: 'organizations/o/ticket-openings/priya/a.png',
+              fileSizeBytes: 2048,
+              mimeType: 'image/png',
+              createdAt: AT,
+            },
+          ],
+        }),
+        routes: { 'DELETE /api/v1/attachments/o1': ok(null) },
+      });
+      await loaded();
+      const log = await screen.findByRole('log', { name: 'Conversation' });
+
+      await userEvent.click(
+        within(log).getByRole('button', { name: 'Delete screen.png' }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Delete file' }),
+      );
+
+      await waitFor(() =>
+        expect(globalThis.fetch as jest.Mock).toHaveBeenCalledWith(
+          '/api/v1/attachments/o1',
+          expect.objectContaining({ method: 'DELETE' }),
+        ),
       );
     });
 

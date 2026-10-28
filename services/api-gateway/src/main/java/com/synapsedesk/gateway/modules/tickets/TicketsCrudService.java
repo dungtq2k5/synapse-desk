@@ -6,10 +6,14 @@ import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.AttachmentResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketResponseDto;
+import com.synapsedesk.gateway.modules.tickets.dto.rest.NewAttachmentDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.TicketResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.UpdateTicketDto;
 import io.grpc.stub.MetadataUtils;
+import org.springframework.beans.BeanUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -22,11 +26,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
+import synapsedesk.ticket.Common.AttachmentResponse;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Common.TicketPriority;
 import synapsedesk.ticket.Common.TicketResponse;
 import synapsedesk.ticket.Common.TicketSource;
 import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
+import synapsedesk.ticket.Ticket.CreateTicketResponse;
 import synapsedesk.ticket.Ticket.GetTicketByNumberRequest;
 import synapsedesk.ticket.Ticket.GetTicketRequest;
 import synapsedesk.ticket.Ticket.ListTicketsRequest;
@@ -168,7 +175,7 @@ public class TicketsCrudService {
     return ok(context, response, "OK", HttpStatus.OK);
   }
 
-  public ResponseEntity<ApiResponse<TicketResponseDto>> create(
+  public ResponseEntity<ApiResponse<CreateTicketResponseDto>> create(
     RequestContext context,
     CreateTicketDto dto
   ) {
@@ -193,10 +200,50 @@ public class TicketsCrudService {
     if (authorId != null) {
       wire.setAuthorId(authorId.toString());
     }
+    wire.addAllAttachments(toNewAttachments(dto.getAttachments()));
 
-    TicketResponse response = withMetadata(context).createTicket(wire.build());
+    CreateTicketResponse response = withMetadata(context).createTicket(
+      wire.build()
+    );
 
-    return ok(context, response, "Ticket created", HttpStatus.CREATED);
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+      ApiResponse.of(
+        HttpStatus.CREATED.value(),
+        "Ticket created",
+        toCreateTicketResponseDto(references, context, response)
+      )
+    );
+  }
+
+  /**
+   * {@code CreateTicket}'s answer, as both creates send it: the ticket with
+   * its references filled, and the files it couldn't bind.
+   */
+  public static CreateTicketResponseDto toCreateTicketResponseDto(
+    TicketReferences references,
+    RequestContext context,
+    CreateTicketResponse response
+  ) {
+    TicketResponseDto ticket = toTicketResponseDto(response.getTicket());
+    references.fillTickets(context, List.of(ticket));
+    CreateTicketResponseDto created = new CreateTicketResponseDto();
+    BeanUtils.copyProperties(ticket, created);
+    return created.skippedAttachments(response.getSkippedAttachmentsList());
+  }
+
+  /** The request's uploaded paths, as the wire takes them. */
+  public static List<NewAttachment> toNewAttachments(
+    List<NewAttachmentDto> attachments
+  ) {
+    return (attachments == null ? List.<NewAttachmentDto>of() : attachments)
+      .stream()
+      .map(attachment ->
+        NewAttachment.newBuilder()
+          .setObjectPath(attachment.getObjectPath())
+          .setFileName(attachment.getFileName())
+          .build()
+      )
+      .toList();
   }
 
   public ResponseEntity<ApiResponse<TicketResponseDto>> update(
@@ -357,7 +404,7 @@ public class TicketsCrudService {
     }
   }
 
-  static TicketResponseDto toTicketResponseDto(TicketResponse ticket) {
+  public static TicketResponseDto toTicketResponseDto(TicketResponse ticket) {
     return new TicketResponseDto()
       .id(ticket.getId())
       .ticketNumber(BigDecimal.valueOf(ticket.getTicketNumber()))
@@ -400,7 +447,29 @@ public class TicketsCrudService {
       .deletedAt(
         ticket.hasDeletedAt() ? toOffsetDateTime(ticket.getDeletedAt()) : null
       )
-      .deletedById(ticket.hasDeletedById() ? ticket.getDeletedById() : null);
+      .deletedById(ticket.hasDeletedById() ? ticket.getDeletedById() : null)
+      .attachments(
+        ticket
+          .getAttachmentsList()
+          .stream()
+          .map(TicketsCrudService::toAttachmentResponseDto)
+          .toList()
+      );
+  }
+
+  /** A file on a message, or on the ticket's opening (no message). */
+  public static AttachmentResponseDto toAttachmentResponseDto(
+    AttachmentResponse attachment
+  ) {
+    return new AttachmentResponseDto()
+      .id(attachment.getId())
+      .messageId(attachment.hasMessageId() ? attachment.getMessageId() : null)
+      .ticketId(attachment.getTicketId())
+      .fileName(attachment.getFileName())
+      .fileUrl(attachment.getFileUrl())
+      .fileSizeBytes(BigDecimal.valueOf(attachment.getFileSizeBytes()))
+      .mimeType(attachment.getMimeType())
+      .createdAt(toOffsetDateTime(attachment.getCreatedAt()));
   }
 
   static OffsetDateTime toOffsetDateTime(

@@ -596,6 +596,9 @@
     "POST /api/v1/tickets": {
       "summary": "Create"
     },
+    "POST /api/v1/tickets/attachments/upload-url": {
+      "summary": "Presign a file for a new ticket's opening: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }"
+    },
     "POST /api/v1/tickets/bulk/priority": {
       "summary": "Bulk change priority"
     },
@@ -815,6 +818,12 @@
     "AttachmentResponseDto.fileUrl": {
       "description": "An internal object path today; a signed URL once storage-service lands."
     },
+    "AttachmentResponseDto.messageId": {
+      "description": "Null for a file on the ticket's opening, which has no message."
+    },
+    "AttachmentResponseDto.ticketId": {
+      "description": "The ticket the file belongs to, through its message or directly."
+    },
     "AuditLogResponseDto.action": {
       "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain."
     },
@@ -905,6 +914,9 @@
     "CreateMessageResponseDto.skippedAttachments": {
       "description": "File NAMES, never object paths and never contents — the same rule the AI's\nown skipped list follows, and for the same reason: a user reads this."
     },
+    "CreateTicketResponseDto.skippedAttachments": {
+      "description": "File NAMES, never object paths: a path that failed its confirm (expired,\nnot the caller's, not an attachment). The ticket is created regardless."
+    },
     "CreatePlatformOrganizationDto.slug": {
       "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`."
     },
@@ -913,6 +925,9 @@
     },
     "CreateTicketDto.authorId": {
       "description": "Raising a ticket on behalf of an end user. Only an agent may (a super\nadmin, or a holder of `ticket.read.all` or `ticket.message.moderate`);\nanyone else naming someone other than themselves gets a 403.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database."
+    },
+    "CreateTicketDto.attachments": {
+      "description": "Files already uploaded through `POST /tickets/attachments/upload-url`,\nbound to the ticket's opening as it is created. A path that fails its\nconfirm comes back in `skippedAttachments`; the ticket is created\nregardless."
     },
     "CreateTicketDto.description": {
       "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
@@ -1347,6 +1362,9 @@
     "StartConversationDto.message": {
       "description": "The opening question. Becomes the ticket's description."
     },
+    "StartConversationDto.attachments": {
+      "description": "The question's files, already uploaded through\n`POST /tickets/attachments/upload-url`. Bound before the first answer is\nasked for, so the answer reads them. A path that fails its confirm comes\nback in `skippedAttachments`; the conversation starts regardless."
+    },
     "SubmitFeedbackDto.citationAccurate": {
       "description": "Whether the citations the model gave were accurate.\n\nTri-state on purpose — absent means \"not assessed\", which is different from\n\"assessed and wrong\". Collapsing the two would make every un-assessed reply\nlook like a citation failure in the quality report."
     },
@@ -1400,6 +1418,9 @@
     },
     "TicketResponseDto.unreadCount": {
       "description": "Messages the caller has not read on this ticket.\n\nExcludes their own and any internal note they cannot see. A ticket never\nopened counts as ALL unread, not zero. Always `0` on a single-ticket read —\na badge is a list affordance, and a caller looking at one ticket is reading\nit."
+    },
+    "TicketResponseDto.attachments": {
+      "description": "The files uploaded with the ticket's opening (the description); empty\nwhen none. A message's files are on the message."
     },
     "TicketStatusActionDto.reason": {
       "description": "Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves."

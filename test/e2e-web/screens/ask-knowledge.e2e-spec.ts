@@ -193,6 +193,42 @@ test.describe('Ask, as an end user', () => {
     await look(page, 'ask-typed');
   });
 
+  test('typed, with two files attached', async ({ page }) => {
+    await knowledge(page);
+    let count = 0;
+    await page.route('**/api/v1/tickets/attachments/upload-url', (route) =>
+      route.fulfill(
+        ok({
+          uploadUrl: `/screens-storage/upload/${++count}`,
+          uploadMethod: 'PUT',
+          objectPath: `ticket-openings/screens/${count}`,
+          expiresAt: '2099-01-01T00:00:00.000Z',
+        }),
+      ),
+    );
+    await page.route('**/screens-storage/upload/*', (route) =>
+      route.fulfill({ status: 200 }),
+    );
+    await open(page);
+    await page.getByRole('textbox', { name: 'Your question' }).fill(QUESTION);
+    await page.locator('form input[type="file"]').setInputFiles([
+      {
+        name: 'receipt.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.alloc(217_088, 1),
+      },
+      {
+        name: 'invoice.heic',
+        mimeType: 'image/heic',
+        buffer: Buffer.alloc(1_468_006, 1),
+      },
+    ]);
+    const files = page.getByRole('list', { name: 'Attachments' });
+    await expect(files.getByText('212 KB')).toBeVisible();
+    await expect(files.getByText('1.4 MB')).toBeVisible();
+    await look(page, 'ask-files');
+  });
+
   test('too short to title', async ({ page }) => {
     await knowledge(page);
     await open(page);

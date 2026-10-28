@@ -12,18 +12,10 @@ import {
   PaperclipIcon,
   SendIcon,
   SparklesIcon,
-  UploadIcon,
   XIcon,
   ZapOffIcon,
 } from 'lucide-react';
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type DragEvent,
-  type SubmitEvent,
-} from 'react';
+import { useEffect, useId, useRef, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
 import { Markdown } from '@/components/markdown';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -37,7 +29,7 @@ import { Citations } from '@/components/knowledge/citations';
 import { firstName } from '@/lib/format';
 import { announce } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { AttachmentList } from './attachment-list';
+import { AttachmentList, DropOverlay, useFileDrop } from './attachment-list';
 import { useAttachments, type Presign } from './use-attachments';
 
 /** How long without a keystroke before "typing" ends. */
@@ -49,9 +41,6 @@ const IDLE_MS = 3000;
  */
 const REFRESH_MS = 2000;
 const INSTRUCTION_MAX = 500;
-const FILE_HINT =
-  'PDF, Word, Excel, images, CSV or text. Up to 5 files, 10 MB each.';
-
 /** What goes with a message besides its text. */
 export type SendExtras = {
   attachments: NewAttachmentDto[];
@@ -108,7 +97,6 @@ export function Composer({
   const [drafting, setDrafting] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [draft, setDraft] = useState<Draft>(NO_DRAFT);
-  const [dragging, setDragging] = useState(false);
   const files = useAttachments(presign ?? noPresign);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -238,8 +226,10 @@ export function Composer({
     files.clear();
   };
 
-  const hasFiles = (event: DragEvent) =>
-    Boolean(presign) && event.dataTransfer.types.includes('Files');
+  const drop = useFileDrop(
+    (dropped) => !files.full && files.add(dropped),
+    Boolean(presign),
+  );
 
   const placeholder = !agent
     ? 'Write a message…'
@@ -265,21 +255,7 @@ export function Composer({
     <form
       aria-label={formName}
       onSubmit={submit}
-      onDragOver={(event) => {
-        if (!hasFiles(event)) return;
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-          setDragging(false);
-      }}
-      onDrop={(event) => {
-        if (!hasFiles(event)) return;
-        event.preventDefault();
-        setDragging(false);
-        if (!files.full) files.add([...event.dataTransfer.files]);
-      }}
+      {...drop.handlers}
       className={cn(
         'relative flex flex-col gap-3 rounded-lg border p-3',
         note
@@ -461,13 +437,7 @@ export function Composer({
         </Button>
       </div>
 
-      {dragging && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-primary bg-accent text-center text-sm text-accent-foreground">
-          <UploadIcon aria-hidden className="size-5" />
-          <span className="font-medium">Drop files to attach</span>
-          <span className="text-xs">{FILE_HINT}</span>
-        </div>
-      )}
+      {drop.dragging && <DropOverlay />}
     </form>
   );
 }

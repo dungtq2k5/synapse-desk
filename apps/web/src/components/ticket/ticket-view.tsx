@@ -42,13 +42,12 @@ import {
   LiveAnswerEntry,
   NoticeEntry,
   PendingEntry,
-  PersonEntry,
   type Perspective,
 } from './entries';
 import { SidePanel, SidePanelSheet } from './side-panel';
 import { useTicketCache } from './use-directory';
 import { useLiveTicket } from './use-live-ticket';
-import { ThreadAiMessage, ThreadMessage } from './message-tools';
+import { ThreadAiMessage, ThreadMessage, ThreadOpening } from './message-tools';
 
 /** One ticket: its header, the live thread with the composer, and its details. */
 export function TicketView({
@@ -291,17 +290,7 @@ function Loaded({
           render={(entry) => {
             switch (entry.kind) {
               case 'description':
-                return (
-                  <PersonEntry
-                    mine={entry.mine}
-                    name={ticket.author?.fullName ?? null}
-                    unknown={!ticket.author}
-                    role="Requester"
-                    at={ticket.createdAt}
-                  >
-                    {ticket.description}
-                  </PersonEntry>
-                );
+                return <ThreadOpening ticket={ticket} mine={entry.mine} />;
               case 'message': {
                 const message = entry.message;
                 return message.isAiGenerated ? (

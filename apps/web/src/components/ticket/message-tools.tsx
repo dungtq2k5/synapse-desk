@@ -51,6 +51,7 @@ import {
   type Skipped,
 } from './entries';
 import { serverMessage } from './use-directory';
+import { useOpeningSkipped } from './use-attachments';
 
 /** Past this, a timer can't wait (setTimeout's limit is about 24.8 days). */
 const LONGEST_WAIT = 2 ** 31 - 1;
@@ -77,6 +78,55 @@ function useRefreshThread(ticketId: string) {
     queryClient.invalidateQueries({
       queryKey: [`/api/v1/tickets/${ticketId}/messages`],
     });
+}
+
+/**
+ * The ticket's opening: its description and the files uploaded with it, which
+ * belong to no message. Delete is a moderator's, as the server allows; the
+ * files that failed to attach when it was created show once, under it.
+ */
+export function ThreadOpening({
+  ticket,
+  mine,
+}: {
+  ticket: TicketResponseDto;
+  mine: boolean;
+}) {
+  const { can } = useViewer();
+  const queryClient = useQueryClient();
+  const moderator = can('ticket.message.moderate');
+  const [deleting, setDeleting] = useState<AttachmentResponseDto | null>(null);
+  const skipped = useOpeningSkipped(ticket.id);
+
+  return (
+    <>
+      <PersonEntry
+        mine={mine}
+        name={ticket.author?.fullName ?? null}
+        unknown={!ticket.author}
+        role="Requester"
+        at={ticket.createdAt}
+        attachments={ticket.attachments}
+        skipped={{ by: 'send', names: skipped }}
+        onDeleteAttachment={
+          moderator ? (attachment) => setDeleting(attachment) : undefined
+        }
+      >
+        {ticket.description}
+      </PersonEntry>
+      <DeleteFileDialog
+        attachment={deleting}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        onConfirm={async (attachment) => {
+          await attachmentsControllerRemoveV1(attachment.id);
+          announce(`${attachment.fileName} deleted`);
+          await queryClient.invalidateQueries({
+            queryKey: [`/api/v1/tickets/${ticket.id}`],
+          });
+        }}
+      />
+    </>
+  );
 }
 
 /**

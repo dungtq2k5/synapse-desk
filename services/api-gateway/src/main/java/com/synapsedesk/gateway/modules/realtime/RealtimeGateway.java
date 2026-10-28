@@ -30,7 +30,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
-import synapsedesk.ticket.Message.NewAttachment;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.MessageServiceGrpc;
 
 /**

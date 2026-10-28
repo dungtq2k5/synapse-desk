@@ -8,6 +8,10 @@ import java.time.OffsetDateTime;
  * (`currentAssigneeId`, `currentDepartmentId`, `authorId`) is ALSO a schema
  * field in its own right, kept beside the loader-backed edge it seeds so a
  * client that only wants the id pays no network call for it.
+ *
+ * <p>No {@code attachments}: the opening's files are REST-only, as a
+ * message's are on {@code TicketMessage}. Their URLs are internal object paths
+ * resolved per request.
  */
 public record TicketGqlDto(
   String id,

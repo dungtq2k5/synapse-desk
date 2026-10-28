@@ -6,12 +6,28 @@ import {
   useUserAdminControllerListV1,
 } from '@synapsedesk/api-client';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronsUpDownIcon, CircleAlertIcon, SearchIcon } from 'lucide-react';
+import {
+  ChevronsUpDownIcon,
+  CircleAlertIcon,
+  SearchIcon,
+  UploadIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Popover } from 'radix-ui';
-import { useEffect, useId, useState, type SubmitEvent } from 'react';
+import { useEffect, useId, useRef, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
+import {
+  AttachmentList,
+  DropOverlay,
+  FILE_HINT,
+  useFileDrop,
+} from '@/components/ticket/attachment-list';
+import {
+  leaveOpeningSkipped,
+  presignOpening,
+  useAttachments,
+} from '@/components/ticket/use-attachments';
 import { AppHeader, useTicketsCrumb } from '@/components/shell/app-header';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useViewer } from '@/hooks/use-viewer';
 import { announce } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { ALLOWED_ATTACHMENT_MIME_TYPES } from '@synapsedesk/contracts';
 
 const TITLE_MIN = 3;
 const TITLE_MAX = 255;
@@ -53,6 +70,9 @@ export function NewTicketForm() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const chooses = isAgent && can('user.read');
+  // An agent raising one for someone else uploads as themselves: the files
+  // bind under the agent, the ticket is the requester's.
+  const files = useAttachments(presignOpening);
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +84,7 @@ export function NewTicketForm() {
       description: !description.trim() ? 'Describe what you need.' : undefined,
     };
     setErrors(next);
-    if (next.title || next.description) return;
+    if (next.title || next.description || files.uploading) return;
     setBusy(true);
     setFailure(null);
     try {
@@ -73,8 +93,10 @@ export function NewTicketForm() {
         description: description.trim(),
         authorId:
           requester && requester.id !== user?.id ? requester.id : undefined,
+        attachments: files.ready,
       });
       if (!answer.data) throw new Error('No ticket');
+      leaveOpeningSkipped(answer.data.id, answer.data.skippedAttachments);
       void queryClient.invalidateQueries({ queryKey: ['/api/v1/tickets'] });
       announce(`Ticket #${answer.data.ticketNumber} created`);
       router.push(`/tickets/${answer.data.id}`);
@@ -174,18 +196,100 @@ export function NewTicketForm() {
             />
           )}
         </Field>
-        <div className="flex justify-end gap-2">
+        <AttachmentsField files={files} disabled={busy} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {files.uploading && (
+            <p
+              id="new-uploading"
+              className="mr-auto text-xs text-muted-foreground"
+            >
+              Wait for your files to finish uploading.
+            </p>
+          )}
           <Link
             href={isAgent ? '/tickets' : '/requests'}
             className={buttonVariants({ variant: 'outline' })}
           >
             Cancel
           </Link>
-          <Button type="submit" disabled={busy}>
+          <Button
+            type="submit"
+            disabled={busy || files.uploading}
+            aria-describedby={files.uploading ? 'new-uploading' : undefined}
+          >
             {busy ? 'Creating…' : 'Create ticket'}
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/**
+ * The opening's files: a dashed zone to drop them on, with a button to choose
+ * them, and each file's row below. Up to five, as on a message.
+ */
+function AttachmentsField({
+  files,
+  disabled,
+}: {
+  files: ReturnType<typeof useAttachments>;
+  disabled: boolean;
+}) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const labelId = useId();
+  const hintId = useId();
+  const drop = useFileDrop(
+    (dropped) => !files.full && files.add(dropped),
+    !disabled,
+  );
+  return (
+    <div role="group" aria-labelledby={labelId} className="flex flex-col gap-2">
+      <span id={labelId} className="text-sm leading-none font-medium">
+        Attachments (optional)
+      </span>
+      <div
+        {...drop.handlers}
+        className="relative flex flex-col items-center gap-1 rounded-lg border border-dashed px-4 py-4 text-center text-sm text-muted-foreground"
+      >
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          hidden
+          accept={ALLOWED_ATTACHMENT_MIME_TYPES.join(',')}
+          onChange={(event) => {
+            files.add([...(event.target.files ?? [])]);
+            event.target.value = '';
+          }}
+        />
+        <p className="flex flex-wrap items-center justify-center gap-1">
+          <UploadIcon aria-hidden className="size-4" />
+          Drag files here, or
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0"
+            aria-describedby={hintId}
+            disabled={files.full || disabled}
+            onClick={() => fileInput.current?.click()}
+          >
+            choose files
+          </Button>
+        </p>
+        <p id={hintId} className="text-xs">
+          {files.full
+            ? '5 of 5 files. Remove one to attach another.'
+            : FILE_HINT}
+        </p>
+        {drop.dragging && <DropOverlay />}
+      </div>
+      <AttachmentList
+        items={files.items}
+        onRetry={files.retry}
+        onRemove={files.remove}
+      />
     </div>
   );
 }

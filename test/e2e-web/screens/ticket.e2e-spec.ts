@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type Page, type WebSocketRoute } from '../coverage';
 import { CLIENT_EVENTS, REALTIME_EVENTS } from '@synapsedesk/contracts';
 import { api } from '../support';
+import { REPO_ROOT } from '../../system/services';
 import { look, tabsThrough } from './look';
 import { sessionAs, signInAs, tenant, type Person } from './tenant';
 
@@ -73,6 +76,69 @@ test.describe('the thread', () => {
       page.getByRole('button', { name: 'Ask a person' }),
     ).toBeVisible();
     await look(page, 'ticket-requester');
+  });
+
+  test('a question asked with files: one in the thread, one that didn’t attach', async ({
+    page,
+  }) => {
+    const { priya } = await tenant('thread-opening');
+    const session = await sessionAs(priya);
+    let ticketId: string;
+    try {
+      const bytes = readFileSync(
+        join(REPO_ROOT, 'test/fixtures/images/avatar.png'),
+      );
+      const signed = await api<{
+        uploadUrl: string;
+        uploadMethod: string;
+        objectPath: string;
+      }>(session, 'POST', '/tickets/attachments/upload-url', {
+        fileName: 'error-screen.png',
+        fileSizeBytes: bytes.length,
+        mimeType: 'image/png',
+      });
+      const sent = await fetch(signed.uploadUrl, {
+        method: signed.uploadMethod,
+        headers: { 'Content-Type': 'image/png' },
+        body: new Uint8Array(bytes),
+      });
+      expect(sent.ok).toBe(true);
+      ({ id: ticketId } = await api<{ id: string }>(
+        session,
+        'POST',
+        '/chat/conversations',
+        {
+          title: 'Does the allowance reset in January?',
+          message:
+            'Does the allowance reset in January or on my start date? The portal shows this.',
+          attachments: [
+            { objectPath: signed.objectPath, fileName: 'error-screen.png' },
+          ],
+        },
+      ));
+    } finally {
+      await session.dispose();
+    }
+    // What Ask leaves when a file didn't attach, for the page it opens.
+    await page.addInitScript(
+      (left) => sessionStorage.setItem('synapsedesk.opening-skipped', left),
+      JSON.stringify({ ticketId, names: ['invoice.heic'] }),
+    );
+    await open(page, priya, ticketId);
+    await expect(
+      page.getByRole('button', { name: /^error-screen\.png/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'We couldn’t attach invoice.heic, so the answer doesn’t use it. You can attach it again below.',
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'Not what you needed? A person from the support team can take over.',
+      ),
+    ).toBeVisible({ timeout: 30_000 });
+    await look(page, 'ticket-opening-files');
   });
 
   test('as another agent: only the assignee can reply', async ({ page }) => {

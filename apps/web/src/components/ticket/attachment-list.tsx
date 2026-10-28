@@ -3,13 +3,62 @@ import {
   FileTextIcon,
   LoaderCircleIcon,
   RotateCwIcon,
+  UploadIcon,
   XIcon,
 } from 'lucide-react';
+import { useState, type DragEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { fileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import type { Attachment } from './use-attachments';
+
+/** What a file may be, said where files are dropped or chosen. */
+export const FILE_HINT =
+  'PDF, Word, Excel, images, CSV or text. Up to 5 files, 10 MB each.';
+
+/**
+ * A drop zone's handlers, and whether files are over it now. Only a drag
+ * carrying files counts; leaving for a child of the zone doesn't end it.
+ *
+ * @param enabled false where files can't be attached, so a drop does nothing
+ */
+export function useFileDrop(onFiles: (files: File[]) => void, enabled = true) {
+  const [dragging, setDragging] = useState(false);
+  const carriesFiles = (event: DragEvent) =>
+    enabled && event.dataTransfer.types.includes('Files');
+  return {
+    dragging,
+    handlers: {
+      onDragOver: (event: DragEvent) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        setDragging(true);
+      },
+      onDragLeave: (event: DragEvent) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setDragging(false);
+      },
+      onDrop: (event: DragEvent) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        setDragging(false);
+        onFiles([...event.dataTransfer.files]);
+      },
+    },
+  };
+}
+
+/** What a drop zone shows while files are over it. */
+export function DropOverlay() {
+  return (
+    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-primary bg-accent text-center text-sm text-accent-foreground">
+      <UploadIcon aria-hidden className="size-5" />
+      <span className="font-medium">Drop files to attach</span>
+      <span className="text-xs">{FILE_HINT}</span>
+    </div>
+  );
+}
 
 /** Files on their way: each with its progress, its problem, Retry and remove. */
 export function AttachmentList({

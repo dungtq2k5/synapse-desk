@@ -225,6 +225,70 @@ test.describe('a new ticket', () => {
     await look(page, 'new-ticket');
   });
 
+  test('uploading, one failed', async ({ page }) => {
+    const { priya } = await tenant('new');
+    let count = 0;
+    await page.route('**/api/v1/tickets/attachments/upload-url', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          statusCode: 200,
+          message: 'OK',
+          warning: null,
+          data: {
+            uploadUrl: `/screens-storage/upload/${++count}`,
+            uploadMethod: 'PUT',
+            objectPath: `ticket-openings/screens/${count}`,
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        }),
+      }),
+    );
+    await page.route('**/screens-storage/upload/*', (route) => {
+      const which = route.request().url().split('/').pop();
+      if (which === '1') return new Promise<void>(() => {});
+      if (which === '2') return route.fulfill({ status: 500 });
+      return route.fulfill({ status: 200 });
+    });
+    await form(page, priya);
+    await page.getByLabel('Title').fill('Monitor flickers on the dock');
+    await page
+      .getByLabel('Description')
+      .fill(
+        'My second monitor flickers when it’s connected through the dock. I’ve tried another cable. Can I get a replacement dock?',
+      );
+    await page.locator('form input[type="file"]').setInputFiles([
+      {
+        name: 'dock-photo.jpg',
+        mimeType: 'image/jpeg',
+        buffer: Buffer.alloc(1024, 1),
+      },
+      {
+        name: 'flicker.png',
+        mimeType: 'image/png',
+        buffer: Buffer.alloc(1024, 1),
+      },
+      {
+        name: 'order.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.alloc(151_552, 1),
+      },
+    ]);
+    const files = page.getByRole('list', { name: 'Attachments' });
+    await expect(files.getByText('148 KB')).toBeVisible();
+    await expect(files.getByText('Upload failed.')).toBeVisible();
+    await expect(files.getByText('Uploading… 0%')).toBeVisible();
+    await expect(
+      page.getByText('Wait for your files to finish uploading.'),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Create ticket' }),
+    ).toBeDisabled();
+    await look(page, 'new-ticket-uploading');
+  });
+
   test('as an agent: the Requester, defaulting to them', async ({ page }) => {
     const { maya } = await tenant('new');
     await form(page, maya);

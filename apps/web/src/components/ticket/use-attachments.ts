@@ -1,13 +1,17 @@
 'use client';
 
-import type { PresignAttachmentResponseDto } from '@synapsedesk/api-client';
+import {
+  ticketsControllerPresignOpeningAttachmentV1,
+  type PresignAttachmentResponseDto,
+  type UploadAttachmentDtoMimeType,
+} from '@synapsedesk/api-client';
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENT_FILE_NAME_LENGTH,
   MAX_ATTACHMENTS_PER_MESSAGE,
 } from '@synapsedesk/contracts';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { announce } from '@/lib/toast';
 import { sendFile } from '@/lib/upload';
 
@@ -29,6 +33,50 @@ export type Presign = (file: {
 }) => Promise<PresignAttachmentResponseDto | null | undefined>;
 
 const ALLOWED: ReadonlySet<string> = new Set(ALLOWED_ATTACHMENT_MIME_TYPES);
+
+/**
+ * A presign for a ticket that doesn't exist yet: its opening, which Ask and
+ * New ticket send with the create. The file is the caller's own until then.
+ */
+export const presignOpening: Presign = async (file) =>
+  (
+    await ticketsControllerPresignOpeningAttachmentV1({
+      ...file,
+      // Checked against the allowlist before any upload (`refusal`).
+      mimeType: file.mimeType as UploadAttachmentDtoMimeType,
+    })
+  ).data;
+
+/** Where a create leaves the opening's skipped files for the ticket page. */
+const SKIPPED = 'synapsedesk.opening-skipped';
+
+/**
+ * Leaves the files a create couldn't attach for the ticket page it opens,
+ * which shows them under the description once.
+ */
+export function leaveOpeningSkipped(ticketId: string, names: string[]): void {
+  if (names.length === 0) return;
+  try {
+    sessionStorage.setItem(SKIPPED, JSON.stringify({ ticketId, names }));
+  } catch {
+    // Storage blocked: the ticket opens without the notice.
+  }
+}
+
+/** The files `leaveOpeningSkipped` left for this ticket, taken once. */
+function takeOpeningSkipped(ticketId: string): string[] {
+  try {
+    const left = JSON.parse(sessionStorage.getItem(SKIPPED) ?? 'null') as {
+      ticketId?: string;
+      names?: string[];
+    } | null;
+    if (left?.ticketId !== ticketId || !Array.isArray(left.names)) return [];
+    sessionStorage.removeItem(SKIPPED);
+    return left.names;
+  } catch {
+    return [];
+  }
+}
 
 /** A name over the limit keeps its extension and loses the middle's end. */
 export function storedName(name: string): string {
@@ -147,4 +195,29 @@ export function useAttachments(presign: Presign) {
       .filter((item) => item.state === 'done' && item.objectPath)
       .map((item) => ({ objectPath: item.objectPath!, fileName: item.name })),
   };
+}
+
+/** What this tab took for each ticket, so every render reads the same list. */
+const taken = new Map<string, string[]>();
+const NONE: string[] = [];
+const noChanges = () => () => undefined;
+
+/**
+ * The files a create in this tab couldn't attach to the ticket's opening:
+ * read from storage on the first render in the browser, none on the server.
+ */
+export function useOpeningSkipped(ticketId: string): string[] {
+  return useSyncExternalStore(
+    noChanges,
+    () => {
+      // Kept once found, so the notice stays for this tab; nothing found is
+      // asked again, which costs one storage read.
+      if (!taken.has(ticketId)) {
+        const names = takeOpeningSkipped(ticketId);
+        if (names.length > 0) taken.set(ticketId, names);
+      }
+      return taken.get(ticketId) ?? NONE;
+    },
+    () => NONE,
+  );
 }

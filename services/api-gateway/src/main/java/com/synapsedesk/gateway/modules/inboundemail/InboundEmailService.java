@@ -45,7 +45,7 @@ import synapsedesk.ticket.Common.TicketSource;
 import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.IngestAttachmentRequest;
-import synapsedesk.ticket.Message.NewAttachment;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub;
 import synapsedesk.ticket.Ticket.CreateTicketRequest;
 import synapsedesk.ticket.Ticket.GetTicketByNumberRequest;
@@ -223,20 +223,16 @@ public class InboundEmailService {
     TicketResponse ticket = routing.ticket();
 
     // Ingest BEFORE the note is written, because the note names what ingest
-    // refuses. On a mail that opens a ticket there is no message to attach to, so
-    // every eligible attachment is named as dropped, alongside the ones the mapper
-    // refused.
-    IngestResult ingested =
-      ticket != null
-        ? ingestAttachments(payload, ticket, routing.limits(), context, options)
-        : new IngestResult(
-            List.of(),
-            payload
-              .remoteAttachments()
-              .stream()
-              .map(RemoteAttachment::fileName)
-              .toList()
-          );
+    // refuses. A reply's files go under its ticket; a mail that opens a ticket
+    // has none yet, so its files are ingested as the sender's own and bound to
+    // the new ticket's opening by createTicket.
+    IngestResult ingested = ingestAttachments(
+      payload,
+      ticket,
+      routing.limits(),
+      context,
+      options
+    );
     String storedBody = withTruncationNote(
       QuotedReply.toStoredBody(payload.text(), payload.html()),
       payload.bodyTruncated()
@@ -279,6 +275,9 @@ public class InboundEmailService {
           // The resolved sender: the only identity here that survived verification.
           .setAuthorId(context.sub())
           .setInboundMessageId(inboundMessageId)
+          // Files skipped at confirm are logged by ticket-service, as a reply's
+          // are: the note was written before the confirm could name them.
+          .addAllAttachments(toNewAttachments(ingested.uploaded()))
           .build()
       );
 
@@ -492,14 +491,7 @@ public class InboundEmailService {
       .setIsInternalNote(false)
       .setInvokeAi(false)
       .setInboundMessageId(inboundMessageId);
-    for (UploadedAttachment file : attachments) {
-      message.addAttachments(
-        NewAttachment.newBuilder()
-          .setObjectPath(file.objectPath())
-          .setFileName(file.fileName())
-          .build()
-      );
-    }
+    message.addAllAttachments(toNewAttachments(attachments));
 
     authorised(messages, context, GRPC_DEADLINE_MS).createMessage(
       message.build()
@@ -697,6 +689,33 @@ public class InboundEmailService {
    * A file that passes 1 takes its slot whether or not its ingest then succeeds:
    * with files in flight together, a slot cannot wait on another file's outcome.
    */
+  /** The ticket an ingest files under, or none for a ticket's opening. */
+  private static IngestAttachmentRequest.Builder withTicket(
+    IngestAttachmentRequest.Builder request,
+    TicketResponse ticket
+  ) {
+    return ticket == null ? request : request.setTicketId(ticket.getId());
+  }
+
+  /** Stored files, as {@code CreateMessage} and {@code CreateTicket} take them. */
+  private static List<NewAttachment> toNewAttachments(
+    List<UploadedAttachment> files
+  ) {
+    return files
+      .stream()
+      .map(file ->
+        NewAttachment.newBuilder()
+          .setObjectPath(file.objectPath())
+          .setFileName(file.fileName())
+          .build()
+      )
+      .toList();
+  }
+
+  /**
+   * @param ticket {@code null} for a mail that opens a ticket: the files are
+   *   the sender's own until {@code createTicket} binds them.
+   */
   private IngestResult ingestAttachments(
     InboundEmail payload,
     TicketResponse ticket,
@@ -763,8 +782,7 @@ public class InboundEmailService {
             context,
             INGEST_CALL_DEADLINE_MS
           ).ingestAttachment(
-            IngestAttachmentRequest.newBuilder()
-              .setTicketId(ticket.getId())
+            withTicket(IngestAttachmentRequest.newBuilder(), ticket)
               .setFileName(job.file().fileName())
               .setFileSizeBytes(job.file().sizeBytes())
               .setMimeType(job.file().mimeType())

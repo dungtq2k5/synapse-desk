@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ticket.Ai.DraftCitation;
-import synapsedesk.ticket.Message.AttachmentResponse;
+import synapsedesk.ticket.Common.AttachmentResponse;
 import synapsedesk.ticket.Message.ConfirmAttachmentRequest;
 import synapsedesk.ticket.Message.CreateMessageRequest;
 import synapsedesk.ticket.Message.CreateMessageResponse;
@@ -59,7 +59,7 @@ import synapsedesk.ticket.Message.ListMessagesRequest;
 import synapsedesk.ticket.Message.ListMessagesResponse;
 import synapsedesk.ticket.Message.MessageAnswerStatus;
 import synapsedesk.ticket.Message.MessageResponse;
-import synapsedesk.ticket.Message.NewAttachment;
+import synapsedesk.ticket.Common.NewAttachment;
 import synapsedesk.ticket.Message.PresignAttachmentResponse;
 import synapsedesk.ticket.Message.RedactMessageRequest;
 import synapsedesk.ticket.Message.RedactMessageResponse;
@@ -383,7 +383,7 @@ public class MessagesController {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      ApiResponse.of(201, "Attachment added", toAttachmentResponseDto(response))
+      ApiResponse.of(201, "Attachment added", TicketsCrudService.toAttachmentResponseDto(response))
     );
   }
 
@@ -414,13 +414,13 @@ public class MessagesController {
         response
           .getItemsList()
           .stream()
-          .map(MessagesController::toAttachmentResponseDto)
+          .map(TicketsCrudService::toAttachmentResponseDto)
           .toList()
       )
     );
   }
 
-  private static PresignAttachmentResponseDto toPresignData(
+  static PresignAttachmentResponseDto toPresignData(
     PresignAttachmentResponse response
   ) {
     return new PresignAttachmentResponseDto(
@@ -464,7 +464,7 @@ public class MessagesController {
       message
         .getAttachmentsList()
         .stream()
-        .map(MessagesController::toAttachmentResponseDto)
+        .map(TicketsCrudService::toAttachmentResponseDto)
         .toList(),
       message.getExcludedFromAiContext(),
       toAnswerStatusEnum(message.getAnswerStatus()),
@@ -483,19 +483,6 @@ public class MessagesController {
     );
   }
 
-  private static AttachmentResponseDto toAttachmentResponseDto(
-    AttachmentResponse attachment
-  ) {
-    return new AttachmentResponseDto(
-      attachment.getId(),
-      attachment.getMessageId(),
-      attachment.getFileName(),
-      attachment.getFileUrl(),
-      BigDecimal.valueOf(attachment.getFileSizeBytes()),
-      attachment.getMimeType(),
-      toOffsetDateTime(attachment.getCreatedAt())
-    );
-  }
 
   private static CitationResponseDto toCitationResponseDto(
     DraftCitation citation
