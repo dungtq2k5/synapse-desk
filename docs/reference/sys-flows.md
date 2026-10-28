@@ -137,8 +137,10 @@ Three surfaces take attachments and each selects a different message, because ea
 | Surface | Message selected | Refused turns |
 | :--- | :--- | :--- |
 | `Chat` | the message being sent *(gateway fetches; the rule lives in ticket-service)* | excluded |
-| `Draft` | the newest **user** message, skipping AI replies | excluded |
-| `Classify` | the **earliest** message on the ticket | **included** |
+| `Draft`, and the unary reply (`AnswerOpening`, `invokeAi`) | the newest **user** message, skipping AI replies; **with none left, the ticket's opening files** | excluded, the opening's through `opening_excluded_from_ai_context` |
+| `Classify` | **the ticket's opening files when it has any**, else the earliest message | **included** for a message; an excluded opening sends none |
+
+**A ticket's opening carries its own files** ([ADR 0050](../decisions/0050-a-tickets-opening-carries-its-own-files.md)): rows in `message_attachments` with `ticket_id` and no `message_id`, uploaded before the ticket existed. They are what the first answer reads, and what `Classify` routes on.
 
 `Classify` is the deliberate exception: a refused opening message is still the opening message, and routing a ticket is not answering its author. The other two follow [ADR 0030](../decisions/0030-refused-turns-exclude-their-attachments.md) — exclusion is **per turn, not per file**, and it reaches the files and not only the text. A user who sends injection text plus a screenshot has both dropped.
 

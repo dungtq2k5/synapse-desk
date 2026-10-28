@@ -89,6 +89,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0046](./decisions/0046-resend-for-both-directions.md) | Email is Resend in both directions; only the transport changed |
 | [0048](./decisions/0048-cache-entries-carry-their-scopes-generation.md) | A cached answer carries its scope's generation, so one produced before an invalidation is never read |
 | [0049](./decisions/0049-every-database-gets-the-production-schema-path.md) | Every database gets its schema the way production does: a database check, `migrate deploy`, then `schema-apply` |
+| [0050](./decisions/0050-a-tickets-opening-carries-its-own-files.md) | A ticket's opening carries its own files; it never becomes the first message |
 
 ## `reference/` — what is true today
 

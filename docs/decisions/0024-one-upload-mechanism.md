@@ -15,6 +15,8 @@ Every file — document, avatar, message attachment — uses the same presign �
 
 - **The stored filename is a UUID, never the original.** The human-readable name is served back through the signed URL's `responseDisposition`, so the object path itself carries nothing worth protecting.
 - **The quota gate runs at presign**, before signing — a tenant over `max_storage_bytes` never receives a usable upload URL rather than discovering it after uploading 25 MB.
+- **The record names its uploader and its purpose, and confirm checks both.** A caller who isn't the uploader gets the same `NOT_FOUND` as an expired record, on every purpose; and the binder names the purposes it accepts (`expected_purposes`), so a pending avatar or document can't be bound as a ticket's file. A background job is its own uploader: its identity arrives as the same text at presign and at confirm (known gap 71).
+- **An upload can precede what owns it.** A ticket's opening files are presigned before the ticket exists, under their uploader's own path (`TICKET_OPENING`, [ADR 0050](./0050-a-tickets-opening-carries-its-own-files.md)).
 - **The row is created at confirm, not presign.** An abandoned presign must not leave a row pointing at an object that never arrived.
 - `storage-service` is the only holder of storage credentials, and needs no Postgres.
 - **Ingest-from-URL is presign with the PUT done by storage-service.** `IngestFromUrl` runs the presign preamble, writes the same `PendingUpload` record, fetches the bytes itself and lands them under `pending/`; confirm is unchanged and cannot tell who wrote the object. One mechanism still — the fetch replaces the client's PUT, nothing else ([ADR 0046](./0046-resend-for-both-directions.md)).
