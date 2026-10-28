@@ -773,7 +773,9 @@ function Processing({
             {failedUpdate && (
               <p>
                 Answers still use the previous version.
-                {failed.retry && ' Retry to process the new file again.'}
+                {failed.retry &&
+                  can('document.reindex') &&
+                  ' Retry to process the new file again.'}
               </p>
             )}
             <p>{failed.sentence}</p>

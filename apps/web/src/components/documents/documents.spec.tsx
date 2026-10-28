@@ -412,6 +412,42 @@ describe('one document', () => {
     });
   }
 
+  it('a failed update, for a reader who may not retry, doesn’t say to retry', async () => {
+    show(
+      <DocumentView documentId="d1" />,
+      MANAGER.filter((code) => code !== 'document.reindex'),
+      {
+        'GET /api/v1/documents/d1': ok(
+          doc({
+            latestJob: latest({
+              status: 'FAILED',
+              errorCode: 'PROVIDER_FAILURE',
+            }),
+          }),
+        ),
+        'GET /api/v1/documents/d1/ingestion-jobs': page([
+          job({ id: 'a' }),
+          job({
+            id: 'b',
+            status: 'FAILED',
+            errorCode: 'PROVIDER_FAILURE',
+            failedStage: 'EMBEDDING',
+            processedAt: null,
+          }),
+        ]),
+      },
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(
+      await within(alert).findByText('Answers still use the previous version.'),
+    ).toBeInTheDocument();
+    expect(alert).not.toHaveTextContent('Retry to process the new file again.');
+    expect(
+      within(alert).queryByRole('button', { name: 'Retry' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('a failed update says answers still use the previous version, with the reason and Retry', async () => {
     show(<DocumentView documentId="d1" />, MANAGER, {
       'GET /api/v1/documents/d1': ok(
