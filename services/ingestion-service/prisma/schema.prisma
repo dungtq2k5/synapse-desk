@@ -146,6 +146,12 @@ model DocumentChunk {
   departmentIds      String[] @default([]) @map("department_ids") @db.Uuid
   isDeleted          Boolean  @default(false) @map("is_deleted")
 
+  /// A version being built beside the live one: written, embedded and kept
+  /// out of every read until the run's swap makes it live (and deletes the
+  /// rows it replaces). Unique per `(document, chunk index, staged)`, so one
+  /// live and one staged row may share an index during a run.
+  isStaged Boolean @default(false) @map("is_staged")
+
   // ---------------------------------------------------------------------
   // Usage counters — a daily PROJECTION, never a hot-path write.
   //
@@ -164,7 +170,7 @@ model DocumentChunk {
   document Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
   flags    DocumentFlag[]
 
-  @@unique([documentId, chunkIndex])
+  @@unique([documentId, chunkIndex, isStaged])
   @@index([documentId])
   @@index([organizationId])
   @@map("document_chunks")

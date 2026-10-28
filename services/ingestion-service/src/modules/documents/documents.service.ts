@@ -79,6 +79,7 @@ import { toIngestionJobResponse } from '../ingestion-jobs/ingestion-job.mapper';
 import { asConcurrentIngestion } from '../../common/live-ingestion-job';
 import { Prisma } from '../../generated/prisma/client';
 import { documentVisibility } from '../../common/document-visibility';
+import { setStatusUnlessLive } from '../../common/live-version';
 import {
   DOCUMENT_INCLUDE,
   DocumentWithScope,
@@ -392,7 +393,11 @@ export class DocumentsService {
         ocrLanguages,
       });
 
-      return toDocumentResponse(document.created, departmentIds, 0);
+      return toDocumentResponse(
+        { ...document.created, ingestionJobs: [document.job] },
+        departmentIds,
+        0,
+      );
     } catch (error) {
       if (isUniqueConstraintViolation(error, DOCUMENT_HASH_INDEX)) {
         throw new RpcException({
@@ -529,7 +534,11 @@ export class DocumentsService {
       DOCUMENT_CHUNK_SORTABLE_FIELDS,
     );
 
-    const where: Prisma.DocumentChunkWhereInput = { documentId: document.id };
+    // The live version: a run's staged chunks are not the document yet.
+    const where: Prisma.DocumentChunkWhereInput = {
+      documentId: document.id,
+      isStaged: false,
+    };
 
     const [items, totalItems] = await Promise.all([
       this.prisma.documentChunk.findMany({ where, orderBy, skip, take }),
@@ -554,7 +563,7 @@ export class DocumentsService {
     const document = await this.load(request.documentId, context);
 
     const chunk = await this.prisma.documentChunk.findFirst({
-      where: { id: request.chunkId, documentId: document.id },
+      where: { id: request.chunkId, documentId: document.id, isStaged: false },
     });
     if (!chunk) {
       throw new RpcException({
@@ -890,6 +899,9 @@ export class DocumentsService {
 
     const chunks = await this.prisma.documentChunk.findMany({
       where: {
+        // Staged chunks too, as retrieval's hydration reads them: for the
+        // moment between the swap's Qdrant and Postgres halves an answer can
+        // cite a chunk that is still staged, and goes live with the same id.
         id: { in: ids },
         // The boundary, applied through the parent.
         document: {
@@ -993,13 +1005,9 @@ export class DocumentsService {
           });
         }
 
-        // PENDING, and honestly so: the processor purges this document's
-        // vectors before it writes new ones, so from the moment that job runs
-        // until it finishes the document really is not indexed.
-        await tx.document.update({
-          where: { id: document.id },
-          data: { status: DocumentStatus.PENDING },
-        });
+        // Stays INDEXED: the run builds the new version beside the live one,
+        // which answers until the swap. Only a document without one waits.
+        await setStatusUnlessLive(tx, document.id, DocumentStatus.PENDING);
 
         return created;
       })
@@ -1119,6 +1127,11 @@ export class DocumentsService {
           },
         });
 
+        // Before the update, so the row it returns carries the status. A
+        // document with a live version keeps answering from it until the new
+        // file's run swaps in, and stays INDEXED.
+        await setStatusUnlessLive(tx, document.id, DocumentStatus.PENDING);
+
         const updated = await tx.document.update({
           where: { id: document.id },
           data: {
@@ -1127,7 +1140,6 @@ export class DocumentsService {
             fileSizeBytes: BigInt(confirmed.sizeBytes),
             fileHash,
             ocrLanguages: assertOcrLanguages(request.ocrLanguages),
-            status: DocumentStatus.PENDING,
           },
           include: DOCUMENT_INCLUDE,
         });
@@ -1149,10 +1161,11 @@ export class DocumentsService {
         ocrLanguages: replaced.updated.ocrLanguages,
       });
 
+      // The live version's count: it answers until the new file's run swaps.
       return toDocumentResponse(
         replaced.updated,
         replaced.updated.departmentLinks.map((link) => link.departmentId),
-        0,
+        replaced.updated._count.chunks,
       );
     } catch (error) {
       if (isUniqueConstraintViolation(error, DOCUMENT_HASH_INDEX)) {

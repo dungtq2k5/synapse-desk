@@ -26,6 +26,11 @@ import {
   toKnowledgeArticleResponse,
 } from './knowledge-article.mapper';
 
+/**
+ * The live version's blocks. A reindex or replace builds the next version
+ * staged beside it, and an article reads as it stands until the swap.
+ */
+const LIVE_CHUNKS = { where: { isStaged: false } } as const;
 /** What an end user may sort a help centre by. */
 // Local rather than in `libs/common`: one consumer, and §3.1 says a second has
 // to exist or be imminent before a constant moves.
@@ -74,7 +79,7 @@ export class KnowledgeArticlesService {
         orderBy,
         skip,
         take,
-        include: { _count: { select: { chunks: true } } },
+        include: { _count: { select: { chunks: LIVE_CHUNKS } } },
       }),
       // The SAME `where`. A count computed without the scope would tell an end
       // user how many articles exist that they cannot open.
@@ -129,8 +134,9 @@ export class KnowledgeArticlesService {
     const article = await this.prisma.document.findFirst({
       where: { id: request.id, ...this.scope(context) },
       include: {
-        _count: { select: { chunks: true } },
+        _count: { select: { chunks: LIVE_CHUNKS } },
         chunks: {
+          ...LIVE_CHUNKS,
           skip,
           take,
           // Fixed, not caller-chosen: the blocks ARE the document, in order.
@@ -208,7 +214,11 @@ export class KnowledgeArticlesService {
     // Counted, not read off `chunkIndex`: the position among the blocks the
     // reader pages through, whatever the numbering.
     const position = await this.prisma.documentChunk.count({
-      where: { documentId: articleId, chunkIndex: { lt: block.chunkIndex } },
+      where: {
+        documentId: articleId,
+        isStaged: false,
+        chunkIndex: { lt: block.chunkIndex },
+      },
     });
     const page = Math.floor(position / take) + 1;
     return { position, page, skip: (page - 1) * take };

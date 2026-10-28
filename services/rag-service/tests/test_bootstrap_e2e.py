@@ -21,6 +21,7 @@ from rag_service.qdrant.collection import (
     EMBEDDING_DIMENSION,
     IS_DELETED,
     IS_ORGANIZATION_WIDE,
+    IS_STAGED,
     ORGANIZATION_ID,
     payload_index_fields,
 )
@@ -66,6 +67,7 @@ class TestBootPreconditions:
             IS_DELETED,
             DEPARTMENT_IDS,
             IS_ORGANIZATION_WIDE,
+            IS_STAGED,
         ):
             assert field in fields, f"{field} is not payload-indexed"
 

@@ -25,6 +25,7 @@ import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
 import { IngestionJob, Prisma } from '../../generated/prisma/client';
 import { documentVisibility } from '../../common/document-visibility';
 import { asConcurrentIngestion } from '../../common/live-ingestion-job';
+import { setStatusUnlessLive } from '../../common/live-version';
 import { toIngestionJobResponse } from './ingestion-job.mapper';
 
 /** What the tenant may sort a job worklist by. */
@@ -223,10 +224,11 @@ export class IngestionJobsService {
 
         if (count === 0) await this.refuseSuperseded(tx, source.id);
 
-        await tx.document.update({
-          where: { id: source.documentId },
-          data: { status: DocumentStatus.PENDING },
-        });
+        await setStatusUnlessLive(
+          tx,
+          source.documentId,
+          DocumentStatus.PENDING,
+        );
 
         return created;
       })
@@ -297,12 +299,10 @@ export class IngestionJobsService {
         });
       }
 
-      await tx.document.update({
-        where: { id: job.documentId },
-        // `FAILED`, because `DocumentStatus` has no cancelled-shaped member by
-        // design — the document row says "not indexed", the job row says why.
-        data: { status: DocumentStatus.FAILED },
-      });
+      // `FAILED`, because `DocumentStatus` has no cancelled-shaped member by
+      // design — the document row says "not indexed", the job row says why. A
+      // document with a live version is still indexed, and stays INDEXED.
+      await setStatusUnlessLive(tx, job.documentId, DocumentStatus.FAILED);
     });
 
     // Best effort, and after the commit: a stranded job has no queue entry

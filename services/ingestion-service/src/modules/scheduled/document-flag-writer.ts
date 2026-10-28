@@ -81,11 +81,15 @@ export class DocumentFlagWriter {
         // INDEXED only. A document still processing has no chunks to retrieve,
         // so flagging it would report a pipeline state as a quality problem.
         status: DocumentStatus.INDEXED,
-        chunks: { some: {} },
+        chunks: { some: { isStaged: false } },
       },
       select: {
         id: true,
-        chunks: { select: { retrievalCount: true, citationCount: true } },
+        // The live version's counters; an update's staged chunks start at 0.
+        chunks: {
+          where: { isStaged: false },
+          select: { retrievalCount: true, citationCount: true },
+        },
       },
     });
 
@@ -115,11 +119,15 @@ export class DocumentFlagWriter {
         organizationId,
         deletedAt: null,
         status: DocumentStatus.INDEXED,
-        chunks: { some: {} },
+        chunks: { some: { isStaged: false } },
       },
       select: {
         id: true,
-        chunks: { select: { retrievalCount: true, citationCount: true } },
+        // The live version's counters; an update's staged chunks start at 0.
+        chunks: {
+          where: { isStaged: false },
+          select: { retrievalCount: true, citationCount: true },
+        },
       },
     });
 

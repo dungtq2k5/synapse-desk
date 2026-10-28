@@ -3,9 +3,17 @@ import {
   DocumentResponse,
   toProtoDocumentFileType,
   toProtoDocumentStatus,
+  toProtoIngestionErrorCode,
+  toProtoIngestionJobStatus,
+  toProtoIngestionWaitingReason,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { Document, DocumentChunk, Prisma } from '../../generated/prisma/client';
+import {
+  Document,
+  DocumentChunk,
+  IngestionJob,
+  Prisma,
+} from '../../generated/prisma/client';
 
 /**
  * Prisma row -> wire.
@@ -14,12 +22,22 @@ import { Document, DocumentChunk, Prisma } from '../../generated/prisma/client';
  * both come from relations the caller has already loaded (or deliberately has
  * not), and re-querying them here would turn one list page into two queries per
  * row.
+ *
+ * `latestJob` comes from `ingestionJobs`, newest first, when the row was read
+ * with {@link DOCUMENT_INCLUDE}.
  */
 export function toDocumentResponse(
-  document: Document,
+  document: Document & {
+    ingestionJobs?: Pick<
+      IngestionJob,
+      'status' | 'waitingReason' | 'errorCode'
+    >[];
+  },
   departmentIds: string[],
   chunkCount: number,
 ): DocumentResponse {
+  const latest = document.ingestionJobs?.[0];
+
   return {
     id: document.id,
     organizationId: document.organizationId,
@@ -49,6 +67,11 @@ export function toDocumentResponse(
     updatedAt: toProtoTimestamp(document.updatedAt),
     deletedAt: toProtoTimestamp(document.deletedAt),
     deletedById: document.deletedById ?? undefined,
+    latestJob: latest && {
+      status: toProtoIngestionJobStatus(latest.status),
+      waitingReason: toProtoIngestionWaitingReason(latest.waitingReason),
+      errorCode: toProtoIngestionErrorCode(latest.errorCode),
+    },
   };
 }
 
@@ -81,7 +104,14 @@ export function toDocumentChunkResponse(
  */
 export const DOCUMENT_INCLUDE = {
   departmentLinks: { select: { departmentId: true } },
-  _count: { select: { chunks: true } },
+  // The live version's chunks; a run's staged ones are not the document yet.
+  _count: { select: { chunks: { where: { isStaged: false } } } },
+  // The newest job, for `latestJob`.
+  ingestionJobs: {
+    orderBy: { createdAt: 'desc' },
+    take: 1,
+    select: { status: true, waitingReason: true, errorCode: true },
+  },
 } satisfies Prisma.DocumentInclude;
 
 export type DocumentWithScope = Prisma.DocumentGetPayload<{

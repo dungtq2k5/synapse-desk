@@ -35,6 +35,7 @@ from rag_service.qdrant.collection import (
     DEPARTMENT_IDS,
     IS_DELETED,
     IS_ORGANIZATION_WIDE,
+    IS_STAGED,
     ORGANIZATION_ID,
 )
 
@@ -68,6 +69,10 @@ def tenant_scope(ctx: CallerContext) -> TenantScope:
                                                      # retrieval immediately
         AND ( is_organization_wide == True           # RDM §1.2 — department
               OR department_ids ∩ ctx.department_ids )  #   scoping
+
+    And one beside them that is not a boundary: a chunk ingestion-service has
+    staged (`is_staged`, a version still being built) is skipped until the
+    run's swap makes it live.
 
     Department scoping is a **separate boundary** from tenancy and cannot be
     folded into it: HR's salary bands must not surface for an IT agent in the
@@ -130,7 +135,12 @@ def _qdrant_filter(organization_id: str, department_ids: list[str]) -> qm.Filter
             ),
             qm.FieldCondition(key=IS_DELETED, match=qm.MatchValue(value=False)),
             qm.Filter(should=visibility),
-        ]
+        ],
+        # `must_not`, not `must == False`: a point written before the field
+        # existed has none, and is live.
+        must_not=[
+            qm.FieldCondition(key=IS_STAGED, match=qm.MatchValue(value=True)),
+        ],
     )
 
 
@@ -153,5 +163,6 @@ def _sql_where() -> str:
     return (
         "organization_id = $1 "
         "AND is_deleted = FALSE "
+        "AND is_staged = FALSE "
         "AND (is_organization_wide = TRUE OR department_ids && $2::uuid[])"
     )

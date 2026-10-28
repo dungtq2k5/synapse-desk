@@ -43,6 +43,11 @@ export const QDRANT_PAYLOAD_FIELDS = {
   documentId: 'document_id',
   /** The bridge back to `document_chunks.id`, for citation text. */
   chunkId: 'chunk_id',
+  /**
+   * A version being built beside the live one, invisible to retrieval until
+   * the swap. Absent on points written before it existed, which read as live.
+   */
+  isStaged: 'is_staged',
 } as const;
 
 /**
@@ -66,6 +71,7 @@ export type QdrantChunkPayload = {
   [QDRANT_PAYLOAD_FIELDS.departmentIds]: string[];
   [QDRANT_PAYLOAD_FIELDS.isOrganizationWide]: boolean;
   [QDRANT_PAYLOAD_FIELDS.isDeleted]: boolean;
+  [QDRANT_PAYLOAD_FIELDS.isStaged]: boolean;
 };
 
 /**

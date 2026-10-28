@@ -190,6 +190,21 @@ export interface DocumentResponse {
    * `optional` — proto3 repeated fields are already absent-by-default.
    */
   ocrLanguages: string[];
+  /**
+   * The newest ingestion job, absent when there is none. A document with a
+   * live version stays INDEXED while an update runs and after one fails, so
+   * this is what says the update is running or failed.
+   */
+  latestJob: LatestIngestionJob | undefined;
+}
+
+/** The part of a document's newest `IngestionJobResponse` a list row needs. */
+export interface LatestIngestionJob {
+  status: IngestionJobStatus;
+  /** UNSPECIFIED unless the job is QUEUED for a reason. */
+  waitingReason: IngestionWaitingReason;
+  /** UNSPECIFIED unless the job FAILED. */
+  errorCode: IngestionErrorCode;
 }
 
 export interface PresignDocumentRequest {

@@ -133,7 +133,7 @@ DOCUMENT_FLAG_SEVERITY_WARNING: DocumentFlagSeverity
 DOCUMENT_FLAG_SEVERITY_CRITICAL: DocumentFlagSeverity
 
 class DocumentResponse(_message.Message):
-    __slots__ = ("id", "organization_id", "created_by_id", "title", "file_url", "file_type", "file_size_bytes", "is_organization_wide", "status", "department_ids", "chunk_count", "created_at", "updated_at", "deleted_at", "deleted_by_id", "ocr_languages")
+    __slots__ = ("id", "organization_id", "created_by_id", "title", "file_url", "file_type", "file_size_bytes", "is_organization_wide", "status", "department_ids", "chunk_count", "created_at", "updated_at", "deleted_at", "deleted_by_id", "ocr_languages", "latest_job")
     ID_FIELD_NUMBER: _ClassVar[int]
     ORGANIZATION_ID_FIELD_NUMBER: _ClassVar[int]
     CREATED_BY_ID_FIELD_NUMBER: _ClassVar[int]
@@ -150,6 +150,7 @@ class DocumentResponse(_message.Message):
     DELETED_AT_FIELD_NUMBER: _ClassVar[int]
     DELETED_BY_ID_FIELD_NUMBER: _ClassVar[int]
     OCR_LANGUAGES_FIELD_NUMBER: _ClassVar[int]
+    LATEST_JOB_FIELD_NUMBER: _ClassVar[int]
     id: str
     organization_id: str
     created_by_id: str
@@ -166,7 +167,18 @@ class DocumentResponse(_message.Message):
     deleted_at: _timestamp_pb2.Timestamp
     deleted_by_id: str
     ocr_languages: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, id: _Optional[str] = ..., organization_id: _Optional[str] = ..., created_by_id: _Optional[str] = ..., title: _Optional[str] = ..., file_url: _Optional[str] = ..., file_type: _Optional[_Union[DocumentFileType, str]] = ..., file_size_bytes: _Optional[int] = ..., is_organization_wide: _Optional[bool] = ..., status: _Optional[_Union[DocumentStatus, str]] = ..., department_ids: _Optional[_Iterable[str]] = ..., chunk_count: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deleted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deleted_by_id: _Optional[str] = ..., ocr_languages: _Optional[_Iterable[str]] = ...) -> None: ...
+    latest_job: LatestIngestionJob
+    def __init__(self, id: _Optional[str] = ..., organization_id: _Optional[str] = ..., created_by_id: _Optional[str] = ..., title: _Optional[str] = ..., file_url: _Optional[str] = ..., file_type: _Optional[_Union[DocumentFileType, str]] = ..., file_size_bytes: _Optional[int] = ..., is_organization_wide: _Optional[bool] = ..., status: _Optional[_Union[DocumentStatus, str]] = ..., department_ids: _Optional[_Iterable[str]] = ..., chunk_count: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deleted_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., deleted_by_id: _Optional[str] = ..., ocr_languages: _Optional[_Iterable[str]] = ..., latest_job: _Optional[_Union[LatestIngestionJob, _Mapping]] = ...) -> None: ...
+
+class LatestIngestionJob(_message.Message):
+    __slots__ = ("status", "waiting_reason", "error_code")
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    WAITING_REASON_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    status: IngestionJobStatus
+    waiting_reason: IngestionWaitingReason
+    error_code: IngestionErrorCode
+    def __init__(self, status: _Optional[_Union[IngestionJobStatus, str]] = ..., waiting_reason: _Optional[_Union[IngestionWaitingReason, str]] = ..., error_code: _Optional[_Union[IngestionErrorCode, str]] = ...) -> None: ...
 
 class PresignDocumentRequest(_message.Message):
     __slots__ = ("content_type", "size_bytes", "file_name")

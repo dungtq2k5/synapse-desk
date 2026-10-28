@@ -55,7 +55,7 @@ async def test_creates_a_missing_collection_and_its_indexes():
     await ensure_collection(client)  # type: ignore[arg-type]
 
     assert not client.read_back
-    assert len(client.indexed) == 5
+    assert len(client.indexed) == 6
 
 
 async def test_a_create_that_loses_the_race_goes_on_as_if_it_found_the_collection():
@@ -64,7 +64,7 @@ async def test_a_create_that_loses_the_race_goes_on_as_if_it_found_the_collectio
     await ensure_collection(client)  # type: ignore[arg-type]
 
     assert client.read_back
-    assert len(client.indexed) == 5
+    assert len(client.indexed) == 6
 
 
 async def test_the_other_services_collection_still_has_its_dimension_checked():
@@ -108,7 +108,7 @@ async def test_a_collection_still_loading_is_waited_for(monkeypatch):
     await ensure_collection(client)  # type: ignore[arg-type]
 
     assert client.read_back
-    assert len(client.indexed) == 5
+    assert len(client.indexed) == 6
 
 
 async def test_a_collection_that_never_loads_still_fails_the_boot(monkeypatch):

@@ -1511,7 +1511,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
     it('7. never touches a job that is mid-flight', async () => {
       // PARSING/CHUNKING/EMBEDDING is a worker already writing chunks for that
-      // document. A second worker on it is what `writeChunkRows` cannot survive.
+      // document. A second worker on it is what `stageChunks` cannot survive.
       await stuck({ status: IngestionJobStatus.PARSING });
       await stuck({ status: IngestionJobStatus.EMBEDDING });
 
@@ -1630,7 +1630,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       // `deleteDocument` soft-deletes the document and never touches
       // `ingestion_jobs`, so a document deleted while its job was stranded
       // still has a QUEUED row. Re-queueing it parses, chunks and EMBEDS it —
-      // metered against the tenant — before `writeChunkRows` marks the chunks
+      // metered against the tenant — before `stageChunks` marks the chunks
       // deleted. No disclosure, and a full ingestion nobody asked for.
       const job = await stuck();
       await fx.prisma.document.update({
