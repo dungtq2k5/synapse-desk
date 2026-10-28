@@ -34,9 +34,11 @@ sequenceDiagram
   IN->>FB: download the object
   IN->>IN: PARSING · per type, per page
   IN->>IN: CHUNKING
-  IN->>PG: write chunk rows
+  IN->>PG: write chunk rows, staged
   IN->>IN: EMBEDDING
-  IN->>QD: upsert vectors + scope payload
+  IN->>QD: upsert vectors + scope payload, staged
+  IN->>QD: swap: delete live points, publish new ones
+  IN->>PG: swap: delete live rows, publish new ones
   IN->>PG: COMPLETED, flags if pages were lost
 ```
 
@@ -71,7 +73,9 @@ QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED
                                         ↘ CANCELLED
 ```
 
-`CANCELLED` is a **job** status only. A cancelled job's *document* is `DocumentStatus.FAILED` — the two enums are not parallel and reading one for the other is a common mistake. It means stopped on request, or superseded by a retry.
+`CANCELLED` is a **job** status only. A cancelled job's *document* is `DocumentStatus.FAILED` when it has no live version, and stays `INDEXED` when it has one — the two enums are not parallel and reading one for the other is a common mistake. It means stopped on request, or superseded by a retry.
+
+**A document with a live version stays `INDEXED`** through a reindex, a replace or a retry, and after one fails or is cancelled: it is still answering from that version. Only a document that has never completed moves through `PENDING`, `PROCESSING` and `FAILED`. The **job** carries the run's state, and every document response carries its newest job as `latestJob` (`status`, `waitingReason`, `errorCode`), which is what a client reads to show a document updating or an update failed.
 
 The status is written at each stage boundary, so a stuck job says where it stuck. A job sitting in `PARSING` for minutes is almost always OCR (§4).
 
@@ -108,7 +112,7 @@ flowchart TD
 
 **Language codes are narrowed once, by parsing rather than casting.** An unrecognized code throws, producing a `FAILED` job that carries the bad code — the alternative is the code dropping out of `-l` and the document being OCR'd in English with nothing reporting it.
 
-**The flag is raised after chunking, not during parsing — and that is where the second drop is caught.** A page that OCR'd to eight tokens clears the parser's bar (`MIN_PAGE_CHARACTERS` is 32 *characters*) and is then discarded by the chunker (`MIN_CHUNK_TOKENS` is 16 *tokens*), so it *"survived the parser, counted as a success, and vanished anyway."* Raising the flag at the parse step would miss every page lost that way.
+**The flag is computed after chunking, not during parsing — and that is where the second drop is caught.** It is raised or resolved at the swap (§5), so it always describes the live version. A page that OCR'd to eight tokens clears the parser's bar (`MIN_PAGE_CHARACTERS` is 32 *characters*) and is then discarded by the chunker (`MIN_CHUNK_TOKENS` is 16 *tokens*), so it *"survived the parser, counted as a success, and vanished anyway."* Raising the flag at the parse step would miss every page lost that way.
 
 **A partly-lost document does not fail; a totally-lost one does.** Losing *some* pages raises `PAGES_NOT_INDEXED` at `WARNING` (not the `INFO` default) carrying page numbers and counts — never document text — and the rest is indexed and searchable.
 
@@ -122,7 +126,9 @@ Losing *all* of them is `NoExtractableText`, which is an error: the job is `FAIL
 
 `MAX_CHUNKS_PER_DOCUMENT` is checked **after chunking and before any embedding call**. The ceiling exists to stop the spend, so checking it after paying would be checking nothing.
 
-Chunk rows are written to Postgres before embedding, which is what makes the lexical arm of retrieval work even if the vector upsert later fails: the text is searchable, the vectors are not, and the document is not silently absent from both.
+**A new version is built beside the live one and swapped in at the end** ([ADR 0051](../../decisions/0051-a-documents-new-version-is-staged-then-swapped.md)). The chunk rows and their points are written **staged** (`document_chunks.is_staged`, and the same field on each point); both retrieval arms skip staged chunks, so until the swap every reader sees exactly the live version. The swap is two steps, each by filter on the document, so a crash between them converges on the re-run: **Qdrant first** (delete the live points, clear `is_staged` on the new ones), **then Postgres** in one transaction (delete the live rows, clear `is_staged` on the new ones). Qdrant goes first because its window is mixed rather than empty: hydration reads rows by id, staged or not, so a new point returns the new text while the lexical arm still returns the old.
+
+**A run that stops before the swap leaves the live version answering in full**: refused, deferred at the AI cap, failed on its last attempt, or cancelled. A refusal, a cancellation and the last attempt purge the staged data; an earlier failed attempt and a deferral keep it, and the next run **reuses each staged chunk whose text is unchanged and already embedded**, paying only for the rest. A reindex re-embeds every chunk: the live version is never reused.
 
 ---
 
@@ -146,7 +152,9 @@ Each chunk is embedded and upserted to Qdrant with a payload carrying the four f
 | **Unrecognized OCR language** | `FAILED`, carrying the code | Better than OCR'ing in the wrong language and reporting success |
 | **Object missing from storage** | `FAILED` at download | Nothing to parse; the `PendingUpload` record is how this is diagnosed |
 | **`.doc` uploaded** | not parsed | A real `.doc` is an OLE compound file, not a zip; the parser fails with a bare error that costs three retries |
-| **Job retried** | previous job → `CANCELLED`, document → `FAILED` until the new one completes | A retry supersedes; two live jobs on one document is the state to avoid |
+| **Job retried** | previous job → `CANCELLED`; a document with no live version → `FAILED` until the new one completes, one with a live version stays `INDEXED` | A retry supersedes; two live jobs on one document is the state to avoid |
+| **A replace or reindex fails** | the document stays `INDEXED` and answers from its live version; `latestJob` is `FAILED` with its code | The update failed, not the document |
+| **A crash between the swap's two halves** | the retry reuses the staged rows, re-stages the points it keeps, and swaps again | Both halves are idempotent by filter, so any interrupted state converges |
 | **Worker killed mid-job** | BullMQ redelivers; `INGESTION_RECONCILE` catches orphans | Redelivery is the queue's job; the sweep is for what the queue lost |
 
 ---

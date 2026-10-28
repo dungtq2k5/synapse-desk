@@ -874,7 +874,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes, capped at `MAX_DOCUMENT_BYTES` = **100 MB** (raised from 25 MB). Checked at presign, before signing, against the tenant's remaining storage quota. |
 | **ocr_languages** | VarChar[] | NOT NULL, **no column default** | ISO 639-1 codes the uploader declared for OCR. **`[]` means "not specified", not NULL** — Prisma scalar lists cannot be null, so absent and empty are one value and the parser falls back to `eng`. ISO 639-1 (`vi`, `ja`) rather than tesseract's codes (`vie`, `jpn`); capped at four, ordered (ADR 0035). |
 | **is_organization_wide** | BOOLEAN | NOT NULL, Default: true | If true, document is accessible across all departments in the org. |
-| **status** | ENUM | NOT NULL, Default: 'PENDING' | Pipeline status: PENDING, PROCESSING, INDEXED, FAILED. |
+| **status** | ENUM | NOT NULL, Default: 'PENDING' | Pipeline status: PENDING, PROCESSING, INDEXED, FAILED. **A document with a live version stays `INDEXED`** through a reindex, replace or retry and after one fails; its newest `ingestion_jobs` row carries that run's state. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Upload timestamp. |
 | **updated_at** | TIMESTAMPTZ | NOT NULL, NOW() | Metadata update timestamp. |
 | **deleted_at** | TIMESTAMPTZ | Nullable | Soft-delete timestamp (removes doc from active RAG context). |
@@ -901,7 +901,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 | :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Internal database primary key. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id | Parent document reference. |
-| **chunk_index** | INT | NOT NULL | Sequential chunk order in original file (0, 1, 2, 3...). |
+| **chunk_index** | INT | NOT NULL, UNIQUE with `document_id` and `is_staged` | Sequential chunk order in original file (0, 1, 2, 3...). Unique per version, so a staged chunk sits beside its live one. |
 | **content_text** | TEXT | NOT NULL | Full raw text extracted for this chunk. |
 | **page_number** | INT | Nullable | Source page number (for PDF citation highlighting). |
 | **token_count** | INT | NOT NULL | Total tokens in chunk (used for prompt budget calculation). |
@@ -910,6 +910,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 | **is_organization_wide** | BOOLEAN | NOT NULL, Default: true | **Denormalized from `documents`.** Department-scoping clause 1. |
 | **department_ids** | UUID[] | NOT NULL, Default: '{}' | **Denormalized from `department_documents`.** Department-scoping clause 2. GIN-indexed for `&&` (array overlap). |
 | **is_deleted** | BOOLEAN | NOT NULL, Default: false | **Denormalized from `documents.deleted_at IS NOT NULL`.** Soft-deleted documents leave retrieval immediately without a join. |
+| **is_staged** | BOOLEAN | NOT NULL, Default: false | A chunk of a version still being built: invisible to both retrieval arms and to every list and count, until the swap deletes the live rows and clears `is_staged` on these ([ADR 0051](./decisions/0051-a-documents-new-version-is-staged-then-swapped.md)). The same field rides each Qdrant point; a point without it is live. |
 | **retrieval_count** | INT | NOT NULL, Default 0 | Times this chunk has been retrieved into a generation's context. Maintained by the daily projection job, **not** written on the hot path. |
 | **last_retrieved_at** | TIMESTAMPTZ | Nullable | — |
 | **citation_count** | INT | NOT NULL, Default 0 | Times this chunk was actually *cited* in an answer, which is a strictly smaller number than `retrieval_count`. The gap between the two is the interesting signal — see Table 27. |
