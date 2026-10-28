@@ -772,8 +772,8 @@ function Processing({
           <AlertDescription>
             {failedUpdate && (
               <p>
-                Answers still use the previous version. Retry to process the new
-                file again.
+                Answers still use the previous version.
+                {failed.retry && ' Retry to process the new file again.'}
               </p>
             )}
             <p>{failed.sentence}</p>

@@ -378,6 +378,40 @@ describe('one document', () => {
     ).toBeInTheDocument();
   });
 
+  for (const code of [
+    'TOO_LONG',
+    'NO_READABLE_TEXT',
+    'OCR_UNAVAILABLE',
+  ] as const) {
+    it(`a failed update that retrying can't fix (${code}) doesn't say to retry`, async () => {
+      show(<DocumentView documentId="d1" />, MANAGER, {
+        'GET /api/v1/documents/d1': ok(
+          doc({ latestJob: latest({ status: 'FAILED', errorCode: code }) }),
+        ),
+        'GET /api/v1/documents/d1/ingestion-jobs': page([
+          job({ id: 'a' }),
+          job({
+            id: 'b',
+            status: 'FAILED',
+            errorCode: code,
+            failedStage: 'PARSING',
+            processedAt: null,
+          }),
+        ]),
+      });
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('The update failed');
+      expect(
+        within(alert).getByText('Answers still use the previous version.'),
+      ).toBeInTheDocument();
+      expect(alert).not.toHaveTextContent(
+        'Retry to process the new file again.',
+      );
+      expect(alert).toHaveTextContent(failure(code, 'pdf').sentence);
+    });
+  }
+
   it('a failed update says answers still use the previous version, with the reason and Retry', async () => {
     show(<DocumentView documentId="d1" />, MANAGER, {
       'GET /api/v1/documents/d1': ok(
