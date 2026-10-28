@@ -138,7 +138,7 @@ test('**an end user asks with a screenshot**: the answer comes, and the file is 
   ).toBeVisible({ timeout: 30_000 });
 });
 
-test('**a member opens a ticket with a file**, and it is under the description', async ({
+test('**a member opens a ticket with a file**, it is under the description, and they delete it inside the window', async ({
   page,
 }) => {
   const { priya } = await tenant('j-open-file');
@@ -157,11 +157,24 @@ test('**a member opens a ticket with a file**, and it is under the description',
   await page.getByRole('button', { name: 'Create ticket' }).click();
   await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
 
+  const description = opening(page, 'See the photo of the dock.');
   await expect(
-    opening(page, 'See the photo of the dock.').getByRole('button', {
-      name: /^avatar\.png/,
-    }),
+    description.getByRole('button', { name: /^avatar\.png/ }),
   ).toBeVisible();
+
+  // Their own file, inside the window: they may remove it, and the server
+  // agrees (it answered 403 to this click before).
+  await description.getByRole('button', { name: 'Delete avatar.png' }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(
+    dialog.getByText(
+      'It’s removed from this ticket for everyone. This can’t be undone.',
+    ),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Delete file' }).click();
+  await expect(
+    description.getByRole('button', { name: /^avatar\.png/ }),
+  ).toHaveCount(0);
 });
 
 test('**an upload made for something else can’t be bound to a ticket**: its name comes back skipped', async () => {

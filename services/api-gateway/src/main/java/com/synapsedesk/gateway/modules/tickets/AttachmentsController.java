@@ -3,10 +3,8 @@ package com.synapsedesk.gateway.modules.tickets;
 import com.synapsedesk.gateway.common.auth.CurrentRequest;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
-import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
-import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.modules.documents.dto.rest.DownloadDocumentResponseDto;
@@ -95,10 +93,14 @@ public class AttachmentsController {
     );
   }
 
+  /**
+   * No permission here: ticket-service decides who. A moderator always; a
+   * message's sender while they may still edit it; the ticket's author for
+   * the opening's files, inside the same window. Anyone else gets its 403.
+   */
   @DeleteMapping(value = "/attachments/{id}", produces = { "application/json" })
   @ApiErrors({ "400", "401", "403", "404" })
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @RequirePermission(PermissionCodesEnum.TICKET_MESSAGE_MODERATE)
   public ResponseEntity<ApiResponse<Void>> attachmentsControllerRemoveV1(
     @PathVariable("id") String id
   ) {

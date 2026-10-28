@@ -97,6 +97,9 @@ export function ThreadOpening({
   const moderator = can('ticket.message.moderate');
   const [deleting, setDeleting] = useState<AttachmentResponseDto | null>(null);
   const skipped = useOpeningSkipped(ticket.id);
+  // The server's own answer for this caller: the author who raised it, while
+  // the window is open.
+  const deletable = useBefore(ticket.openingFilesDeletableUntil);
 
   return (
     <>
@@ -109,7 +112,9 @@ export function ThreadOpening({
         attachments={ticket.attachments}
         skipped={{ by: 'send', names: skipped }}
         onDeleteAttachment={
-          moderator ? (attachment) => setDeleting(attachment) : undefined
+          moderator || deletable
+            ? (attachment) => setDeleting(attachment)
+            : undefined
         }
       >
         {ticket.description}
@@ -132,7 +137,8 @@ export function ThreadOpening({
 /**
  * A person's stored message, with what the viewer may do to it: Edit while
  * the server's `editableUntil` is ahead; for a moderator, a menu with Edit
- * note and Redact message; Delete on a file for its uploader or a moderator.
+ * note and Redact message; Delete on a file for its sender while they may
+ * still edit, or a moderator.
  */
 export function ThreadMessage({
   ticket,
@@ -219,7 +225,8 @@ export function ThreadMessage({
           )
         }
         onDeleteAttachment={
-          mine || moderator
+          // Its sender while they may still edit it, as the server allows.
+          editable || moderator
             ? (attachment) => setDeleting(attachment)
             : undefined
         }
@@ -497,8 +504,9 @@ function DeleteFileDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>{`Delete ${attachment.fileName}?`}</AlertDialogTitle>
               <AlertDialogDescription>
-                It’s removed from this message for everyone. This can’t be
-                undone.
+                {attachment.messageId
+                  ? 'It’s removed from this message for everyone. This can’t be undone.'
+                  : 'It’s removed from this ticket for everyone. This can’t be undone.'}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

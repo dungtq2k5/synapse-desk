@@ -185,6 +185,9 @@ public class TicketResponseDto {
 
   private List<@Valid AttachmentResponseDto> attachments = new ArrayList<>();
 
+  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+  private OffsetDateTime openingFilesDeletableUntil = null;
+
   private UserReferenceResponseDto author = null;
 
   private UserReferenceResponseDto assignee = null;
@@ -626,6 +629,32 @@ public class TicketResponseDto {
     this.attachments = attachments;
   }
 
+  public TicketResponseDto openingFilesDeletableUntil(
+    OffsetDateTime openingFilesDeletableUntil
+  ) {
+    this.openingFilesDeletableUntil = openingFilesDeletableUntil;
+    return this;
+  }
+
+  /**
+   * Until when YOU may delete the opening's files: the ticket's author, when
+   * they raised it themselves, inside the edit window from its creation. Null
+   * for anyone else, a moderator included (who may always).
+   * @return openingFilesDeletableUntil
+   */
+  @Valid
+  @JsonProperty("openingFilesDeletableUntil")
+  public OffsetDateTime getOpeningFilesDeletableUntil() {
+    return openingFilesDeletableUntil;
+  }
+
+  @JsonProperty("openingFilesDeletableUntil")
+  public void setOpeningFilesDeletableUntil(
+    OffsetDateTime openingFilesDeletableUntil
+  ) {
+    this.openingFilesDeletableUntil = openingFilesDeletableUntil;
+  }
+
   public TicketResponseDto author(UserReferenceResponseDto author) {
     this.author = author;
     return this;
@@ -707,7 +736,11 @@ public class TicketResponseDto {
       Objects.equals(this.updatedAt, ticketResponseDto.updatedAt) &&
       Objects.equals(this.deletedAt, ticketResponseDto.deletedAt) &&
       Objects.equals(this.deletedById, ticketResponseDto.deletedById) &&
-      Objects.equals(this.attachments, ticketResponseDto.attachments)
+      Objects.equals(this.attachments, ticketResponseDto.attachments) &&
+      Objects.equals(
+        this.openingFilesDeletableUntil,
+        ticketResponseDto.openingFilesDeletableUntil
+      )
     );
   }
 
@@ -732,7 +765,8 @@ public class TicketResponseDto {
       updatedAt,
       deletedAt,
       deletedById,
-      attachments
+      attachments,
+      openingFilesDeletableUntil
     );
   }
 

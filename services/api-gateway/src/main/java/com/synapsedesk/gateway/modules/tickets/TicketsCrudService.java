@@ -13,13 +13,13 @@ import com.synapsedesk.gateway.modules.tickets.dto.rest.NewAttachmentDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.TicketResponseDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.UpdateTicketDto;
 import io.grpc.stub.MetadataUtils;
-import org.springframework.beans.BeanUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -454,6 +454,11 @@ public class TicketsCrudService {
           .stream()
           .map(TicketsCrudService::toAttachmentResponseDto)
           .toList()
+      )
+      .openingFilesDeletableUntil(
+        ticket.hasOpeningFilesDeletableUntil()
+          ? toOffsetDateTime(ticket.getOpeningFilesDeletableUntil())
+          : null
       );
   }
 

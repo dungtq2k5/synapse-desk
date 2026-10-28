@@ -55,6 +55,7 @@ const ticketOf = (
   deletedAt: null,
   deletedById: null,
   attachments: [],
+  openingFilesDeletableUntil: null,
   ...over,
 });
 
@@ -438,6 +439,89 @@ describe('the ticket page', () => {
       expect(
         within(log).queryByRole('button', { name: 'Delete screen.png' }),
       ).not.toBeInTheDocument();
+    });
+
+    describe('Delete on a file follows the server’s window', () => {
+      const SOON = new Date(Date.now() + 10 * 60_000).toISOString();
+      const FILE = {
+        id: 'f1',
+        fileName: 'receipt.pdf',
+        fileUrl: 'organizations/o/tickets/t1/attachments/a.pdf',
+        fileSizeBytes: 2048,
+        mimeType: 'application/pdf',
+        createdAt: AT,
+      };
+      const opening = {
+        ...FILE,
+        id: 'o1',
+        fileName: 'screen.png',
+        messageId: null,
+        ticketId: 't1',
+      };
+      const sent = (editableUntil: string | null) =>
+        messageOf({
+          senderId: PRIYA.id,
+          sender: PRIYA,
+          content: 'Here it is.',
+          editableUntil,
+          attachments: [{ ...FILE, messageId: 'mx', ticketId: 't1' }],
+        });
+
+      it('**its sender, while they may still edit**: shown; after: hidden', async () => {
+        setup({ messages: [sent(SOON)] });
+        await loaded();
+        const log = await screen.findByRole('log', { name: 'Conversation' });
+        expect(
+          within(log).getByRole('button', { name: 'Delete receipt.pdf' }),
+        ).toBeInTheDocument();
+      });
+
+      it('its sender once the window has closed: hidden', async () => {
+        setup({ messages: [sent(null)] });
+        await loaded();
+        const log = await screen.findByRole('log', { name: 'Conversation' });
+        expect(within(log).getByText('Here it is.')).toBeInTheDocument();
+        expect(
+          within(log).queryByRole('button', { name: 'Delete receipt.pdf' }),
+        ).not.toBeInTheDocument();
+      });
+
+      it('**the opening’s author inside the window**: shown, and the dialog says “this ticket”', async () => {
+        setup({
+          ticket: ticketOf({
+            attachments: [opening],
+            openingFilesDeletableUntil: SOON,
+          }),
+        });
+        await loaded();
+        const log = await screen.findByRole('log', { name: 'Conversation' });
+
+        await userEvent.click(
+          within(log).getByRole('button', { name: 'Delete screen.png' }),
+        );
+
+        expect(
+          await screen.findByText(
+            'It’s removed from this ticket for everyone. This can’t be undone.',
+          ),
+        ).toBeInTheDocument();
+      });
+
+      it('a message’s file: the dialog says “this message”', async () => {
+        setup({ messages: [sent(SOON)] });
+        await loaded();
+        const log = await screen.findByRole('log', { name: 'Conversation' });
+
+        await userEvent.click(
+          within(log).getByRole('button', { name: 'Delete receipt.pdf' }),
+        );
+
+        expect(
+          await screen.findByText(
+            'It’s removed from this message for everyone. This can’t be undone.',
+          ),
+        ).toBeInTheDocument();
+      });
     });
 
     it('a moderator may delete a file on the opening', async () => {

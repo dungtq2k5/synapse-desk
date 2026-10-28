@@ -64202,6 +64202,10 @@
               "$ref": "#/components/schemas/AttachmentResponseDto"
             }
           },
+          "openingFilesDeletableUntil": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
           "author": {
             "oneOf": [
               {
@@ -64254,6 +64258,7 @@
           "description",
           "escalatedAt",
           "id",
+          "openingFilesDeletableUntil",
           "organizationId",
           "priority",
           "resolvedAt",
@@ -65045,6 +65050,11 @@
               "$ref": "#/components/schemas/AttachmentResponseDto"
             }
           },
+          "openingFilesDeletableUntil": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Until when YOU may delete the opening's files: the ticket's author, when\nthey raised it themselves, inside the edit window from its creation. Null\nfor anyone else, a moderator included (who may always)."
+          },
           "author": {
             "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id names nobody (a deleted user or department). A client shows \"Unknown\" for it.",
             "oneOf": [
@@ -65093,6 +65103,7 @@
           "description",
           "escalatedAt",
           "id",
+          "openingFilesDeletableUntil",
           "organizationId",
           "priority",
           "resolvedAt",
