@@ -31,16 +31,19 @@ describe('Inbound email dedup (e2e)', () => {
     memberContext({ id: t.userId, organizationId: t.organizationId });
 
   const fromEmail = (inboundMessageId: string, title = 'From email') =>
-    tickets.createTicket(
-      {
-        title,
-        description: 'The printer is on fire',
-        source: TicketSource.TICKET_SOURCE_EMAIL,
-        priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
-        inboundMessageId,
-      },
-      caller(),
-    );
+    tickets
+      .createTicket(
+        {
+          attachments: [],
+          title,
+          description: 'The printer is on fire',
+          source: TicketSource.TICKET_SOURCE_EMAIL,
+          priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
+          inboundMessageId,
+        },
+        caller(),
+      )
+      .then((created) => created.ticket!);
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -60,16 +63,19 @@ describe('Inbound email dedup (e2e)', () => {
     // priority, and reading one off the subject would let the sender set it.
     // That makes THIS default the triage rule for every emailed ticket, so it
     // is asserted here rather than assumed.
-    const ticket = await tickets.createTicket(
-      {
-        title: 'From email',
-        description: 'The printer is on fire',
-        source: TicketSource.TICKET_SOURCE_EMAIL,
-        priority: TicketPriority.TICKET_PRIORITY_UNSPECIFIED,
-        inboundMessageId: '<unset-priority@mail.test>',
-      },
-      caller(),
-    );
+    const ticket = await tickets
+      .createTicket(
+        {
+          attachments: [],
+          title: 'From email',
+          description: 'The printer is on fire',
+          source: TicketSource.TICKET_SOURCE_EMAIL,
+          priority: TicketPriority.TICKET_PRIORITY_UNSPECIFIED,
+          inboundMessageId: '<unset-priority@mail.test>',
+        },
+        caller(),
+      )
+      .then((created) => created.ticket!);
 
     const row = await fx.prisma.ticket.findUnique({
       where: { id: ticket.id },
@@ -109,16 +115,19 @@ describe('Inbound email dedup (e2e)', () => {
     await fromEmail('<shared@mail.test>');
 
     const other = buildTenant();
-    await tickets.createTicket(
-      {
-        title: 'Other tenant',
-        description: 'Same message id',
-        source: TicketSource.TICKET_SOURCE_EMAIL,
-        priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
-        inboundMessageId: '<shared@mail.test>',
-      },
-      caller(other),
-    );
+    await tickets
+      .createTicket(
+        {
+          attachments: [],
+          title: 'Other tenant',
+          description: 'Same message id',
+          source: TicketSource.TICKET_SOURCE_EMAIL,
+          priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
+          inboundMessageId: '<shared@mail.test>',
+        },
+        caller(other),
+      )
+      .then((created) => created.ticket!);
 
     expect(
       await fx.prisma.inboundEmail.count({
@@ -134,16 +143,19 @@ describe('Inbound email dedup (e2e)', () => {
     const tooLong = 'x'.repeat(5000);
 
     await expect(
-      tickets.createTicket(
-        {
-          title: tooLong,
-          description: 'doomed',
-          source: TicketSource.TICKET_SOURCE_EMAIL,
-          priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
-          inboundMessageId: '<doomed@mail.test>',
-        },
-        caller(),
-      ),
+      tickets
+        .createTicket(
+          {
+            attachments: [],
+            title: tooLong,
+            description: 'doomed',
+            source: TicketSource.TICKET_SOURCE_EMAIL,
+            priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
+            inboundMessageId: '<doomed@mail.test>',
+          },
+          caller(),
+        )
+        .then((created) => created.ticket!),
     ).rejects.toBeDefined();
 
     expect(
@@ -154,15 +166,18 @@ describe('Inbound email dedup (e2e)', () => {
   });
 
   it('5. a ticket from any other transport writes no row at all', async () => {
-    await tickets.createTicket(
-      {
-        title: 'From the web',
-        description: 'No message id',
-        source: TicketSource.TICKET_SOURCE_WEB,
-        priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
-      },
-      caller(),
-    );
+    await tickets
+      .createTicket(
+        {
+          attachments: [],
+          title: 'From the web',
+          description: 'No message id',
+          source: TicketSource.TICKET_SOURCE_WEB,
+          priority: TicketPriority.TICKET_PRIORITY_MEDIUM,
+        },
+        caller(),
+      )
+      .then((created) => created.ticket!);
 
     expect(await fx.prisma.inboundEmail.count()).toBe(0);
   });

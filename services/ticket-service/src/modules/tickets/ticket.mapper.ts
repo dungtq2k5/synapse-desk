@@ -8,7 +8,22 @@ import {
   toProtoTicketStatus,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { Ticket, TicketStatusChange } from '../../generated/prisma/client';
+import {
+  MessageAttachment,
+  Ticket,
+  TicketStatusChange,
+} from '../../generated/prisma/client';
+import { toAttachmentResponse } from '../messages/message.mapper';
+
+/**
+ * A ticket with its opening's files, which every response carries.
+ *
+ * Required rather than optional, so a caller that forgot to read them fails
+ * to compile instead of answering a ticket with no files.
+ */
+export type TicketWithOpening = Ticket & {
+  openingAttachments: MessageAttachment[];
+};
 
 // The enum bridges are NOT declared here. `packages/grpc-proto` already exports one
 // per enum, built with `enumBridge`: the forward map is exhaustive over the
@@ -31,7 +46,7 @@ export {
  *   a caller looking at one ticket is reading it.
  */
 export function toTicketResponse(
-  ticket: Ticket,
+  ticket: TicketWithOpening,
   unreadCount: number = 0,
 ): TicketResponse {
   return {
@@ -56,6 +71,9 @@ export function toTicketResponse(
     updatedAt: toProtoTimestamp(ticket.updatedAt),
     deletedAt: toProtoTimestamp(ticket.deletedAt),
     deletedById: ticket.deletedById ?? undefined,
+    attachments: ticket.openingAttachments.map((attachment) =>
+      toAttachmentResponse(attachment, ticket.id),
+    ),
   };
 }
 

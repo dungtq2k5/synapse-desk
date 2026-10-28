@@ -461,9 +461,10 @@ describe('the inbound-email webhook', () => {
       peers.auth
         .on('UserService/ResolveInboundSender')
         .reply({ userId: SENDER, created: false });
-      peers.ticket
-        .on('TicketService/CreateTicket')
-        .reply({ id: TICKET, ticketNumber: 1 });
+      peers.ticket.on('TicketService/CreateTicket').reply({
+        ticket: { id: TICKET, ticketNumber: 1 },
+        skippedAttachments: [],
+      });
       programMail(mail);
     };
 
@@ -594,9 +595,10 @@ describe('the inbound-email webhook', () => {
         peers.auth
           .on('UserService/ResolveInboundSender')
           .reply({ userId: SENDER, created: false });
-        peers.ticket
-          .on('TicketService/CreateTicket')
-          .reply({ id: TICKET, ticketNumber: 1 });
+        peers.ticket.on('TicketService/CreateTicket').reply({
+          ticket: { id: TICKET, ticketNumber: 1 },
+          skippedAttachments: [],
+        });
 
         await accepted(mail, 'TICKET_CREATED');
 

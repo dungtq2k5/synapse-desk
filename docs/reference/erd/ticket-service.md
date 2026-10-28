@@ -11,6 +11,7 @@ erDiagram
     String priority 
     String title 
     String description 
+    Boolean opening_excluded_from_ai_context 
     String current_assignee_id "❓"
     String current_department_id "❓"
     DateTime escalated_at "❓"
@@ -88,7 +89,8 @@ erDiagram
 
   "message_attachments" {
     String id "🗝️"
-    String message_id 
+    String message_id "❓"
+    String ticket_id "❓"
     String fileName 
     String fileUrl 
     BigInt file_size_bytes 
@@ -212,6 +214,7 @@ erDiagram
     "ticket_read_states" }o--|| tickets : "ticket"
     "ticket_assignments" }o--|| tickets : "ticket"
     "ticket_messages" }o--|| tickets : "ticket"
-    "message_attachments" }o--|| ticket_messages : "message"
+    "message_attachments" }o--|o ticket_messages : "message"
+    "message_attachments" }o--|o tickets : "ticket"
     "ai_summaries" |o--|| tickets : "ticket"
 ```

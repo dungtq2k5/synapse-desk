@@ -8,6 +8,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { AttachmentPart, CallerContext } from '@synapsedesk/grpc-proto';
+import type { MessageAttachment } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
@@ -72,6 +73,37 @@ export class AiAttachmentService {
       orderBy: { createdAt: 'asc' },
     });
 
+    return this.toParts(rows, context);
+  }
+
+  /**
+   * The parts for the ticket's opening: the files uploaded with it, which
+   * belong to no message.
+   *
+   * The same refusal rule as a message's, through the ticket: once a prompt
+   * built from the opening is refused (`opening_excluded_from_ai_context`),
+   * its files never reach a prompt again.
+   */
+  async forOpening(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<AiAttachments> {
+    const rows = await this.prisma.messageAttachment.findMany({
+      where: { ticketId, ticket: { openingExcludedFromAiContext: false } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return this.toParts(rows, context);
+  }
+
+  /**
+   * Rows into parts, filtered then fetched: eligibility comes off the row, and
+   * only what survives it costs a download.
+   */
+  private async toParts(
+    rows: MessageAttachment[],
+    context: CallerContext,
+  ): Promise<AiAttachments> {
     if (rows.length === 0) return { parts: [], skipped: [] };
 
     const parts: AttachmentPart[] = [];
@@ -205,7 +237,11 @@ export class AiAttachmentService {
     const messageId = await this.newestUserMessageId(ticketId, {
       excludingRefused: true,
     });
-    if (!messageId) return { parts: [], skipped: [] };
+    // **No user message left: the opening's files.** That is the first
+    // answer's case (`AnswerOpening` runs before any message exists), and a
+    // thread whose every user message was refused: the description still leads
+    // the transcript, so its files describe the same exchange.
+    if (!messageId) return this.forOpening(ticketId, context);
 
     return this.forMessage(messageId, context);
   }
@@ -222,10 +258,10 @@ export class AiAttachmentService {
    * the replies nor the conversation, so a ticket whose body says "see
    * attached" routes on those two words unless the file is here.
    *
-   * **Empty is the ordinary case for an emailed ticket**, and accepted:
-   * `createTicket` writes a ticket row and no message. Classify is
-   * agent-triggered, so a message usually exists by the time anyone clicks —
-   * and re-running is one click.
+   * **The opening's files come first**: an emailed or asked ticket carries
+   * its files on the ticket itself (`createTicket` writes no message), so a
+   * ticket that opened with a screenshot is classified with it. Only a ticket
+   * that opened without files falls back to its earliest message.
    *
    * User messages only, like `forLastUserMessage`: an assistant reply carries
    * no attachments.
@@ -256,9 +292,42 @@ export class AiAttachmentService {
       select: { id: true },
     });
 
+    // **The opening's files first, when it has any**: they are what `title`
+    // and `description` were written with. A refused opening yields NOTHING
+    // (`forOpening`), not the earliest message's files, for the reason the
+    // clause above gives: a later file is not what the opening describes.
+    const openingFiles = await this.prisma.messageAttachment.count({
+      where: { ticketId },
+    });
+    if (openingFiles > 0) return this.forOpening(ticketId, context);
+
     if (!message) return { parts: [], skipped: [] };
 
     return this.forMessage(message.id, context);
+  }
+
+  /**
+   * Keeps what a refused prompt was replying to out of every later prompt:
+   * the last user message, or, with none (the first answer, or a thread with
+   * no message yet), the ticket's opening files.
+   *
+   * The opening's DESCRIPTION still leads the transcript: only its files are
+   * excluded here.
+   */
+  async markRefused(ticketId: string): Promise<void> {
+    const messageId = await this.lastUserMessageId(ticketId);
+    if (messageId) {
+      await this.prisma.ticketMessage.update({
+        where: { id: messageId },
+        data: { excludedFromAiContext: true },
+      });
+      return;
+    }
+
+    await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { openingExcludedFromAiContext: true },
+    });
   }
 
   /**

@@ -122,6 +122,40 @@ describe('e2e bootstrap (ticket-service)', () => {
     ).rejects.toThrow();
   });
 
+  it('**the one-owner CHECK refuses a file on both a message and a ticket, or on neither**', async () => {
+    const tenant = buildTenant();
+    const ticket = await fx.prisma.ticket.create({ data: buildTicket(tenant) });
+    const message = await fx.prisma.ticketMessage.create({
+      data: { ticketId: ticket.id, content: 'x' },
+    });
+    const file = {
+      fileName: 'a.png',
+      fileUrl: 'organizations/o/a.png',
+      fileSizeBytes: BigInt(1),
+      mimeType: 'image/png',
+    };
+
+    await expect(
+      fx.prisma.messageAttachment.create({
+        data: { ...file, messageId: message.id, ticketId: ticket.id },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      fx.prisma.messageAttachment.create({ data: file }),
+    ).rejects.toThrow();
+    // ...while either one alone is a file.
+    await expect(
+      fx.prisma.messageAttachment.create({
+        data: { ...file, ticketId: ticket.id },
+      }),
+    ).resolves.toBeDefined();
+    await expect(
+      fx.prisma.messageAttachment.create({
+        data: { ...file, messageId: message.id },
+      }),
+    ).resolves.toBeDefined();
+  });
+
   it('reset() empties every table', async () => {
     const tenant = buildTenant();
     const ticket = await fx.prisma.ticket.create({ data: buildTicket(tenant) });

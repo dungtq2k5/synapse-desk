@@ -168,7 +168,9 @@ describe('tickets', () => {
   rowFor('Tickets')(
     '**`create` succeeds for a caller holding `ticket.create`**',
     async () => {
-      peers.ticket.on('TicketService/CreateTicket').reply(wireTicket());
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ ticket: wireTicket(), skippedAttachments: [] });
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/tickets`,
@@ -177,6 +179,89 @@ describe('tickets', () => {
       );
 
       expect(response.status).toBe(201);
+    },
+  );
+
+  const OPENING_FILE = {
+    id: '99999999-1111-4111-8111-999999999999',
+    ticketId: TICKET,
+    fileName: 'screen.png',
+    fileUrl: 'organizations/o/ticket-openings/u/abc.png',
+    fileSizeBytes: 2048,
+    mimeType: 'image/png',
+    createdAt: { seconds: 1_756_684_800, nanos: 0 },
+  };
+
+  rowFor('Tickets')(
+    '**`create` binds the opening’s files**: the paths go to ticket-service, the skipped come back by name, and the ticket carries its files',
+    async () => {
+      peers.ticket.on('TicketService/CreateTicket').reply({
+        ticket: wireTicket({ attachments: [OPENING_FILE] }),
+        skippedAttachments: ['gone.png'],
+      });
+      const files = [
+        {
+          objectPath: 'organizations/o/ticket-openings/u/pending/abc.png',
+          fileName: 'screen.png',
+        },
+      ];
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets`,
+        {
+          title: 'A new ticket',
+          description: 'Something broke',
+          attachments: files,
+        },
+        headersWithCodes(['ticket.create']),
+      );
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        data: {
+          id: TICKET,
+          skippedAttachments: ['gone.png'],
+          attachments: [
+            {
+              id: OPENING_FILE.id,
+              ticketId: TICKET,
+              messageId: null,
+              fileName: 'screen.png',
+            },
+          ],
+        },
+      });
+      const [call] = peers.ticket.calls('TicketService/CreateTicket');
+      expect(call.request).toMatchObject({ attachments: files });
+    },
+  );
+
+  rowFor('Tickets')(
+    '**`presignOpeningAttachment` needs no permission and sends no ticket**',
+    async () => {
+      peers.ticket.on('MessageService/UploadAttachment').reply({
+        uploadUrl: 'https://storage.test/upload',
+        uploadMethod: 'PUT',
+        objectPath: 'organizations/o/ticket-openings/u/pending/abc.png',
+        expiresAt: { seconds: 1_756_685_400, nanos: 0 },
+      });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/attachments/upload-url`,
+        { fileName: 'screen.png', mimeType: 'image/png', fileSizeBytes: 1024 },
+        headersWithCodes([]),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          uploadUrl: 'https://storage.test/upload',
+          objectPath: 'organizations/o/ticket-openings/u/pending/abc.png',
+        },
+      });
+      const [call] = peers.ticket.calls('MessageService/UploadAttachment');
+      expect(call.request).not.toHaveProperty('ticketId');
+      expect(call.request).not.toHaveProperty('messageId');
     },
   );
 

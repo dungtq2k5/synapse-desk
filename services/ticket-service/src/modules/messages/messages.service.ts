@@ -12,7 +12,6 @@ import {
   CreateMessageRequest,
   CreateMessageResponse,
   ExcludeFromAiContextRequest,
-  NewAttachment,
   DeleteAttachmentRequest,
   DeleteAttachmentResponse,
   DownloadAttachmentRequest,
@@ -43,7 +42,6 @@ import {
   TICKET_PATTERNS,
   SupersededReason,
   ticketMessageGroupKey,
-  PARSE_ELIGIBLE_MIME_TYPES,
   TicketStatus,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
@@ -51,14 +49,21 @@ import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 import { isAtCap, isDraftRefusal } from '../ai-client/refusal';
-import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
+import {
+  recordInboundEmail,
+  refuseRedelivery,
+  withInboundDedup,
+} from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { assertKnownStatus } from '../../common/utils/ticket-state';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { LedgerClientService } from '../ai-client/ledger-client.service';
-import { AttachmentExtractorClient } from '../ai-client/attachment-extractor.client';
+import {
+  AttachmentBinder,
+  requireFileName,
+} from '../attachment-binder/attachment-binder';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
@@ -148,7 +153,7 @@ export class MessagesService {
     private readonly rag: RagClientService,
     private readonly aiAttachments: AiAttachmentService,
     private readonly ledger: LedgerClientService,
-    private readonly extractor: AttachmentExtractorClient,
+    private readonly binder: AttachmentBinder,
     private readonly authReference: AuthReferenceService,
     private readonly storage: StorageReferenceService,
     private readonly configService: ConfigService,
@@ -317,6 +322,14 @@ export class MessagesService {
         };
     }
 
+    // A redelivered mail is refused before its files are confirmed, so they
+    // stay under `pending/` rather than moving out to be orphaned.
+    await refuseRedelivery(
+      this.prisma,
+      ticket.organizationId,
+      request.inboundMessageId,
+    );
+
     // `min(platform, tenant)`, resolved once for this message. The constant
     // alone was the cap until a tenant could narrow it; `MAX_ATTACHMENTS_PER_MESSAGE`
     // is still the ceiling this can never exceed.
@@ -336,10 +349,8 @@ export class MessagesService {
     // network call to storage-service; holding a Prisma transaction open across
     // N of them is the shape that looks fine in a test and exhausts the
     // connection pool under load.
-    const { confirmed, skippedAttachments } = await this.confirmNewAttachments(
-      request.attachments,
-      context,
-    );
+    const { confirmed, skippedAttachments } =
+      await this.binder.confirmNewAttachments(request.attachments, context);
 
     // Outside the `try` because the `catch` below is narrow on purpose: it
     // exists to turn ONE error — the unique-constraint violation on
@@ -430,113 +441,6 @@ export class MessagesService {
     }
 
     return { message: this.respond(message, context), skippedAttachments };
-  }
-
-  /**
-   * Confirms every uploaded path, and reports the ones that did not.
-   *
-   * Sequential rather than `Promise.all`: these are writes against a peer, the
-   * count is capped at the tenant's per-message limit, and a burst of
-   * parallel confirms buys milliseconds while making the failure modes harder
-   * to reason about.
-   */
-  private async confirmNewAttachments(
-    attachments: NewAttachment[],
-    context: CallerContext,
-  ): Promise<{
-    confirmed: Prisma.MessageAttachmentCreateWithoutMessageInput[];
-    skippedAttachments: string[];
-  }> {
-    const confirmed: Prisma.MessageAttachmentCreateWithoutMessageInput[] = [];
-    const skippedAttachments: string[] = [];
-
-    for (const attachment of attachments) {
-      const fileName = this.requireFileName(attachment.fileName);
-
-      try {
-        const object = await this.storage.confirmUpload(
-          attachment.objectPath,
-          context,
-        );
-
-        confirmed.push({
-          fileName,
-          // An object PATH, never a URL — the same rule `confirmAttachment`
-          // follows, so a read resolves a fresh signed URL rather than trusting
-          // one stored months ago.
-          //
-          // **`object.objectPath`, not `attachment.objectPath`**
-          // The caller presigned into `pending/` and the object has
-          // just moved out of it; storing what the client sent would record the
-          // one path a lifecycle sweep is entitled to delete.
-          fileUrl: object.objectPath,
-          // Read back from the OBJECT, never from what the client declared.
-          // Moving the confirm did not move that: a row built from the caller's
-          // claims would record whatever they felt like claiming.
-          fileSizeBytes: BigInt(object.sizeBytes),
-          mimeType: object.contentType,
-          // **The single extraction hook, and it has to be this one.** Both
-          // attachment routes reach here — a client confirming its own upload,
-          // and `createMessage` writing a message that arrived with files
-          // already in storage. That second one is the path inbound email's
-          // attachments take: objects already in storage arrive as paths, and
-          // this is where they are confirmed.
-          //
-          // Hooking `confirmAttachment` alone would have left every emailed
-          // office attachment unextracted, permanently and silently — on the
-          // surface `injection.py` calls the highest-trust position an
-          // untrusted file reaches in this system, because nobody sending it
-          // ever authenticated.
-          //
-          // `object.contentType` for the same reason the column above uses it.
-          extractedText: await this.extractIfParseable(
-            object.objectPath,
-            object.contentType,
-            context,
-          ),
-        });
-      } catch (error) {
-        // **Named, not thrown.** An expired presign, a forged path and an
-        // already-confirmed one are indistinguishable by design, so there is no
-        // message this could produce that is both honest and useful — and the
-        // typed message must survive either way.
-        this.logger.warn(
-          `Attachment could not be confirmed: ${formatErrorMsg(error)}`,
-        );
-        skippedAttachments.push(fileName);
-      }
-    }
-
-    return { confirmed, skippedAttachments };
-  }
-
-  /**
-   * The markdown for a parse-eligible attachment, or `null` for everything else.
-   *
-   * **Three outcomes, and the column holds all three.** `null` when nothing was
-   * attempted — a `.png`, a `.doc`, a type with no parser — or when the attempt
-   * failed. `''` when a parser ran and the file genuinely had no text. Text
-   * when it worked. The feed path treats the first two identically and the
-   * DIFFERENCE is for whoever debugs it later, which is why a `String[]` would
-   * not do: Prisma scalar lists cannot be null.
-   *
-   * **Never throws**, because every caller is inside a confirm. `AttachmentExtractorClient`
-   * already swallows its own failures; the eligibility check here is what stops
-   * a `.png` costing a pointless round trip to ingestion-service.
-   *
-   * @param objectPath the CONFIRMED path, after the object left `pending/`.
-   * @param mimeType read back from the object, never client-declared.
-   */
-  private async extractIfParseable(
-    objectPath: string,
-    mimeType: string,
-    context: CallerContext,
-  ): Promise<string | null> {
-    if (!(PARSE_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mimeType)) {
-      return null;
-    }
-
-    return this.extractor.extract(objectPath, mimeType, context);
   }
 
   /**
@@ -794,14 +698,20 @@ export class MessagesService {
     request: UploadAttachmentRequest,
     context: CallerContext,
   ): Promise<PresignAttachmentResponse> {
-    // The ticket is loaded either way. It is what authorizes the write, and
-    // `loadMessage` was carrying that check as a side effect — dropping it for
-    // the message-less path would let anyone presign into any ticket's prefix.
-    const ticket = await this.tickets.load(request.ticketId, context);
-
-    const message = request.messageId
-      ? await this.loadMessage(request.ticketId, request.messageId, context)
+    // The ticket is loaded whenever there is one. It is what authorizes the
+    // write, and `loadMessage` was carrying that check as a side effect —
+    // dropping it for the message-less path would let anyone presign into any
+    // ticket's prefix. With no ticket the file is the caller's own, under their
+    // own prefix, until `CreateTicket` binds it: nothing to authorize beyond
+    // the caller and the tenant's limits below.
+    const ticket = request.ticketId
+      ? await this.tickets.load(request.ticketId, context)
       : null;
+
+    const message =
+      ticket && request.messageId
+        ? await this.loadMessage(ticket.id, request.messageId, context)
+        : null;
 
     const limits = await this.authReference.getAttachmentLimits(context);
 
@@ -832,7 +742,8 @@ export class MessagesService {
     try {
       const presigned = await this.storage.presignAttachment(
         {
-          ticketId: ticket.id,
+          // Absent before the ticket exists: the caller's own opening file.
+          ticketId: ticket?.id,
           // Absent when there is no message yet: storage-service omits the
           // segment rather than filling it with a placeholder.
           messageId: message?.id,
@@ -880,7 +791,11 @@ export class MessagesService {
     request: IngestAttachmentRequest,
     context: CallerContext,
   ): Promise<IngestAttachmentResponse> {
-    const ticket = await this.tickets.load(request.ticketId, context);
+    // No ticket for a mail that opens one: the file is the routed sender's
+    // own until `CreateTicket` binds it.
+    const ticket = request.ticketId
+      ? await this.tickets.load(request.ticketId, context)
+      : null;
     const limits = await this.authReference.getAttachmentLimits(context);
 
     if (exceedsLimit(request.fileSizeBytes, limits.maxBytes)) {
@@ -892,7 +807,7 @@ export class MessagesService {
 
     return this.storage.ingestAttachment(
       {
-        ticketId: ticket.id,
+        ticketId: ticket?.id,
         contentType: request.mimeType,
         sizeBytes: request.fileSizeBytes,
         fileName: request.fileName,
@@ -933,7 +848,7 @@ export class MessagesService {
     const attachment = await this.prisma.messageAttachment.create({
       data: {
         messageId: message.id,
-        fileName: this.requireFileName(request.fileName),
+        fileName: requireFileName(request.fileName),
         // An object PATH, never a URL. Reads resolve it to a fresh signed URL
         // per request, so revoking access takes effect on the NEXT read rather
         // than whenever a stored URL happens to expire.
@@ -947,7 +862,7 @@ export class MessagesService {
         // The same rule as the nested route, through the same helper — the
         // eligibility decision exists once, so the two paths cannot disagree
         // about which types get text.
-        extractedText: await this.extractIfParseable(
+        extractedText: await this.binder.extractIfParseable(
           confirmed.objectPath,
           confirmed.contentType,
           context,
@@ -955,7 +870,7 @@ export class MessagesService {
       },
     });
 
-    return toAttachmentResponse(attachment);
+    return toAttachmentResponse(attachment, message.ticketId);
   }
 
   async listAttachments(
@@ -973,7 +888,9 @@ export class MessagesService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return { items: items.map(toAttachmentResponse) };
+    return {
+      items: items.map((item) => toAttachmentResponse(item, message.ticketId)),
+    };
   }
 
   /**
@@ -1255,13 +1172,7 @@ export class MessagesService {
     if (!isDraftRefusal(error)) return;
 
     try {
-      const messageId = await this.aiAttachments.lastUserMessageId(ticketId);
-      if (!messageId) return;
-
-      await this.prisma.ticketMessage.update({
-        where: { id: messageId },
-        data: { excludedFromAiContext: true },
-      });
+      await this.aiAttachments.markRefused(ticketId);
     } catch (writeError) {
       this.logger.error(
         `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,
@@ -1497,6 +1408,9 @@ export class MessagesService {
   /**
    * An attachment on a ticket the caller may see, or NOT_FOUND.
    *
+   * On a message, or on the ticket's opening: the opening isn't an internal
+   * note, so only the ticket's own visibility applies to its files.
+   *
    * NOT_FOUND for both "no such attachment" and "not yours" — telling the two
    * apart turns id enumeration into a tenant-membership oracle.
    */
@@ -1510,10 +1424,12 @@ export class MessagesService {
         message: { select: { ticketId: true, isInternalNote: true } },
       },
     });
+    const ticketId = attachment?.message?.ticketId ?? attachment?.ticketId;
 
     if (
       !attachment ||
-      (attachment.message.isInternalNote && !this.canSeeInternalNotes(context))
+      !ticketId ||
+      (attachment.message?.isInternalNote && !this.canSeeInternalNotes(context))
     ) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -1522,20 +1438,8 @@ export class MessagesService {
     }
 
     // Throws NOT_FOUND if the caller may not see the ticket it hangs off.
-    await this.tickets.load(attachment.message.ticketId, context);
+    await this.tickets.load(ticketId, context);
 
     return attachment;
-  }
-
-  private requireFileName(fileName: string): string {
-    const trimmed = fileName?.trim() ?? '';
-    if (!trimmed) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: 'A file name is required',
-      });
-    }
-
-    return trimmed.slice(0, 255);
   }
 }

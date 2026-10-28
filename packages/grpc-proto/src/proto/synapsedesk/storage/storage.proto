@@ -18,6 +18,9 @@ enum StoragePurpose {
   // path, so the signed-URL discipline and the tenant prefix are reused rather
   // than reinvented.
   STORAGE_PURPOSE_EXPORT = 4;
+  // A file on a ticket's opening, uploaded before the ticket exists: owned by
+  // its uploader, bound by CreateTicket.
+  STORAGE_PURPOSE_TICKET_OPENING = 5;
 }
 
 message PresignUploadRequest {
@@ -46,7 +49,12 @@ message PresignUploadResponse {
   string upload_method = 4;
 }
 
-message ConfirmUploadRequest { string object_path = 1; }
+message ConfirmUploadRequest {
+  string object_path = 1;
+  // The purposes the caller binds this object as. Empty accepts any; a
+  // pending upload of another purpose answers NOT_FOUND, like a stranger's.
+  repeated StoragePurpose expected_purposes = 2;
+}
 
 message ConfirmUploadResponse {
   string object_path = 1;

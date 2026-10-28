@@ -11,6 +11,7 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
 import { DraftCitation } from "./ai";
+import { AttachmentResponse, NewAttachment } from "./common";
 
 /**
  * `AnswerStatus`, mirrored from `synapsedesk.rag` rather than imported — the
@@ -51,16 +52,6 @@ export enum MessageAnswerStatus {
    */
   MESSAGE_ANSWER_STATUS_REFUSED = 5,
   UNRECOGNIZED = -1,
-}
-
-export interface AttachmentResponse {
-  id: string;
-  messageId: string;
-  fileName: string;
-  fileUrl: string;
-  fileSizeBytes: number;
-  mimeType: string;
-  createdAt: Timestamp | undefined;
 }
 
 export interface MessageResponse {
@@ -174,18 +165,6 @@ export interface CreateMessageRequest {
    * created; that is the only safe outcome.
    */
   attachments: NewAttachment[];
-}
-
-/**
- * One already-uploaded object, waiting to be bound to a message.
- *
- * No size or MIME type: both are read back from the OBJECT at confirm, never
- * taken from the client — the rule `confirmAttachment` already follows, and the
- * reason a row cannot record whatever the caller felt like claiming.
- */
-export interface NewAttachment {
-  objectPath: string;
-  fileName: string;
 }
 
 /**
@@ -307,7 +286,14 @@ export interface RedactMessageResponse {
  * whether the upload may happen and records it once it has.
  */
 export interface UploadAttachmentRequest {
-  ticketId: string;
+  /**
+   * *Absent before the ticket exists**: the file is then presigned under
+   * STORAGE_PURPOSE_TICKET_OPENING, owned by the caller, for CreateTicket to
+   * bind. The tenant's limits still apply; no ticket is loaded.
+   */
+  ticketId?:
+    | string
+    | undefined;
   /**
    * *Absent when the message does not exist yet**. Optional
    * rather than removed, so the `:messageId`-nested routes keep serving
@@ -327,7 +313,14 @@ export interface UploadAttachmentRequest {
  * never a message yet on this path.
  */
 export interface IngestAttachmentRequest {
-  ticketId: string;
+  /**
+   * Absent for a mail that opens a ticket: the file is ingested under
+   * STORAGE_PURPOSE_TICKET_OPENING, owned by the routed sender, for
+   * CreateTicket to bind.
+   */
+  ticketId?:
+    | string
+    | undefined;
   /**
    * 2 is left unused so the numbering mirrors UploadAttachmentRequest
    * (message_id = 2 there); this path never has a message.

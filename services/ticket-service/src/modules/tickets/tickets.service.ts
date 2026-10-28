@@ -12,6 +12,7 @@ import {
   CallerContext,
   ChangeTicketStatusRequest,
   CreateTicketRequest,
+  CreateTicketResponse,
   DeleteTicketResponse,
   emptyPage,
   GetTicketByNumberRequest,
@@ -52,11 +53,16 @@ import {
   tenantScope,
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
-import { recordInboundEmail, withInboundDedup } from './inbound-dedup';
+import {
+  recordInboundEmail,
+  refuseRedelivery,
+  withInboundDedup,
+} from './inbound-dedup';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { AiService } from '../ai/ai.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
+import { exceedsLimit } from '@synapsedesk/core';
 import { Prisma, Ticket } from '../../generated/prisma/client';
 import {
   assertKnownStatus,
@@ -70,6 +76,10 @@ import {
   toTicketResponse,
   toTicketStatusChangeResponse,
 } from './ticket.mapper';
+import {
+  AttachmentBinder,
+  type ConfirmedAttachment,
+} from '../attachment-binder/attachment-binder';
 
 @Injectable()
 export class TicketsService {
@@ -81,19 +91,16 @@ export class TicketsService {
     private readonly events: TicketEventPublisher,
     private readonly access: TicketAccessService,
     private readonly ai: AiService,
+    private readonly binder: AttachmentBinder,
   ) {}
 
-  // -------------------------------------------------------------------------
-  // Read
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- Read
 
   async getTicket(
     request: GetTicketRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return toTicketResponse(
-      await this.access.loadForReading(request.id, context),
-    );
+    return this.respond(await this.access.loadForReading(request.id, context));
   }
 
   /**
@@ -122,7 +129,7 @@ export class TicketsService {
       });
     }
 
-    return toTicketResponse(ticket);
+    return this.respond(ticket);
   }
 
   async listTickets(
@@ -166,9 +173,7 @@ export class TicketsService {
     );
 
     return {
-      items: items.map((ticket) =>
-        toTicketResponse(ticket, unread.get(ticket.id) ?? 0),
-      ),
+      items: await this.respondAll(items, unread),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -214,7 +219,7 @@ export class TicketsService {
     });
 
     // A SET, in the database's order. The caller aligns it to its keys.
-    return { items: items.map((item) => toTicketResponse(item)) };
+    return { items: await this.respondAll(items) };
   }
 
   /**
@@ -276,14 +281,12 @@ export class TicketsService {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Write
-  // -------------------------------------------------------------------------
+  //------------------------------------------------------------------------- Write
 
   async createTicket(
     request: CreateTicketRequest,
     context: CallerContext,
-  ): Promise<TicketResponse> {
+  ): Promise<CreateTicketResponse> {
     const organizationId = requireTenant(context);
     const actorId = requireActor(context);
 
@@ -304,6 +307,36 @@ export class TicketsService {
       await this.authReference.assertUserExists(authorId, context);
     }
 
+    // The opening's files. A redelivered mail is refused before any is
+    // confirmed (so they stay under `pending/`), the count is held to the
+    // per-message cap (the opening is one entry), and each path is confirmed
+    // OUTSIDE the transaction, as `CreateMessage` does: a network call per
+    // file must not hold a transaction open.
+    await refuseRedelivery(
+      this.prisma,
+      organizationId,
+      request.inboundMessageId,
+    );
+    const attachments = request.attachments ?? [];
+    let confirmed: ConfirmedAttachment[] = [];
+    let skippedAttachments: string[] = [];
+    if (attachments.length > 0) {
+      const limits = await this.authReference.getAttachmentLimits(context);
+      if (exceedsLimit(attachments.length, limits.maxPerMessage)) {
+        throw new RpcException({
+          code: status.FAILED_PRECONDITION,
+          message: `A ticket can open with at most ${limits.maxPerMessage} attachments`,
+        });
+      }
+      ({ confirmed, skippedAttachments } =
+        await this.binder.confirmNewAttachments(attachments, context));
+    }
+    // Written WITH the ticket, so no instant has the ticket without its files.
+    const data = {
+      ...this.newTicketData(organizationId, authorId, request),
+      openingAttachments: { create: confirmed },
+    };
+
     // **The dedup row and the ticket share one transaction**.
     // Recorded separately, a request that inserted the row and then failed
     // would make the provider's retry a no-op, losing the mail on the one
@@ -315,9 +348,7 @@ export class TicketsService {
     const ticket = request.inboundMessageId
       ? await withInboundDedup(() =>
           this.prisma.$transaction(async (tx) => {
-            const created = await tx.ticket.create({
-              data: this.newTicketData(organizationId, authorId, request),
-            });
+            const created = await tx.ticket.create({ data });
 
             await recordInboundEmail(
               tx,
@@ -329,9 +360,7 @@ export class TicketsService {
             return created;
           }),
         )
-      : await this.prisma.ticket.create({
-          data: this.newTicketData(organizationId, authorId, request),
-        });
+      : await this.prisma.ticket.create({ data });
 
     // AFTER the commit, never inside it. An event announcing a ticket a later
     // rollback erases is an event no consumer can un-handle — the same rule
@@ -347,7 +376,7 @@ export class TicketsService {
       title: ticket.title,
     });
 
-    return toTicketResponse(ticket);
+    return { ticket: await this.respond(ticket), skippedAttachments };
   }
 
   async updateTicket(
@@ -375,12 +404,10 @@ export class TicketsService {
       data,
     });
 
-    return toTicketResponse(ticket);
+    return this.respond(ticket);
   }
 
-  // -------------------------------------------------------------------------
-  // The state machine — one validator, five entry points
-  // -------------------------------------------------------------------------
+  // ----------------------------------------------------------- The state machine — one validator, five entry points
 
   async changeTicketStatus(
     request: ChangeTicketStatusRequest,
@@ -395,7 +422,7 @@ export class TicketsService {
     }
     assertNotTerminal(to);
 
-    return toTicketResponse(
+    return this.respond(
       await this.transition(request.id, to, context, request.reason),
     );
   }
@@ -438,14 +465,14 @@ export class TicketsService {
     // failed escalation.
     void this.ai.generateSummaryOnEscalation(ticket.id, context);
 
-    return toTicketResponse(ticket);
+    return this.respond(ticket);
   }
 
   async resolveTicket(
     request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return toTicketResponse(
+    return this.respond(
       await this.transition(
         request.ticketId,
         TicketStatus.RESOLVED,
@@ -459,7 +486,7 @@ export class TicketsService {
     request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return toTicketResponse(
+    return this.respond(
       await this.transition(
         request.ticketId,
         TicketStatus.OPEN,
@@ -473,7 +500,7 @@ export class TicketsService {
     request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    return toTicketResponse(
+    return this.respond(
       await this.transition(
         request.ticketId,
         TicketStatus.CLOSED,
@@ -603,9 +630,7 @@ export class TicketsService {
     return { lastReadAt: toProtoTimestamp(stored.last_read_at) };
   }
 
-  // -------------------------------------------------------------------------
-  // Soft delete
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- Soft delete
 
   async deleteTicket(
     request: TicketIdRequest,
@@ -645,7 +670,7 @@ export class TicketsService {
     // No uniqueness to re-enter, unlike Domain A's restores: a ticket has no
     // partial unique index over a soft-deletable column, so this cannot
     // conflict with a row created while it was gone.
-    return toTicketResponse(
+    return this.respond(
       await this.prisma.ticket.update({
         where: { id: existing.id },
         data: restoreData(),
@@ -888,6 +913,43 @@ export class TicketsService {
     });
 
     return new Map(grouped.map((row) => [row.ticketId, row._count._all]));
+  }
+
+  /** One ticket on the wire, with its opening's files. */
+  private async respond(ticket: Ticket): Promise<TicketResponse> {
+    const [response] = await this.respondAll([ticket]);
+    return response;
+  }
+
+  /**
+   * Tickets on the wire, each with its opening's files: one query for the
+   * whole page. A file is signed only when it's downloaded, so a list costs
+   * nothing more.
+   *
+   * @param unread messages each caller hasn't read, for a list; 0 otherwise.
+   */
+  private async respondAll(
+    tickets: Ticket[],
+    unread?: Map<string, number>,
+  ): Promise<TicketResponse[]> {
+    const files =
+      tickets.length === 0
+        ? []
+        : await this.prisma.messageAttachment.findMany({
+            where: { ticketId: { in: tickets.map((ticket) => ticket.id) } },
+            orderBy: { createdAt: 'asc' },
+          });
+    return tickets.map((ticket) =>
+      toTicketResponse(
+        {
+          ...ticket,
+          openingAttachments: files.filter(
+            (file) => file.ticketId === ticket.id,
+          ),
+        },
+        unread?.get(ticket.id) ?? 0,
+      ),
+    );
   }
 }
 

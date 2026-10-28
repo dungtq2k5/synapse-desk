@@ -76,6 +76,12 @@ export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
     prefix: 'exports',
     allowsSecondaryOwner: false,
   },
+  [StoragePurpose.TICKET_OPENING]: {
+    mimeAllowlist: ALLOWED_ATTACHMENT_MIME_TYPES,
+    maxSizeBytes: MAX_ATTACHMENT_BYTES,
+    prefix: 'ticket-openings',
+    allowsSecondaryOwner: false,
+  },
   [StoragePurpose.DOCUMENT]: {
     mimeAllowlist: ALLOWED_DOCUMENT_MIME_TYPES,
     maxSizeBytes: MAX_DOCUMENT_BYTES,

@@ -57,6 +57,12 @@ model Ticket {
   title       String @db.VarChar(255)
   description String @db.Text
 
+  /// The opening (the description and its files) is kept OUT of AI prompts'
+  /// files. Set when a draft or the first answer is refused with no user
+  /// message to mark, so an opening file that caused the refusal is not sent
+  /// again. The description itself still leads the transcript.
+  openingExcludedFromAiContext Boolean @default(false) @map("opening_excluded_from_ai_context")
+
   /// DENORMALIZED cache of the current `ticket_assignments` row.
   ///
   /// Duplicated on purpose: the queue list filters and displays from these two
@@ -75,12 +81,14 @@ model Ticket {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  assignments    TicketAssignment[]
-  statusChanges  TicketStatusChange[]
-  readStates     TicketReadState[]
-  messages       TicketMessage[]
-  aiSummary     AiSummary?
-  inboundEmails InboundEmail[]
+  assignments        TicketAssignment[]
+  statusChanges      TicketStatusChange[]
+  readStates         TicketReadState[]
+  messages           TicketMessage[]
+  /// The opening's files: attachments bound to the ticket, not a message.
+  openingAttachments MessageAttachment[]
+  aiSummary          AiSummary?
+  inboundEmails      InboundEmail[]
 
   /// The queue view: "this tenant's tickets in status X".
   @@index([organizationId, status])
@@ -447,8 +455,13 @@ model TicketMessage {
 /// UNAVAILABLE rather than not existing, so a client can tell "not built yet"
 /// from "broken".
 model MessageAttachment {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  messageId String @map("message_id") @db.Uuid
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Set for a file on a message. Exactly one of `messageId` and `ticketId`
+  /// is set: `message_attachments_one_owner_check`, which `DatabaseSeeder`
+  /// applies because a schema file cannot say it.
+  messageId String? @map("message_id") @db.Uuid
+  /// Set for a file on the ticket's opening, which has no message.
+  ticketId  String? @map("ticket_id") @db.Uuid
 
   fileName      String @db.VarChar(255)
   fileUrl       String @db.Text
@@ -480,9 +493,12 @@ model MessageAttachment {
 
   /// Cascade: an attachment has no meaning without its message, and a redacted
   /// message keeps its row, so this only fires when a ticket is hard-deleted.
-  message TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message TicketMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Cascade, for the same reason: only a hard-deleted ticket removes it.
+  ticket  Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
+  @@index([ticketId])
   @@map("message_attachments")
 }
 
@@ -570,7 +586,7 @@ model AuditLog {
   /// Nullable for the rows written before it existed. A NULL is not deduped,
   /// which is correct: those rows predate the guarantee and inventing ids for
   /// them would claim a property they never had.
-  eventId String? @map("event_id") @unique @db.Uuid
+  eventId String? @unique @map("event_id") @db.Uuid
 
   /// NULL for a platform-level act (RDM §1.7) — the event belongs to the
   /// platform, not to the customer it touched. That is why this is nullable and

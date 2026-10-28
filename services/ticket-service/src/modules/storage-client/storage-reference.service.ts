@@ -27,7 +27,11 @@ import {
   UNKNOWN_ORIGIN,
 } from '@synapsedesk/contracts';
 import { withHttpStatus } from '@synapsedesk/core';
-import { formatErrorMsg, NATS_CLIENT } from '@synapsedesk/nest-common';
+import {
+  formatErrorMsg,
+  NATS_CLIENT,
+  requireActor,
+} from '@synapsedesk/nest-common';
 
 export type PresignedUpload = {
   uploadUrl: string;
@@ -69,12 +73,35 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
+   * Whose file this is: a ticket's, or, before the ticket exists, the
+   * caller's, for `CreateTicket` to bind to its opening.
+   */
+  private static ownerOf(
+    ticketId: string | undefined,
+    context: CallerContext,
+  ): { purpose: ProtoStoragePurpose; ownerId: string } {
+    return ticketId
+      ? {
+          purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+          ownerId: ticketId,
+        }
+      : {
+          purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING,
+          ownerId: requireActor(context),
+        };
+  }
+
+  /**
    * The ticket and the MESSAGE both go into the path, so an attachment's
    * location says which conversation turn it belongs to without a lookup.
    */
   async presignAttachment(
     input: {
-      ticketId: string;
+      /**
+       * Absent before the ticket exists: the file is presigned for the
+       * ticket's opening, owned by the caller.
+       */
+      ticketId?: string;
       /** Absent before the message exists. */
       messageId?: string;
       contentType: string;
@@ -87,8 +114,7 @@ export class StorageReferenceService implements OnModuleInit {
       this.storageService
         .presignUpload(
           {
-            purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
-            ownerId: input.ticketId,
+            ...StorageReferenceService.ownerOf(input.ticketId, context),
             // Empty, not omitted: the field is a plain `string` on the wire, so
             // an absent message and an empty one are the same bytes either way.
             // storage-service reads empty as "no segment".
@@ -128,7 +154,8 @@ export class StorageReferenceService implements OnModuleInit {
    */
   async ingestAttachment(
     input: {
-      ticketId: string;
+      /** Absent for a mail that opens a ticket: owned by the routed sender. */
+      ticketId?: string;
       contentType: string;
       sizeBytes: number;
       fileName: string;
@@ -143,8 +170,7 @@ export class StorageReferenceService implements OnModuleInit {
         this.storageService
           .ingestFromUrl(
             {
-              purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
-              ownerId: input.ticketId,
+              ...StorageReferenceService.ownerOf(input.ticketId, context),
               secondaryOwnerId: '',
               contentType: input.contentType,
               sizeBytes: input.sizeBytes,
@@ -212,7 +238,10 @@ export class StorageReferenceService implements OnModuleInit {
     await firstValueFrom(
       this.storageService
         .confirmUpload(
-          { objectPath },
+          {
+            objectPath,
+            expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT],
+          },
           packRequestContext(systemContext(organizationId)),
         )
         .pipe(timeout(GRPC_DEADLINE_MS)),
@@ -245,7 +274,18 @@ export class StorageReferenceService implements OnModuleInit {
   ): Promise<{ objectPath: string; sizeBytes: number; contentType: string }> {
     const response = await firstValueFrom(
       this.storageService
-        .confirmUpload({ objectPath }, packRequestContext(context))
+        .confirmUpload(
+          {
+            objectPath,
+            // A message's file or an opening's; never an avatar, a document
+            // or another purpose's upload handed in as an attachment.
+            expectedPurposes: [
+              ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+              ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING,
+            ],
+          },
+          packRequestContext(context),
+        )
         .pipe(timeout(GRPC_DEADLINE_MS)),
     );
 

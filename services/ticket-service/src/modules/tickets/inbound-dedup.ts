@@ -75,6 +75,34 @@ export async function recordInboundEmail(
 // from it could differ between redeliveries and open a second ticket.
 
 /**
+ * Refuses a redelivery BEFORE anything is confirmed, as `ALREADY_EXISTS`.
+ *
+ * A write that takes files confirms them outside its transaction, which
+ * moves each object out of `pending/`. Left to the insert's own dedup, a
+ * redelivered mail would move its files and then fail, leaving objects
+ * outside `pending/` that nothing references and no sweep can reach. Read
+ * first, and the redelivery's files stay under `pending/`. The insert's
+ * dedup still catches two deliveries racing past this read.
+ */
+export async function refuseRedelivery(
+  prisma: Pick<Prisma.TransactionClient, 'inboundEmail'>,
+  organizationId: string,
+  messageId: string | undefined,
+): Promise<void> {
+  if (!messageId) return;
+  const seen = await prisma.inboundEmail.findUnique({
+    where: { organizationId_messageId: { organizationId, messageId } },
+    select: { id: true },
+  });
+  if (seen) {
+    throw new RpcException({
+      code: status.ALREADY_EXISTS,
+      message: 'This inbound email has already been processed',
+    });
+  }
+}
+
+/**
  * Runs a write, turning a redelivery into `ALREADY_EXISTS`.
  *
  * **A gRPC status rather than an error, because the caller must answer 200.**

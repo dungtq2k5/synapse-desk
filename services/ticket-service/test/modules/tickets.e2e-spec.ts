@@ -62,6 +62,7 @@ describe('Tickets (e2e)', () => {
       description: 'It really is, and the alarm is going',
       priority: ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED,
       source: ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED,
+      attachments: [],
       ...overrides,
     };
   };
@@ -112,7 +113,9 @@ describe('Tickets (e2e)', () => {
 
   describe('createTicket', () => {
     it('1. creates with status NEW and source WEB, and publishes ticket.created', async () => {
-      const created = await tickets.createTicket(createRequest(), member());
+      const created = await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
 
       expect(created.status).toBe(ProtoTicketStatus.TICKET_STATUS_NEW);
       expect(created.source).toBe(ProtoTicketSource.TICKET_SOURCE_WEB);
@@ -137,22 +140,26 @@ describe('Tickets (e2e)', () => {
       // There is no status field on the create request at all — the assertion
       // is on the SHAPE, which is what makes skipping triage impossible rather
       // than merely discouraged.
-      const created = await tickets.createTicket(
-        createRequest({ status: ProtoTicketStatus.TICKET_STATUS_RESOLVED }),
-        member(),
-      );
+      const created = await tickets
+        .createTicket(
+          createRequest({ status: ProtoTicketStatus.TICKET_STATUS_RESOLVED }),
+          member(),
+        )
+        .then((created) => created.ticket!);
 
       expect(created.status).toBe(ProtoTicketStatus.TICKET_STATUS_NEW);
     });
 
     it('an explicit priority and source are honoured', async () => {
-      const created = await tickets.createTicket(
-        createRequest({
-          priority: ProtoTicketPriority.TICKET_PRIORITY_URGENT,
-          source: ProtoTicketSource.TICKET_SOURCE_CHAT,
-        }),
-        member(),
-      );
+      const created = await tickets
+        .createTicket(
+          createRequest({
+            priority: ProtoTicketPriority.TICKET_PRIORITY_URGENT,
+            source: ProtoTicketSource.TICKET_SOURCE_CHAT,
+          }),
+          member(),
+        )
+        .then((created) => created.ticket!);
 
       expect(created.priority).toBe(ProtoTicketPriority.TICKET_PRIORITY_URGENT);
       expect(created.source).toBe(ProtoTicketSource.TICKET_SOURCE_CHAT);
@@ -170,10 +177,12 @@ describe('Tickets (e2e)', () => {
       );
 
       await expectRpc(
-        tickets.createTicket(
-          createRequest({ authorId: faker.string.uuid() }),
-          agent(),
-        ),
+        tickets
+          .createTicket(
+            createRequest({ authorId: faker.string.uuid() }),
+            agent(),
+          )
+          .then((created) => created.ticket!),
         status.INVALID_ARGUMENT,
       );
 
@@ -183,17 +192,18 @@ describe('Tickets (e2e)', () => {
     it('11b. the caller authoring their OWN ticket needs no lookup', async () => {
       // The id came from a verified token. Validating it would be a gRPC round
       // trip per ticket to re-confirm something the gateway already proved.
-      await tickets.createTicket(createRequest(), member());
+      await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
 
       expect(assertUserExists).not.toHaveBeenCalled();
     });
 
     it('11c. authoring on BEHALF of someone else IS validated', async () => {
       const onBehalfOf = faker.string.uuid();
-      await tickets.createTicket(
-        createRequest({ authorId: onBehalfOf }),
-        agent(),
-      );
+      await tickets
+        .createTicket(createRequest({ authorId: onBehalfOf }), agent())
+        .then((created) => created.ticket!);
 
       expect(assertUserExists).toHaveBeenCalledWith(
         onBehalfOf,
@@ -205,10 +215,12 @@ describe('Tickets (e2e)', () => {
       // Otherwise an end user (who holds `ticket.create`) could raise a ticket
       // in a colleague's name: in the colleague's list, theirs to answer.
       await expectRpc(
-        tickets.createTicket(
-          createRequest({ authorId: faker.string.uuid() }),
-          member(),
-        ),
+        tickets
+          .createTicket(
+            createRequest({ authorId: faker.string.uuid() }),
+            member(),
+          )
+          .then((created) => created.ticket!),
         status.PERMISSION_DENIED,
       );
 
@@ -217,8 +229,12 @@ describe('Tickets (e2e)', () => {
     });
 
     it('11e. without authorId the caller is the author, agent or not', async () => {
-      const own = await tickets.createTicket(createRequest(), member());
-      const agents = await tickets.createTicket(createRequest(), agent());
+      const own = await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
+      const agents = await tickets
+        .createTicket(createRequest(), agent())
+        .then((created) => created.ticket!);
 
       expect(own.authorId).toBe(member().sub);
       expect(agents.authorId).toBe(agent().sub);
@@ -1659,14 +1675,15 @@ describe('Tickets (e2e)', () => {
    */
   describe('ListTicketsByIds — the batch contract', () => {
     it("1. **returns only the caller's tenant**", async () => {
-      const mine = await tickets.createTicket(createRequest(), member());
+      const mine = await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
       // A second tenant is just a second set of ids — this service holds no
       // organizations table, and the tenant is whatever the caller context says.
       const otherTenant = buildTenant();
-      const theirs = await tickets.createTicket(
-        createRequest(),
-        member(otherTenant),
-      );
+      const theirs = await tickets
+        .createTicket(createRequest(), member(otherTenant))
+        .then((created) => created.ticket!);
 
       const { items } = await tickets.listTicketsByIds(
         { ticketIds: [mine.id, theirs.id] },
@@ -1680,7 +1697,9 @@ describe('Tickets (e2e)', () => {
       // The one that matters most here. Without it, a caller with no
       // `ticket.read.all` could enumerate the whole queue an id at a time,
       // which is exactly the narrowing the list route exists to apply.
-      const strangers = await tickets.createTicket(createRequest(), agent());
+      const strangers = await tickets
+        .createTicket(createRequest(), agent())
+        .then((created) => created.ticket!);
 
       const { items } = await tickets.listTicketsByIds(
         { ticketIds: [strangers.id] },
@@ -1691,7 +1710,9 @@ describe('Tickets (e2e)', () => {
     });
 
     it('3. unknown ids are omitted, not an error', async () => {
-      const mine = await tickets.createTicket(createRequest(), member());
+      const mine = await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
 
       const { items } = await tickets.listTicketsByIds(
         { ticketIds: [mine.id, randomUUID()] },
@@ -1702,7 +1723,9 @@ describe('Tickets (e2e)', () => {
     });
 
     it('4. duplicates collapse, and an empty request is empty', async () => {
-      const mine = await tickets.createTicket(createRequest(), member());
+      const mine = await tickets
+        .createTicket(createRequest(), member())
+        .then((created) => created.ticket!);
 
       const duplicated = await tickets.listTicketsByIds(
         { ticketIds: [mine.id, mine.id] },

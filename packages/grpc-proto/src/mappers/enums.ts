@@ -823,6 +823,8 @@ const storagePurpose = enumBridge<StoragePurpose, ProtoStoragePurpose>(
       ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
     [StoragePurpose.DOCUMENT]: ProtoStoragePurpose.STORAGE_PURPOSE_DOCUMENT,
     [StoragePurpose.EXPORT]: ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT,
+    [StoragePurpose.TICKET_OPENING]:
+      ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_OPENING,
   },
   ProtoStoragePurpose.STORAGE_PURPOSE_UNSPECIFIED,
 );

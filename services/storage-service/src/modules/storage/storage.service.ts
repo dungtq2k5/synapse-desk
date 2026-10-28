@@ -124,6 +124,7 @@ export class StorageService {
         committedPath,
         organizationId,
         actorId,
+        purpose,
         contentType: request.contentType,
         sizeBytes: request.sizeBytes,
         originalFileName: request.originalFileName,
@@ -229,6 +230,7 @@ export class StorageService {
         committedPath,
         organizationId,
         actorId,
+        purpose,
         contentType: request.contentType,
         sizeBytes: request.sizeBytes,
         originalFileName: request.originalFileName,
@@ -294,11 +296,21 @@ export class StorageService {
     context: CallerContext,
   ): Promise<ConfirmUploadResponse> {
     const organizationId = requireTenant(context);
+    const actorId = requireActor(context);
+    const expected = (request.expectedPurposes ?? []).map((purpose) =>
+      this.requirePurpose(purpose),
+    );
     const pending = await this.pending.get(request.objectPath);
 
     // Absent covers three cases that must be indistinguishable: never
-    // presigned, expired, and already confirmed once.
-    if (pending?.organizationId !== organizationId) {
+    // presigned, expired, and already confirmed once. So do another tenant's,
+    // another person's, and one uploaded for something else: confirming that
+    // the path exists at all is the leak.
+    if (
+      pending?.organizationId !== organizationId ||
+      pending.actorId !== actorId ||
+      (expected.length > 0 && !expected.includes(pending.purpose))
+    ) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'No pending upload for that object path',
@@ -562,6 +574,15 @@ export class StorageService {
     const policy = PURPOSE_POLICY[purpose];
     const fileName = `${randomUUID()}.${extensionFor(contentType)}`;
     const base = `organizations/${organizationId}/${policy.prefix}`;
+
+    if (purpose === StoragePurpose.TICKET_OPENING) {
+      // Owned by the uploader until a ticket binds it, and abandonable like a
+      // message's file, so segregated the same way.
+      return {
+        objectPath: `${base}/${ownerId}/pending/${fileName}`,
+        committedPath: `${base}/${ownerId}/${fileName}`,
+      };
+    }
 
     if (purpose !== StoragePurpose.TICKET_ATTACHMENT) {
       // **No segregation for the other purposes**, and it would buy nothing.

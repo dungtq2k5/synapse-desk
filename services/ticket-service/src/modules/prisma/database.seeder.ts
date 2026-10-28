@@ -209,5 +209,19 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         END IF;
       END $$;
     `);
+    // A file belongs to a message or to the ticket's opening, never both and
+    // never neither: one owner is what every read joins through.
+    await this.prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'message_attachments_one_owner_check'
+        ) THEN
+          ALTER TABLE "message_attachments"
+            ADD CONSTRAINT "message_attachments_one_owner_check"
+            CHECK (("message_id" IS NULL) <> ("ticket_id" IS NULL));
+        END IF;
+      END $$;
+    `);
   }
 }

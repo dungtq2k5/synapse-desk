@@ -160,6 +160,7 @@
   "DELETE /api/v1/roles/{id}/users/{userId}": ["user.role.assign"],
   "GET /api/v1/tickets": [],
   "POST /api/v1/tickets": ["ticket.create"],
+  "POST /api/v1/tickets/attachments/upload-url": [],
   "POST /api/v1/tickets/bulk/priority": ["ticket.update"],
   "POST /api/v1/tickets/bulk/status": ["ticket.update"],
   "GET /api/v1/tickets/by-number/{ticketNumber}": [],

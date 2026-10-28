@@ -25,6 +25,19 @@ message CreateTicketRequest {
   // provider redelivery is a duplicate-key violation rather than a second
   // ticket. Absent for every other transport, and absent is not an error.
   optional string inbound_message_id = 6;
+
+  // Files already uploaded under STORAGE_PURPOSE_TICKET_OPENING, bound to the
+  // ticket's opening in the same write. A path that fails its confirm is
+  // skipped and named; the ticket is created regardless.
+  repeated NewAttachment attachments = 7;
+}
+
+// What `CreateTicket` answers with: the ticket, and the files it couldn't
+// bind. A wrapper for the reason `CreateMessageResponse` is one.
+message CreateTicketResponse {
+  TicketResponse ticket = 1;
+  // File names, never object paths.
+  repeated string skipped_attachments = 2;
 }
 
 message GetTicketRequest {
@@ -205,7 +218,7 @@ message ListTicketsByIdsResponse { repeated TicketResponse items = 1; }
 
 service TicketService {
   rpc ListTicketsByIds(ListTicketsByIdsRequest) returns (ListTicketsByIdsResponse);
-  rpc CreateTicket(CreateTicketRequest) returns (TicketResponse);
+  rpc CreateTicket(CreateTicketRequest) returns (CreateTicketResponse);
   rpc GetTicket(GetTicketRequest) returns (TicketResponse);
   rpc GetTicketByNumber(GetTicketByNumberRequest) returns (TicketResponse);
   rpc ListTickets(ListTicketsRequest) returns (ListTicketsResponse);

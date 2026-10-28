@@ -6,6 +6,7 @@ import { StorageClientModule } from '../storage-client/storage-client.module';
 import { MessagesService } from './messages.service';
 import { AiAttachmentsModule } from '../ai-attachments/ai-attachments.module';
 import { MessagesGrpcController } from './messages-grpc.controller';
+import { AttachmentBinderModule } from '../attachment-binder/attachment-binder.module';
 
 /**
  * `TicketsModule` for the tenant + visibility check every thread read runs
@@ -18,6 +19,7 @@ import { MessagesGrpcController } from './messages-grpc.controller';
     AiClientModule,
     StorageClientModule,
     AiAttachmentsModule,
+    AttachmentBinderModule,
   ],
   controllers: [MessagesGrpcController],
   providers: [MessagesService],

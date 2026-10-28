@@ -419,13 +419,7 @@ export class AiService {
     if (!isDraftRefusal(error)) return;
 
     try {
-      const messageId = await this.aiAttachments.lastUserMessageId(ticketId);
-      if (!messageId) return;
-
-      await this.prisma.ticketMessage.update({
-        where: { id: messageId },
-        data: { excludedFromAiContext: true },
-      });
+      await this.aiAttachments.markRefused(ticketId);
     } catch (writeError) {
       this.logger.error(
         `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,
