@@ -1177,7 +1177,7 @@ describe('Documents (e2e)', () => {
     const indexed = () =>
       createDocument(fx.prisma, tenant, { status: DocumentStatus.INDEXED });
 
-    it('1. queues a NEW job and puts the document back to PENDING', async () => {
+    it('1. queues a NEW job and puts a document without a live version back to PENDING', async () => {
       const document = await indexed();
       const first = await createIngestionJob(fx.prisma, tenant, document.id, {
         status: IngestionJobStatus.COMPLETED,

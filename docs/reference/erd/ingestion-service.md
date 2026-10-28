@@ -40,6 +40,7 @@ erDiagram
     Boolean is_organization_wide 
     String department_ids 
     Boolean is_deleted 
+    Boolean is_staged 
     Int retrieval_count 
     DateTime last_retrieved_at "❓"
     Int citation_count 

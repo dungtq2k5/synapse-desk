@@ -129,7 +129,7 @@ export class IngestionReconcileSweep {
         // `deleteDocument` soft-deletes the document and never touches
         // `ingestion_jobs`, so without this a document deleted while its job
         // was stranded is re-ingested: parsed, chunked and EMBEDDED against the
-        // tenant's budget, before `writeChunkRows` marks the chunks deleted.
+        // tenant's budget, before `stageChunks` marks the chunks deleted.
         // No disclosure, and a full metered ingestion nobody asked for.
         document: { deletedAt: null },
       },

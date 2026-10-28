@@ -15,6 +15,7 @@ import {
   IngestionWaitingReason,
   MAX_CHUNKS_PER_DOCUMENT,
   QDRANT_UPSERT_BATCH,
+  RESUMABLE_INGESTION_STATUSES,
   TERMINAL_INGESTION_STATUSES,
   estimateCostMicros,
   parseOcrLanguages,
@@ -25,6 +26,7 @@ import {
   INGESTION_OUTCOMES,
   type IngestionOutcome,
 } from '../../common/configs/ingestion.config';
+import { setStatusUnlessLive } from '../../common/live-version';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
@@ -184,8 +186,12 @@ function errorCodeOf(error: unknown): IngestionErrorCode {
 /**
  * `QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED | FAILED`.
  *
- * Three orderings here are load-bearing and each has a failure behind it:
+ * Four orderings here are load-bearing and each has a failure behind it:
  *
+ *   - **The new version is built staged and swapped in at the end.** Every
+ *     reader skips staged chunks, so until the swap the document answers from
+ *     its live version in full, and a run that stops before it (refused,
+ *     deferred, failed, cancelled) leaves that version as it was.
  *   - **Chunk rows are written BEFORE the Qdrant upsert, and
  *     `vector_point_id` is written back AFTER it.** Reversed, a failed upsert
  *     leaves Postgres claiming vectors that were never stored, and nothing
@@ -221,8 +227,15 @@ export class IngestionProcessor {
    * Returns `'DEFERRED'` when the tenant is at the AI cap, so the queue layer
    * can leave the job alone rather than retrying it into a failure. A thrown
    * error means a genuine failure and is recorded as one.
+   *
+   * @param lastAttempt whether this is BullMQ's last attempt at the job. Only
+   *   the last attempt's failure purges the staged version; an earlier one
+   *   leaves it for the retry to reuse.
    */
-  async process(data: IngestionJobData): Promise<IngestionOutcome> {
+  async process(
+    data: IngestionJobData,
+    lastAttempt = true,
+  ): Promise<IngestionOutcome> {
     const { documentId, ingestionJobId, organizationId } = data;
     // The stage the job is in, for `failed_stage` if it fails.
     let stage = IngestionStage.PARSING;
@@ -245,7 +258,7 @@ export class IngestionProcessor {
         // From the EVENT, not a database read. `objectPath` and
         // `fileType` are there for the same reason: the worker needs no lookup
         // to start, and this service's only document read happens later,
-        // inside `writeChunkRows`.
+        // inside `stageChunks`.
         //
         // Narrowed HERE, once, and by parsing rather than casting. The column
         // and the wire are both `string[]` and cannot be otherwise; a cast at
@@ -265,7 +278,7 @@ export class IngestionProcessor {
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
       const chunks = await this.chunker.chunk(parsed.pages);
 
-      // Before `writeChunkRows` and before any embedding call: the ceiling
+      // Before `stageChunks` and before any embedding call: the ceiling
       // exists to stop the spend, so checking it after paying is checking
       // nothing.
       if (chunks.length > MAX_CHUNKS_PER_DOCUMENT) {
@@ -314,33 +327,26 @@ export class IngestionProcessor {
         throw new NoExtractableText(data.fileType);
       }
 
+      const scope = await this.stageChunks(data, chunks);
+
+      stage = IngestionStage.EMBEDDING;
+      await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
+      await this.embedAndUpsert(data, scope);
+
+      // Once more before the swap: a cancellation that landed while the
+      // batches were embedding stops here, and the live version stays.
+      await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
+      await this.swap(documentId, organizationId);
+
       // **After chunking, because that is where the SECOND drop happens** —
       // `document-chunker.service.ts` discards any chunk under
       // `MIN_CHUNK_TOKENS`, so a page that OCR'd to eight tokens survived the
       // parser, counted as a success, and vanished anyway. Checking the parser's
       // output alone would have reported that document as complete.
+      //
+      // After the swap, because the flag describes the live version: a run
+      // that stops earlier leaves the live version and its flags as they were.
       await this.reportMissingPages(data, parsed, chunks);
-
-      // The previous run's points, removed on EVERY run — retry, reindex and
-      // replace all arrive here, and a purge per route would be three copies of
-      // one rule with three chances to omit it.
-      //
-      // HERE, below the parse, and that is the whole placement: a parse failure
-      // or `NoExtractableText` above leaves the old chunk rows and their points
-      // intact and consistent, so a reindex of a file that turns out to be
-      // unreadable does not destroy a working index. From this line to the last
-      // upsert the document has neither, which is the window `writeChunkRows`
-      // already opens by deleting the rows.
-      //
-      // By document, not by point id: the ids live on the rows the next
-      // statement deletes, and nothing captures them first.
-      await this.qdrant.deleteDocumentPoints(documentId, organizationId);
-
-      const scope = await this.writeChunkRows(documentId, chunks);
-
-      stage = IngestionStage.EMBEDDING;
-      await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
-      await this.embedAndUpsert(data, scope);
 
       await this.complete(data, chunks.length);
       return INGESTION_OUTCOMES.INDEXED;
@@ -351,6 +357,7 @@ export class IngestionProcessor {
         this.logger.log(
           `Ingestion of ${documentId} stopped: job ${ingestionJobId} is no longer runnable`,
         );
+        await this.purgeStaged(data);
 
         return INGESTION_OUTCOMES.CANCELLED;
       }
@@ -382,14 +389,17 @@ export class IngestionProcessor {
         // `false` — and installing tesseract is a deploy, which replaces the
         // process anyway. A retry cannot observe the fix even after it lands.
         await this.fail(data, error, stage);
+        await this.purgeStaged(data);
         this.logger.warn(`Refused ${documentId}: ${formatErrorMsg(error)}`);
 
         return INGESTION_OUTCOMES.REFUSED;
       }
 
       if (error instanceof BudgetExhausted) {
-        // Back to QUEUED, and the document back to PENDING. Both are honest:
-        // nothing is wrong, the work is simply waiting for the cycle to roll.
+        // Back to QUEUED, and a document without a live version back to
+        // PENDING. Both are honest: nothing is wrong, the work is simply
+        // waiting for the cycle to roll. The staged version stays, so the
+        // resumed run pays only for the batches not yet embedded.
         //
         // `setJobStatus` can refuse, and a throw raised inside a catch block
         // escapes the handler — which is the retried-job outcome the CANCELLED
@@ -407,6 +417,7 @@ export class IngestionProcessor {
             this.logger.log(
               `Ingestion of ${documentId} was cancelled while deferring at the AI cap`,
             );
+            await this.purgeStaged(data);
 
             return INGESTION_OUTCOMES.CANCELLED;
           }
@@ -421,6 +432,7 @@ export class IngestionProcessor {
       }
 
       await this.fail(data, error, stage);
+      if (lastAttempt) await this.purgeStaged(data);
       throw error;
     }
   }
@@ -530,57 +542,157 @@ export class IngestionProcessor {
   }
 
   /**
-   * The chunk rows, carrying the four scope columns copied from the parent.
+   * The new version's chunk rows, written staged beside the live ones.
    *
-   * A chunk with a NULL `organization_id` is a chunk no tenant filter excludes
-   * — the lexical arm's half of the boundary is these four columns, so writing
-   * them is not bookkeeping, it is the security precondition.
+   * Each row carries the four scope columns copied from the parent. A chunk
+   * with a NULL `organization_id` is a chunk no tenant filter excludes — the
+   * lexical arm's half of the boundary is these four columns, so writing them
+   * is not bookkeeping, it is the security precondition.
    *
-   * `deleteMany` first makes a re-run idempotent: a retried job that appended
-   * would double every chunk. The matching Qdrant purge is the caller's, one
-   * statement above.
+   * **An earlier run's staged rows are reused where they still fit.** A staged
+   * row whose index and text match the new chunk and whose
+   * `vector_point_id` is set already has its point, and the embedding model
+   * is one for every tenant, so the same text embeds the same. A deferral
+   * resumed at the cycle roll, or a retry after a provider failure, then pays
+   * only for the batches not yet embedded. Every other staged row and point is
+   * a leftover (a different file, a crashed run) and is purged.
+   *
+   * Rows first, then points: a row whose point is gone must never survive, or
+   * the next run would keep it and the swap would make a vector-less chunk
+   * live. A point whose row is gone is invisible and the next purge takes it.
+   *
+   * Never touches the live version.
    */
-  private async writeChunkRows(
-    documentId: string,
-    chunks: Array<{
-      chunkIndex: number;
-      contentText: string;
-      pageNumber: number | null;
-      tokenCount: number;
-    }>,
-  ) {
+  private async stageChunks(data: IngestionJobData, chunks: Chunk[]) {
+    const { documentId, organizationId } = data;
+    const scope = { organizationId, ...(await this.readScope(documentId)) };
+
+    const texts = new Map(
+      chunks.map((chunk) => [chunk.chunkIndex, chunk.contentText]),
+    );
+    const staged = await this.prisma.documentChunk.findMany({
+      where: { documentId, isStaged: true },
+      select: {
+        id: true,
+        chunkIndex: true,
+        contentText: true,
+        vectorPointId: true,
+      },
+    });
+    const kept = staged.filter(
+      (row) =>
+        row.vectorPointId !== null &&
+        texts.get(row.chunkIndex) === row.contentText,
+    );
+    const keptIndexes = new Set(kept.map((row) => row.chunkIndex));
+
+    await this.prisma.$transaction([
+      this.prisma.documentChunk.deleteMany({
+        where: {
+          documentId,
+          isStaged: true,
+          id: { notIn: kept.map((row) => row.id) },
+        },
+      }),
+      this.prisma.documentChunk.createMany({
+        data: chunks
+          .filter((chunk) => !keptIndexes.has(chunk.chunkIndex))
+          .map((chunk) => ({
+            documentId,
+            chunkIndex: chunk.chunkIndex,
+            contentText: chunk.contentText,
+            pageNumber: chunk.pageNumber,
+            tokenCount: chunk.tokenCount,
+            isStaged: true,
+            ...scope,
+          })),
+      }),
+    ]);
+
+    await this.qdrant.purgeStagedPoints(
+      documentId,
+      organizationId,
+      kept.map((row) => row.vectorPointId as string),
+    );
+
+    return scope;
+  }
+
+  /**
+   * Makes the staged version live and deletes the one it replaces.
+   *
+   * **Qdrant first, then Postgres,** because of what a search sees between the
+   * two. Qdrant first: the vector arm returns the new points, hydration reads
+   * their (still staged) rows by id, and the lexical arm still returns the old
+   * version — mixed for a moment, never empty. Postgres first would leave the
+   * vector arm's hits pointing at deleted rows, so it would answer nothing for
+   * the document until Qdrant caught up.
+   *
+   * Each half works by filter on the document, deleting only live data and
+   * flipping only staged data, so a re-run converges from a crash between
+   * them: the purge skips live data, and the next swap repeats both halves.
+   */
+  private async swap(documentId: string, organizationId: string) {
+    // Read again rather than reused from `stageChunks`: a scope change while
+    // the batches were embedding reached the rows, not the points of a batch
+    // upserted after it. Both halves stamp it.
+    const scope = await this.readScope(documentId);
+    await this.qdrant.swapDocumentPoints(documentId, organizationId, scope);
+
+    await this.prisma.$transaction([
+      this.prisma.documentChunk.deleteMany({
+        where: { documentId, isStaged: false },
+      }),
+      this.prisma.documentChunk.updateMany({
+        where: { documentId, isStaged: true },
+        data: { isStaged: false, ...scope },
+      }),
+    ]);
+  }
+
+  /** The scope columns a chunk copies from its document, beside its tenant. */
+  private async readScope(documentId: string) {
     const document = await this.prisma.document.findUniqueOrThrow({
       where: { id: documentId },
       include: { departmentLinks: { select: { departmentId: true } } },
     });
 
-    const departmentIds = document.departmentLinks.map(
-      (link) => link.departmentId,
-    );
-
-    await this.prisma.$transaction([
-      this.prisma.documentChunk.deleteMany({ where: { documentId } }),
-      this.prisma.documentChunk.createMany({
-        data: chunks.map((chunk) => ({
-          documentId,
-          chunkIndex: chunk.chunkIndex,
-          contentText: chunk.contentText,
-          pageNumber: chunk.pageNumber,
-          tokenCount: chunk.tokenCount,
-          organizationId: document.organizationId,
-          isOrganizationWide: document.isOrganizationWide,
-          departmentIds,
-          isDeleted: document.deletedAt !== null,
-        })),
-      }),
-    ]);
-
     return {
-      organizationId: document.organizationId,
       isOrganizationWide: document.isOrganizationWide,
-      departmentIds,
+      departmentIds: document.departmentLinks.map((link) => link.departmentId),
       isDeleted: document.deletedAt !== null,
     };
+  }
+
+  /**
+   * Removes a run's staged version once nothing will finish it. Best effort:
+   * a leftover is invisible, and the next run purges or reuses it.
+   *
+   * Skipped while another job for the document can still run — a retry
+   * queued after a cancellation builds its staged version from the same
+   * rows, and purging under it would leave it swapping in half a document.
+   */
+  private async purgeStaged(data: IngestionJobData): Promise<void> {
+    const { documentId, organizationId, ingestionJobId } = data;
+    try {
+      const successor = await this.prisma.ingestionJob.count({
+        where: {
+          documentId,
+          id: { not: ingestionJobId },
+          status: { in: [...RESUMABLE_INGESTION_STATUSES] },
+        },
+      });
+      if (successor > 0) return;
+
+      await this.prisma.documentChunk.deleteMany({
+        where: { documentId, isStaged: true },
+      });
+      await this.qdrant.purgeStagedPoints(documentId, organizationId);
+    } catch (error) {
+      this.logger.warn(
+        `Could not purge the staged version of ${documentId}: ${formatErrorMsg(error)}`,
+      );
+    }
   }
 
   /**
@@ -590,9 +702,10 @@ export class IngestionProcessor {
    * tenant who crosses the cap halfway through a large document stops there
    * with half its chunks indexed.
    *
-   * `vector_point_id` is nullable so that, WITHIN a run, a chunk without one is
-   * a chunk whose upsert never happened — which is what keeps Postgres from
-   * claiming vectors that are not there. It does not carry work across runs.
+   * `vector_point_id` is nullable so that a staged chunk without one is a chunk
+   * whose upsert never happened — which is what keeps Postgres from claiming
+   * vectors that are not there, and what lets the next run skip the chunks
+   * that have one.
    */
   private async embedAndUpsert(
     data: IngestionJobData,
@@ -605,13 +718,14 @@ export class IngestionProcessor {
   ): Promise<void> {
     const settings = await this.aiSettings.settingsFor(data.organizationId);
 
-    // Reads as "resume the chunks not yet embedded" and never does: every entry
-    // into `process()` runs `writeChunkRows` first, which deletes and recreates
-    // every row, so this matches the whole document on every run and the tenant
-    // is billed for the repeat (known-gaps #11 — NOT #3, which is a deferred
-    // job never being re-enqueued at all).
+    // The staged chunks not yet embedded: `stageChunks` kept the ones an
+    // earlier run of this version already paid for.
     const pending = await this.prisma.documentChunk.findMany({
-      where: { documentId: data.documentId, vectorPointId: null },
+      where: {
+        documentId: data.documentId,
+        isStaged: true,
+        vectorPointId: null,
+      },
       orderBy: { chunkIndex: 'asc' },
       select: { id: true, contentText: true },
     });
@@ -758,8 +872,8 @@ export class IngestionProcessor {
     });
 
     try {
-      await this.prisma.$transaction([
-        this.prisma.ingestionJob.update({
+      await this.prisma.$transaction(async (tx) => {
+        await tx.ingestionJob.update({
           where: { id: data.ingestionJobId },
           data: {
             status: IngestionJobStatus.FAILED,
@@ -768,12 +882,11 @@ export class IngestionProcessor {
             failedStage: stage,
             processedAt: new Date(),
           },
-        }),
-        this.prisma.document.update({
-          where: { id: data.documentId },
-          data: { status: DocumentStatus.FAILED },
-        }),
-      ]);
+        });
+        // A document with a live version still answers from it, and stays
+        // INDEXED; the job says the update failed.
+        await setStatusUnlessLive(tx, data.documentId, DocumentStatus.FAILED);
+      });
     } catch (writeError) {
       // The original error is what matters and it is already being rethrown by
       // the caller. Swallowing this one keeps a failed status write from
@@ -822,6 +935,9 @@ export class IngestionProcessor {
    * so a job that is no longer runnable cannot leave a document claiming to be
    * processing.
    *
+   * A document with a live version keeps its status: it still answers from
+   * that version, and the job alone carries the run's state.
+   *
    * @param waitingReason why a job put back to `QUEUED` waits; every other
    *   move clears it.
    */
@@ -834,10 +950,7 @@ export class IngestionProcessor {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.setJobStatus(ingestionJobId, jobStatus, tx, waitingReason);
-      await tx.document.update({
-        where: { id: documentId },
-        data: { status: documentStatus },
-      });
+      await setStatusUnlessLive(tx, documentId, documentStatus);
     });
   }
 

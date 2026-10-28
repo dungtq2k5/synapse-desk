@@ -40,7 +40,7 @@ describe('QdrantService.ensureCollection (unit)', () => {
 
     expect(client.createCollection).toHaveBeenCalledTimes(1);
     expect(client.getCollection).not.toHaveBeenCalled();
-    expect(client.createPayloadIndex).toHaveBeenCalledTimes(5);
+    expect(client.createPayloadIndex).toHaveBeenCalledTimes(6);
   });
 
   it('**a create that loses the race to rag-service goes on as if it found the collection**', async () => {
@@ -49,7 +49,7 @@ describe('QdrantService.ensureCollection (unit)', () => {
     await expect(service.ensureCollection()).resolves.toBeUndefined();
 
     expect(client.getCollection).toHaveBeenCalledWith(QDRANT_COLLECTION);
-    expect(client.createPayloadIndex).toHaveBeenCalledTimes(5);
+    expect(client.createPayloadIndex).toHaveBeenCalledTimes(6);
   });
 
   it('still checks the dimension of the collection the other service created', async () => {
@@ -92,7 +92,7 @@ describe('QdrantService.ensureCollection (unit)', () => {
 
       await expect(done).resolves.toBeUndefined();
       expect(client.getCollection).toHaveBeenCalledTimes(3);
-      expect(client.createPayloadIndex).toHaveBeenCalledTimes(5);
+      expect(client.createPayloadIndex).toHaveBeenCalledTimes(6);
     });
 
     it('that never loads still fails the boot', async () => {

@@ -271,6 +271,12 @@ class RetrievalService:
         arms; re-applying the boundary here would suggest the earlier
         application was not trusted, and a reviewer who believes there are two
         checks will eventually weaken one of them.
+
+        **Reads staged rows too, on purpose.** Ingestion's swap flips Qdrant
+        first and Postgres second, so for that moment the vector arm returns
+        the new version's points while their rows are still staged. Reading by
+        id finds them, and the answer is mixed rather than empty for the
+        document.
         """
         if not selected:
             return []

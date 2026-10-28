@@ -171,6 +171,9 @@ async def seed(qdrant, pool):
         department_ids: list[str] | None = None,
         is_organization_wide: bool = True,
         is_deleted: bool = False,
+        # None writes a point without the field, as one written before it
+        # existed; Postgres has no such case, its column defaults to false.
+        is_staged: bool | None = None,
         document_id: str | None = None,
         title: str = "fixture",
         page_number: int | None = None,
@@ -201,6 +204,7 @@ async def seed(qdrant, pool):
                         "department_ids": department_ids,
                         "is_organization_wide": is_organization_wide,
                         "is_deleted": is_deleted,
+                        **({} if is_staged is None else {"is_staged": is_staged}),
                     },
                 )
             ],
@@ -240,10 +244,10 @@ async def seed(qdrant, pool):
                 INSERT INTO document_chunks (
                     id, document_id, chunk_index, content_text, token_count,
                     vector_point_id, organization_id, is_organization_wide,
-                    department_ids, is_deleted, page_number
+                    department_ids, is_deleted, page_number, is_staged
                 ) VALUES (
                     $1::uuid, $2::uuid, $10, $3, 10,
-                    $4::uuid, $5::uuid, $6, $7::uuid[], $8, $9
+                    $4::uuid, $5::uuid, $6, $7::uuid[], $8, $9, $11
                 )
                 """,
                 chunk_id,
@@ -260,6 +264,7 @@ async def seed(qdrant, pool):
                 # unique — so a fixture could not express the thing retrieval
                 # actually returns, which is chunks rather than documents.
                 chunk_index,
+                bool(is_staged),
             )
 
         return SeededChunk(

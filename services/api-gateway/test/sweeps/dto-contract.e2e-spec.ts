@@ -138,7 +138,10 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       // line; the field is an advanced upload option that no screen reads yet,
       // and adding it to the public schema before anything queries it is how a
       // schema accumulates fields nobody can remove.
-      restOnly: ['fileUrl', 'deletedById', 'ocrLanguages'],
+      //
+      // `latestJob` is REST-only too: the documents screens read it to show an
+      // update running or failed, and nothing queries it through the schema.
+      restOnly: ['fileUrl', 'deletedById', 'ocrLanguages', 'latestJob'],
     },
     {
       name: 'Notification',
@@ -298,6 +301,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     AddDepartmentMembersResponseDto: 'a write RESULT, not an entity',
     // documents
     DocumentChunkResponseDto: 'an ingestion internal, not a product shape',
+    LatestIngestionJobResponseDto: 'nested inside DocumentResponse, REST-only',
     DocumentFlagResponseDto: 'operator diagnostics, REST-only',
     PresignDocumentResponseDto: 'a short-lived credential, never a query',
     DownloadDocumentResponseDto: 'a short-lived credential, never a query',

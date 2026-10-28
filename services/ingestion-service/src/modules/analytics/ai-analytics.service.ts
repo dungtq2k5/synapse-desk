@@ -237,7 +237,7 @@ export class AiAnalyticsService {
              COUNT(c.id)::int AS chunk_count
       FROM documents d
       LEFT JOIN document_chunks c
-        ON c.document_id = d.id AND c.is_deleted = false
+        ON c.document_id = d.id AND c.is_deleted = false AND NOT c.is_staged
       WHERE d.organization_id = $1::uuid AND d.deleted_at IS NULL
       GROUP BY d.id, d.title
       `,

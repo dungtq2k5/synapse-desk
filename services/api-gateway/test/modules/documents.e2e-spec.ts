@@ -26,7 +26,9 @@ import {
 } from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
 import {
+  IngestionErrorCode as ProtoIngestionErrorCode,
   IngestionJobStatus as ProtoIngestionJobStatus,
+  IngestionWaitingReason as ProtoIngestionWaitingReason,
   SortOrder,
 } from '@synapsedesk/grpc-proto';
 
@@ -62,6 +64,7 @@ describe('Documents at the HTTP boundary (e2e)', () => {
     updatedAt: timestamp(),
     deletedAt: undefined,
     deletedById: undefined,
+    latestJob: undefined,
     ...overrides,
   });
 
@@ -115,6 +118,36 @@ describe('Documents at the HTTP boundary (e2e)', () => {
 
       expect(res.body.data.items[0]).toHaveProperty('deletedAt', null);
       expect(res.body.data.items[0]).toHaveProperty('deletedById', null);
+    });
+
+    it('2b. relays the newest job as latestJob, and none as null', async () => {
+      fx.stubs.document.listDocuments.mockReturnValue(
+        of({
+          items: [
+            wireDocument({
+              status: ProtoDocumentStatus.DOCUMENT_STATUS_INDEXED,
+              latestJob: {
+                status: ProtoIngestionJobStatus.INGESTION_JOB_STATUS_FAILED,
+                waitingReason:
+                  ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_UNSPECIFIED,
+                errorCode:
+                  ProtoIngestionErrorCode.INGESTION_ERROR_CODE_PROVIDER_FAILURE,
+              },
+            }),
+            wireDocument(),
+          ],
+          meta: wirePage([]).meta,
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app).get(`${API}/documents`);
+
+      expect(res.body.data.items[0].latestJob).toEqual({
+        status: 'FAILED',
+        waitingReason: null,
+        errorCode: 'PROVIDER_FAILURE',
+      });
+      expect(res.body.data.items[1].latestJob).toBeNull();
     });
 
     it('3. forwards ABSENT filters as UNSPECIFIED and empty strings', async () => {

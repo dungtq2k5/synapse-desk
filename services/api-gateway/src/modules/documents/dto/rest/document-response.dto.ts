@@ -2,10 +2,23 @@ import {
   DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentStatus,
+  IngestionErrorCode,
+  IngestionJobStatus,
+  IngestionWaitingReason,
   type DocumentFileType,
   type DocumentFlagType,
   type OcrLanguage,
 } from '@synapsedesk/contracts';
+
+/** The part of a document's newest ingestion attempt a list row needs. */
+export class LatestIngestionJobResponseDto {
+  /** `null` only if the peer sent a member this build does not know. */
+  status!: IngestionJobStatus | null;
+  /** Why a `QUEUED` attempt waits; `null` is an ordinary queue. */
+  waitingReason!: IngestionWaitingReason | null;
+  /** Why a `FAILED` attempt failed; `null` on one that hasn't failed. */
+  errorCode!: IngestionErrorCode | null;
+}
 
 /**
  * A document as the REST API returns it.
@@ -44,6 +57,12 @@ export class DocumentResponseDto {
   updatedAt!: Date;
   deletedAt!: Date | null;
   deletedById!: string | null;
+  /**
+   * The newest ingestion attempt, `null` when there is none. A document that
+   * already answers stays `INDEXED` while an update runs and after one fails,
+   * so this is what says an update is running, waiting or failed.
+   */
+  latestJob!: LatestIngestionJobResponseDto | null;
 }
 
 export class DocumentChunkResponseDto {

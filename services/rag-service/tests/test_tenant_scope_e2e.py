@@ -25,6 +25,7 @@ from rag_service.qdrant.collection import (
     DEPARTMENT_IDS,
     IS_DELETED,
     IS_ORGANIZATION_WIDE,
+    IS_STAGED,
     ORGANIZATION_ID,
     payload_index_fields,
 )
@@ -64,6 +65,7 @@ class TestCollection:
             IS_DELETED,
             DEPARTMENT_IDS,
             IS_ORGANIZATION_WIDE,
+            IS_STAGED,
         ):
             assert field in fields, f"{field} is not payload-indexed"
 
@@ -226,6 +228,35 @@ class TestSoftDelete:
         assert [result.chunk_id for result in results] == [live.chunk_id]
 
 
+class TestStagedChunks:
+    """A version ingestion-service is still building never answers."""
+
+    @pytest.mark.parametrize("run_arm", ARMS)
+    async def test_a_staged_chunk_is_skipped(
+        self, run_arm, qdrant, pool, seed, query_vector, tenant_a
+    ):
+        live = await seed(tenant_a.organization_id, text=SHARED_TEXT, is_staged=False)
+        await seed(tenant_a.organization_id, text=SHARED_TEXT, is_staged=True)
+
+        results = await run_arm(
+            qdrant, pool, tenant_scope(tenant_a.outsider()), query_vector
+        )
+
+        assert [result.chunk_id for result in results] == [live.chunk_id]
+
+    @pytest.mark.parametrize("run_arm", ARMS)
+    async def test_a_point_written_before_the_field_is_live(
+        self, run_arm, qdrant, pool, seed, query_vector, tenant_a
+    ):
+        legacy = await seed(tenant_a.organization_id, text=SHARED_TEXT)
+
+        results = await run_arm(
+            qdrant, pool, tenant_scope(tenant_a.outsider()), query_vector
+        )
+
+        assert [result.chunk_id for result in results] == [legacy.chunk_id]
+
+
 class TestBothRenderingsAgree:
     """The drift test — the one this whole design exists to make possible."""
 
@@ -256,6 +287,9 @@ class TestBothRenderingsAgree:
         )
         await seed(  # deleted
             tenant_a.organization_id, text=SHARED_TEXT, is_deleted=True
+        )
+        await seed(  # staged
+            tenant_a.organization_id, text=SHARED_TEXT, is_staged=True
         )
         await seed(tenant_b.organization_id, text=SHARED_TEXT)  # wrong tenant
 

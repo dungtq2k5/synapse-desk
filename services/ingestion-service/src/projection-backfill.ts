@@ -8,8 +8,8 @@
  *
  * **Why this is not the first nightly run.** Deriving the counters from the
  * whole ledger means resetting them first, and a reset is an `UPDATE` over
- * every chunk row: it row-locks the same table `writeChunkRows` deletes from
- * and inserts into on every upload. Inside a 02:00 job that lock lands on live
+ * every chunk row: it row-locks the same table `stageChunks` and the swap
+ * delete from and insert into on every upload. Inside a 02:00 job that lock lands on live
  * ingestion with nobody watching. Here it is batched, and it is somebody's
  * deliberate command.
  *

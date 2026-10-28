@@ -33,7 +33,12 @@ export class IngestionWorker extends WorkerHost {
       return;
     }
 
-    const outcome = await this.processor.process(job.data);
+    // `attemptsMade` counts the attempts that already failed, so this one is
+    // the last when no further attempt is left after it.
+    const outcome = await this.processor.process(
+      job.data,
+      job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    );
 
     // A deferral is a SUCCESS as far as BullMQ is concerned, and that is the
     // point: throwing would burn the retry budget and eventually mark the job

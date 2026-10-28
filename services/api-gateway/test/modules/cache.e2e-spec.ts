@@ -294,6 +294,7 @@ describe('The shared cache (e2e)', () => {
           ocrLanguages: [],
           createdAt: timestamp(),
           updatedAt: timestamp(),
+          latestJob: undefined,
         },
       ],
       meta: {

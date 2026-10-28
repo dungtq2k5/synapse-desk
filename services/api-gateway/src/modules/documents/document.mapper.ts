@@ -9,6 +9,9 @@ import {
   fromProtoDocumentFlagSeverity,
   fromProtoDocumentFlagType,
   fromProtoDocumentStatus,
+  fromProtoIngestionErrorCode,
+  fromProtoIngestionJobStatus,
+  fromProtoIngestionWaitingReason,
   fromProtoTimestamp,
   ListDocumentChunksResponse,
   ListDocumentFlagsRequest,
@@ -75,6 +78,15 @@ export function toDocumentResponseDto(
     updatedAt: requireProtoTimestamp(document.updatedAt, 'updatedAt'),
     deletedAt: fromProtoTimestamp(document.deletedAt) ?? null,
     deletedById: document.deletedById ?? null,
+    latestJob: document.latestJob
+      ? {
+          status: fromProtoIngestionJobStatus(document.latestJob.status),
+          waitingReason: fromProtoIngestionWaitingReason(
+            document.latestJob.waitingReason,
+          ),
+          errorCode: fromProtoIngestionErrorCode(document.latestJob.errorCode),
+        }
+      : null,
   };
 }
 

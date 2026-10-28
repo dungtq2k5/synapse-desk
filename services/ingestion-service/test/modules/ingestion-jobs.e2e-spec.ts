@@ -349,7 +349,7 @@ describe('Ingestion jobs (e2e)', () => {
     it('**12b. discards the attempt BullMQ still has pending**', async () => {
       // `fail()` writes FAILED and rethrows, so `attempts: 3` leaves the next
       // try in `delayed` for five seconds. Retrying inside that window without
-      // discarding puts a second worker on one document, and `writeChunkRows`
+      // discarding puts a second worker on one document, and `stageChunks`
       // is `deleteMany` + `createMany` on the documentId — concurrently, they
       // destroy each other's rows.
       //
@@ -412,7 +412,7 @@ describe('Ingestion jobs (e2e)', () => {
 
     it('**14b. two CONCURRENT retries of one row produce one job**', async () => {
       // Both calls pass the precondition — it is a read — and both insert.
-      // Without a guard: two ids, two workers, and `writeChunkRows` deleting
+      // Without a guard: two ids, two workers, and `stageChunks` deleting
       // each other's chunks.
       //
       // TWO guards now stand here, and the message says which one fired.

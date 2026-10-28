@@ -165,6 +165,19 @@ message DocumentResponse {
   // cannot know a PDF is scanned until it is parsed. `repeated` needs no
   // `optional` — proto3 repeated fields are already absent-by-default.
   repeated string ocr_languages = 16;
+  // The newest ingestion job, absent when there is none. A document with a
+  // live version stays INDEXED while an update runs and after one fails, so
+  // this is what says the update is running or failed.
+  LatestIngestionJob latest_job = 17;
+}
+
+// The part of a document's newest `IngestionJobResponse` a list row needs.
+message LatestIngestionJob {
+  IngestionJobStatus status = 1;
+  // UNSPECIFIED unless the job is QUEUED for a reason.
+  IngestionWaitingReason waiting_reason = 2;
+  // UNSPECIFIED unless the job FAILED.
+  IngestionErrorCode error_code = 3;
 }
 
 message PresignDocumentRequest {

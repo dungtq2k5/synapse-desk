@@ -70996,6 +70996,44 @@
         },
         "required": ["reason"]
       },
+      "LatestIngestionJobResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` only if the peer sent a member this build does not know.",
+            "enum": [
+              "CANCELLED",
+              "CHUNKING",
+              "COMPLETED",
+              "EMBEDDING",
+              "FAILED",
+              "PARSING",
+              "QUEUED"
+            ]
+          },
+          "waitingReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why a `QUEUED` attempt waits; `null` is an ordinary queue.",
+            "enum": ["AI_ALLOWANCE"]
+          },
+          "errorCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why a `FAILED` attempt failed; `null` on one that hasn't failed.",
+            "enum": [
+              "NO_READABLE_TEXT",
+              "OCR_UNAVAILABLE",
+              "OTHER",
+              "PROVIDER_FAILURE",
+              "TOO_LONG"
+            ]
+          }
+        },
+        "required": ["status", "waitingReason", "errorCode"]
+      },
       "DocumentResponseDto": {
         "type": "object",
         "properties": {
@@ -71064,6 +71102,16 @@
           "deletedById": {
             "type": "string",
             "nullable": true
+          },
+          "latestJob": {
+            "nullable": true,
+            "description": "The newest ingestion attempt, `null` when there is none. A document that\nalready answers stays `INDEXED` while an update runs and after one fails,\nso this is what says an update is running, waiting or failed.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LatestIngestionJobResponseDto"
+              }
+            ]
           }
         },
         "required": [
@@ -71082,7 +71130,8 @@
           "createdAt",
           "updatedAt",
           "deletedAt",
-          "deletedById"
+          "deletedById",
+          "latestJob"
         ]
       },
       "StorageUsageResponseDto": {

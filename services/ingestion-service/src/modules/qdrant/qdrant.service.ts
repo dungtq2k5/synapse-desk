@@ -150,6 +150,9 @@ export class QdrantService implements OnApplicationBootstrap {
           [QDRANT_PAYLOAD_FIELDS.departmentIds]: point.departmentIds,
           [QDRANT_PAYLOAD_FIELDS.isOrganizationWide]: point.isOrganizationWide,
           [QDRANT_PAYLOAD_FIELDS.isDeleted]: point.isDeleted,
+          // Every point is written staged: retrieval skips it until the run's
+          // swap makes it live (`swapDocumentPoints`).
+          [QDRANT_PAYLOAD_FIELDS.isStaged]: true,
         };
 
         return { id: point.vectorPointId, vector: point.vector, payload };
@@ -263,6 +266,99 @@ export class QdrantService implements OnApplicationBootstrap {
     });
   }
 
+  /**
+   * Removes this document's STAGED points (a stopped run's, or a version that
+   * won't go live), except `keep`: the ones a resumed run reuses. Never a live
+   * point.
+   *
+   * `keep` is marked staged again: after a crash between the swap's two
+   * halves, those points were already made live while their rows were not,
+   * and the next swap would delete them as the old version.
+   */
+  async purgeStagedPoints(
+    documentId: string,
+    organizationId: string,
+    keep: string[] = [],
+  ): Promise<void> {
+    const { must } = this.documentFilter(documentId, organizationId);
+    if (keep.length === 0) {
+      await this.client.delete(QDRANT_COLLECTION, {
+        wait: true,
+        filter: { must: [...must, this.staged] },
+      });
+      return;
+    }
+
+    await this.client.batchUpdate(QDRANT_COLLECTION, {
+      wait: true,
+      operations: [
+        {
+          delete: {
+            filter: {
+              must: [...must, this.staged],
+              must_not: [{ has_id: keep }],
+            },
+          },
+        },
+        {
+          set_payload: {
+            payload: { [QDRANT_PAYLOAD_FIELDS.isStaged]: true },
+            filter: { must: [...must, { has_id: keep }] },
+          },
+        },
+      ],
+    });
+  }
+
+  /**
+   * The swap: this document's live points go, its staged ones become live
+   * with `scope`, the document's scope as it stands now. A scope change made
+   * while a batch was being embedded reached the rows but not that batch's
+   * points, which were upserted with the scope read before it.
+   *
+   * One request, applied in order but not as a transaction: a search between
+   * the two operations sees neither version of this document, for as long as
+   * one operation takes. Both operations select by filter, so a re-run after a
+   * crash between them converges: there is no live point left to delete, and
+   * the staged ones flip.
+   */
+  async swapDocumentPoints(
+    documentId: string,
+    organizationId: string,
+    scope: {
+      departmentIds: string[];
+      isOrganizationWide: boolean;
+      isDeleted: boolean;
+    },
+  ): Promise<void> {
+    const { must } = this.documentFilter(documentId, organizationId);
+    await this.client.batchUpdate(QDRANT_COLLECTION, {
+      wait: true,
+      operations: [
+        // Live: not staged, which includes a point written before the field.
+        { delete: { filter: { must, must_not: [this.staged] } } },
+        {
+          set_payload: {
+            payload: {
+              [QDRANT_PAYLOAD_FIELDS.isStaged]: false,
+              [QDRANT_PAYLOAD_FIELDS.departmentIds]: scope.departmentIds,
+              [QDRANT_PAYLOAD_FIELDS.isOrganizationWide]:
+                scope.isOrganizationWide,
+              [QDRANT_PAYLOAD_FIELDS.isDeleted]: scope.isDeleted,
+            },
+            filter: { must: [...must, this.staged] },
+          },
+        },
+      ],
+    });
+  }
+
+  /** Matches a point being built: `is_staged` is true. */
+  private readonly staged = {
+    key: QDRANT_PAYLOAD_FIELDS.isStaged,
+    match: { value: true },
+  };
+
   private async ensurePayloadIndexes(): Promise<void> {
     const specs: Array<[string, 'keyword' | 'bool']> = [
       [QDRANT_PAYLOAD_FIELDS.organizationId, 'keyword'],
@@ -270,6 +366,7 @@ export class QdrantService implements OnApplicationBootstrap {
       [QDRANT_PAYLOAD_FIELDS.departmentIds, 'keyword'],
       [QDRANT_PAYLOAD_FIELDS.isOrganizationWide, 'bool'],
       [QDRANT_PAYLOAD_FIELDS.documentId, 'keyword'],
+      [QDRANT_PAYLOAD_FIELDS.isStaged, 'bool'],
     ];
 
     for (const [field, schema] of specs) {

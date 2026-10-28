@@ -51,6 +51,11 @@ IS_ORGANIZATION_WIDE = "is_organization_wide"
 DOCUMENT_ID = "document_id"
 CHUNK_ID = "chunk_id"
 
+#: A chunk of a version ingestion-service is still building beside the live
+#: one. Retrieval skips it until the run's swap clears it. A point written
+#: before the field existed has no value and counts as live.
+IS_STAGED = "is_staged"
+
 
 @dataclass(frozen=True)
 class CollectionMetadata:
@@ -125,6 +130,7 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
         # them") would make multi-department scoping useless.
         (DEPARTMENT_IDS, qm.PayloadSchemaType.KEYWORD),
         (IS_ORGANIZATION_WIDE, qm.PayloadSchemaType.BOOL),
+        (IS_STAGED, qm.PayloadSchemaType.BOOL),
         # Not part of the filter. Indexed because the re-scoping fan-out
         # updates every point of one document, and without this
         # that update scans the whole collection.
@@ -144,8 +150,8 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
             # error in any of them. Re-raising would make a successful boot
             # depend on which server version happened to be running.
             #
-            # A genuinely missing index is caught by the test that asserts all
-            # five exist, not by this line.
+            # A genuinely missing index is caught by the test that asserts every one
+            # exists, not by this line.
             logger.debug(
                 "Payload index %s already present or unsupported: %s", field_name, error
             )

@@ -1214,6 +1214,7 @@ describe('The GraphQL surface (e2e)', () => {
       ocrLanguages: [],
       createdAt: timestamp(),
       updatedAt: timestamp(),
+      latestJob: undefined,
     });
 
     const wireJob = (documentId: string) => ({
@@ -1836,6 +1837,7 @@ describe('The GraphQL surface (e2e)', () => {
               ocrLanguages: [],
               createdAt: timestamp(),
               updatedAt: timestamp(),
+              latestJob: undefined,
             },
           ],
         }),

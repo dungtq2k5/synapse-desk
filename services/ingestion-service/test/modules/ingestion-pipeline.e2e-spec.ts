@@ -36,6 +36,8 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
 import { faultInjector } from '@synapsedesk/testing/fault';
+import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
+import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
 
 describe('The ingestion pipeline (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
@@ -1115,10 +1117,9 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('11. KEEPS the parsing work, so a cycle roll resumes at the embedding step', async () => {
-      // The reason the deferral is not a failure: the parse and chunk work
-      // survives, so the cycle roll costs CPU rather than a re-parse. It is
-      // NOT a resume — a re-run recreates these rows and re-embeds all of
-      // them (test 19); what is kept is everything before the embedding step.
+      // The reason the deferral is not a failure: the staged chunks survive,
+      // and the resumed run embeds only the ones without a vector
+      // ('replacing a document', the deferral row).
       getAiEntitlement.mockResolvedValue({
         budgetMicros: 0n,
         billingCycleStart: CYCLE_START,
@@ -1257,10 +1258,11 @@ describe('The ingestion pipeline (e2e)', () => {
       // The write-back ordering, from the failure side: Postgres must never
       // claim vectors that were not stored, because nothing downstream can
       // tell the difference.
+      // Not the last attempt: that one purges the staged chunks.
       fx.embeddings.failNext = new Error('embedding provider is down');
       const data = await queueDocument();
 
-      await processor.process(data).catch(() => undefined);
+      await processor.process(data, false).catch(() => undefined);
 
       const chunks = await fx.prisma.documentChunk.findMany({
         where: { documentId: data.documentId },
@@ -1270,13 +1272,12 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('15. COMPLETES the leftovers on a re-run', async () => {
-      // Recovery, and the reason the column is nullable: WITHIN a run, a chunk
-      // with no `vector_point_id` is one whose upsert never happened, so
-      // Postgres never claims a vector that is not there. The re-run here
-      // starts over rather than resuming — see test 19.
+      // Recovery, and the reason the column is nullable: a chunk with no
+      // `vector_point_id` is one whose upsert never happened, so Postgres
+      // never claims a vector that is not there, and the retry embeds it.
       fx.embeddings.failNext = new Error('transient');
       const data = await queueDocument();
-      await processor.process(data).catch(() => undefined);
+      await processor.process(data, false).catch(() => undefined);
 
       await expect(processor.process(data)).resolves.toBe('INDEXED');
 
@@ -1343,9 +1344,9 @@ describe('The ingestion pipeline (e2e)', () => {
 
     it('18. Leaves no points from the batches a PARTIAL failure had already upserted', async () => {
       // The shape the defect actually occurs in, and the one a single-batch
-      // document cannot produce: batch 1 reaches Qdrant, batch 2 throws, and
-      // the re-run deletes the rows holding batch 1's point ids. Without the
-      // purge those points stay addressable by nothing.
+      // document cannot produce: batch 1 reaches Qdrant, batch 2 throws. The
+      // retry keeps batch 1's rows and points and adds the rest, so every
+      // point belongs to a row.
       const sections = 40;
       downloadObject.mockResolvedValue(markdownFixture(sections));
 
@@ -1362,7 +1363,7 @@ describe('The ingestion pipeline (e2e)', () => {
       );
 
       const data = await queueDocument();
-      await processor.process(data).catch(() => undefined);
+      await processor.process(data, false).catch(() => undefined);
 
       // The arrangement is only worth anything if the first batch really did
       // reach Qdrant — a document that fits in one batch would make the rest
@@ -1384,14 +1385,37 @@ describe('The ingestion pipeline (e2e)', () => {
       ).resolves.toBe(chunks);
     });
 
-    it('19. Re-embeds the WHOLE document on a re-run, and is billed for it', async () => {
-      // Pinning what the code does, not what two docblocks used to say it did.
-      // `vector_point_id IS NULL` reads as "resume", and `writeChunkRows` has
-      // already recreated every row by the time it is evaluated — so the
-      // filter matches everything and the tenant pays twice.
-      //
-      // Change this test when the resume is built (known-gaps #11); until then
-      // it is the record that the cost is known rather than overlooked.
+    it('19. **A retry pays only for the batches the failed attempt did not embed**', async () => {
+      // Known gap 11's own example: a provider failure on batch 2 of a long
+      // document. The failed attempt's staged batch 1 still matches the file,
+      // so BullMQ's retry embeds from batch 2 on.
+      downloadObject.mockResolvedValue(markdownFixture(40));
+      const real = fx.embeddings.embedBatch.bind(fx.embeddings);
+      let call = 0;
+      faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
+          call += 1;
+          if (call === 2) throw new Error('embedding provider is down');
+          return real(texts, model);
+        },
+      );
+      const data = await queueDocument();
+      await processor.process(data, false).catch(() => undefined);
+      const total = await fx.prisma.documentChunk.count({
+        where: { documentId: data.documentId },
+      });
+      expect(total).toBeGreaterThan(EMBEDDING_BATCH_SIZE);
+
+      fx.embeddings.reset();
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+
+      const retried = fx.embeddings.calls.flatMap((batch) => batch.texts);
+      expect(retried).toHaveLength(total - EMBEDDING_BATCH_SIZE);
+    });
+
+    it('19b. A re-run of an indexed document embeds it whole: the live version is never reused', async () => {
       const data = await queueDocument();
 
       await processor.process(data);
@@ -1430,6 +1454,416 @@ describe('The ingestion pipeline (e2e)', () => {
         where: { id: data.ingestionJobId },
       });
       expect(job.status).toBe(IngestionJobStatus.FAILED);
+    });
+  });
+
+  describe('replacing a document', () => {
+    /** `markdownFixture` with every chunk's text changed by `word`. */
+    const variant = (sections: number, word: string): Buffer =>
+      Buffer.from(
+        markdownFixture(sections)
+          .toString('utf8')
+          .replaceAll('Employee', word)
+          .replaceAll('Section', word)
+          .replaceAll('policy', word)
+          .replaceAll('Detailed', word),
+        'utf8',
+      );
+
+    const rowsOf = async (documentId: string) => {
+      const rows = await fx.prisma.documentChunk.findMany({
+        where: { documentId },
+        orderBy: { chunkIndex: 'asc' },
+      });
+      return {
+        live: rows.filter((row) => !row.isStaged),
+        staged: rows.filter((row) => row.isStaged),
+      };
+    };
+
+    /**
+     * Exactly one version: every live row has its point, live, the document
+     * has no other point, and nothing is staged.
+     *
+     * @returns the live version's texts, in order.
+     */
+    const expectOneVersion = async (
+      data: Awaited<ReturnType<typeof queueDocument>>,
+    ) => {
+      const { live, staged } = await rowsOf(data.documentId);
+      expect(staged).toEqual([]);
+      expect(live.length).toBeGreaterThan(0);
+
+      const points = await qdrant.retrieve(
+        live.map((row) => row.vectorPointId as string),
+      );
+      expect(points).toHaveLength(live.length);
+      expect(
+        points.every(
+          (point) => point.payload?.[QDRANT_PAYLOAD_FIELDS.isStaged] === false,
+        ),
+      ).toBe(true);
+      await expect(
+        qdrant.countPoints(data.documentId, data.organizationId),
+      ).resolves.toBe(live.length);
+
+      return live.map((row) => row.contentText);
+    };
+
+    /** The first version, indexed; returns its texts and point ids. */
+    const indexed = async () => {
+      const data = await queueDocument();
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+      const texts = await expectOneVersion(data);
+      const { live } = await rowsOf(data.documentId);
+      fx.embeddings.reset();
+
+      return {
+        data,
+        texts,
+        pointIds: live.map((row) => row.vectorPointId as string),
+      };
+    };
+
+    /** Holds every embedding call until `release()`. */
+    const holdEmbedder = () => {
+      const real = fx.embeddings.embedBatch.bind(fx.embeddings);
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let reached!: () => void;
+      const arrived = new Promise<void>((resolve) => (reached = resolve));
+      faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
+          reached();
+          await gate;
+          return real(texts, model);
+        },
+      );
+
+      return { arrived, release };
+    };
+
+    /** Allows the first `batches` budget checks, then answers "at the cap". */
+    const capAfter = (batches: number) => {
+      const ledger = fx.moduleRef.get(AiLedgerService);
+      const real = ledger.checkBudget.bind(ledger);
+      const cap = { allowed: batches };
+      faults.replace(ledger, 'checkBudget', async (...args) => {
+        if (cap.allowed <= 0) {
+          return { allowed: false } as Awaited<ReturnType<typeof real>>;
+        }
+        cap.allowed -= 1;
+        return real(...args);
+      });
+
+      return cap;
+    };
+
+    const statusOf = async (data: { documentId: string }) =>
+      (
+        await fx.prisma.document.findUniqueOrThrow({
+          where: { id: data.documentId },
+        })
+      ).status;
+
+    const jobOf = (data: { ingestionJobId: string }) =>
+      fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+
+    it('**answers from the old version only while held mid-run, then from the new one only**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const hold = holdEmbedder();
+      const rerun = await requeue(old.data);
+
+      const running = processor.process(rerun);
+      await hold.arrived;
+
+      const { live, staged } = await rowsOf(old.data.documentId);
+      expect(live.map((row) => row.contentText)).toEqual(old.texts);
+      expect(staged.length).toBeGreaterThan(0);
+      expect(staged.some((row) => old.texts.includes(row.contentText))).toBe(
+        false,
+      );
+      const points = await qdrant.retrieve(old.pointIds);
+      expect(points).toHaveLength(old.pointIds.length);
+      await expect(
+        qdrant.countPoints(old.data.documentId, tenant.organizationId),
+      ).resolves.toBe(old.pointIds.length);
+      // Still answering, so still INDEXED; the job carries the run.
+      await expect(statusOf(old.data)).resolves.toBe(DocumentStatus.INDEXED);
+      expect((await jobOf(rerun)).status).toBe(IngestionJobStatus.EMBEDDING);
+
+      hold.release();
+      await expect(running).resolves.toBe('INDEXED');
+
+      const now = await expectOneVersion(old.data);
+      expect(now.some((text) => old.texts.includes(text))).toBe(false);
+      await expect(qdrant.retrieve(old.pointIds)).resolves.toEqual([]);
+    });
+
+    it('**a replace refused at parsing leaves the old version in full**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(Buffer.from('tiny', 'utf8'));
+      const rerun = await requeue(old.data);
+
+      await expect(processor.process(rerun)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
+
+      await expect(expectOneVersion(old.data)).resolves.toEqual(old.texts);
+      await expect(statusOf(old.data)).resolves.toBe(DocumentStatus.INDEXED);
+      expect((await jobOf(rerun)).status).toBe(IngestionJobStatus.FAILED);
+    });
+
+    it('**a replace failing at embedding on the last attempt leaves the old version and no staged data**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(40, 'Revised'));
+      const real = fx.embeddings.embedBatch.bind(fx.embeddings);
+      let call = 0;
+      faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
+          call += 1;
+          if (call === 2) throw new Error('embedding provider is down');
+          return real(texts, model);
+        },
+      );
+      const rerun = await requeue(old.data);
+
+      await expect(processor.process(rerun)).rejects.toThrow(
+        'embedding provider is down',
+      );
+
+      // Batch 1 reached Qdrant staged; the purge took it.
+      expect(call).toBe(2);
+      await expect(expectOneVersion(old.data)).resolves.toEqual(old.texts);
+      await expect(statusOf(old.data)).resolves.toBe(DocumentStatus.INDEXED);
+      expect((await jobOf(rerun)).status).toBe(IngestionJobStatus.FAILED);
+    });
+
+    it('**a replace cancelled mid-embedding leaves the old version and no staged data**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const hold = holdEmbedder();
+      const rerun = await requeue(old.data);
+
+      const running = processor.process(rerun);
+      await hold.arrived;
+      await fx.prisma.ingestionJob.update({
+        where: { id: rerun.ingestionJobId },
+        data: { status: IngestionJobStatus.CANCELLED },
+      });
+      hold.release();
+
+      await expect(running).resolves.toBe(INGESTION_OUTCOMES.CANCELLED);
+      await expect(expectOneVersion(old.data)).resolves.toEqual(old.texts);
+      await expect(statusOf(old.data)).resolves.toBe(DocumentStatus.INDEXED);
+    });
+
+    it('**a cancelled run leaves the staged version to a successor that can still run**', async () => {
+      // The successor builds from the same staged rows; purging under it
+      // would leave it swapping in half a document.
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const hold = holdEmbedder();
+      const rerun = await requeue(old.data);
+
+      const running = processor.process(rerun);
+      await hold.arrived;
+      await fx.prisma.ingestionJob.update({
+        where: { id: rerun.ingestionJobId },
+        data: { status: IngestionJobStatus.CANCELLED },
+      });
+      await requeue(old.data);
+      hold.release();
+
+      await expect(running).resolves.toBe(INGESTION_OUTCOMES.CANCELLED);
+      const { staged } = await rowsOf(old.data.documentId);
+      expect(staged.length).toBeGreaterThan(0);
+    });
+
+    it('a purge that fails is logged, and the run still ends as it would have', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(Buffer.from('tiny', 'utf8'));
+      faults.failOnce(
+        qdrant,
+        'purgeStagedPoints',
+        new Error('qdrant is unreachable'),
+      );
+      const warn = jest.spyOn(Logger.prototype, 'warn');
+
+      await expect(processor.process(await requeue(old.data))).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('Could not purge the staged version'),
+      );
+      await expect(expectOneVersion(old.data)).resolves.toEqual(old.texts);
+    });
+
+    it('**a replace deferred at the cap halfway keeps the old version, and the resumed run embeds only the rest**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(40, 'Revised'));
+      const cap = capAfter(1);
+      const rerun = await requeue(old.data);
+
+      await expect(processor.process(rerun)).resolves.toBe(
+        INGESTION_OUTCOMES.DEFERRED,
+      );
+
+      const { live, staged } = await rowsOf(old.data.documentId);
+      expect(live.map((row) => row.contentText)).toEqual(old.texts);
+      expect(staged.filter((row) => row.vectorPointId !== null)).toHaveLength(
+        EMBEDDING_BATCH_SIZE,
+      );
+      await expect(statusOf(old.data)).resolves.toBe(DocumentStatus.INDEXED);
+      const waiting = await jobOf(rerun);
+      expect(waiting.status).toBe(IngestionJobStatus.QUEUED);
+      expect(waiting.waitingReason).toBe(IngestionWaitingReason.AI_ALLOWANCE);
+
+      cap.allowed = Number.POSITIVE_INFINITY;
+      fx.embeddings.reset();
+      await expect(processor.process(rerun)).resolves.toBe('INDEXED');
+
+      const resumed = fx.embeddings.calls.flatMap((batch) => batch.texts);
+      expect(resumed).toHaveLength(staged.length - EMBEDDING_BATCH_SIZE);
+      const now = await expectOneVersion(old.data);
+      expect(now).toHaveLength(staged.length);
+    });
+
+    it('**a staged leftover with different text is purged and re-embedded, never reused**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(40, 'Draft'));
+      const cap = capAfter(1);
+      const rerun = await requeue(old.data);
+      await expect(processor.process(rerun)).resolves.toBe(
+        INGESTION_OUTCOMES.DEFERRED,
+      );
+
+      // Replaced again before the allowance returns: same indexes, new text.
+      downloadObject.mockResolvedValue(variant(40, 'Final'));
+      cap.allowed = Number.POSITIVE_INFINITY;
+      fx.embeddings.reset();
+      await expect(processor.process(rerun)).resolves.toBe('INDEXED');
+
+      const embedded = new Set(
+        fx.embeddings.calls.flatMap((batch) => batch.texts),
+      );
+      const now = await expectOneVersion(old.data);
+      expect(now.every((text) => embedded.has(text))).toBe(true);
+      expect(embedded.size).toBe(now.length);
+    });
+
+    it('**a crash between the two halves of the swap, then the retry: one version, no orphaned point**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const real = qdrant.swapDocumentPoints.bind(qdrant);
+      let crashed = false;
+      faults.replace(qdrant, 'swapDocumentPoints', async (...args) => {
+        await real(...args);
+        if (crashed) return;
+        crashed = true;
+        throw new Error('crashed between the halves');
+      });
+      const rerun = await requeue(old.data);
+
+      await expect(processor.process(rerun, false)).rejects.toThrow(
+        'crashed between the halves',
+      );
+      // Postgres still holds the old version as live.
+      const { live } = await rowsOf(old.data.documentId);
+      expect(live.map((row) => row.contentText)).toEqual(old.texts);
+
+      fx.embeddings.reset();
+      await expect(processor.process(rerun)).resolves.toBe('INDEXED');
+
+      // Every new point was kept, so the retry embedded nothing.
+      expect(fx.embeddings.calls).toHaveLength(0);
+      const now = await expectOneVersion(old.data);
+      expect(now.some((text) => old.texts.includes(text))).toBe(false);
+      await expect(qdrant.retrieve(old.pointIds)).resolves.toEqual([]);
+    });
+
+    it('**the same crash on the last attempt leaves orphaned points that the next run removes**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const real = qdrant.swapDocumentPoints.bind(qdrant);
+      let crashed = false;
+      faults.replace(qdrant, 'swapDocumentPoints', async (...args) => {
+        await real(...args);
+        if (crashed) return;
+        crashed = true;
+        throw new Error('crashed between the halves');
+      });
+      const rerun = await requeue(old.data);
+      await expect(processor.process(rerun)).rejects.toThrow(
+        'crashed between the halves',
+      );
+
+      await expect(processor.process(await requeue(old.data))).resolves.toBe(
+        'INDEXED',
+      );
+
+      await expectOneVersion(old.data);
+    });
+
+    it('**a scope change mid-run reaches the new version**', async () => {
+      const old = await indexed();
+      downloadObject.mockResolvedValue(variant(2, 'Revised'));
+      const hold = holdEmbedder();
+      const rerun = await requeue(old.data);
+
+      const running = processor.process(rerun);
+      await hold.arrived;
+      // What `setDocumentDepartments` does: the document, then the one writer.
+      await fx.prisma.document.update({
+        where: { id: old.data.documentId },
+        data: {
+          isOrganizationWide: false,
+          departmentLinks: { create: { departmentId: tenant.departmentId } },
+        },
+      });
+      await fx.moduleRef.get(ScopeWriterService).apply(
+        old.data.documentId,
+        tenant.organizationId,
+        {
+          isOrganizationWide: false,
+          departmentIds: [tenant.departmentId],
+          isDeleted: false,
+        },
+        { isOrganizationWide: true, departmentIds: [], isDeleted: false },
+      );
+      hold.release();
+      await expect(running).resolves.toBe('INDEXED');
+
+      await expectOneVersion(old.data);
+      const { live } = await rowsOf(old.data.documentId);
+      expect(
+        live.every(
+          (row) =>
+            !row.isOrganizationWide &&
+            row.departmentIds.join() === tenant.departmentId,
+        ),
+      ).toBe(true);
+      const points = await qdrant.retrieve(
+        live.map((row) => row.vectorPointId as string),
+      );
+      expect(
+        points.every(
+          (point) =>
+            point.payload?.[QDRANT_PAYLOAD_FIELDS.isOrganizationWide] ===
+              false &&
+            JSON.stringify(
+              point.payload?.[QDRANT_PAYLOAD_FIELDS.departmentIds],
+            ) === JSON.stringify([tenant.departmentId]),
+        ),
+      ).toBe(true);
     });
   });
 });
