@@ -3,6 +3,7 @@ import {
   AtCapAction,
   CONFLICT_CONFIDENCE_MIN,
   CONFLICT_SWEEP_PER_TENANT,
+  DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
@@ -17,6 +18,7 @@ import {
 } from '../factories';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
 import { ConflictCheckService } from '../../src/modules/ingestion/conflict-check.service';
+import { UNREADABLE_CONFLICT_DETAIL } from '../../src/modules/scheduled/document-flag-writer';
 import { ConflictCheckQueueService } from '../../src/modules/ingestion/conflict-check-queue.service';
 import { ScopeFanoutProcessor } from '../../src/modules/ingestion/scope-fanout.processor';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
@@ -251,6 +253,17 @@ describe('The conflict check (e2e)', () => {
     await expect(conflicts.check(a.id)).resolves.toBe(true);
 
     expect(await openConflicts()).toEqual([]);
+    // B3 still holds, so the resolved flags keep the judge's sentence.
+    const resolved = await fx.prisma.documentFlag.findMany({
+      where: { flagType: DocumentFlagType.CONFLICTING },
+    });
+    expect(resolved.map((flag) => flag.detail)).toEqual([
+      'This says one thing; Parking costs 5 a day. says another.',
+      'This says one thing; Parking costs 5 a day. says another.',
+    ]);
+    expect(resolved.every((flag) => flag.relatedDocumentId !== null)).toBe(
+      true,
+    );
   });
 
   it('a re-check where the passages are no longer similar resolves too', async () => {
@@ -308,6 +321,28 @@ describe('The conflict check (e2e)', () => {
   });
 
   describe('B3 again, after a visibility change', () => {
+    /** Every CONFLICTING row, open or resolved. */
+    const allConflicts = () =>
+      fx.prisma.documentFlag.findMany({
+        where: {
+          organizationId: tenant.organizationId,
+          flagType: DocumentFlagType.CONFLICTING,
+        },
+      });
+
+    /** A resolved flag that no longer names, links to or quotes the other side. */
+    const expectRedacted = async () => {
+      const [flag] = await allConflicts();
+      expect(flag).toMatchObject({
+        detail: UNREADABLE_CONFLICT_DETAIL,
+        relatedDocumentId: null,
+        relatedChunkId: null,
+        confidenceScore: null,
+      });
+      expect(flag.resolvedAt).not.toBeNull();
+      return flag;
+    };
+
     /** A flag on HR's policy naming the org-wide handbook. */
     const raised = async () => {
       const handbook = await documentWith('Carryover is 10 days.');
@@ -335,6 +370,39 @@ describe('The conflict check (e2e)', () => {
       await expect(conflicts.retestAudience(handbook.id)).resolves.toBe(1);
 
       expect(await openConflicts()).toEqual([]);
+      await expectRedacted();
+    });
+
+    it('**a flag a person already dismissed loses the other side’s words too, and keeps their resolution**', async () => {
+      const { handbook } = await raised();
+      const [open] = await openConflicts();
+      await fx.prisma.documentFlag.update({
+        where: { id: open.id },
+        data: {
+          resolvedAt: new Date(),
+          resolvedById: tenant.userId,
+          resolution: DocumentFlagResolution.DISMISSED,
+          resolutionComment: 'Both are right for their own audience.',
+        },
+      });
+      await fx.prisma.document.update({
+        where: { id: handbook.id },
+        data: {
+          isOrganizationWide: false,
+          departmentLinks: {
+            create: { departmentId: tenant.otherDepartmentId },
+          },
+        },
+      });
+
+      await expect(conflicts.retestAudience(handbook.id)).resolves.toBe(1);
+
+      const flag = await expectRedacted();
+      expect(flag).toMatchObject({
+        resolution: DocumentFlagResolution.DISMISSED,
+        resolvedById: tenant.userId,
+        resolutionComment: 'Both are right for their own audience.',
+      });
     });
 
     it('**widening the flagged document resolves the flag**', async () => {
@@ -359,6 +427,7 @@ describe('The conflict check (e2e)', () => {
       await expect(conflicts.retestAudience(hrPolicy.id)).resolves.toBe(1);
 
       expect(await openConflicts()).toEqual([]);
+      await expectRedacted();
     });
 
     it('deleting the named document resolves the flag, through the fan-out job', async () => {
@@ -380,6 +449,7 @@ describe('The conflict check (e2e)', () => {
       } as never);
 
       expect(await openConflicts()).toEqual([]);
+      await expectRedacted();
     });
   });
 

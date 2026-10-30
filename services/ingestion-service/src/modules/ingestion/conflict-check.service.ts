@@ -325,25 +325,26 @@ export class ConflictCheckService {
 
   /**
    * B3 again, after a visibility change to one document (a delete included):
-   * resolves every open `CONFLICTING` flag on it, or naming it, whose flagged
-   * side's readers can no longer open the named side.
+   * every `CONFLICTING` flag on it or naming it, open or resolved, whose
+   * flagged side's readers can no longer open the named side loses the named
+   * side's words and ids, and an open one is resolved
+   * ({@link DocumentFlagWriter.redactConflict}).
    *
-   * A restore needs nothing: it can't disclose, and the next check finds the
-   * pair again.
+   * Resolved flags too, because "include resolved" shows them to the same
+   * readers. A restore needs nothing: it can't disclose, and the next check
+   * finds the pair again.
    *
-   * @returns how many flags were resolved.
+   * @returns how many flags lost the other document.
    */
   async retestAudience(documentId: string): Promise<number> {
-    const open = await this.prisma.documentFlag.findMany({
+    const named = await this.prisma.documentFlag.findMany({
       where: {
         flagType: DocumentFlagType.CONFLICTING,
-        resolvedAt: null,
+        relatedDocumentId: { not: null },
         OR: [{ documentId }, { relatedDocumentId: documentId }],
       },
       select: {
-        organizationId: true,
-        documentId: true,
-        relatedDocumentId: true,
+        id: true,
         document: {
           include: { departmentLinks: { select: { departmentId: true } } },
         },
@@ -353,22 +354,18 @@ export class ConflictCheckService {
       },
     });
 
-    let resolved = 0;
-    for (const flag of open) {
+    let redacted = 0;
+    for (const flag of named) {
       const allowed =
         flag.relatedDocument !== null &&
         mayName(audienceOf(flag.document), audienceOf(flag.relatedDocument));
       if (allowed) continue;
 
-      resolved += await this.flags.resolveSystem(
-        flag.organizationId,
-        flag.documentId,
-        DocumentFlagType.CONFLICTING,
-        flag.relatedDocumentId ?? undefined,
-      );
+      await this.flags.redactConflict(flag.id);
+      redacted += 1;
     }
 
-    return resolved;
+    return redacted;
   }
 }
 

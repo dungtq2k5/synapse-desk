@@ -49,6 +49,14 @@ export type FlagFinding = {
 /** A document's live-version counters, summed over its chunks. */
 type Counters = { documentId: string; retrievals: number; citations: number };
 
+/** What a system resolution says in the comment a human reads. */
+const SYSTEM_RESOLUTION_COMMENT =
+  'Resolved automatically: the condition no longer holds';
+
+/** A `CONFLICTING` flag's sentence once the other side is out of reach. */
+export const UNREADABLE_CONFLICT_DETAIL =
+  "The other document is no longer visible to this document's readers.";
+
 /** The suppression key: one flag per document, type and related document. */
 const keyOf = (documentId: string, relatedDocumentId?: string | null) =>
   `${documentId}:${relatedDocumentId ?? ''}`;
@@ -383,8 +391,7 @@ export class DocumentFlagWriter {
         // anyone would put a name in a worklist beside a decision they did not
         // make.
         resolvedById: null,
-        resolutionComment:
-          'Resolved automatically: the condition no longer holds',
+        resolutionComment: SYSTEM_RESOLUTION_COMMENT,
       },
     });
 
@@ -395,6 +402,38 @@ export class DocumentFlagWriter {
     }
 
     return count;
+  }
+
+  /**
+   * Takes the other document out of a `CONFLICTING` flag whose readers can no
+   * longer open it: the judge's sentence quotes it, and the ids link to it.
+   *
+   * The flag keeps its place in the history with a neutral sentence. An open
+   * flag is also resolved, as the system; a person's resolution keeps its
+   * resolution, actor and comment, and only the words about the other
+   * document go.
+   */
+  async redactConflict(flagId: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.documentFlag.updateMany({
+        where: { id: flagId, resolvedAt: null },
+        data: {
+          resolvedAt: new Date(),
+          resolution: DocumentFlagResolution.FIXED,
+          resolvedById: null,
+          resolutionComment: SYSTEM_RESOLUTION_COMMENT,
+        },
+      }),
+      this.prisma.documentFlag.update({
+        where: { id: flagId },
+        data: {
+          detail: UNREADABLE_CONFLICT_DETAIL,
+          relatedDocumentId: null,
+          relatedChunkId: null,
+          confidenceScore: null,
+        },
+      }),
+    ]);
   }
 
   /**
