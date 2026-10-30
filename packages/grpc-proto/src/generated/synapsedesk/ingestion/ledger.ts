@@ -50,6 +50,8 @@ export enum AiGenerationPurpose {
    * make the fused call look like a new cost that it is not.
    */
   AI_GENERATION_PURPOSE_INJECTION_CLASSIFY = 10,
+  /** AI_GENERATION_PURPOSE_CONFLICT_CHECK - Judging whether two passages from different documents disagree. */
+  AI_GENERATION_PURPOSE_CONFLICT_CHECK = 11,
   UNRECOGNIZED = -1,
 }
 

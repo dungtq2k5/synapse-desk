@@ -70,6 +70,32 @@ message WithdrawFeedbackRequest {
 
 message WithdrawFeedbackResponse {}
 
+// The ratings of AI answers since `since`, per document those answers cited.
+// For ingestion-service's `NEGATIVE_FEEDBACK` detection, which calls it as the
+// system: the tenant is a field, as on the ledger's RPCs, because there is no
+// user to read it from.
+message ListCitedDocumentFeedbackRequest {
+  string organization_id = 1;
+  google.protobuf.Timestamp since = 2;
+}
+
+// One document's share of the ratings. Each rating counts once per document
+// its answer cited, however many of the document's passages it cited.
+message CitedDocumentFeedback {
+  string document_id = 1;
+  // Ratings of answers citing it, by `updated_at` since the window opened.
+  int32 ratings = 2;
+  // Of those, thumbs-down.
+  int32 downvotes = 3;
+  // Of those, marked "citation inaccurate". The mark is on the answer, so it
+  // counts against every document the answer cited.
+  int32 inaccurate = 4;
+}
+
+message ListCitedDocumentFeedbackResponse {
+  repeated CitedDocumentFeedback items = 1;
+}
+
 service FeedbackService {
   rpc SubmitFeedback(SubmitFeedbackRequest) returns (FeedbackResponse);
   rpc ListFeedback(ListFeedbackRequest) returns (ListFeedbackResponse);
@@ -78,4 +104,6 @@ service FeedbackService {
   // reason `WithdrawFeedback` takes only a message id.
   rpc GetFeedback(GetFeedbackRequest) returns (GetFeedbackResponse);
   rpc WithdrawFeedback(WithdrawFeedbackRequest) returns (WithdrawFeedbackResponse);
+  // Service-to-service only, never routed by the gateway: it reads no caller.
+  rpc ListCitedDocumentFeedback(ListCitedDocumentFeedbackRequest) returns (ListCitedDocumentFeedbackResponse);
 }

@@ -88,6 +88,38 @@ export interface WithdrawFeedbackRequest {
 export interface WithdrawFeedbackResponse {
 }
 
+/**
+ * The ratings of AI answers since `since`, per document those answers cited.
+ * For ingestion-service's `NEGATIVE_FEEDBACK` detection, which calls it as the
+ * system: the tenant is a field, as on the ledger's RPCs, because there is no
+ * user to read it from.
+ */
+export interface ListCitedDocumentFeedbackRequest {
+  organizationId: string;
+  since: Timestamp | undefined;
+}
+
+/**
+ * One document's share of the ratings. Each rating counts once per document
+ * its answer cited, however many of the document's passages it cited.
+ */
+export interface CitedDocumentFeedback {
+  documentId: string;
+  /** Ratings of answers citing it, by `updated_at` since the window opened. */
+  ratings: number;
+  /** Of those, thumbs-down. */
+  downvotes: number;
+  /**
+   * Of those, marked "citation inaccurate". The mark is on the answer, so it
+   * counts against every document the answer cited.
+   */
+  inaccurate: number;
+}
+
+export interface ListCitedDocumentFeedbackResponse {
+  items: CitedDocumentFeedback[];
+}
+
 export interface FeedbackServiceClient {
   submitFeedback(request: SubmitFeedbackRequest, metadata?: Metadata): Observable<FeedbackResponse>;
 
@@ -102,6 +134,13 @@ export interface FeedbackServiceClient {
   getFeedback(request: GetFeedbackRequest, metadata?: Metadata): Observable<GetFeedbackResponse>;
 
   withdrawFeedback(request: WithdrawFeedbackRequest, metadata?: Metadata): Observable<WithdrawFeedbackResponse>;
+
+  /** Service-to-service only, never routed by the gateway: it reads no caller. */
+
+  listCitedDocumentFeedback(
+    request: ListCitedDocumentFeedbackRequest,
+    metadata?: Metadata,
+  ): Observable<ListCitedDocumentFeedbackResponse>;
 }
 
 export interface FeedbackServiceController {
@@ -130,11 +169,27 @@ export interface FeedbackServiceController {
     request: WithdrawFeedbackRequest,
     metadata?: Metadata,
   ): Promise<WithdrawFeedbackResponse> | Observable<WithdrawFeedbackResponse> | WithdrawFeedbackResponse;
+
+  /** Service-to-service only, never routed by the gateway: it reads no caller. */
+
+  listCitedDocumentFeedback(
+    request: ListCitedDocumentFeedbackRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ListCitedDocumentFeedbackResponse>
+    | Observable<ListCitedDocumentFeedbackResponse>
+    | ListCitedDocumentFeedbackResponse;
 }
 
 export function FeedbackServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["submitFeedback", "listFeedback", "getFeedback", "withdrawFeedback"];
+    const grpcMethods: string[] = [
+      "submitFeedback",
+      "listFeedback",
+      "getFeedback",
+      "withdrawFeedback",
+      "listCitedDocumentFeedback",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("FeedbackService", method)(constructor.prototype[method], method, descriptor);

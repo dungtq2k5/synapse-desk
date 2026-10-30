@@ -10,6 +10,8 @@ import {
   unpackCallerContext,
   GetFeedbackRequest,
   GetFeedbackResponse,
+  ListCitedDocumentFeedbackRequest,
+  ListCitedDocumentFeedbackResponse,
   WithdrawFeedbackRequest,
   WithdrawFeedbackResponse,
 } from '@synapsedesk/grpc-proto';
@@ -39,6 +41,12 @@ export class FeedbackGrpcController implements FeedbackServiceController {
     metadata?: Metadata,
   ): Promise<GetFeedbackResponse> {
     return this.feedback.getFeedback(request, unpackCallerContext(metadata));
+  }
+
+  listCitedDocumentFeedback(
+    request: ListCitedDocumentFeedbackRequest,
+  ): Promise<ListCitedDocumentFeedbackResponse> {
+    return this.feedback.listCitedDocumentFeedback(request);
   }
 
   withdrawFeedback(

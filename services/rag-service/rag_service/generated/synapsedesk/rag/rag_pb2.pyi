@@ -263,6 +263,34 @@ class SuggestedArticle(_message.Message):
     score: float
     def __init__(self, document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., page_number: _Optional[int] = ..., score: _Optional[float] = ...) -> None: ...
 
+class ConflictPassage(_message.Message):
+    __slots__ = ("document_title", "text")
+    DOCUMENT_TITLE_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    document_title: str
+    text: str
+    def __init__(self, document_title: _Optional[str] = ..., text: _Optional[str] = ...) -> None: ...
+
+class JudgeConflictRequest(_message.Message):
+    __slots__ = ("organization_id", "first", "second")
+    ORGANIZATION_ID_FIELD_NUMBER: _ClassVar[int]
+    FIRST_FIELD_NUMBER: _ClassVar[int]
+    SECOND_FIELD_NUMBER: _ClassVar[int]
+    organization_id: str
+    first: ConflictPassage
+    second: ConflictPassage
+    def __init__(self, organization_id: _Optional[str] = ..., first: _Optional[_Union[ConflictPassage, _Mapping]] = ..., second: _Optional[_Union[ConflictPassage, _Mapping]] = ...) -> None: ...
+
+class JudgeConflictResponse(_message.Message):
+    __slots__ = ("conflicting", "confidence", "detail")
+    CONFLICTING_FIELD_NUMBER: _ClassVar[int]
+    CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
+    DETAIL_FIELD_NUMBER: _ClassVar[int]
+    conflicting: bool
+    confidence: float
+    detail: str
+    def __init__(self, conflicting: _Optional[bool] = ..., confidence: _Optional[float] = ..., detail: _Optional[str] = ...) -> None: ...
+
 class ChatResponse(_message.Message):
     __slots__ = ("content", "status", "citations", "generation_id")
     CONTENT_FIELD_NUMBER: _ClassVar[int]

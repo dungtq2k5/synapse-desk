@@ -358,6 +358,29 @@ export interface SuggestedArticle {
   score: number;
 }
 
+/** One side of a possible conflict: a passage and its document's title. */
+export interface ConflictPassage {
+  documentTitle: string;
+  text: string;
+}
+
+export interface JudgeConflictRequest {
+  organizationId: string;
+  first: ConflictPassage | undefined;
+  second: ConflictPassage | undefined;
+}
+
+export interface JudgeConflictResponse {
+  conflicting: boolean;
+  /** 0-1, the judge's own. */
+  confidence: number;
+  /**
+   * One sentence naming both sides by their titles, for the flag's detail.
+   * Empty when not conflicting.
+   */
+  detail: string;
+}
+
 /** The unary form of a ChatCompletion, for `Ask`. */
 export interface ChatResponse {
   content: string;
@@ -407,6 +430,15 @@ export interface RagServiceClient {
   classify(request: ClassifyRequest, metadata?: Metadata): Observable<ClassifyResponse>;
 
   suggest(request: SuggestionsRequest, metadata?: Metadata): Observable<SuggestionsResponse>;
+
+  /**
+   * Whether two passages from different documents disagree. Called by
+   * ingestion-service's conflict check as the system, never routed by the
+   * gateway: the tenant is a field, as on the ledger's RPCs. Billed to the
+   * tenant as CONFLICT_CHECK; at the cap it is refused like Classify.
+   */
+
+  judgeConflict(request: JudgeConflictRequest, metadata?: Metadata): Observable<JudgeConflictResponse>;
 }
 
 export interface RagServiceController {
@@ -462,11 +494,32 @@ export interface RagServiceController {
     request: SuggestionsRequest,
     metadata?: Metadata,
   ): Promise<SuggestionsResponse> | Observable<SuggestionsResponse> | SuggestionsResponse;
+
+  /**
+   * Whether two passages from different documents disagree. Called by
+   * ingestion-service's conflict check as the system, never routed by the
+   * gateway: the tenant is a field, as on the ledger's RPCs. Billed to the
+   * tenant as CONFLICT_CHECK; at the cap it is refused like Classify.
+   */
+
+  judgeConflict(
+    request: JudgeConflictRequest,
+    metadata?: Metadata,
+  ): Promise<JudgeConflictResponse> | Observable<JudgeConflictResponse> | JudgeConflictResponse;
 }
 
 export function RagServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["search", "chat", "ask", "draft", "summarize", "classify", "suggest"];
+    const grpcMethods: string[] = [
+      "search",
+      "chat",
+      "ask",
+      "draft",
+      "summarize",
+      "classify",
+      "suggest",
+      "judgeConflict",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("RagService", method)(constructor.prototype[method], method, descriptor);

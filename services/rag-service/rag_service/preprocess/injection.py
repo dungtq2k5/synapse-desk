@@ -63,6 +63,10 @@ UNGUARDED_RPCS: dict[str, str] = {
     "Classify": "output is a department id and a priority — a constrained choice",
     "Suggest": "output is a fixed set of suggested actions",
     "Search": "retrieval only — no model ever sees the query text",
+    "JudgeConflict": (
+        "no caller writes its input: two document passages, behind the nonce "
+        "boundary as sources, and a constrained verdict out"
+    ),
 }
 
 

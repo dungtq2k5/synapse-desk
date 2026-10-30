@@ -29,6 +29,7 @@ import {
 import { setStatusUnlessLive } from '../../common/live-version';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConflictCheckQueueService } from './conflict-check-queue.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
 import { AiSettingsService } from '../ai-settings/ai-settings.service';
@@ -218,6 +219,7 @@ export class IngestionProcessor {
     private readonly ledger: AiLedgerService,
     private readonly aiSettings: AiSettingsService,
     private readonly events: DocumentEventPublisher,
+    private readonly conflicts: ConflictCheckQueueService,
     @Inject(EMBEDDING_CLIENT) private readonly embeddings: EmbeddingClient,
   ) {}
 
@@ -349,6 +351,9 @@ export class IngestionProcessor {
       await this.reportMissingPages(data, parsed, chunks);
 
       await this.complete(data, chunks.length);
+      // A new version is live: check it against the other documents. Best
+      // effort; an unqueued check is found by the nightly sweep.
+      await this.conflicts.enqueue(documentId);
       return INGESTION_OUTCOMES.INDEXED;
     } catch (error) {
       if (error instanceof JobNoLongerRunnableError) {
@@ -506,19 +511,25 @@ export class IngestionProcessor {
     // destroys trust in the worklist.
     await this.flags.raise(
       data.organizationId,
-      [data.documentId],
       DocumentFlagType.PAGES_NOT_INDEXED,
       // **WARNING, not the INFO default.** A Knowledge Manager scanning the
       // worklist should see "part of this document is not searchable" above the
       // `UNRETRIEVED` noise, and a one-word omission is what would bury it.
       DocumentFlagSeverity.WARNING,
-      // **Page numbers and counts, never document text.** `detail` is
-      // `@db.Text` and operator-facing, which puts it under the same rule as
-      // `error_log` — and it is the field most likely to grow a helpful excerpt
-      // later. "page 7 read as: …" is exactly the improvement somebody ships
-      // without noticing they have put tenant content on an operator's screen.
-      `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
-        `${summarizePages(missing)}. ${explainMissingPages(missing, parsed)}`,
+      [
+        {
+          documentId: data.documentId,
+          // **Page numbers and counts, never document text.** `detail` is
+          // `@db.Text` and operator-facing, which puts it under the same rule
+          // as `error_log` — and it is the field most likely to grow a helpful
+          // excerpt later. "page 7 read as: …" is exactly the improvement
+          // somebody ships without noticing they have put tenant content on an
+          // operator's screen.
+          detail:
+            `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
+            `${summarizePages(missing)}. ${explainMissingPages(missing, parsed)}`,
+        },
+      ],
     );
 
     this.logger.warn(

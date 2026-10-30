@@ -1,5 +1,6 @@
 import {
   AiGenerationPurpose,
+  CONFLICT_CHECK_QUEUE,
   DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
@@ -16,6 +17,8 @@ import {
 } from '@synapsedesk/contracts';
 import { Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import { Queue } from 'bullmq';
+import { getQueueToken } from '@nestjs/bullmq';
 import { waitFor } from '@synapsedesk/testing/wait';
 import {
   BUDGET_MICROS,
@@ -210,6 +213,18 @@ describe('The ingestion pipeline (e2e)', () => {
       expect(job.processedAt).not.toBeNull();
       expect(job.errorLog).toBeNull();
       expect(document.status).toBe(DocumentStatus.INDEXED);
+    });
+
+    it('1b. Queues a conflict check once the new version is live', async () => {
+      const data = await queueDocument();
+
+      await processor.process(data);
+
+      const queue = fx.moduleRef.get<Queue>(
+        getQueueToken(CONFLICT_CHECK_QUEUE),
+      );
+      const job = await queue.getJob(`conflicts-${data.documentId}`);
+      expect(job?.data).toEqual({ documentId: data.documentId });
     });
 
     it('2. Writes chunks carrying the HEADING PATH, which is what a citation names', async () => {

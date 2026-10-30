@@ -4,6 +4,9 @@ import {
   AiGenerationOutcome,
   AiGenerationPurpose,
   DISMISSAL_SUPPRESSION_DAYS,
+  DOCUMENT_REVIEW_DAYS,
+  DocumentFlagSeverity,
+  FEEDBACK_WINDOW_DAYS,
   DocumentFlagResolution,
   DocumentFlagType,
   DOCUMENT_PATTERNS,
@@ -27,6 +30,7 @@ import {
   RECENT_SPEND_WINDOW_MS,
 } from '../../src/modules/scheduled/quota-reconciliation.job';
 import { DocumentFlagWriter } from '../../src/modules/scheduled/document-flag-writer';
+import { TicketReferenceService } from '../../src/modules/ticket-client/ticket-reference.service';
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -54,6 +58,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
   let sweep: DiscardedDraftSweep;
   let reconciliation: QuotaReconciliationJob;
   let flags: DocumentFlagWriter;
+  let feedbackRead: jest.SpyInstance;
   let documentFlags: DocumentFlagsService;
   let scopeWriter: ScopeWriterService;
   let fanoutQueue: ScopeFanoutQueueService;
@@ -92,6 +97,12 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
     sweep = fx.moduleRef.get(DiscardedDraftSweep);
     reconciliation = fx.moduleRef.get(QuotaReconciliationJob);
     flags = fx.moduleRef.get(DocumentFlagWriter);
+    // ticket-service isn't running for this suite; NEGATIVE_FEEDBACK's rows
+    // set the ratings they need.
+    feedbackRead = jest.spyOn(
+      fx.moduleRef.get(TicketReferenceService),
+      'citedDocumentFeedback',
+    );
     documentFlags = fx.moduleRef.get(DocumentFlagsService);
     scopeWriter = fx.moduleRef.get(ScopeWriterService);
     fanoutQueue = fx.moduleRef.get(ScopeFanoutQueueService);
@@ -102,6 +113,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
   beforeEach(async () => {
     await fx.reset();
     tenant = buildTenant();
+    feedbackRead.mockReset().mockResolvedValue([]);
   });
 
   afterAll(async () => {
@@ -886,7 +898,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       ]);
     });
 
-    it('10. Leaves a document alone once it has been cited even once', async () => {
+    it('10. Takes a document out of UNCITED once it has been cited even once', async () => {
       const document = await documentWithChunks(1);
 
       await fx.prisma.documentChunk.updateMany({
@@ -896,9 +908,15 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
       await flags.detect(tenant.organizationId);
 
+      // A rate this low is LOW_CONFIDENCE's (row 14), not these two.
       await expect(
         fx.prisma.documentFlag.count({
-          where: { organizationId: tenant.organizationId },
+          where: {
+            organizationId: tenant.organizationId,
+            flagType: {
+              in: [DocumentFlagType.UNCITED, DocumentFlagType.UNRETRIEVED],
+            },
+          },
         }),
       ).resolves.toBe(0);
     });
@@ -1047,6 +1065,223 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
           where: { organizationId: tenant.organizationId },
         }),
       ).resolves.toBe(0);
+    });
+  });
+
+  describe('The counter flags: OUTDATED, LOW_CONFIDENCE, NEGATIVE_FEEDBACK', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const ago = (days: number) => new Date(Date.now() - days * DAY);
+
+    /** One live chunk carrying the document's counters. */
+    const counted = async (
+      retrievals: number,
+      citations: number,
+      overrides = {},
+    ) => {
+      const document = await documentWithChunks(1, overrides);
+      await fx.prisma.documentChunk.updateMany({
+        where: { documentId: document.id },
+        data: { retrievalCount: retrievals, citationCount: citations },
+      });
+      return document;
+    };
+
+    const raisedOf = async (flagType: DocumentFlagType) =>
+      (
+        await fx.prisma.documentFlag.findMany({
+          where: { organizationId: tenant.organizationId, flagType },
+          orderBy: { detectedAt: 'asc' },
+        })
+      ).map((flag) => ({ documentId: flag.documentId, detail: flag.detail }));
+
+    /** A person's resolution of an OUTDATED flag, `days` ago. */
+    const reviewed = (
+      documentId: string,
+      days: number,
+      resolution: DocumentFlagResolution,
+      resolvedById: string | null = tenant.userId,
+    ) =>
+      fx.prisma.documentFlag.create({
+        data: {
+          organizationId: tenant.organizationId,
+          documentId,
+          flagType: DocumentFlagType.OUTDATED,
+          severity: DocumentFlagSeverity.WARNING,
+          detail: 'Its file hasn’t changed in a year.',
+          resolvedAt: ago(days),
+          resolvedById,
+          resolution,
+        },
+      });
+
+    it('13. OUTDATED: a file unreviewed for a year, not one a day younger', async () => {
+      const old = await documentWithChunks(1, {
+        fileUpdatedAt: new Date('2025-09-12T09:00:00Z'),
+      });
+      await documentWithChunks(1, {
+        fileUpdatedAt: ago(DOCUMENT_REVIEW_DAYS - 1),
+      });
+
+      await flags.detect(tenant.organizationId);
+
+      expect(await raisedOf(DocumentFlagType.OUTDATED)).toEqual([
+        {
+          documentId: old.id,
+          detail:
+            'Its file hasn’t changed since September 12, 2025. Check it’s still current; dismiss to mark it reviewed for another year.',
+        },
+      ]);
+    });
+
+    it('**13a. OUTDATED: a person’s Dismiss or Fixed is a review, quiet for a year**', async () => {
+      const dismissed = await documentWithChunks(1, {
+        fileUpdatedAt: ago(800),
+      });
+      const fixed = await documentWithChunks(1, { fileUpdatedAt: ago(800) });
+      const longAgo = await documentWithChunks(1, { fileUpdatedAt: ago(800) });
+      const bySystem = await documentWithChunks(1, { fileUpdatedAt: ago(800) });
+      await reviewed(dismissed.id, 200, DocumentFlagResolution.DISMISSED);
+      await reviewed(fixed.id, 10, DocumentFlagResolution.FIXED);
+      await reviewed(
+        longAgo.id,
+        DOCUMENT_REVIEW_DAYS + 1,
+        DocumentFlagResolution.DISMISSED,
+      );
+      await reviewed(bySystem.id, 10, DocumentFlagResolution.FIXED, null);
+
+      await flags.detect(tenant.organizationId);
+
+      const raised = await fx.prisma.documentFlag.findMany({
+        where: { flagType: DocumentFlagType.OUTDATED, resolvedAt: null },
+        select: { documentId: true },
+      });
+      expect(raised.map((flag) => flag.documentId).sort()).toEqual(
+        [longAgo.id, bySystem.id].sort(),
+      );
+    });
+
+    it('14. LOW_CONFIDENCE: cited in under 5% of 20 or more retrievals', async () => {
+      const low = await counted(21, 1);
+      await counted(20, 1); // exactly 5%
+      await counted(19, 0); // too few retrievals to judge
+      const uncited = await counted(20, 0); // UNCITED's, not this one
+
+      await flags.detect(tenant.organizationId);
+
+      expect(await raisedOf(DocumentFlagType.LOW_CONFIDENCE)).toEqual([
+        {
+          documentId: low.id,
+          detail:
+            'Cited in 1 of the 21 answers it was found for. The answers rarely trust it; check that it says what its title promises.',
+        },
+      ]);
+      expect(
+        (await raisedOf(DocumentFlagType.UNCITED)).map(
+          (flag) => flag.documentId,
+        ),
+      ).toEqual([uncited.id]);
+    });
+
+    it('14a. LOW_CONFIDENCE reads the live version only', async () => {
+      const document = await counted(40, 1);
+      // An update's staged chunk, its counters set as no projection would.
+      await fx.prisma.documentChunk.create({
+        data: {
+          documentId: document.id,
+          chunkIndex: 0,
+          contentText: 'The next version.',
+          tokenCount: 10,
+          organizationId: tenant.organizationId,
+          isStaged: true,
+          retrievalCount: 0,
+          citationCount: 40,
+        },
+      });
+
+      await flags.detect(tenant.organizationId);
+
+      expect(
+        (await raisedOf(DocumentFlagType.LOW_CONFIDENCE)).map(
+          (flag) => flag.documentId,
+        ),
+      ).toEqual([document.id]);
+    });
+
+    it('15. NEGATIVE_FEEDBACK: three thumbs-down that are half the ratings, or two inaccurate marks', async () => {
+      const half = await documentWithChunks(1);
+      const underHalf = await documentWithChunks(1);
+      const twoDown = await documentWithChunks(1);
+      const inaccurate = await documentWithChunks(1);
+      const oneInaccurate = await documentWithChunks(1);
+      feedbackRead.mockResolvedValue([
+        { documentId: half.id, ratings: 6, downvotes: 3, inaccurate: 0 },
+        { documentId: underHalf.id, ratings: 7, downvotes: 3, inaccurate: 0 },
+        { documentId: twoDown.id, ratings: 2, downvotes: 2, inaccurate: 0 },
+        { documentId: inaccurate.id, ratings: 2, downvotes: 0, inaccurate: 2 },
+        {
+          documentId: oneInaccurate.id,
+          ratings: 1,
+          downvotes: 0,
+          inaccurate: 1,
+        },
+      ]);
+
+      await flags.detect(tenant.organizationId);
+
+      expect(await raisedOf(DocumentFlagType.NEGATIVE_FEEDBACK)).toEqual(
+        expect.arrayContaining([
+          {
+            documentId: half.id,
+            detail: `3 of 6 ratings of answers citing it were thumbs-down in the last ${FEEDBACK_WINDOW_DAYS} days.`,
+          },
+          {
+            documentId: inaccurate.id,
+            detail: '2 said an answer citing it was inaccurate.',
+          },
+        ]),
+      );
+      expect(await raisedOf(DocumentFlagType.NEGATIVE_FEEDBACK)).toHaveLength(
+        2,
+      );
+      const [[organizationId, since]] = feedbackRead.mock.calls;
+      expect(organizationId).toBe(tenant.organizationId);
+      expect(Date.now() - (since as Date).getTime()).toBeCloseTo(
+        FEEDBACK_WINDOW_DAYS * DAY,
+        -5,
+      );
+    });
+
+    it('15a. NEGATIVE_FEEDBACK only on a document that still answers', async () => {
+      const deleted = await documentWithChunks(1, { deletedAt: new Date() });
+      const processing = await documentWithChunks(1, {
+        status: DocumentStatus.PROCESSING,
+      });
+      const elsewhere = '00000000-0000-4000-8000-000000000000';
+      feedbackRead.mockResolvedValue(
+        [deleted.id, processing.id, elsewhere].map((documentId) => ({
+          documentId,
+          ratings: 3,
+          downvotes: 3,
+          inaccurate: 3,
+        })),
+      );
+
+      await flags.detect(tenant.organizationId);
+
+      expect(await raisedOf(DocumentFlagType.NEGATIVE_FEEDBACK)).toEqual([]);
+    });
+
+    it('**15b. ticket-service down: NEGATIVE_FEEDBACK is skipped, the others still run**', async () => {
+      const unretrieved = await documentWithChunks(1);
+      feedbackRead.mockRejectedValue(new Error('ticket-service unavailable'));
+
+      await expect(flags.detect(tenant.organizationId)).resolves.toBe(1);
+
+      expect(
+        (await raisedOf(DocumentFlagType.UNRETRIEVED)).map(
+          (flag) => flag.documentId,
+        ),
+      ).toEqual([unretrieved.id]);
     });
   });
 

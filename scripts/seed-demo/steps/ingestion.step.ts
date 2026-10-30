@@ -296,6 +296,12 @@ const CALLS: Record<
     model: CHEAP_MODEL,
     cost: [10, 30],
   },
+  // A few judge calls a night, from the conflict check's sweep.
+  [AiGenerationPurpose.CONFLICT_CHECK]: {
+    per: [0, 2],
+    model: CHEAP_MODEL,
+    cost: [10, 30],
+  },
   [AiGenerationPurpose.EMBEDDING]: {
     per: [1, 3],
     model: EMBEDDING_MODEL,

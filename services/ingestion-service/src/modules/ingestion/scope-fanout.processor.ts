@@ -6,6 +6,7 @@ import {
   SCOPE_FANOUT_JOB_NAME,
   SCOPE_FANOUT_QUEUE,
 } from '@synapsedesk/contracts';
+import { ConflictCheckService } from './conflict-check.service';
 import { ScopeWriterService } from './scope-writer.service';
 
 /**
@@ -34,7 +35,10 @@ import { ScopeWriterService } from './scope-writer.service';
 export class ScopeFanoutProcessor extends WorkerHost {
   private readonly logger = new Logger(ScopeFanoutProcessor.name);
 
-  constructor(private readonly writer: ScopeWriterService) {
+  constructor(
+    private readonly writer: ScopeWriterService,
+    private readonly conflicts: ConflictCheckService,
+  ) {
     super();
   }
 
@@ -105,6 +109,10 @@ export class ScopeFanoutProcessor extends WorkerHost {
     // makes BullMQ retry, and there is no user waiting for a response to
     // protect. The grant that is merely deferred at the endpoint must
     // eventually land, and this is what lands it.
+    // A `CONFLICTING` flag on or naming this document may now name a side its
+    // readers can't open; those close. Idempotent, so a retried job re-tests.
+    await this.conflicts.retestAudience(event.documentId);
+
     const drift = await this.writer.findScopeDrift(event.documentId);
     if (drift.length > 0) {
       // Reachable when a chunk row was written between the two stores — an

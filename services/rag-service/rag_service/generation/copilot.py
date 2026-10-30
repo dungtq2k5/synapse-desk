@@ -24,11 +24,14 @@ from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.boundary import (
     attachment_instruction,
     classified_text_instruction,
+    compared_sources_instruction,
     history_instruction,
     new_nonce,
+    scrub_boundary,
     wrap_attachments,
     wrap_history,
     wrap_question,
+    wrap_sources,
 )
 from rag_service.generation.parts import Attachment, Prompt
 from rag_service.ledger.client import GenerationEntry
@@ -41,6 +44,10 @@ logger = logging.getLogger(__name__)
 SUMMARY_MAX_TOKENS = 512
 CLASSIFY_MAX_TOKENS = 128
 SUGGESTIONS_MAX_TOKENS = 768
+CONFLICT_MAX_TOKENS = 256
+
+#: The longest `detail` a conflict verdict keeps: one sentence on a flag card.
+CONFLICT_DETAIL_MAX_CHARS = 300
 
 
 @dataclass(frozen=True)
@@ -50,6 +57,13 @@ class Summary:
     confidence_score: float
     model_name: str
     generation_id: str
+
+
+@dataclass(frozen=True)
+class ConflictVerdict:
+    conflicting: bool
+    confidence: float
+    detail: str
 
 
 @dataclass(frozen=True)
@@ -188,6 +202,67 @@ class CopilotService:
             confidence_score=_confidence(parsed.get("confidence")),
             model_name=settings.generation_model,
             generation_id=generation_id,
+        )
+
+    async def judge_conflict(
+        self,
+        first: tuple[str, str],
+        second: tuple[str, str],
+        settings: AiSettings,
+        *,
+        budget: BudgetState,
+    ) -> ConflictVerdict:
+        """Whether two passages from different documents disagree.
+
+        Each side is `(document title, passage)`. Both are tenant text and both
+        go behind the nonce boundary as sources, the way generation treats
+        retrieved documents; the title too, since a person typed it.
+
+        The verdict is a constrained JSON object, and `detail` is scrubbed of
+        boundary tags and capped at `CONFLICT_DETAIL_MAX_CHARS`: it becomes a
+        flag's sentence. A malformed reply is "not conflicting", never an error
+        on a call that already cost money. Recorded with no user: the caller is
+        the system.
+        """
+        nonce = new_nonce()
+        blocks = "\n".join(
+            wrap_sources(f"TITLE: {title}\nPASSAGE: {text}", nonce)
+            for title, text in (first, second)
+        )
+        prompt = (
+            "Two passages from different documents of one organization follow, "
+            "each with its document's title.\n"
+            "Decide whether they CONTRADICT each other: a fact, number, rule or "
+            "procedure that cannot be true in both. Different topics, extra "
+            "detail, or one being more specific is NOT a contradiction.\n"
+            "Reply as JSON with keys: conflicting (true or false), confidence "
+            "(0-1), detail (one sentence naming each document by its title and "
+            'what each says, like "Leave Policy says 5 days of carryover; '
+            'Employee Handbook says 10."; empty when not conflicting).\n'
+            + compared_sources_instruction(nonce)
+            + "\n"
+            + blocks
+            + "\n\nJSON:"
+        )
+
+        text, _ = await self._spend(
+            prompt,
+            settings.cheap_model,
+            CONFLICT_MAX_TOKENS,
+            budget=budget,
+            purpose=AiGenerationPurpose.CONFLICT_CHECK,
+            user_id=None,
+            ticket_id=None,
+        )
+
+        parsed = _json_object(text)
+        conflicting = parsed.get("conflicting") is True
+        detail = scrub_boundary(str(parsed.get("detail") or "")).strip()
+
+        return ConflictVerdict(
+            conflicting=conflicting,
+            confidence=_clamp_unit(parsed.get("confidence")) if conflicting else 0.0,
+            detail=detail[:CONFLICT_DETAIL_MAX_CHARS] if conflicting else "",
         )
 
     async def classify(
@@ -479,6 +554,15 @@ class CopilotService:
             generation_id = ""
 
         return content, generation_id
+
+
+def _clamp_unit(value: object) -> float:
+    """A model's 0-1 number, or 0 when it isn't one."""
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+    return min(max(number, 0.0), 1.0)
 
 
 def _json_object(text: str) -> dict:

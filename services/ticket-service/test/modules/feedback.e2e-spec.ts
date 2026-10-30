@@ -692,4 +692,119 @@ describe('AI feedback (e2e)', () => {
       ).resolves.toMatchObject({ items: [] });
     });
   });
+
+  // -------------------------------------------------- cited-document read
+
+  describe('listCitedDocumentFeedback', () => {
+    const DOC_A = faker.string.uuid();
+    const DOC_B = faker.string.uuid();
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+
+    const cite = (documentId: string) => ({
+      chunkId: faker.string.uuid(),
+      documentId,
+      documentTitle: 'Handbook',
+      pageNumber: null,
+      vectorPointId: faker.string.uuid(),
+    });
+
+    /** An AI answer citing `documents`, rated by one person per rating. */
+    const rated = async (
+      documents: string[],
+      ratings: Array<{
+        rating: number;
+        citationAccurate?: boolean;
+        updatedAt?: Date;
+      }>,
+      t = tenant,
+    ) => {
+      const ticket = await createTicket(fx.prisma, t);
+      const reply = await createAiMessage(fx.prisma, ticket.id, {
+        citations: documents.map(cite),
+      });
+      for (const rating of ratings) {
+        await fx.prisma.aiResponseFeedback.create({
+          data: {
+            ticketMessageId: reply.id,
+            userId: faker.string.uuid(),
+            organizationId: t.organizationId,
+            rating: rating.rating,
+            citationAccurate: rating.citationAccurate ?? null,
+            ...(rating.updatedAt ? { updatedAt: rating.updatedAt } : {}),
+          },
+        });
+      }
+    };
+
+    const read = (t = tenant) =>
+      feedback.listCitedDocumentFeedback({
+        organizationId: t.organizationId,
+        since: toProtoTimestamp(since),
+      });
+
+    const byDocument = <T extends { documentId: string }>(items: T[]) =>
+      Object.fromEntries(items.map((item) => [item.documentId, item]));
+
+    it('counts each rating once per document its answer cited', async () => {
+      // Two passages of A and one of B in one answer, rated down twice.
+      await rated(
+        [DOC_A, DOC_A, DOC_B],
+        [{ rating: -1, citationAccurate: false }, { rating: -1 }],
+      );
+      await rated([DOC_A], [{ rating: 1 }]);
+
+      const items = byDocument((await read()).items);
+
+      expect(items[DOC_A]).toEqual({
+        documentId: DOC_A,
+        ratings: 3,
+        downvotes: 2,
+        inaccurate: 1,
+      });
+      expect(items[DOC_B]).toEqual({
+        documentId: DOC_B,
+        ratings: 2,
+        downvotes: 2,
+        inaccurate: 1,
+      });
+    });
+
+    it('reads ratings changed inside the window only', async () => {
+      await rated(
+        [DOC_A],
+        [
+          { rating: -1, updatedAt: new Date(since.getTime() - 60_000) },
+          { rating: -1, updatedAt: new Date(since.getTime() + 60_000) },
+        ],
+      );
+
+      const items = byDocument((await read()).items);
+
+      expect(items[DOC_A].ratings).toBe(1);
+    });
+
+    it('never counts another tenant’s ratings, or an answer with no citations', async () => {
+      await rated([DOC_A], [{ rating: -1 }], buildTenant());
+      await rated([], [{ rating: -1 }]);
+
+      await expect(read()).resolves.toEqual({ items: [] });
+    });
+
+    it('refuses a read with no tenant or no window', async () => {
+      await expectRpc(
+        feedback.listCitedDocumentFeedback({
+          organizationId: tenant.organizationId,
+          since: undefined,
+        }),
+        status.INVALID_ARGUMENT,
+      );
+      await expectRpc(
+        feedback.listCitedDocumentFeedback({
+          organizationId: '',
+          since: toProtoTimestamp(since),
+        }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+  });
 });

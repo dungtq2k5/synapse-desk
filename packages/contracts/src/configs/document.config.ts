@@ -185,6 +185,64 @@ export const DOCUMENT_FLAG_RESOLUTIONS = Object.values(DocumentFlagResolution);
 export const DISMISSAL_SUPPRESSION_DAYS = 30;
 
 /**
+ * How long a document's file may go unreviewed before `OUTDATED` asks.
+ *
+ * Counted from the later of `file_updated_at` and the last time a person
+ * resolved an `OUTDATED` flag on it, so dismissing means "reviewed, still
+ * current" for another year.
+ */
+export const DOCUMENT_REVIEW_DAYS = 365;
+
+/**
+ * How many retrievals a document needs before its citation rate means
+ * anything: `UNCITED` and `LOW_CONFIDENCE` both wait for it.
+ *
+ * Below this, "retrieved but rarely cited" is indistinguishable from "barely
+ * retrieved", and flagging it would send a Knowledge Manager to fix a document
+ * the retriever has hardly seen.
+ */
+export const UNCITED_MIN_RETRIEVALS = 20;
+
+/**
+ * The citation rate under which `LOW_CONFIDENCE` is raised: cited in fewer
+ * than 1 in 20 of the answers it was found for. Zero citations is
+ * `UNCITED`'s.
+ */
+export const LOW_CITATION_RATE = 0.05;
+
+/** How far back `NEGATIVE_FEEDBACK` reads ratings, by when they were given. */
+export const FEEDBACK_WINDOW_DAYS = 90;
+
+/**
+ * Thumbs-down ratings, in the window, on answers citing a document before
+ * `NEGATIVE_FEEDBACK` is raised for them, and only when they are at least
+ * half its ratings. Fewer is one unhappy reader.
+ */
+export const NEGATIVE_FEEDBACK_MIN_DOWNVOTES = 3;
+
+/**
+ * "Citation inaccurate" marks, in the window, on answers citing a document
+ * before `NEGATIVE_FEEDBACK` is raised for them, whatever the ratings say.
+ */
+export const INACCURATE_CITATION_MIN = 2;
+
+/**
+ * How similar two passages from different documents must be (cosine) before
+ * the judge reads them: similar passages are where two documents answer the
+ * same question, which is where they can disagree.
+ */
+export const CONFLICT_SIMILARITY_MIN = 0.8;
+
+/** The most similar pairs a document's check sends to the judge. */
+export const CONFLICT_PAIRS_PER_DOCUMENT = 10;
+
+/** Unchecked documents the nightly sweep queues per tenant. */
+export const CONFLICT_SWEEP_PER_TENANT = 20;
+
+/** The judge's confidence at which a `CONFLICTING` flag is raised. */
+export const CONFLICT_CONFIDENCE_MIN = 0.7;
+
+/**
  * `ai_generations.purpose` — every surface that spends.
  *
  * The list is the point: before RDM Table 29, only `CHAT_ANSWER` was ever
@@ -224,6 +282,8 @@ export enum AiGenerationPurpose {
    * did not change as though it had.
    */
   INJECTION_CLASSIFY = 'INJECTION_CLASSIFY',
+  /** Judging whether two passages from different documents disagree. */
+  CONFLICT_CHECK = 'CONFLICT_CHECK',
 }
 
 export const AI_GENERATION_PURPOSES = Object.values(AiGenerationPurpose);
@@ -548,3 +608,14 @@ export const SCOPE_FANOUT_QUEUE = 'document-scope-fanout';
 
 /** The job name within that queue. */
 export const SCOPE_FANOUT_JOB_NAME = 'reconcile-scope';
+
+/**
+ * The BullMQ queue checking one document for `CONFLICTING` flags: after its
+ * version goes live, and from the nightly sweep of unchecked documents. Its
+ * own queue because each job spends the tenant's AI allowance on judge calls,
+ * and must not sit behind a parse or hold up a re-scope.
+ */
+export const CONFLICT_CHECK_QUEUE = 'document-conflict-check';
+
+/** The job name within that queue. */
+export const CONFLICT_CHECK_JOB_NAME = 'check-conflicts';

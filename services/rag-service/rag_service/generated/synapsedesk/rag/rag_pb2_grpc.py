@@ -69,6 +69,11 @@ class RagServiceStub:
                 request_serializer=synapsedesk_dot_rag_dot_rag__pb2.SuggestionsRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_rag_dot_rag__pb2.SuggestionsResponse.FromString,
                 _registered_method=True)
+        self.JudgeConflict = channel.unary_unary(
+                '/synapsedesk.rag.RagService/JudgeConflict',
+                request_serializer=synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictResponse.FromString,
+                _registered_method=True)
 
 
 class RagServiceServicer:
@@ -131,6 +136,16 @@ class RagServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def JudgeConflict(self, request, context):
+        """Whether two passages from different documents disagree. Called by
+        ingestion-service's conflict check as the system, never routed by the
+        gateway: the tenant is a field, as on the ledger's RPCs. Billed to the
+        tenant as CONFLICT_CHECK; at the cap it is refused like Classify.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RagServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -168,6 +183,11 @@ def add_RagServiceServicer_to_server(servicer, server):
                     servicer.Suggest,
                     request_deserializer=synapsedesk_dot_rag_dot_rag__pb2.SuggestionsRequest.FromString,
                     response_serializer=synapsedesk_dot_rag_dot_rag__pb2.SuggestionsResponse.SerializeToString,
+            ),
+            'JudgeConflict': grpc.unary_unary_rpc_method_handler(
+                    servicer.JudgeConflict,
+                    request_deserializer=synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictRequest.FromString,
+                    response_serializer=synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -359,6 +379,33 @@ class RagService:
             '/synapsedesk.rag.RagService/Suggest',
             synapsedesk_dot_rag_dot_rag__pb2.SuggestionsRequest.SerializeToString,
             synapsedesk_dot_rag_dot_rag__pb2.SuggestionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def JudgeConflict(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.rag.RagService/JudgeConflict',
+            synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictRequest.SerializeToString,
+            synapsedesk_dot_rag_dot_rag__pb2.JudgeConflictResponse.FromString,
             options,
             channel_credentials,
             insecure,

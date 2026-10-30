@@ -1139,6 +1139,8 @@ export class DocumentsService {
             fileType: extensionFor(confirmed.contentType),
             fileSizeBytes: BigInt(confirmed.sizeBytes),
             fileHash,
+            // The file's own date, which `OUTDATED` counts from.
+            fileUpdatedAt: new Date(),
             ocrLanguages: assertOcrLanguages(request.ocrLanguages),
           },
           include: DOCUMENT_INCLUDE,
