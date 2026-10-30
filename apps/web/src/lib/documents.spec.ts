@@ -10,6 +10,7 @@ import {
   storageLevel,
   updateFailed,
   updatedLabel,
+  FLAG_TYPE,
 } from './documents';
 
 const job = (
@@ -121,5 +122,14 @@ describe('document wording', () => {
     expect(updatedLabel('2026-10-17T11:59:30Z', now, 'UTC')).toBe('Just now');
     expect(updatedLabel('2026-10-17T08:00:00Z', now, 'UTC')).toBe('Today');
     expect(updatedLabel('2026-10-02T08:00:00Z', now, 'UTC')).toBe('2 Oct 2026');
+  });
+});
+
+describe('flag words', () => {
+  it('says what LOW_CONFIDENCE means: found, rarely used', () => {
+    expect(FLAG_TYPE.LOW_CONFIDENCE).toEqual({
+      label: 'Low confidence',
+      sentence: 'Answers rarely use it when they find it.',
+    });
   });
 });

@@ -1,4 +1,6 @@
+import { AI_GENERATION_PURPOSES } from '@synapsedesk/contracts';
 import {
+  PURPOSE_WORDS,
   change,
   daysText,
   duration,
@@ -190,5 +192,16 @@ describe('numbers in words', () => {
       'No change vs the previous 30 days',
     );
     expect(change('rate', null, 0.5, 30)).toBeNull();
+  });
+});
+
+describe('AI purposes in words', () => {
+  it('names every purpose the ledger records, so none shows as its raw value', () => {
+    for (const purpose of AI_GENERATION_PURPOSES) {
+      expect(PURPOSE_WORDS[purpose]).toEqual(expect.any(String));
+    }
+    expect(PURPOSE_WORDS.CONFLICT_CHECK).toBe(
+      'Conflict checks between documents',
+    );
   });
 });

@@ -197,7 +197,7 @@ export const FLAG_TYPE: Record<FlagType, { label: string; sentence: string }> =
     },
     LOW_CONFIDENCE: {
       label: 'Low confidence',
-      sentence: 'Answers from it are low-confidence.',
+      sentence: 'Answers rarely use it when they find it.',
     },
     NEGATIVE_FEEDBACK: {
       label: 'Poor feedback',

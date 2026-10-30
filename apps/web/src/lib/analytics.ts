@@ -373,6 +373,7 @@ export const PURPOSE_WORDS: Record<string, string> = {
   SUGGESTIONS: 'Next-step suggestions for agents',
   CLASSIFY: 'Ticket classification',
   INJECTION_CLASSIFY: 'Safety checks',
+  CONFLICT_CHECK: 'Conflict checks between documents',
   GREETING_CLASSIFY: 'Greeting checks (chat)',
   REFORMULATION: 'Question rewording',
   EMBEDDING: 'Search indexing (embeddings)',
