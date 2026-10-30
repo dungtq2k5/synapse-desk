@@ -10,6 +10,7 @@ erDiagram
     String file_type 
     BigInt file_size_bytes 
     String file_hash 
+    DateTime file_updated_at 
     Boolean is_organization_wide 
     String status 
     String ocr_languages 

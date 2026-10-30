@@ -506,19 +506,25 @@ export class IngestionProcessor {
     // destroys trust in the worklist.
     await this.flags.raise(
       data.organizationId,
-      [data.documentId],
       DocumentFlagType.PAGES_NOT_INDEXED,
       // **WARNING, not the INFO default.** A Knowledge Manager scanning the
       // worklist should see "part of this document is not searchable" above the
       // `UNRETRIEVED` noise, and a one-word omission is what would bury it.
       DocumentFlagSeverity.WARNING,
-      // **Page numbers and counts, never document text.** `detail` is
-      // `@db.Text` and operator-facing, which puts it under the same rule as
-      // `error_log` — and it is the field most likely to grow a helpful excerpt
-      // later. "page 7 read as: …" is exactly the improvement somebody ships
-      // without noticing they have put tenant content on an operator's screen.
-      `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
-        `${summarizePages(missing)}. ${explainMissingPages(missing, parsed)}`,
+      [
+        {
+          documentId: data.documentId,
+          // **Page numbers and counts, never document text.** `detail` is
+          // `@db.Text` and operator-facing, which puts it under the same rule
+          // as `error_log` — and it is the field most likely to grow a helpful
+          // excerpt later. "page 7 read as: …" is exactly the improvement
+          // somebody ships without noticing they have put tenant content on an
+          // operator's screen.
+          detail:
+            `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
+            `${summarizePages(missing)}. ${explainMissingPages(missing, parsed)}`,
+        },
+      ],
     );
 
     this.logger.warn(

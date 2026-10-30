@@ -6,6 +6,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
 import { EventsModule } from './modules/events/events.module';
 import { AuthClientModule } from './modules/auth-client/auth-client.module';
 import { StorageClientModule } from './modules/storage-client/storage-client.module';
+import { TicketClientModule } from './modules/ticket-client/ticket-client.module';
 import { AiLedgerModule } from './modules/ai-ledger/ai-ledger.module';
 import { AiSettingsModule } from './modules/ai-settings/ai-settings.module';
 import { DocumentsModule } from './modules/documents/documents.module';
@@ -28,6 +29,7 @@ import { OpsModule } from './modules/ops/ops.module';
     EventsModule,
     AuthClientModule,
     StorageClientModule,
+    TicketClientModule,
     AiLedgerModule,
     AiSettingsModule,
     DocumentsModule,

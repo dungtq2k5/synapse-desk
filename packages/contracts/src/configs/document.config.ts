@@ -185,6 +185,48 @@ export const DOCUMENT_FLAG_RESOLUTIONS = Object.values(DocumentFlagResolution);
 export const DISMISSAL_SUPPRESSION_DAYS = 30;
 
 /**
+ * How long a document's file may go unreviewed before `OUTDATED` asks.
+ *
+ * Counted from the later of `file_updated_at` and the last time a person
+ * resolved an `OUTDATED` flag on it, so dismissing means "reviewed, still
+ * current" for another year.
+ */
+export const DOCUMENT_REVIEW_DAYS = 365;
+
+/**
+ * How many retrievals a document needs before its citation rate means
+ * anything: `UNCITED` and `LOW_CONFIDENCE` both wait for it.
+ *
+ * Below this, "retrieved but rarely cited" is indistinguishable from "barely
+ * retrieved", and flagging it would send a Knowledge Manager to fix a document
+ * the retriever has hardly seen.
+ */
+export const UNCITED_MIN_RETRIEVALS = 20;
+
+/**
+ * The citation rate under which `LOW_CONFIDENCE` is raised: cited in fewer
+ * than 1 in 20 of the answers it was found for. Zero citations is
+ * `UNCITED`'s.
+ */
+export const LOW_CITATION_RATE = 0.05;
+
+/** How far back `NEGATIVE_FEEDBACK` reads ratings, by when they were given. */
+export const FEEDBACK_WINDOW_DAYS = 90;
+
+/**
+ * Thumbs-down ratings, in the window, on answers citing a document before
+ * `NEGATIVE_FEEDBACK` is raised for them, and only when they are at least
+ * half its ratings. Fewer is one unhappy reader.
+ */
+export const NEGATIVE_FEEDBACK_MIN_DOWNVOTES = 3;
+
+/**
+ * "Citation inaccurate" marks, in the window, on answers citing a document
+ * before `NEGATIVE_FEEDBACK` is raised for them, whatever the ratings say.
+ */
+export const INACCURATE_CITATION_MIN = 2;
+
+/**
  * `ai_generations.purpose` — every surface that spends.
  *
  * The list is the point: before RDM Table 29, only `CHAT_ANSWER` was ever

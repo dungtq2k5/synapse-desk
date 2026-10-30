@@ -15,6 +15,8 @@ import {
   toProtoTimestamp,
   GetFeedbackRequest,
   GetFeedbackResponse,
+  ListCitedDocumentFeedbackRequest,
+  ListCitedDocumentFeedbackResponse,
   WithdrawFeedbackRequest,
   WithdrawFeedbackResponse,
 } from '@synapsedesk/grpc-proto';
@@ -208,6 +210,70 @@ export class FeedbackService {
     await this.prisma.aiResponseFeedback.delete({ where: { id: existing.id } });
 
     return {};
+  }
+
+  /**
+   * The ratings of AI answers since `since`, per document the answers cited.
+   *
+   * For ingestion-service's `NEGATIVE_FEEDBACK` detection, which calls it as
+   * the system. **No caller check, deliberately:** the tenant is a field of
+   * the request, as on the ledger's RPCs, because a system caller has no user
+   * to read it from. What protects it is that it's service-to-service only and
+   * never routed by the gateway.
+   *
+   * Each rating counts once per DOCUMENT its answer cited, however many of
+   * the document's passages it cited. "Citation inaccurate" is a mark on the
+   * answer, so it counts against every document the answer cited.
+   *
+   * @throws RpcException INVALID_ARGUMENT without `organizationId` or
+   *   `since`.
+   */
+  async listCitedDocumentFeedback(
+    request: ListCitedDocumentFeedbackRequest,
+  ): Promise<ListCitedDocumentFeedbackResponse> {
+    const { organizationId } = request;
+    const since = fromProtoTimestamp(request.since);
+    if (!organizationId || !since) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: '`organizationId` and `since` are required',
+      });
+    }
+
+    const rows = await this.prisma.$queryRaw<
+      {
+        document_id: string;
+        ratings: number;
+        downvotes: number;
+        inaccurate: number;
+      }[]
+    >`
+      SELECT cited.document_id,
+             count(*)::int AS ratings,
+             count(*) FILTER (WHERE f.rating = -1)::int
+               AS downvotes,
+             count(*) FILTER (WHERE f.citation_accurate = false)::int
+               AS inaccurate
+      FROM ai_response_feedbacks f
+      JOIN ticket_messages m ON m.id = f.ticket_message_id
+      CROSS JOIN LATERAL (
+        SELECT DISTINCT citation ->> 'documentId' AS document_id
+        FROM jsonb_array_elements(m.citations) AS citation
+      ) cited
+      WHERE f.organization_id = ${organizationId}::uuid
+        AND f.updated_at >= ${since}
+        AND jsonb_typeof(m.citations) = 'array'
+      GROUP BY cited.document_id
+    `;
+
+    return {
+      items: rows.map((row) => ({
+        documentId: row.document_id,
+        ratings: row.ratings,
+        downvotes: row.downvotes,
+        inaccurate: row.inaccurate,
+      })),
+    };
   }
 
   /**

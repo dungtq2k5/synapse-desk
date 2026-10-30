@@ -1319,6 +1319,7 @@ describe('Documents (e2e)', () => {
       const document = await createDocument(fx.prisma, tenant, {
         status: DocumentStatus.INDEXED,
         isOrganizationWide: true,
+        fileUpdatedAt: new Date('2025-01-01T00:00:00Z'),
       });
       const objectPath = replacement(document.id);
       confirmUpload.mockResolvedValue({
@@ -1341,6 +1342,10 @@ describe('Documents (e2e)', () => {
       expect(reloaded.ocrLanguages).toEqual(['vi']);
       expect(reloaded.status).toBe(DocumentStatus.PENDING);
       expect(await fx.prisma.ingestionJob.count()).toBe(1);
+      // The new file's date, which OUTDATED's year counts from.
+      expect(Date.now() - reloaded.fileUpdatedAt.getTime()).toBeLessThan(
+        60_000,
+      );
     });
 
     it('2. **supersedes the OLD path, never the new one**', async () => {

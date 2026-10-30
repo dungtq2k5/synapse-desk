@@ -64,6 +64,10 @@ export const envValidationSchema = Joi.object({
   // configured is worse than a service that refuses to boot.
   STORAGE_SERVICE_URL: Joi.string().required(),
 
+  // Required as an address; an outage only skips `NEGATIVE_FEEDBACK` for the
+  // night, so it is not a boot dependency in any other sense.
+  TICKET_SERVICE_URL: Joi.string().required(),
+
   // --------------------------------------------------------- 7 THIRD PARTY
 
   // Required in every environment EXCEPT test, where the pipeline runs against

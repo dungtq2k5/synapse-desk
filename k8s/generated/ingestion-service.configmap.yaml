@@ -28,3 +28,4 @@ data:
   QDRANT_URL: 'http://qdrant:6333'
   REDIS_DB: '0'
   STORAGE_SERVICE_URL: 'storage-service:50253'
+  TICKET_SERVICE_URL: 'ticket-service:5002'

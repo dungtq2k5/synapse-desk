@@ -48,6 +48,11 @@ model Document {
   /// dedup would leak the existence of one tenant's upload to another.
   fileHash String @map("file_hash") @db.VarChar(64)
 
+  /// When the current file arrived: set at the confirm and at a replace's
+  /// confirm, never by an edit to the title or scope (`updated_at` moves on
+  /// those). `OUTDATED` counts a year from it.
+  fileUpdatedAt DateTime @default(now()) @map("file_updated_at") @db.Timestamptz
+
   /// RDM §1.2's department boundary, clause 1. True means every department in
   /// the tenant can see it; false means only those in `departmentLinks`.
   isOrganizationWide Boolean @default(true) @map("is_organization_wide")
