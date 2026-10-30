@@ -230,8 +230,15 @@ export const INACCURATE_CITATION_MIN = 2;
  * How similar two passages from different documents must be (cosine) before
  * the judge reads them: similar passages are where two documents answer the
  * same question, which is where they can disagree.
+ *
+ * Measured on rag-service's eval corpus with the production embedding model:
+ * its closest unrelated cross-document pair is 0.77, while hand-written
+ * same-topic contradictions score 0.92–0.95 (an agreement scores 0.91 too;
+ * telling them apart is the judge's job). The sample is small: three
+ * documents, 34 chunks. If the judge's spend shows on the AI usage page, this
+ * is the knob.
  */
-export const CONFLICT_SIMILARITY_MIN = 0.8;
+export const CONFLICT_SIMILARITY_MIN = 0.85;
 
 /** The most similar pairs a document's check sends to the judge. */
 export const CONFLICT_PAIRS_PER_DOCUMENT = 10;
