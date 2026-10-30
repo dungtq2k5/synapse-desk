@@ -29,6 +29,7 @@ import {
 import { setStatusUnlessLive } from '../../common/live-version';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConflictCheckQueueService } from './conflict-check-queue.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
 import { AiSettingsService } from '../ai-settings/ai-settings.service';
@@ -218,6 +219,7 @@ export class IngestionProcessor {
     private readonly ledger: AiLedgerService,
     private readonly aiSettings: AiSettingsService,
     private readonly events: DocumentEventPublisher,
+    private readonly conflicts: ConflictCheckQueueService,
     @Inject(EMBEDDING_CLIENT) private readonly embeddings: EmbeddingClient,
   ) {}
 
@@ -349,6 +351,9 @@ export class IngestionProcessor {
       await this.reportMissingPages(data, parsed, chunks);
 
       await this.complete(data, chunks.length);
+      // A new version is live: check it against the other documents. Best
+      // effort; an unqueued check is found by the nightly sweep.
+      await this.conflicts.enqueue(documentId);
       return INGESTION_OUTCOMES.INDEXED;
     } catch (error) {
       if (error instanceof JobNoLongerRunnableError) {

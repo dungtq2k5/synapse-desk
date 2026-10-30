@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  CONFLICT_SWEEP_PER_TENANT,
+  DocumentStatus,
   PROJECTION_LAG_MS,
   ROLLUP_TRAILING_DAYS,
 } from '@synapsedesk/contracts';
@@ -10,6 +12,7 @@ import {
   ProjectionCursorMissingError,
 } from '../scheduled/chunk-usage.projection';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
+import { ConflictCheckQueueService } from '../ingestion/conflict-check-queue.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
 
 /** What one `ledger.daily` run did: the rollup's counts and any step that failed. */
@@ -59,9 +62,12 @@ export async function runStep(
  *      drop — anything that runs after retention reads nothing, permanently.
  *   2. `AiGenerationRollupJob` second, for the same reason: it aggregates the
  *      same rows retention removes.
- *   3. `DocumentFlagWriter` LAST, because `UNRETRIEVED` and `UNCITED` are
+ *   3. `DocumentFlagWriter`, because `UNRETRIEVED` and `UNCITED` are
  *      computed from the counters step 1 writes. Flagging first means
  *      flagging against yesterday's numbers.
+ *   4. The conflict sweep: queues up to `CONFLICT_SWEEP_PER_TENANT`
+ *      never-checked documents per tenant. It only queues; the checks run on
+ *      their own queue and spend as they go.
  *
  * When retention is built it goes at the END of this sequence and nowhere
  * else.
@@ -85,6 +91,7 @@ export class LedgerDailySequence {
     private readonly prisma: PrismaService,
     private readonly projection: ChunkUsageProjection,
     private readonly flags: DocumentFlagWriter,
+    private readonly conflicts: ConflictCheckQueueService,
     private readonly aiRollup: AiGenerationRollupJob,
     private readonly runs: JobRunRecorder,
   ) {}
@@ -162,6 +169,37 @@ export class LedgerDailySequence {
       },
     );
     if (!flagged) failed.push('document-flags');
+
+    // The corpus no check has completed for: documents from before the
+    // detector, and checks stopped at the cap or by a failure. The oldest
+    // first, a bounded number per tenant, so one large tenant can't spend a
+    // night's judging for everyone.
+    const swept = await runStep(
+      this.runs,
+      this.logger,
+      'conflict-sweep',
+      async () => {
+        const unchecked = await this.prisma.$queryRaw<{ id: string }[]>`
+          SELECT id FROM (
+            SELECT id,
+                   row_number() OVER (
+                     PARTITION BY organization_id ORDER BY created_at
+                   ) AS position
+            FROM documents
+            WHERE conflicts_checked_at IS NULL
+              AND deleted_at IS NULL
+              AND status = ${DocumentStatus.INDEXED}
+          ) ranked
+          WHERE position <= ${CONFLICT_SWEEP_PER_TENANT}
+        `;
+        for (const document of unchecked) {
+          await this.conflicts.enqueue(document.id);
+        }
+
+        return `${unchecked.length} document(s) queued`;
+      },
+    );
+    if (!swept) failed.push('conflict-sweep');
 
     return { ...rollup, failed };
   }

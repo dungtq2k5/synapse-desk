@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  CONFLICT_CHECK_QUEUE,
   INGESTION_QUEUE,
   SCHEDULER_QUEUE,
   SCOPE_FANOUT_QUEUE,
@@ -12,6 +13,7 @@ import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { EMBEDDING_CLIENT } from '../../src/modules/embeddings/embedding.contract';
 import { FakeEmbeddingClient } from './fake-embedding.client';
 import { IngestionWorker } from '../../src/modules/ingestion/ingestion.worker';
+import { ConflictCheckWorker } from '../../src/modules/ingestion/conflict-check.worker';
 import { ScopeFanoutProcessor } from '../../src/modules/ingestion/scope-fanout.processor';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 
@@ -95,6 +97,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   for (const worker of [
     moduleRef.get(IngestionWorker),
     moduleRef.get(ScopeFanoutProcessor),
+    moduleRef.get(ConflictCheckWorker),
     moduleRef.get(SchedulerProcessor),
   ]) {
     await worker.worker.waitUntilReady();
@@ -104,6 +107,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   const queues = [
     INGESTION_QUEUE,
     SCOPE_FANOUT_QUEUE,
+    CONFLICT_CHECK_QUEUE,
     SCHEDULER_QUEUE.ingestion,
   ].map((name) => moduleRef.get<Queue>(getQueueToken(name)));
 

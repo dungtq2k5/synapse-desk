@@ -68,6 +68,14 @@ export const envValidationSchema = Joi.object({
   // night, so it is not a boot dependency in any other sense.
   TICKET_SERVICE_URL: Joi.string().required(),
 
+  // Optional in TEST only, where suites fake the CONFLICTING judge. Anywhere
+  // else a missing address would leave every document unchecked in silence.
+  RAG_SERVICE_URL: Joi.string().when('NODE_ENV', {
+    is: 'test',
+    then: Joi.optional(),
+    otherwise: Joi.required(),
+  }),
+
   // --------------------------------------------------------- 7 THIRD PARTY
 
   // Required in every environment EXCEPT test, where the pipeline runs against

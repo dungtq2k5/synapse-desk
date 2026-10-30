@@ -53,6 +53,11 @@ model Document {
   /// those). `OUTDATED` counts a year from it.
   fileUpdatedAt DateTime @default(now()) @map("file_updated_at") @db.Timestamptz
 
+  /// When a conflict check last COMPLETED for the live version; null until
+  /// one has. The nightly sweep checks the null ones; a check stopped at the
+  /// AI cap or by a failure leaves it as it was.
+  conflictsCheckedAt DateTime? @map("conflicts_checked_at") @db.Timestamptz
+
   /// RDM §1.2's department boundary, clause 1. True means every department in
   /// the tenant can see it; false means only those in `departmentLinks`.
   isOrganizationWide Boolean @default(true) @map("is_organization_wide")

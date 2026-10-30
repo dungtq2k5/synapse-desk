@@ -597,6 +597,44 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             generation_id=summary.generation_id,
         )
 
+    async def JudgeConflict(
+        self,
+        request: rag_pb2.JudgeConflictRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> rag_pb2.JudgeConflictResponse:
+        """Whether two passages from different documents disagree.
+
+        Called by ingestion-service's conflict check as the system. **The tenant
+        is a field, not the caller's**, as on the ledger's RPCs: there is no
+        user, and this is service-to-service only, never routed by the gateway.
+        At the cap it is refused like `Classify`; the check then leaves the
+        document unchecked for the next night.
+        """
+        organization_id = request.organization_id
+        if not organization_id:
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT, "organization_id is required"
+            )
+            raise AssertionError("unreachable: abort raises")
+
+        settings = await self._deps.settings.settings_for(organization_id)
+        budget = await self._budget_state(organization_id)
+        if not budget.allows_embedding:
+            await context.abort(grpc.StatusCode.PERMISSION_DENIED, AT_CAP_REFUSAL)
+
+        verdict = await self._copilot.judge_conflict(
+            (request.first.document_title, request.first.text),
+            (request.second.document_title, request.second.text),
+            settings,
+            budget=budget,
+        )
+
+        return rag_pb2.JudgeConflictResponse(
+            conflicting=verdict.conflicting,
+            confidence=verdict.confidence,
+            detail=verdict.detail,
+        )
+
     async def Classify(
         self,
         request: rag_pb2.ClassifyRequest,

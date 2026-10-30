@@ -1,4 +1,7 @@
-import { fromProtoTimestamp } from '@synapsedesk/grpc-proto';
+import {
+  fromProtoTimestamp,
+  type ListCitedDocumentFeedbackRequest,
+} from '@synapsedesk/grpc-proto';
 import { of } from 'rxjs';
 import { TicketReferenceService } from './ticket-reference.service';
 
@@ -21,7 +24,9 @@ describe('TicketReferenceService (unit)', () => {
     expect(items).toEqual([
       { documentId: 'd1', ratings: 4, downvotes: 3, inaccurate: 0 },
     ]);
-    const [request] = listCitedDocumentFeedback.mock.calls[0];
+    const [request] = listCitedDocumentFeedback.mock.calls[0] as [
+      ListCitedDocumentFeedbackRequest,
+    ];
     expect(request.organizationId).toBe('org-1');
     expect(fromProtoTimestamp(request.since)).toEqual(since);
   });

@@ -353,6 +353,53 @@ export class QdrantService implements OnApplicationBootstrap {
     });
   }
 
+  /**
+   * The nearest live points of OTHER documents in the tenant to one point,
+   * at or above `minScore` (cosine), for the `CONFLICTING` check.
+   *
+   * By point id: Qdrant reads the point's own vector, so nothing is embedded
+   * again. Deleted and staged points are left out, like retrieval leaves them.
+   */
+  async nearestInOtherDocuments(
+    vectorPointId: string,
+    documentId: string,
+    organizationId: string,
+    limit: number,
+    minScore: number,
+  ): Promise<{ chunkId: string; documentId: string; score: number }[]> {
+    const result = await this.client.query(QDRANT_COLLECTION, {
+      query: vectorPointId,
+      limit,
+      score_threshold: minScore,
+      with_payload: [
+        QDRANT_PAYLOAD_FIELDS.chunkId,
+        QDRANT_PAYLOAD_FIELDS.documentId,
+      ],
+      filter: {
+        must: [
+          {
+            key: QDRANT_PAYLOAD_FIELDS.organizationId,
+            match: { value: organizationId },
+          },
+          { key: QDRANT_PAYLOAD_FIELDS.isDeleted, match: { value: false } },
+        ],
+        must_not: [
+          {
+            key: QDRANT_PAYLOAD_FIELDS.documentId,
+            match: { value: documentId },
+          },
+          this.staged,
+        ],
+      },
+    });
+
+    return result.points.map((point) => ({
+      chunkId: String(point.payload?.[QDRANT_PAYLOAD_FIELDS.chunkId]),
+      documentId: String(point.payload?.[QDRANT_PAYLOAD_FIELDS.documentId]),
+      score: point.score,
+    }));
+  }
+
   /** Matches a point being built: `is_staged` is true. */
   private readonly staged = {
     key: QDRANT_PAYLOAD_FIELDS.isStaged,

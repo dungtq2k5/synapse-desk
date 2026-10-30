@@ -44,6 +44,7 @@ class AiGenerationPurpose(StrEnum):
     EMBEDDING = "EMBEDDING"
     REVIEW = "REVIEW"
     INJECTION_CLASSIFY = "INJECTION_CLASSIFY"
+    CONFLICT_CHECK = "CONFLICT_CHECK"
 
 
 class AiGenerationStatus(StrEnum):

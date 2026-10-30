@@ -333,6 +333,33 @@ service RagService {
   rpc Summarize(SummaryRequest) returns (SummaryResponse);
   rpc Classify(ClassifyRequest) returns (ClassifyResponse);
   rpc Suggest(SuggestionsRequest) returns (SuggestionsResponse);
+
+  // Whether two passages from different documents disagree. Called by
+  // ingestion-service's conflict check as the system, never routed by the
+  // gateway: the tenant is a field, as on the ledger's RPCs. Billed to the
+  // tenant as CONFLICT_CHECK; at the cap it is refused like Classify.
+  rpc JudgeConflict(JudgeConflictRequest) returns (JudgeConflictResponse);
+}
+
+// One side of a possible conflict: a passage and its document's title.
+message ConflictPassage {
+  string document_title = 1;
+  string text = 2;
+}
+
+message JudgeConflictRequest {
+  string organization_id = 1;
+  ConflictPassage first = 2;
+  ConflictPassage second = 3;
+}
+
+message JudgeConflictResponse {
+  bool conflicting = 1;
+  // 0-1, the judge's own.
+  double confidence = 2;
+  // One sentence naming both sides by their titles, for the flag's detail.
+  // Empty when not conflicting.
+  string detail = 3;
 }
 
 // The unary form of a ChatCompletion, for `Ask`.

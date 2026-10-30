@@ -193,6 +193,8 @@ export enum AiSurface {
   KNOWLEDGE_SEARCH = 'KNOWLEDGE_SEARCH',
   KNOWLEDGE_ASK = 'KNOWLEDGE_ASK',
   INGESTION_EMBEDDING = 'INGESTION_EMBEDDING',
+  /** The nightly judge of two similar passages from different documents. */
+  DOCUMENT_CONFLICT_CHECK = 'DOCUMENT_CONFLICT_CHECK',
 }
 
 /**
@@ -256,6 +258,11 @@ export const AT_CAP_POLICY: Record<
   // free version of it.
   [AiSurface.KNOWLEDGE_ASK]: { action: AtCapAction.REFUSE, graceRatio: 0 },
   [AiSurface.INGESTION_EMBEDDING]: { action: AtCapAction.DEFER, graceRatio: 0 },
+  // The document stays unchecked and the next night's sweep picks it up.
+  [AiSurface.DOCUMENT_CONFLICT_CHECK]: {
+    action: AtCapAction.DEFER,
+    graceRatio: 0,
+  },
 };
 
 /** Allowed, or the specific thing this surface does instead. */

@@ -26,6 +26,7 @@ data:
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
   QDRANT_URL: 'http://qdrant:6333'
+  RAG_SERVICE_URL: 'rag-service:50255'
   REDIS_DB: '0'
   STORAGE_SERVICE_URL: 'storage-service:50253'
   TICKET_SERVICE_URL: 'ticket-service:5002'

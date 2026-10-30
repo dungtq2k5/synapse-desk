@@ -1,7 +1,14 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/contracts';
+import {
+  CONFLICT_CHECK_QUEUE,
+  INGESTION_QUEUE,
+  SCOPE_FANOUT_QUEUE,
+} from '@synapsedesk/contracts';
+import { ConflictCheckService } from './conflict-check.service';
+import { ConflictCheckQueueService } from './conflict-check-queue.service';
+import { ConflictCheckWorker } from './conflict-check.worker';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { ScheduledModule } from '../scheduled/scheduled.module';
@@ -52,6 +59,8 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
       // security-relevant, and sharing a queue would put it behind a
       // 200-page PDF parse.
       { name: SCOPE_FANOUT_QUEUE },
+      // Its own queue: every job spends AI allowance on judge calls.
+      { name: CONFLICT_CHECK_QUEUE },
     ),
     PrismaModule,
     StorageClientModule,
@@ -77,6 +86,9 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     ScopeWriterService,
     ScopeFanoutProcessor,
     ScopeFanoutQueueService,
+    ConflictCheckService,
+    ConflictCheckQueueService,
+    ConflictCheckWorker,
     // The queue's own reconciler. Here rather than in `ScheduledModule` for two
     // reasons: this module already imports that one for `DocumentFlagWriter`,
     // so the reverse edge would be a cycle — and the sweep is about THIS
@@ -93,6 +105,8 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     AttachmentExtractorService,
     ScopeWriterService,
     ScopeFanoutQueueService,
+    ConflictCheckService,
+    ConflictCheckQueueService,
     IngestionReconcileSweep,
     ScopeReconcileSweep,
   ],

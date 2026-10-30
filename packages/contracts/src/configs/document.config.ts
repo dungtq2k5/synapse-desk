@@ -227,6 +227,22 @@ export const NEGATIVE_FEEDBACK_MIN_DOWNVOTES = 3;
 export const INACCURATE_CITATION_MIN = 2;
 
 /**
+ * How similar two passages from different documents must be (cosine) before
+ * the judge reads them: similar passages are where two documents answer the
+ * same question, which is where they can disagree.
+ */
+export const CONFLICT_SIMILARITY_MIN = 0.8;
+
+/** The most similar pairs a document's check sends to the judge. */
+export const CONFLICT_PAIRS_PER_DOCUMENT = 10;
+
+/** Unchecked documents the nightly sweep queues per tenant. */
+export const CONFLICT_SWEEP_PER_TENANT = 20;
+
+/** The judge's confidence at which a `CONFLICTING` flag is raised. */
+export const CONFLICT_CONFIDENCE_MIN = 0.7;
+
+/**
  * `ai_generations.purpose` — every surface that spends.
  *
  * The list is the point: before RDM Table 29, only `CHAT_ANSWER` was ever
@@ -266,6 +282,8 @@ export enum AiGenerationPurpose {
    * did not change as though it had.
    */
   INJECTION_CLASSIFY = 'INJECTION_CLASSIFY',
+  /** Judging whether two passages from different documents disagree. */
+  CONFLICT_CHECK = 'CONFLICT_CHECK',
 }
 
 export const AI_GENERATION_PURPOSES = Object.values(AiGenerationPurpose);
@@ -590,3 +608,14 @@ export const SCOPE_FANOUT_QUEUE = 'document-scope-fanout';
 
 /** The job name within that queue. */
 export const SCOPE_FANOUT_JOB_NAME = 'reconcile-scope';
+
+/**
+ * The BullMQ queue checking one document for `CONFLICTING` flags: after its
+ * version goes live, and from the nightly sweep of unchecked documents. Its
+ * own queue because each job spends the tenant's AI allowance on judge calls,
+ * and must not sit behind a parse or hold up a re-scope.
+ */
+export const CONFLICT_CHECK_QUEUE = 'document-conflict-check';
+
+/** The job name within that queue. */
+export const CONFLICT_CHECK_JOB_NAME = 'check-conflicts';
