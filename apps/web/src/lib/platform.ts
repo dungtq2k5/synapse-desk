@@ -355,6 +355,65 @@ const GRANT_WORDS: Record<
   maxAnalyticsRangeDays: ['Analytics ranges', plain, ' days'],
 };
 
+/** A metadata value as text; anything but a string reads as nothing. */
+const text = (value: unknown) => (typeof value === 'string' ? value : '');
+
+/** Each field a plan edit can change: the plan form's label, how values read. */
+const PLAN_FIELD_WORDS: Record<string, [string, (value: unknown) => string]> = {
+  name: ['Name', (value) => text(value)],
+  stripeProductId: [
+    'Stripe product',
+    (value) => (value ? text(value) : 'none'),
+  ],
+  maxAgentSeats: ['Seats', (value) => plain(Number(value))],
+  maxStorageBytes: ['Document storage', (value) => gbText(Number(value))],
+  monthlyAiTokenBudget: ['AI allowance', (value) => usd(Number(value))],
+  aiModelTier: ['AI model', (value) => TIER[text(value)] ?? text(value)],
+  maxDocumentBytes: ['Largest document', (value) => mbText(Number(value))],
+  maxAttachmentBytes: ['Largest attachment', (value) => mbText(Number(value))],
+  maxDocumentUploads: ['Documents', (value) => plain(Number(value))],
+  maxAnalyticsRangeDays: [
+    'Analytics ranges up to',
+    (value) => `${plain(Number(value))} days`,
+  ],
+  isActive: ['Offered', (value) => (value ? 'yes' : 'no')],
+};
+
+type PriceWords = { stripePriceId?: unknown; interval?: unknown };
+
+/**
+ * What a plan edit changed, a line per field in the form's order, prices
+ * last: "Seats 20 → 25", "Prices: added price_x (monthly); removed price_y".
+ * Empty for an entry with no `changes` (one written before they were kept).
+ *
+ * @example planEditLines({ changes: [{ field: 'maxAgentSeats', from: 20, to: 25 }] }) // ['Seats 20 → 25']
+ */
+export function planEditLines(
+  metadata: Record<string, unknown> | null | undefined,
+): string[] {
+  const changes = Array.isArray(metadata?.changes) ? metadata.changes : [];
+  return changes.flatMap((change: Record<string, unknown>) => {
+    if (change.field === 'prices') {
+      const added = (Array.isArray(change.added) ? change.added : []).map(
+        (price: PriceWords) =>
+          `${text(price.stripePriceId)} (${price.interval === 'year' ? 'yearly' : 'monthly'})`,
+      );
+      const removed = (Array.isArray(change.removed) ? change.removed : []).map(
+        (price: PriceWords) => text(price.stripePriceId),
+      );
+      const parts = [
+        added.length > 0 && `added ${added.join(', ')}`,
+        removed.length > 0 && `removed ${removed.join(', ')}`,
+      ].filter(Boolean);
+      return parts.length > 0 ? [`Prices: ${parts.join('; ')}`] : [];
+    }
+    const words = PLAN_FIELD_WORDS[text(change.field)];
+    if (!words) return [];
+    const [label, read] = words;
+    return [`${label} ${read(change.from)} → ${read(change.to)}`];
+  });
+}
+
 /**
  * What applying changes for one subscriber, a line per grant: "Seats 20 →
  * 25", "AI allowance $12.00 → $10.00 a month, from its next cycle".

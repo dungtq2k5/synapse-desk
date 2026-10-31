@@ -224,6 +224,8 @@ public class PlatformPlansService {
     UpdatePlanDto dto
   ) {
     superAdminCheck.require(context);
+    requireWithinLimit("addPrices", dto.getAddPrices());
+    requireWithinLimit("removePrices", dto.getRemovePrices());
 
     UpdatePlanRequest.Builder wire = UpdatePlanRequest.newBuilder()
       .setPlanId(id)
@@ -273,6 +275,21 @@ public class PlatformPlansService {
     }
     if (dto.getIsActive() != null) {
       wire.setIsActive(dto.getIsActive());
+    }
+    // `repeated`, so absent and empty are one value on the wire.
+    if (dto.getAddPrices() != null) {
+      dto
+        .getAddPrices()
+        .forEach(price ->
+          wire.addAddPrices(
+            CreatePlanPriceInput.newBuilder()
+              .setStripePriceId(price.getStripePriceId())
+              .setInterval(price.getInterval().getValue())
+          )
+        );
+    }
+    if (dto.getRemovePrices() != null) {
+      wire.addAllRemovePrices(dto.getRemovePrices());
     }
 
     SubscriptionPlanResponse response = withMetadata(context).updatePlan(
@@ -539,10 +556,14 @@ public class PlatformPlansService {
   }
 
   private static void requirePricesWithinLimit(List<?> prices) {
+    requireWithinLimit("prices", prices);
+  }
+
+  private static void requireWithinLimit(String field, List<?> prices) {
     if (prices != null && prices.size() > MAX_PLAN_PRICES) {
       throw new ResponseStatusException(
         HttpStatus.BAD_REQUEST,
-        "prices must contain no more than " + MAX_PLAN_PRICES + " elements"
+        field + " must contain no more than " + MAX_PLAN_PRICES + " elements"
       );
     }
   }

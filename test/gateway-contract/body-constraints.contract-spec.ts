@@ -51,7 +51,7 @@ import {
 } from './request-bodies';
 import { readRunState } from './run-state';
 
-type Sample = { valid: string; invalid: string };
+type Sample = { valid: unknown; invalid: unknown };
 
 const ISO_VALID = '2026-01-01T00:00:00.000Z';
 
@@ -80,6 +80,8 @@ const MATCHES: Record<string, Sample> = {
   domain: { valid: 'acme.com', invalid: 'not a domain!' },
   stripePriceId: { valid: 'price_123', invalid: 'bad id!' },
   stripeProductId: { valid: 'prod_123', invalid: 'bad id!' },
+  // On a list's elements: one element breaks the pattern.
+  removePrices: { valid: ['price_123'], invalid: ['bad id!'] },
 };
 
 /** The sentence `ConstraintPublishingCustomizer` publishes for a rule no keyword can state. */
@@ -106,7 +108,8 @@ const PUBLISHED: Record<
   Kind,
   (property: Schema & Record<string, unknown>) => boolean
 > = {
-  Matches: (p) => typeof p.pattern === 'string',
+  Matches: (p) =>
+    typeof (p.items ? (resolve(p.items) as typeof p) : p).pattern === 'string',
   StrictIso8601: (p) => typeof p.pattern === 'string',
   CalendarDate: (p) => typeof p.pattern === 'string',
   NumberString: (p) => typeof p.pattern === 'string',
@@ -202,7 +205,7 @@ const MOST_RESTRICTIVE: Kind[] = [
   'StrictIso8601',
   'OffsetDateTime',
 ];
-const validFor = (item: Found): string => {
+const validFor = (item: Found): unknown => {
   const kinds = constraints
     .filter((c) => c.schema === item.schema && c.property === item.property)
     .map((c) => c.kind);

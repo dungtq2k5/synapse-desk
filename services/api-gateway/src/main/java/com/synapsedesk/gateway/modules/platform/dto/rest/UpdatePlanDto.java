@@ -4,9 +4,12 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.synapsedesk.gateway.common.validation.Matches;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -74,6 +77,56 @@ public class UpdatePlanDto {
   private @Nullable BigDecimal maxAnalyticsRangeDays;
 
   private @Nullable Boolean isActive;
+
+  private @Nullable List<@Valid CreatePlanPriceDto> addPrices;
+
+  private @Nullable List<@Size(max = 255) @Matches(
+    regex = "^[A-Za-z0-9_-]+$"
+  ) String> removePrices;
+
+  public UpdatePlanDto addPrices(@Nullable List<CreatePlanPriceDto> addPrices) {
+    this.addPrices = addPrices;
+    return this;
+  }
+
+  /**
+   * Prices to put on the plan, in create's shape: each is read from Stripe and must be of the plan's Stripe product. Absent or `[]`, none.
+   * @return addPrices
+   */
+  @Valid
+  @JsonProperty("addPrices")
+  public @Nullable List<@Valid CreatePlanPriceDto> getAddPrices() {
+    return addPrices;
+  }
+
+  @JsonProperty("addPrices")
+  public void setAddPrices(
+    @Nullable List<@Valid CreatePlanPriceDto> addPrices
+  ) {
+    this.addPrices = addPrices;
+  }
+
+  public UpdatePlanDto removePrices(@Nullable List<String> removePrices) {
+    this.removePrices = removePrices;
+    return this;
+  }
+
+  /**
+   * Stripe price ids to take off the plan. Refused while an organization's live subscription is on one. Absent or `[]`, none.
+   * @return removePrices
+   */
+  @ArraySchema(schema = @Schema(pattern = "^[A-Za-z0-9_-]+$"))
+  @JsonProperty("removePrices")
+  public @Nullable List<@Size(max = 255) @Matches(
+    regex = "^[A-Za-z0-9_-]+$"
+  ) String> getRemovePrices() {
+    return removePrices;
+  }
+
+  @JsonProperty("removePrices")
+  public void setRemovePrices(@Nullable List<String> removePrices) {
+    this.removePrices = removePrices;
+  }
 
   public UpdatePlanDto name(@Nullable String name) {
     this.name = name;
@@ -388,7 +441,9 @@ public class UpdatePlanDto {
         this.maxAnalyticsRangeDays,
         updatePlanDto.maxAnalyticsRangeDays
       ) &&
-      Objects.equals(this.isActive, updatePlanDto.isActive)
+      Objects.equals(this.isActive, updatePlanDto.isActive) &&
+      Objects.equals(this.addPrices, updatePlanDto.addPrices) &&
+      Objects.equals(this.removePrices, updatePlanDto.removePrices)
     );
   }
 
@@ -406,7 +461,9 @@ public class UpdatePlanDto {
       maxAttachmentBytes,
       maxDocumentUploads,
       maxAnalyticsRangeDays,
-      isActive
+      isActive,
+      addPrices,
+      removePrices
     );
   }
 
@@ -446,6 +503,12 @@ public class UpdatePlanDto {
       .append(toIndentedString(maxAnalyticsRangeDays))
       .append("\n");
     sb.append("    isActive: ").append(toIndentedString(isActive)).append("\n");
+    sb.append("    addPrices: ")
+      .append(toIndentedString(addPrices))
+      .append("\n");
+    sb.append("    removePrices: ")
+      .append(toIndentedString(removePrices))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }

@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.modules.platform.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OrganizationResponseDto;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -37,6 +38,8 @@ public class PlatformOrganizationStatusResponseDto {
   private Boolean entitlementsPinned;
 
   private Boolean planAssigned;
+
+  private String aiModelTier;
 
   private BigDecimal revokedSessionCount;
 
@@ -285,6 +288,27 @@ public class PlatformOrganizationStatusResponseDto {
     this.planAssigned = planAssigned;
   }
 
+  public PlatformOrganizationStatusResponseDto aiModelTier(String aiModelTier) {
+    this.aiModelTier = aiModelTier;
+    return this;
+  }
+
+  /**
+   * The model tier its AI answers with, from its plan.
+   * @return aiModelTier
+   */
+  @NotNull
+  @Schema(allowableValues = { "FAST", "QUALITY" })
+  @JsonProperty("aiModelTier")
+  public String getAiModelTier() {
+    return aiModelTier;
+  }
+
+  @JsonProperty("aiModelTier")
+  public void setAiModelTier(String aiModelTier) {
+    this.aiModelTier = aiModelTier;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -337,6 +361,10 @@ public class PlatformOrganizationStatusResponseDto {
         platformOrganizationStatusResponseDto.planAssigned
       ) &&
       Objects.equals(
+        this.aiModelTier,
+        platformOrganizationStatusResponseDto.aiModelTier
+      ) &&
+      Objects.equals(
         this.revokedSessionCount,
         platformOrganizationStatusResponseDto.revokedSessionCount
       )
@@ -356,6 +384,7 @@ public class PlatformOrganizationStatusResponseDto {
       statusChangedAt,
       entitlementsPinned,
       planAssigned,
+      aiModelTier,
       revokedSessionCount
     );
   }
@@ -391,6 +420,9 @@ public class PlatformOrganizationStatusResponseDto {
       .append("\n");
     sb.append("    planAssigned: ")
       .append(toIndentedString(planAssigned))
+      .append("\n");
+    sb.append("    aiModelTier: ")
+      .append(toIndentedString(aiModelTier))
       .append("\n");
     sb.append("    revokedSessionCount: ")
       .append(toIndentedString(revokedSessionCount))

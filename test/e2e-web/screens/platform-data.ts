@@ -202,6 +202,10 @@ export function organization(
     entitlementsPinned: org.pinned ?? false,
     planAssigned: !org.stripe && !!org.plan && org.plan !== 'Free',
     statusChangedAt: org.since ? at(org.since) : null,
+    // Free and Starter answer with the fast model; the rest with quality.
+    aiModelTier: ['Free', 'Starter'].includes(org.plan ?? 'Free')
+      ? 'FAST'
+      : 'QUALITY',
   };
 }
 
@@ -827,6 +831,26 @@ const entry = (
 
 export const AUDIT: PlatformAuditLogResponseDto[] = [
   entry(
+    'a0',
+    '2026-10-22T11:10:00',
+    'Ravi Patel',
+    'PLATFORM_PLAN_UPDATED',
+    'SUBSCRIPTION_PLAN',
+    'plan-pro',
+    'Pro',
+    {
+      name: 'Pro',
+      subscriberCount: 17,
+      changes: [
+        {
+          field: 'prices',
+          added: [{ stripePriceId: 'price_1QcR4tN8wE', interval: 'year' }],
+          removed: [{ stripePriceId: 'price_1PxNa3Lw8Z', interval: 'year' }],
+        },
+      ],
+    },
+  ),
+  entry(
     'a1',
     '2026-10-22T10:58:00',
     'Ravi Patel',
@@ -844,7 +868,15 @@ export const AUDIT: PlatformAuditLogResponseDto[] = [
     'SUBSCRIPTION_PLAN',
     'plan-pro',
     'Pro',
-    { name: 'Pro', subscriberCount: 17 },
+    {
+      name: 'Pro',
+      subscriberCount: 17,
+      changes: [
+        { field: 'maxAgentSeats', from: 20, to: 25 },
+        { field: 'maxStorageBytes', from: 40 * GIB, to: 50 * GIB },
+        { field: 'monthlyAiTokenBudget', from: 8_000_000, to: 10_000_000 },
+      ],
+    },
   ),
   entry(
     'a3',

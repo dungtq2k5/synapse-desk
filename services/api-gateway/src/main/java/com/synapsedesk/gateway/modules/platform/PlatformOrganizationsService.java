@@ -40,6 +40,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
+import synapsedesk.auth.Common.AiModelTier;
 import synapsedesk.auth.Common.OrgStatus;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
@@ -250,6 +251,7 @@ public class PlatformOrganizationsService {
         .statusChangedAt(organization.getStatusChangedAt())
         .entitlementsPinned(organization.getEntitlementsPinned())
         .planAssigned(organization.getPlanAssigned())
+        .aiModelTier(organization.getAiModelTier())
         .usage(
           new PlatformOrganizationUsageResponseDto()
             .seats(
@@ -390,6 +392,7 @@ public class PlatformOrganizationsService {
         .statusChangedAt(organization.getStatusChangedAt())
         .entitlementsPinned(organization.getEntitlementsPinned())
         .planAssigned(organization.getPlanAssigned())
+        .aiModelTier(organization.getAiModelTier())
         // Every session on a freeze, none otherwise.
         .revokedSessionCount(
           BigDecimal.valueOf(response.getRevokedSessionCount())
@@ -515,25 +518,38 @@ public class PlatformOrganizationsService {
   private static PlatformOrganizationResponseDto toPlatformOrganizationResponseDto(
     PlatformOrganizationResponse row
   ) {
-    return new PlatformOrganizationResponseDto()
-      .organization(toOrganizationResponseDto(row.getOrganization()))
-      .userCount(BigDecimal.valueOf(row.getUserCount()))
-      .pendingInvitationCount(
-        BigDecimal.valueOf(row.getPendingInvitationCount())
-      )
-      .departmentCount(BigDecimal.valueOf(row.getDepartmentCount()))
-      .deletedAt(
-        row.hasDeletedAt() ? toOffsetDateTime(row.getDeletedAt()) : null
-      )
-      .planName(row.hasPlanName() ? row.getPlanName() : null)
-      .billedThroughStripe(row.getBilledThroughStripe())
-      .statusChangedAt(
-        row.hasStatusChangedAt()
-          ? toOffsetDateTime(row.getStatusChangedAt())
-          : null
-      )
-      .entitlementsPinned(row.getEntitlementsPinned())
-      .planAssigned(row.getPlanAssigned());
+    return (
+      new PlatformOrganizationResponseDto()
+        .organization(toOrganizationResponseDto(row.getOrganization()))
+        .userCount(BigDecimal.valueOf(row.getUserCount()))
+        .pendingInvitationCount(
+          BigDecimal.valueOf(row.getPendingInvitationCount())
+        )
+        .departmentCount(BigDecimal.valueOf(row.getDepartmentCount()))
+        .deletedAt(
+          row.hasDeletedAt() ? toOffsetDateTime(row.getDeletedAt()) : null
+        )
+        .planName(row.hasPlanName() ? row.getPlanName() : null)
+        .billedThroughStripe(row.getBilledThroughStripe())
+        .statusChangedAt(
+          row.hasStatusChangedAt()
+            ? toOffsetDateTime(row.getStatusChangedAt())
+            : null
+        )
+        .entitlementsPinned(row.getEntitlementsPinned())
+        .planAssigned(row.getPlanAssigned())
+        // `UNSPECIFIED` reads as the product default, `FAST`, as on a plan.
+        .aiModelTier(
+          row.getOrganization().getAiModelTier() ==
+            AiModelTier.AI_MODEL_TIER_UNSPECIFIED
+            ? "FAST"
+            : row
+                .getOrganization()
+                .getAiModelTier()
+                .name()
+                .replace("AI_MODEL_TIER_", "")
+        )
+    );
   }
 
   private static OrganizationResponseDto toOrganizationResponseDto(

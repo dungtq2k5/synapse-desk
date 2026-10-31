@@ -34,6 +34,7 @@ import {
 import {
   aboutOf,
   PLATFORM_KIND_WORDS,
+  planEditLines,
   platformActionWords,
   reasonOf,
 } from '@/lib/platform';
@@ -239,7 +240,10 @@ export function PlatformAuditView() {
                       </button>
                     </TableCell>
                     <TableCell>{entry.actorName ?? '—'}</TableCell>
-                    <TableCell>{platformActionWords(entry.action)}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {platformActionWords(entry.action)}
+                      <EditLines entry={entry} />
+                    </TableCell>
                     <TableCell className="whitespace-normal">
                       <AboutCell entry={entry} names={organizationNames} />
                     </TableCell>
@@ -264,6 +268,7 @@ export function PlatformAuditView() {
                 >
                   {platformActionWords(entry.action)}
                 </button>
+                <EditLines entry={entry} />
                 <AboutCell entry={entry} names={organizationNames} />
                 {reasonOf(entry.metadata) && (
                   <span className="text-muted-foreground">
@@ -292,6 +297,19 @@ export function PlatformAuditView() {
         onClose={() => setOpen(null)}
       />
     </ConsolePage>
+  );
+}
+
+/** A plan edit's changes, a line each, under its action. */
+function EditLines({ entry }: { entry: PlatformAuditLogResponseDto }) {
+  const lines = planEditLines(entry.metadata);
+  if (lines.length === 0) return null;
+  return (
+    <ul className="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
   );
 }
 

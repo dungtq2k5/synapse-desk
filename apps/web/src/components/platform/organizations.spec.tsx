@@ -46,6 +46,7 @@ const DETAIL = {
   departmentCount: 6,
   deletedAt: null,
   planName: 'Pro',
+  aiModelTier: 'QUALITY',
   billedThroughStripe: true,
   entitlementsPinned: false,
   planAssigned: false,
@@ -205,6 +206,38 @@ describe('an organization’s page', () => {
       );
     },
   );
+});
+
+describe('an organization’s plan and limits', () => {
+  it('names the AI model its plan gives it, in the plan list’s words', async () => {
+    const METER = {
+      available: true,
+      used: 1,
+      limit: 2,
+      unavailableReason: null,
+    };
+    stubApi({
+      [`GET /api/v1/platform/organizations/${ORG}`]: ok({
+        ...DETAIL,
+        usage: { seats: METER, storage: METER, aiTokens: METER },
+      }),
+      'GET /api/v1/platform/audit-logs': ok({
+        items: [],
+        meta: {
+          currentPage: 1,
+          itemsPerPage: 5,
+          totalItems: 0,
+          totalPages: 0,
+          itemCount: 0,
+        },
+      }),
+    });
+    renderSettings(<OrganizationView organizationId={ORG} />);
+
+    expect(
+      await screen.findByText('$10.00 a month, Quality model'),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('the organization’s dialogs', () => {

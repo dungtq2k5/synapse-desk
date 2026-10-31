@@ -198,6 +198,29 @@ describe('global roles', () => {
     ]),
     'GET /api/v1/platform/metrics': ok({ totalOrganizations: 42 }),
     'POST /api/v1/platform/roles': post,
+    'GET /api/v1/permissions': ok([
+      {
+        id: 'p1',
+        code: 'audit.read',
+        name: 'Read audit logs',
+        group: 'audit',
+        isRetired: false,
+      },
+      {
+        id: 'p2',
+        code: 'ticket.brand.new',
+        name: 'Do the brand-new thing',
+        group: 'ticket',
+        isRetired: false,
+      },
+      {
+        id: 'p3',
+        code: 'ticket.read.old',
+        name: 'An old way to read',
+        group: 'ticket',
+        isRetired: true,
+      },
+    ]),
   });
 
   it('creates one every organization gets, with the permissions ticked', async () => {
@@ -231,6 +254,28 @@ describe('global roles', () => {
       description: 'Sees billing.',
       permissionCodes: ['audit.read'],
     });
+  });
+
+  it('offers the server’s codes, in 08’s words, never a retired one', async () => {
+    stubApi(routes());
+    renderSettings(<GlobalRolesView />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'New global role' }),
+    );
+
+    expect(
+      await screen.findByLabelText('View the audit log'),
+    ).toBeInTheDocument();
+    // A code the web has no words for reads as the server names it.
+    expect(screen.getByLabelText('Do the brand-new thing')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('An old way to read'),
+    ).not.toBeInTheDocument();
+    // Only what the server offers: a code it doesn't list isn't there.
+    expect(
+      screen.queryByLabelText('View organization settings'),
+    ).not.toBeInTheDocument();
   });
 
   it('a taken name is said under the field', async () => {
@@ -305,6 +350,31 @@ describe('the platform’s audit log', () => {
       await screen.findByRole('option', { name: 'Last 7 days' }),
     );
     await waitFor(() => expect(calls.at(-1)?.url).toContain('userId=sa-1'));
+  });
+
+  it('a plan edit lists its changes under the entry', async () => {
+    stubApi({
+      'GET /api/v1/platform/audit-logs': paged([
+        {
+          ...ENTRY,
+          id: 'a2',
+          action: 'PLATFORM_PLAN_UPDATED',
+          resourceType: 'SUBSCRIPTION_PLAN',
+          metadata: {
+            name: 'Pro',
+            subscriberCount: 17,
+            changes: [{ field: 'maxAgentSeats', from: 20, to: 25 }],
+          },
+        },
+      ]),
+      'GET /api/v1/platform/audit-logs/actions': ok({ actions: [] }),
+      'GET /api/v1/platform/organizations': paged([]),
+    });
+    renderSettings(<PlatformAuditView />);
+
+    expect(
+      (await screen.findAllByText('Seats 20 → 25')).length,
+    ).toBeGreaterThan(0);
   });
 
   it('filtered to one organization, shows it as a chip that clears', async () => {

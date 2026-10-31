@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.modules.platform.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.synapsedesk.gateway.modules.organizations.dto.rest.OrganizationResponseDto;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -37,6 +38,8 @@ public class PlatformOrganizationDetailResponseDto {
   private Boolean entitlementsPinned;
 
   private Boolean planAssigned;
+
+  private String aiModelTier;
 
   private PlatformOrganizationUsageResponseDto usage;
 
@@ -302,6 +305,27 @@ public class PlatformOrganizationDetailResponseDto {
     this.planAssigned = planAssigned;
   }
 
+  public PlatformOrganizationDetailResponseDto aiModelTier(String aiModelTier) {
+    this.aiModelTier = aiModelTier;
+    return this;
+  }
+
+  /**
+   * The model tier its AI answers with, from its plan.
+   * @return aiModelTier
+   */
+  @NotNull
+  @Schema(allowableValues = { "FAST", "QUALITY" })
+  @JsonProperty("aiModelTier")
+  public String getAiModelTier() {
+    return aiModelTier;
+  }
+
+  @JsonProperty("aiModelTier")
+  public void setAiModelTier(String aiModelTier) {
+    this.aiModelTier = aiModelTier;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -353,6 +377,10 @@ public class PlatformOrganizationDetailResponseDto {
       Objects.equals(
         this.planAssigned,
         platformOrganizationDetailResponseDto.planAssigned
+      ) &&
+      Objects.equals(
+        this.aiModelTier,
+        platformOrganizationDetailResponseDto.aiModelTier
       )
     );
   }
@@ -370,7 +398,8 @@ public class PlatformOrganizationDetailResponseDto {
       billedThroughStripe,
       statusChangedAt,
       entitlementsPinned,
-      planAssigned
+      planAssigned,
+      aiModelTier
     );
   }
 
@@ -406,6 +435,9 @@ public class PlatformOrganizationDetailResponseDto {
       .append("\n");
     sb.append("    planAssigned: ")
       .append(toIndentedString(planAssigned))
+      .append("\n");
+    sb.append("    aiModelTier: ")
+      .append(toIndentedString(aiModelTier))
       .append("\n");
     sb.append("}");
     return sb.toString();

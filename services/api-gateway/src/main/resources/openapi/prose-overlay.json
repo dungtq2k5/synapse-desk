@@ -1736,6 +1736,21 @@
     },
     "ReportClientErrorDto.buildId": {
       "description": "The web build that reported it (`GIT_SHA`)."
+    },
+    "UpdatePlanDto.addPrices": {
+      "description": "Prices to put on the plan, in create's shape: each is read from Stripe\nand must be of the plan's Stripe product. Absent or `[]`, none."
+    },
+    "UpdatePlanDto.removePrices": {
+      "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none."
+    },
+    "PlatformOrganizationResponseDto.aiModelTier": {
+      "description": "The model tier its AI answers with, from its plan."
+    },
+    "PlatformOrganizationStatusResponseDto.aiModelTier": {
+      "description": "The model tier its AI answers with, from its plan."
+    },
+    "PlatformOrganizationDetailResponseDto.aiModelTier": {
+      "description": "The model tier its AI answers with, from its plan."
     }
   }
 }

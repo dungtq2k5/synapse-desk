@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
   ElementType.METHOD,
   ElementType.PARAMETER,
   ElementType.RECORD_COMPONENT,
+  // On a list's elements too: every element must match.
+  ElementType.TYPE_USE,
 })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Matches {

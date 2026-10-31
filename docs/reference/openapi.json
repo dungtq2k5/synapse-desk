@@ -66310,9 +66310,15 @@
           "planAssigned": {
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+          },
+          "aiModelTier": {
+            "type": "string",
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"]
           }
         },
         "required": [
+          "aiModelTier",
           "billedThroughStripe",
           "deletedAt",
           "departmentCount",
@@ -66411,12 +66417,18 @@
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
           },
+          "aiModelTier": {
+            "type": "string",
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"]
+          },
           "revokedSessionCount": {
             "type": "number",
             "description": "Sessions the change ended: every one on a freeze, none otherwise."
           }
         },
         "required": [
+          "aiModelTier",
           "billedThroughStripe",
           "deletedAt",
           "departmentCount",
@@ -68639,6 +68651,22 @@
           },
           "isActive": {
             "type": ["boolean", "null"]
+          },
+          "addPrices": {
+            "type": ["array", "null"],
+            "description": "Prices to put on the plan, in create's shape: each is read from Stripe\nand must be of the plan's Stripe product. Absent or `[]`, none.",
+            "items": {
+              "$ref": "#/components/schemas/CreatePlanPriceDto"
+            }
+          },
+          "removePrices": {
+            "type": ["array", "null"],
+            "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
           }
         }
       },
@@ -70220,12 +70248,18 @@
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
           },
+          "aiModelTier": {
+            "type": "string",
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"]
+          },
           "usage": {
             "$ref": "#/components/schemas/PlatformOrganizationUsageResponseDto",
             "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads."
           }
         },
         "required": [
+          "aiModelTier",
           "billedThroughStripe",
           "deletedAt",
           "departmentCount",

@@ -235,7 +235,6 @@ test('create a negotiated plan, assign it, apply an edit, release: each preview 
   const found = await tenant('platform-apply');
   const organization = await organizationOf(found);
   const admin = await superAdmin('plans');
-  await freeSparePrice();
   await offAnyPlan(organization.id);
   await consoleSignIn(page, admin);
 
@@ -255,12 +254,12 @@ test('create a negotiated plan, assign it, apply an edit, release: each preview 
   }
   await page.getByLabel('AI model').click();
   await page.getByRole('option', { name: 'Fast' }).click();
-  await page.getByRole('button', { name: 'Add a price' }).click();
-  await page.getByLabel('Stripe price 1').fill(FAKE_SPARE_PRICE.id);
+  // Negotiated: no Stripe product, so no prices.
   await page.getByRole('button', { name: 'Create plan' }).click();
-
-  // The amount comes from Stripe once it's saved.
-  await expect(page.getByRole('cell', { name: '$49.00' })).toBeVisible();
+  await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+  await expect(
+    page.getByText('No prices yet. An assigned plan needs none.'),
+  ).toBeVisible();
   const planId = page.url().split('/').pop()!;
 
   // Assigned from the organization's page: one seat is fewer than it uses.
@@ -318,9 +317,53 @@ test('create a negotiated plan, assign it, apply an edit, release: each preview 
   ).toBeVisible();
 });
 
+test('add a price to a plan sold through Stripe: its amount comes from Stripe, and the edit is in the audit log', async ({
+  page,
+}) => {
+  const admin = await superAdmin('plan-prices');
+  await freeSparePrice();
+  await consoleSignIn(page, admin);
+
+  await page.goto('/platform/plans/new');
+  const name = `Team ${Date.now()}`;
+  await page.getByLabel('Name').fill(name);
+  await page
+    .getByLabel('Stripe product (optional)')
+    .fill(FAKE_SPARE_PRICE.product);
+  for (const [label, value] of [
+    ['Seats', '1'],
+    ['Document storage (GB)', '5'],
+    ['AI allowance a month (USD)', '5'],
+    ['Largest document (MB)', '10'],
+    ['Largest attachment (MB)', '5'],
+    ['Documents', '1000'],
+    ['Analytics ranges up to (days)', '90'],
+  ]) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+  }
+  await page.getByLabel('AI model').click();
+  await page.getByRole('option', { name: 'Fast' }).click();
+  await page.getByRole('button', { name: 'Create plan' }).click();
+  await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+
+  // Added on the plan's page; the amount comes from Stripe once it's saved.
+  await page.getByRole('button', { name: 'Add a price' }).click();
+  await page.getByLabel('Stripe price 1').fill(FAKE_SPARE_PRICE.id);
+  await page.getByLabel('Seats', { exact: true }).fill('2');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('cell', { name: '$49.00' })).toBeVisible();
+
+  // The edit, line by line, under its entry.
+  await page.goto('/platform/audit-log');
+  await expect(page.getByText('Seats 1 → 2').first()).toBeVisible();
+  await expect(
+    page.getByText(`Prices: added ${FAKE_SPARE_PRICE.id} (monthly)`).first(),
+  ).toBeVisible();
+});
+
 /**
- * The spare price, back from whichever plan an earlier run gave it to: a
- * price belongs to one plan, and Postgres outlives a run.
+ * The spare price and its product, back from whichever plan an earlier run
+ * gave them to: each belongs to one plan, and Postgres outlives a run.
  */
 async function freeSparePrice(): Promise<void> {
   const prisma = new AuthPrisma({
@@ -329,6 +372,12 @@ async function freeSparePrice(): Promise<void> {
   try {
     await prisma.subscriptionPlanPrice.deleteMany({
       where: { stripePriceId: FAKE_SPARE_PRICE.id },
+    });
+    // Its product too: a product belongs to one plan, and a plan an earlier
+    // run made still holds it.
+    await prisma.subscriptionPlan.updateMany({
+      where: { stripeProductId: FAKE_SPARE_PRICE.product },
+      data: { stripeProductId: null },
     });
   } finally {
     await prisma.$disconnect();

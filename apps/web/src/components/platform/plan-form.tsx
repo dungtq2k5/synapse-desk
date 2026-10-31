@@ -231,6 +231,35 @@ export function planRefusal(error: unknown): {
   };
 }
 
+/**
+ * A refusal about ONE new price, in the words shown under its field: Stripe
+ * has no such price or no single amount (400), it's another product's (400),
+ * or it's already on a plan (409). `null` for any other refusal.
+ *
+ * @example priceRefusal(error) // { stripePriceId: 'price_x', message: 'price_x is already on Pro. …' }
+ */
+export function priceRefusal(
+  error: unknown,
+): { stripePriceId: string; message: string } | null {
+  if (!(error instanceof ApiError) || ![400, 409].includes(error.status)) {
+    return null;
+  }
+  const message = error.message.replace(/!$/, '.');
+  const unknown =
+    /^Stripe has no price (\S+?)\.?$/.exec(message) ??
+    /^Stripe price (\S+) has no single amount/.exec(message);
+  if (unknown) {
+    return {
+      stripePriceId: unknown[1],
+      message: `Stripe has no price ${unknown[1]}, or it has no single amount. Check its id in Stripe.`,
+    };
+  }
+  const named =
+    /^(\S+) belongs to another Stripe product, not /.exec(message) ??
+    /^(\S+) is already on /.exec(message);
+  return named ? { stripePriceId: named[1], message } : null;
+}
+
 /** A new plan: every grant required; its prices' amounts come after saving. */
 export function PlanCreate() {
   return <PlanForm plan={null} />;
@@ -268,6 +297,8 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
   const editing = plan !== null;
   const [form, setForm] = useState<Form>(plan ? formOf(plan) : EMPTY);
   const [prices, setPrices] = useState<Price[]>([]);
+  const [priceErrors, setPriceErrors] = useState<Record<number, string>>({});
+  const [removing, setRemoving] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [missing, setMissing] = useState(false);
   const [refusal, setRefusal] = useState<{
@@ -295,6 +326,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRefusal(null);
+    setPriceErrors({});
     const { errors: found, values } = grantsOf(form);
     if (!form.name.trim()) found.name = REQUIRED;
     setErrors(found);
@@ -316,9 +348,11 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
             : plan.stripeProductId
               ? { clearStripeProductId: true }
               : {}),
+          ...(filled(prices).length > 0 ? { addPrices: filled(prices) } : {}),
         };
         await platformControllerUpdatePlanV1(plan.id, change);
         toast.success(`${form.name.trim()} is saved`);
+        setPrices([]);
         invalidate();
         setBusy(false);
       } else {
@@ -327,18 +361,25 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           name: form.name.trim(),
           isActive: form.isActive,
           stripeProductId: form.stripeProductId.trim() || undefined,
-          prices: prices
-            .filter((price) => price.stripePriceId.trim())
-            .map((price) => ({
-              stripePriceId: price.stripePriceId.trim(),
-              interval: price.interval,
-            })),
+          prices: filled(prices),
         });
         invalidate();
         router.push(`/platform/plans/${created.data?.id ?? ''}`);
       }
     } catch (failed) {
       setBusy(false);
+      // A refusal about one new price goes under its field.
+      const aboutPrice = priceRefusal(failed);
+      const row = aboutPrice
+        ? prices.find(
+            (price) => price.stripePriceId.trim() === aboutPrice.stripePriceId,
+          )
+        : undefined;
+      if (aboutPrice && row) {
+        setPriceErrors({ [row.key]: aboutPrice.message });
+        document.getElementById(`price-${row.key}`)?.focus();
+        return;
+      }
       if (failed instanceof ApiError && [400, 503].includes(failed.status)) {
         setRefusal(planRefusal(failed));
         return;
@@ -541,42 +582,66 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           title="Prices"
           lead={`Stripe’s prices for the product, by id and interval. Amounts come from Stripe. Up to ${MAX_PRICES}.`}
         >
-          {plan ? (
-            plan.prices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No prices yet. An assigned plan needs none.
-              </p>
-            ) : (
-              <div className="overflow-hidden rounded-lg border">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead>Stripe price</TableHead>
-                      <TableHead>Interval</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+          {plan && plan.prices.length > 0 && (
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Stripe price</TableHead>
+                    <TableHead>Interval</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="w-12">
+                      <span className="sr-only">Remove</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {plan.prices.map((price) => (
+                    <TableRow key={price.id}>
+                      <TableCell className="max-w-0 truncate font-mono">
+                        {price.stripePriceId}
+                      </TableCell>
+                      <TableCell>
+                        {price.interval === 'year' ? 'Yearly' : 'Monthly'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {priceLine(price).replace(/ a (month|year)$/, '')}
+                      </TableCell>
+                      <TableCell>
+                        {!plan.deletedAt && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Remove ${price.stripePriceId}`}
+                            onClick={() => setRemoving(price.stripePriceId)}
+                          >
+                            <Trash2Icon aria-hidden />
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {plan.prices.map((price) => (
-                      <TableRow key={price.id}>
-                        <TableCell className="font-mono">
-                          {price.stripePriceId}
-                        </TableCell>
-                        <TableCell>
-                          {price.interval === 'year' ? 'Yearly' : 'Monthly'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {priceLine(price).replace(/ a (month|year)$/, '')}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )
-          ) : (
-            <NewPrices prices={prices} onChange={setPrices} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
+          {plan && !plan.stripeProductId
+            ? // A negotiated plan takes no prices.
+              plan.prices.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No prices yet. An assigned plan needs none.
+                </p>
+              )
+            : !plan?.deletedAt && (
+                <NewPrices
+                  prices={prices}
+                  errors={priceErrors}
+                  room={MAX_PRICES - (plan?.prices.length ?? 0)}
+                  saved={(plan?.prices.length ?? 0) > 0}
+                  onChange={setPrices}
+                />
+              )}
         </ConsoleCard>
         <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
           <Link
@@ -590,6 +655,19 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           </Button>
         </div>
       </form>
+      {plan && removing && (
+        <RemovePriceDialog
+          plan={plan}
+          stripePriceId={removing}
+          onOpenChange={(open) => {
+            if (!open) setRemoving(null);
+          }}
+          onDone={() => {
+            setRemoving(null);
+            invalidate();
+          }}
+        />
+      )}
       {plan && (
         <RetireDialog
           plan={plan}
@@ -608,9 +686,18 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
 /** The new plan's prices: a Stripe price id and its interval, up to twelve. */
 function NewPrices({
   prices,
+  errors,
+  room,
+  saved,
   onChange,
 }: {
   prices: Price[];
+  /** A refusal under a new price's field, by its key. */
+  errors: Record<number, string>;
+  /** How many more prices fit: twelve, less the saved ones. */
+  room: number;
+  /** Whether the plan already has prices, so "No prices yet" is wrong. */
+  saved: boolean;
   onChange: (prices: Price[]) => void;
 }) {
   const update = (key: number, change: Partial<Price>) =>
@@ -622,13 +709,15 @@ function NewPrices({
   return (
     <div className="flex flex-col gap-3">
       {prices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No prices yet. An assigned plan needs none.
-        </p>
+        !saved && (
+          <p className="text-sm text-muted-foreground">
+            No prices yet. An assigned plan needs none.
+          </p>
+        )
       ) : (
         <ul className="flex flex-col gap-2">
           {prices.map((price, index) => (
-            <li key={price.key} className="flex flex-wrap items-end gap-2">
+            <li key={price.key} className="flex flex-wrap items-start gap-2">
               <div className="flex min-w-48 flex-1 flex-col gap-1.5">
                 <Label htmlFor={`price-${price.key}`}>
                   Stripe price <span className="sr-only">{index + 1}</span>
@@ -638,11 +727,23 @@ function NewPrices({
                   placeholder="price_…"
                   className="font-mono"
                   autoComplete="off"
+                  aria-invalid={errors[price.key] ? true : undefined}
+                  aria-describedby={
+                    errors[price.key] ? `price-${price.key}-error` : undefined
+                  }
                   value={price.stripePriceId}
                   onChange={(event) =>
                     update(price.key, { stripePriceId: event.target.value })
                   }
                 />
+                {errors[price.key] && (
+                  <p
+                    id={`price-${price.key}-error`}
+                    className="text-sm text-destructive"
+                  >
+                    {errors[price.key]}
+                  </p>
+                )}
               </div>
               <div className="flex w-36 flex-col gap-1.5">
                 <Label htmlFor={`interval-${price.key}`}>Interval</Label>
@@ -668,6 +769,7 @@ function NewPrices({
                 type="button"
                 variant="ghost"
                 size="icon"
+                className="mt-6"
                 aria-label={`Remove price ${index + 1}`}
                 onClick={() =>
                   onChange(prices.filter((one) => one.key !== price.key))
@@ -679,7 +781,7 @@ function NewPrices({
           ))}
         </ul>
       )}
-      {prices.length < MAX_PRICES && (
+      {prices.length < room && (
         <Button
           type="button"
           variant="outline"
@@ -696,6 +798,66 @@ function NewPrices({
         </Button>
       )}
     </div>
+  );
+}
+
+/** The new prices with an id, as the API takes them. */
+function filled(
+  prices: Price[],
+): { stripePriceId: string; interval: Price['interval'] }[] {
+  return prices
+    .filter((price) => price.stripePriceId.trim())
+    .map((price) => ({
+      stripePriceId: price.stripePriceId.trim(),
+      interval: price.interval,
+    }));
+}
+
+/**
+ * Remove a saved price: its own confirmed change, sent alone. Refused while
+ * an organization's subscription is on it, in the server's words.
+ */
+function RemovePriceDialog({
+  plan,
+  stripePriceId,
+  onOpenChange,
+  onDone,
+}: {
+  plan: SubscriptionPlanResponseDto;
+  stripePriceId: string;
+  onOpenChange: (open: boolean) => void;
+  onDone: () => void;
+}) {
+  return (
+    <ConfirmDialog
+      open
+      onOpenChange={onOpenChange}
+      title={`Remove ${stripePriceId} from ${plan.name}?`}
+      description="Nobody can subscribe on it from Billing after this. The price itself stays in Stripe."
+      confirmLabel="Remove price"
+      icon={Trash2Icon}
+      onConfirm={async () => {
+        try {
+          await platformControllerUpdatePlanV1(plan.id, {
+            removePrices: [stripePriceId],
+          });
+          // The toast is announced: "Price removed".
+          toast.success('Price removed');
+          onDone();
+        } catch (failed) {
+          if (
+            failed instanceof ApiError &&
+            [400, 409].includes(failed.status)
+          ) {
+            return {
+              title: failed.message.replace(/!$/, '.'),
+              description: null,
+            };
+          }
+          return planRefusal(failed);
+        }
+      }}
+    />
   );
 }
 

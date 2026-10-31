@@ -3,6 +3,7 @@
 import {
   ApiError,
   platformControllerCreateGlobalRoleV1,
+  usePermissionsControllerListV1,
   usePlatformControllerListGlobalRolesV1,
   usePlatformControllerGetMetricsV1,
   type CreateGlobalRoleDtoPermissionCodesItem as PermissionCode,
@@ -134,8 +135,9 @@ export function GlobalRolesView() {
 
 /**
  * New global role: it appears in every organization's roles at once, and
- * can't be limited to some. The catalog is the web's own (08's words): a
- * Super Admin can't read an organization's.
+ * can't be limited to some. The server's catalog decides which codes it
+ * offers (retired ones left out), and 08's words name and group them, as in
+ * the role editor; a code the web has no words for shows the server's name.
  */
 function NewGlobalRoleDialog({
   open,
@@ -154,6 +156,9 @@ function NewGlobalRoleDialog({
     query: { enabled: open },
   });
   const organizations = metrics.data?.data?.totalOrganizations;
+  const catalog = usePermissionsControllerListV1({
+    query: { enabled: open, staleTime: 300_000 },
+  });
 
   const reset = () => {
     setName('');
@@ -199,11 +204,16 @@ function NewGlobalRoleDialog({
     }
   };
 
+  const offered = (catalog.data?.data ?? []).filter((item) => !item.isRetired);
+  const names = new Map(offered.map((item) => [item.code, item.name]));
   const groups = PERMISSION_GROUPS.map((group) => ({
     group,
-    items: Object.entries(PERMISSION_WORDS)
-      .filter(([, words]) => words.group === group)
-      .map(([code]) => code),
+    items: offered
+      .filter(
+        (item) =>
+          (PERMISSION_WORDS[item.code]?.group ?? 'Organization') === group,
+      )
+      .map((item) => item.code),
   })).filter((entry) => entry.items.length > 0);
 
   return (
@@ -273,7 +283,9 @@ function NewGlobalRoleDialog({
                     onCheckedChange={(state) => toggle(code, state === true)}
                   />
                   <label htmlFor={`global-${code}`} className="text-sm">
-                    {permissionWords(code)}
+                    {PERMISSION_WORDS[code]
+                      ? permissionWords(code)
+                      : (names.get(code) ?? code)}
                   </label>
                 </div>
               ))}

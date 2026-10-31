@@ -41,7 +41,8 @@ export function priceLine(
   return amount ? `${amount} ${per}` : `${price.stripePriceId} ${per}`;
 }
 
-const tier = (value: string | null | undefined) =>
+/** A tier in the catalog's words: "Quality" or "Fast". */
+export const tier = (value: string | null | undefined) =>
   value === 'QUALITY' ? 'Quality' : 'Fast';
 
 /**

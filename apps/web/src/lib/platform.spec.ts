@@ -14,6 +14,7 @@ import {
   overLimitLine,
   overLimitWarning,
   parentOf,
+  planEditLines,
   platformActionWords,
   reachable,
   reasonOf,
@@ -354,5 +355,39 @@ describe('assigning and releasing a plan', () => {
         after: { maxAgentSeats: 30, entitlementsPinned: false },
       }),
     ).toBe('seats 25 → 30, limits unpinned');
+  });
+});
+
+describe('a plan edit’s audit lines', () => {
+  it('reads each change in the form’s words, prices last', () => {
+    expect(
+      planEditLines({
+        changes: [
+          { field: 'maxAgentSeats', from: 20, to: 25 },
+          {
+            field: 'maxStorageBytes',
+            from: 40 * 1024 ** 3,
+            to: 50 * 1024 ** 3,
+          },
+          { field: 'monthlyAiTokenBudget', from: 8_000_000, to: 10_000_000 },
+          { field: 'aiModelTier', from: 'FAST', to: 'QUALITY' },
+          {
+            field: 'prices',
+            added: [{ stripePriceId: 'price_new', interval: 'year' }],
+            removed: [{ stripePriceId: 'price_old', interval: 'month' }],
+          },
+        ],
+      }),
+    ).toEqual([
+      'Seats 20 → 25',
+      'Document storage 40 GB → 50 GB',
+      'AI allowance $8.00 → $10.00',
+      'AI model Fast → Quality',
+      'Prices: added price_new (yearly); removed price_old',
+    ]);
+  });
+
+  it('an entry written before changes were kept has no lines', () => {
+    expect(planEditLines({ name: 'Pro', subscriberCount: 3 })).toEqual([]);
   });
 });

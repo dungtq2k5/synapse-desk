@@ -57,6 +57,7 @@ import {
   StatusDialog,
 } from './organization-dialogs';
 import { AssignPlanDialog, ReleasePlanDialog } from './plan-assignment-dialogs';
+import { tier } from './plans-view';
 
 type Dialog =
   'status' | 'reset' | 'offboard' | 'restore' | 'assign' | 'release' | null;
@@ -382,7 +383,7 @@ function PlanAndLimits({
           ['Document storage', fileSize(organization.maxStorageBytes)],
           [
             'AI allowance',
-            `${aiMoney(organization.monthlyAiTokenBudget, 'en-US')} a month`,
+            `${aiMoney(organization.monthlyAiTokenBudget, 'en-US')} a month, ${tier(data.aiModelTier)} model`,
           ],
           ['Analytics ranges', `up to ${organization.analyticsRangeDays} days`],
           ['Billing cycle started', dayDate(organization.billingCycleStart)],

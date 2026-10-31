@@ -65,7 +65,7 @@ const ANSWERS: Overrides = {
       ok(
         new URL(route.request().url()).searchParams.get('resourceId')
           ? paged(NORTHWIND_ACTS, NORTHWIND_ACTS.length, 5)
-          : paged(AUDIT, 216, 20),
+          : paged(AUDIT, 217, 20),
       ),
     ),
   'GET /platform/audit-logs/actions': ok({
@@ -506,6 +506,76 @@ test.describe('Plans', () => {
     await look(page, 'platform-plan-edit');
   });
 
+  test('a plan: add a price, before saving', async ({ page }) => {
+    await open(page, '/platform/plans/plan-pro', 'Pro');
+    await page.getByRole('button', { name: 'Add a price' }).click();
+    await page.getByLabel(/^Stripe price/).fill('price_1QcR4tN8wE');
+    await page.getByLabel('Interval').click();
+    await page.getByRole('option', { name: 'Yearly' }).click();
+    await look(page, 'platform-plan-price-new');
+  });
+
+  for (const [name, id, refusal] of [
+    ['unknown', 'price_1QcR4tX0zz', 'Stripe has no price price_1QcR4tX0zz!'],
+    [
+      'taken',
+      'price_1PbQ2sR7tY',
+      'price_1PbQ2sR7tY is already on Starter. A price can belong to one plan only!',
+    ],
+    [
+      'other-product',
+      'price_1QdT8uM2pX',
+      'price_1QdT8uM2pX belongs to another Stripe product, not Pro’s!',
+    ],
+  ] as const) {
+    test(`a plan: an added price refused (${name})`, async ({ page }) => {
+      await open(page, '/platform/plans/plan-pro', 'Pro', {
+        'PATCH /platform/plans/plan-pro': failed(
+          name === 'taken' ? 409 : 400,
+          refusal,
+        ),
+      });
+      await page.getByRole('button', { name: 'Add a price' }).click();
+      await page.getByLabel(/^Stripe price/).fill(id);
+      await page.getByRole('button', { name: 'Save' }).click();
+      await expect(page.getByLabel(/^Stripe price/)).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+      await look(page, `platform-plan-price-refused-${name}`);
+    });
+  }
+
+  test('a plan: remove a price', async ({ page }) => {
+    await open(page, '/platform/plans/plan-pro', 'Pro');
+    await page.getByRole('button', { name: 'Remove price_1PxNa3Lw8Z' }).click();
+    await expect(
+      page.getByRole('alertdialog', {
+        name: 'Remove price_1PxNa3Lw8Z from Pro?',
+      }),
+    ).toBeVisible();
+    await look(page, 'platform-plan-price-remove', { viewportOnly: true });
+  });
+
+  test('a plan: remove refused, organizations are on it', async ({ page }) => {
+    await open(page, '/platform/plans/plan-pro', 'Pro', {
+      'PATCH /platform/plans/plan-pro': failed(
+        409,
+        'Organizations are subscribed on price_1PxM9kQ2sV. Move them to another price in Stripe first!',
+      ),
+    });
+    await page.getByRole('button', { name: 'Remove price_1PxM9kQ2sV' }).click();
+    await page.getByRole('button', { name: 'Remove price' }).click();
+    await expect(
+      page.getByText(
+        'Organizations are subscribed on price_1PxM9kQ2sV. Move them to another price in Stripe first.',
+      ),
+    ).toBeVisible();
+    await look(page, 'platform-plan-price-remove-refused', {
+      viewportOnly: true,
+    });
+  });
+
   test('a plan: create, every grant required', async ({ page }) => {
     await open(page, '/platform/plans/new', 'New plan');
     await page.getByLabel('Name').fill('Team');
@@ -659,6 +729,7 @@ test.describe('People, roles, jobs and audit', () => {
     await expect(
       page.getByText('Job · 42 organizations, 1,268 rows').first(),
     ).toBeVisible();
+    await expect(page.getByText('Seats 20 → 25').first()).toBeVisible();
     await look(page, 'platform-audit');
   });
 

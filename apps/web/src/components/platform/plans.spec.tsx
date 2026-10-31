@@ -165,6 +165,94 @@ describe('a plan’s page', () => {
     });
   });
 
+  it('adds a price with Save, and a refusal about it goes under its field', async () => {
+    const answers = [
+      fail(
+        409,
+        'price_new is already on Starter. A price can belong to one plan only!',
+      ),
+      ok(PLAN),
+    ];
+    const calls = stubApi({
+      [`GET ${URL_PLAN}`]: ok(PLAN),
+      [`PATCH ${URL_PLAN}`]: () => answers.shift()!,
+    });
+    renderSettings(<PlanEdit planId="plan-pro" />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Add a price' }),
+    );
+    await user.type(screen.getByLabelText(/Stripe price/), 'price_new');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    const field = screen.getByLabelText(/Stripe price/);
+    await waitFor(() =>
+      expect(field).toHaveAccessibleDescription(
+        'price_new is already on Starter. A price can belong to one plan only.',
+      ),
+    );
+    expect(calls.find((call) => call.method === 'PATCH')?.body).toMatchObject({
+      addPrices: [{ stripePriceId: 'price_new', interval: 'month' }],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(calls.filter((call) => call.method === 'PATCH')).toHaveLength(2),
+    );
+    expect(field).not.toHaveAccessibleDescription();
+  });
+
+  it('removes a price on its own, after a confirmation; a price in use is refused in the dialog', async () => {
+    const answers = [
+      fail(
+        409,
+        'Organizations are subscribed on price_m. Move them to another price in Stripe first!',
+      ),
+      ok({ ...PLAN, prices: [] }),
+    ];
+    const calls = stubApi({
+      [`GET ${URL_PLAN}`]: ok(PLAN),
+      [`PATCH ${URL_PLAN}`]: () => answers.shift()!,
+    });
+    renderSettings(<PlanEdit planId="plan-pro" />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Remove price_m' }),
+    );
+    expect(
+      screen.getByRole('alertdialog', { name: 'Remove price_m from Pro?' }),
+    ).toHaveTextContent(
+      'Nobody can subscribe on it from Billing after this. The price itself stays in Stripe.',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Remove price' }));
+    expect(
+      await screen.findByText(
+        'Organizations are subscribed on price_m. Move them to another price in Stripe first.',
+      ),
+    ).toBeInTheDocument();
+    expect(calls.find((call) => call.method === 'PATCH')?.body).toEqual({
+      removePrices: ['price_m'],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove price' }));
+    expect(await screen.findByText('Price removed')).toBeInTheDocument();
+  });
+
+  it('a negotiated plan takes no prices: no Add a price', async () => {
+    stubApi({
+      [`GET ${URL_PLAN}`]: ok({ ...PLAN, stripeProductId: null, prices: [] }),
+    });
+    renderSettings(<PlanEdit planId="plan-pro" />);
+
+    expect(
+      await screen.findByText('No prices yet. An assigned plan needs none.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add a price' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('can’t retire a plan with subscribers: it deactivates it instead', async () => {
     const calls = stubApi({
       [`GET ${URL_PLAN}`]: ok(PLAN),
