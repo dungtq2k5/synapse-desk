@@ -8,6 +8,7 @@ import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   OVER_LIMIT_DIMENSIONS,
+  type AiModelTier,
   type OverLimitDimension,
 } from '@synapsedesk/contracts';
 
@@ -39,6 +40,8 @@ export class PlatformOrganizationResponseDto {
    * checkout refuses it, and only the platform releases it.
    */
   readonly planAssigned!: boolean;
+  /** The model tier its AI answers with, from its plan. */
+  readonly aiModelTier!: AiModelTier;
 }
 
 export class PlatformOrganizationStatusResponseDto extends PlatformOrganizationResponseDto {

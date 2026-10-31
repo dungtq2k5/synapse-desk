@@ -51,7 +51,8 @@ import { scanDtoDirectory } from './validator-scan';
 import { join } from 'node:path';
 import { REPO_ROOT } from './gateway';
 
-type Sample = { valid: string; invalid: string };
+/** A value each side of a validator; an array for a field validated `each`. */
+type Sample = { valid: string | string[]; invalid: string | string[] };
 
 const ISO_VALID = '2026-01-01T00:00:00.000Z';
 
@@ -91,6 +92,8 @@ const MATCHES: Record<string, Sample> = {
   domain: { valid: 'acme.com', invalid: 'not a domain!' },
   stripePriceId: { valid: 'price_123', invalid: 'bad id!' },
   stripeProductId: { valid: 'prod_123', invalid: 'bad id!' },
+  // A list of ids, each matched: the invalid list holds one bad id.
+  removePrices: { valid: ['price_123'], invalid: ['bad id!'] },
   // The exports' day ranges: a timestamp is the value the day pattern refuses.
   from: { valid: '2026-01-01', invalid: '2026-01-01T00:00:00Z' },
   to: { valid: '2026-01-31', invalid: '2026-01-31T00:00:00Z' },
@@ -163,7 +166,7 @@ const MOST_RESTRICTIVE = [
   'IsISO8601',
   'IsDate',
 ];
-const validFor = (item: Unpublished): string => {
+const validFor = (item: Unpublished): string | string[] => {
   const kinds = unpublished
     .filter((u) => u.schema === item.schema && u.property === item.property)
     .map((u) => u.kind);

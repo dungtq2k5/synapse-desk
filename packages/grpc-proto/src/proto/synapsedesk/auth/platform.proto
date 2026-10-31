@@ -498,6 +498,12 @@ message UpdatePlanRequest {
   optional int32 max_analytics_range_days = 13;
 
   optional bool is_active = 11;
+
+  // Prices to put on the plan, read from Stripe as on create; empty, none.
+  repeated CreatePlanPriceInput add_prices = 14;
+  // Stripe price ids to take off the plan; empty, none. Refused while an
+  // organization's live subscription is on one.
+  repeated string remove_prices = 15;
 }
 
 // What ONE subscriber would get, and what that would mean for them.

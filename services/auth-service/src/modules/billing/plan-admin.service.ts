@@ -10,7 +10,7 @@ import {
   type PlanLimitDimension,
 } from '@synapsedesk/contracts';
 import Stripe from 'stripe';
-import { withHttpStatus } from '@synapsedesk/core';
+import { isUniqueConstraintViolation, withHttpStatus } from '@synapsedesk/core';
 import {
   AuditPublisher,
   formatErrorMsg,
@@ -202,31 +202,38 @@ export class PlanAdminService {
       });
     }
 
-    const amounts = await this.amountsOf(request.prices ?? []);
-
-    const plan = await this.prisma.subscriptionPlan.create({
-      data: {
-        name,
-        stripeProductId: request.stripeProductId ?? null,
-        maxAgentSeats: request.maxAgentSeats,
-        maxStorageBytes: BigInt(request.maxStorageBytes),
-        monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget),
-        aiModelTier: this.tierName(request.aiModelTier),
-        maxDocumentBytes: BigInt(request.maxDocumentBytes),
-        maxAttachmentBytes: BigInt(request.maxAttachmentBytes),
-        maxDocumentUploads: request.maxDocumentUploads,
-        maxAnalyticsRangeDays: request.maxAnalyticsRangeDays,
-        isActive: request.isActive,
-        prices: {
-          create: (request.prices ?? []).map((price, index) => ({
-            stripePriceId: price.stripePriceId,
-            interval: price.interval,
-            ...amounts[index],
-          })),
-        },
-      },
-      include: PLAN_INCLUDE,
+    const prices = request.prices ?? [];
+    await this.assertPricesFree(prices);
+    const amounts = await this.amountsOf(prices, {
+      name,
+      stripeProductId: request.stripeProductId ?? null,
     });
+
+    const plan = await this.prisma.subscriptionPlan
+      .create({
+        data: {
+          name,
+          stripeProductId: request.stripeProductId ?? null,
+          maxAgentSeats: request.maxAgentSeats,
+          maxStorageBytes: BigInt(request.maxStorageBytes),
+          monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget),
+          aiModelTier: this.tierName(request.aiModelTier),
+          maxDocumentBytes: BigInt(request.maxDocumentBytes),
+          maxAttachmentBytes: BigInt(request.maxAttachmentBytes),
+          maxDocumentUploads: request.maxDocumentUploads,
+          maxAnalyticsRangeDays: request.maxAnalyticsRangeDays,
+          isActive: request.isActive,
+          prices: {
+            create: prices.map((price, index) => ({
+              stripePriceId: price.stripePriceId,
+              interval: price.interval,
+              ...amounts[index],
+            })),
+          },
+        },
+        include: PLAN_INCLUDE,
+      })
+      .catch(asTakenPrice);
 
     this.audit.record(context, {
       action: AuditAction.PLATFORM_PLAN_CREATED,
@@ -243,14 +250,23 @@ export class PlanAdminService {
 
   /**
    * Each price's amount and currency, read from Stripe: what Stripe charges,
-   * never typed by hand. Stripe unreachable refuses the create (503), so the
-   * catalog never holds a price with no amount; a negotiated plan has no
-   * prices and reads nothing.
+   * never typed by hand. Stripe unreachable refuses the save (503), so the
+   * catalog never holds a price with no amount.
+   *
+   * **A price must be of the plan's Stripe product**, or its subscribers would
+   * map to this plan: a plan with no product (negotiated) takes no prices.
    */
   private async amountsOf(
     prices: { stripePriceId: string }[],
+    plan: { name: string; stripeProductId: string | null },
   ): Promise<{ unitAmount: number; currency: string }[]> {
     if (prices.length === 0) return [];
+    if (!plan.stripeProductId) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'A plan with no Stripe product has no prices.',
+      });
+    }
     const api = this.stripe.api;
     return Promise.all(
       prices.map(async ({ stripePriceId }) => {
@@ -278,6 +294,14 @@ export class PlanAdminService {
             ),
           });
         }
+        const product =
+          typeof price.product === 'string' ? price.product : price.product.id;
+        if (product !== plan.stripeProductId) {
+          throw new RpcException({
+            code: status.INVALID_ARGUMENT,
+            message: `${stripePriceId} belongs to another Stripe product, not ${plan.name}'s.`,
+          });
+        }
         // A tiered or metered price has no single amount to show.
         if (price.unit_amount === null) {
           throw new RpcException({
@@ -288,6 +312,59 @@ export class PlanAdminService {
         return { unitAmount: price.unit_amount, currency: price.currency };
       }),
     );
+  }
+
+  /**
+   * Refuses a price that is already on a plan (409): a price can belong to one
+   * plan only, or its subscribers' events would map to two. The unique index
+   * is the backstop for two saves that race ({@link asTakenPrice}).
+   */
+  private async assertPricesFree(
+    prices: { stripePriceId: string }[],
+  ): Promise<void> {
+    if (prices.length === 0) return;
+    const taken = await this.prisma.subscriptionPlanPrice.findFirst({
+      where: { stripePriceId: { in: prices.map((p) => p.stripePriceId) } },
+      select: { stripePriceId: true, plan: { select: { name: true } } },
+    });
+    if (taken) {
+      throw new RpcException({
+        code: status.ALREADY_EXISTS,
+        message: `${taken.stripePriceId} is already on ${taken.plan.name}. A price can belong to one plan only.`,
+      });
+    }
+  }
+
+  /**
+   * Refuses taking off a price that isn't the plan's (400), or that an
+   * organization's live subscription is on (409): its next Stripe event
+   * would find no plan.
+   */
+  private async assertRemovable(
+    plan: PlanRow,
+    stripePriceIds: string[],
+  ): Promise<void> {
+    const own = new Set(plan.prices.map((price) => price.stripePriceId));
+    for (const stripePriceId of stripePriceIds) {
+      if (!own.has(stripePriceId)) {
+        throw new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: `${stripePriceId} isn't on ${plan.name}.`,
+        });
+      }
+      const subscribed = await this.prisma.organization.count({
+        where: { stripePriceId },
+      });
+      if (subscribed > 0) {
+        throw new RpcException({
+          code: status.FAILED_PRECONDITION,
+          message: withHttpStatus(
+            409,
+            `Organizations are subscribed on ${stripePriceId}. Move them to another price in Stripe first.`,
+          ),
+        });
+      }
+    }
   }
 
   /**
@@ -305,62 +382,104 @@ export class PlanAdminService {
     requireActor(context);
 
     const existing = await this.load(request.planId);
+    const name =
+      request.name === undefined ? existing.name : request.name.trim();
+    const stripeProductId = request.clearStripeProductId
+      ? null
+      : (request.stripeProductId ?? existing.stripeProductId);
+    const removePrices = request.removePrices ?? [];
+    const addPrices = request.addPrices ?? [];
 
-    const plan = await this.prisma.subscriptionPlan.update({
-      where: { id: existing.id },
-      data: {
-        // `undefined` means "leave it" to Prisma, which is exactly what an
-        // absent optional field means on the wire. Only `clear…` turns a value
-        // into NULL, so a PATCH touching one grant cannot empty the row.
-        ...(request.name === undefined ? {} : { name: request.name.trim() }),
-        ...(request.clearStripeProductId
-          ? { stripeProductId: null }
-          : request.stripeProductId === undefined // NOSONAR
-            ? {}
-            : { stripeProductId: request.stripeProductId }),
-        ...(request.maxAgentSeats === undefined
-          ? {}
-          : { maxAgentSeats: request.maxAgentSeats }),
-        ...(request.maxStorageBytes === undefined
-          ? {}
-          : { maxStorageBytes: BigInt(request.maxStorageBytes) }),
-        ...(request.monthlyAiTokenBudget === undefined
-          ? {}
-          : { monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget) }),
-        ...(request.aiModelTier === undefined
-          ? {}
-          : { aiModelTier: this.tierName(request.aiModelTier) }),
-        ...(request.maxDocumentBytes === undefined
-          ? {}
-          : { maxDocumentBytes: BigInt(request.maxDocumentBytes) }),
-        ...(request.maxAttachmentBytes === undefined
-          ? {}
-          : { maxAttachmentBytes: BigInt(request.maxAttachmentBytes) }),
-        ...(request.maxDocumentUploads === undefined
-          ? {}
-          : { maxDocumentUploads: request.maxDocumentUploads }),
-        ...(request.maxAnalyticsRangeDays === undefined
-          ? {}
-          : { maxAnalyticsRangeDays: request.maxAnalyticsRangeDays }),
-        ...(request.isActive === undefined
-          ? {}
-          : { isActive: request.isActive }),
-      },
-      include: PLAN_INCLUDE,
-    });
+    // Every Stripe read and check BEFORE the transaction opens: a network call
+    // inside one holds its row locks for as long as Stripe takes.
+    await this.assertRemovable(existing, removePrices);
+    await this.assertPricesFree(addPrices);
+    const amounts = await this.amountsOf(addPrices, { name, stripeProductId });
 
-    this.audit.record(context, {
-      action: AuditAction.PLATFORM_PLAN_UPDATED,
-      resourceType: AuditResourceType.SUBSCRIPTION_PLAN,
-      resourceId: plan.id,
-      organizationId: null,
-      metadata: {
-        name: plan.name,
-        // The number that makes this row answerable later: an edit with
-        // subscribers is a pending fan-out, an edit with none is bookkeeping.
-        subscriberCount: plan._count.organizations,
-      },
-    });
+    const plan = await this.prisma
+      .$transaction(async (tx) => {
+        if (removePrices.length > 0) {
+          await tx.subscriptionPlanPrice.deleteMany({
+            where: {
+              planId: existing.id,
+              stripePriceId: { in: removePrices },
+            },
+          });
+        }
+        if (addPrices.length > 0) {
+          await tx.subscriptionPlanPrice.createMany({
+            data: addPrices.map((price, index) => ({
+              planId: existing.id,
+              stripePriceId: price.stripePriceId,
+              interval: price.interval,
+              ...amounts[index],
+            })),
+          });
+        }
+
+        return tx.subscriptionPlan.update({
+          where: { id: existing.id },
+          data: {
+            // `undefined` means "leave it" to Prisma, which is exactly what an
+            // absent optional field means on the wire. Only `clear…` turns a
+            // value into NULL, so a PATCH touching one grant cannot empty the
+            // row.
+            ...(request.name === undefined ? {} : { name }),
+            ...(request.clearStripeProductId
+              ? { stripeProductId: null }
+              : request.stripeProductId === undefined // NOSONAR
+                ? {}
+                : { stripeProductId: request.stripeProductId }),
+            ...(request.maxAgentSeats === undefined
+              ? {}
+              : { maxAgentSeats: request.maxAgentSeats }),
+            ...(request.maxStorageBytes === undefined
+              ? {}
+              : { maxStorageBytes: BigInt(request.maxStorageBytes) }),
+            ...(request.monthlyAiTokenBudget === undefined
+              ? {}
+              : { monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget) }),
+            ...(request.aiModelTier === undefined
+              ? {}
+              : { aiModelTier: this.tierName(request.aiModelTier) }),
+            ...(request.maxDocumentBytes === undefined
+              ? {}
+              : { maxDocumentBytes: BigInt(request.maxDocumentBytes) }),
+            ...(request.maxAttachmentBytes === undefined
+              ? {}
+              : { maxAttachmentBytes: BigInt(request.maxAttachmentBytes) }),
+            ...(request.maxDocumentUploads === undefined
+              ? {}
+              : { maxDocumentUploads: request.maxDocumentUploads }),
+            ...(request.maxAnalyticsRangeDays === undefined
+              ? {}
+              : { maxAnalyticsRangeDays: request.maxAnalyticsRangeDays }),
+            ...(request.isActive === undefined
+              ? {}
+              : { isActive: request.isActive }),
+          },
+          include: PLAN_INCLUDE,
+        });
+      })
+      .catch(asTakenPrice);
+
+    // A save that changes nothing is not an event.
+    const changes = planChanges(existing, plan);
+    if (changes.length > 0) {
+      this.audit.record(context, {
+        action: AuditAction.PLATFORM_PLAN_UPDATED,
+        resourceType: AuditResourceType.SUBSCRIPTION_PLAN,
+        resourceId: plan.id,
+        organizationId: null,
+        metadata: {
+          name: plan.name,
+          // The number that makes this row answerable later: an edit with
+          // subscribers is a pending fan-out, an edit with none is bookkeeping.
+          subscriberCount: plan._count.organizations,
+          changes,
+        },
+      });
+    }
 
     return toSubscriptionPlanResponse(plan);
   }
@@ -929,4 +1048,97 @@ function refuseBesideSubscription(organization: {
       message: withHttpStatus(409, SUBSCRIPTION_REFUSAL),
     });
   }
+}
+
+/** The catalog fields a plan edit can change, in the plan form's order. */
+const PLAN_FIELDS = [
+  'name',
+  'stripeProductId',
+  'maxAgentSeats',
+  'maxStorageBytes',
+  'monthlyAiTokenBudget',
+  'aiModelTier',
+  'maxDocumentBytes',
+  'maxAttachmentBytes',
+  'maxDocumentUploads',
+  'maxAnalyticsRangeDays',
+  'isActive',
+] as const;
+
+/** One audited change: a field's stored values, or the prices in and out. */
+type PlanChange =
+  | {
+      field: (typeof PLAN_FIELDS)[number];
+      from: string | number | boolean | null;
+      to: string | number | boolean | null;
+    }
+  | {
+      field: 'prices';
+      added: { stripePriceId: string; interval: string }[];
+      removed: { stripePriceId: string; interval: string }[];
+    };
+
+/**
+ * What a plan edit changed, in the plan form's order with prices last.
+ *
+ * The STORED values, never words: byte counts and the allowance in
+ * micro-dollars as JSON numbers (every one far inside `MAX_SAFE_INTEGER`),
+ * the tier by name. The web formats them.
+ *
+ * @example
+ * planChanges(before, after)
+ * // [{ field: 'maxAgentSeats', from: 20, to: 25 },
+ * //  { field: 'prices', added: [{ stripePriceId: 'price_x', interval: 'month' }], removed: [] }]
+ */
+export function planChanges(before: PlanRow, after: PlanRow): PlanChange[] {
+  const stored = (value: unknown) =>
+    typeof value === 'bigint'
+      ? Number(value)
+      : (value as string | number | boolean | null);
+  const changes: PlanChange[] = [];
+  for (const field of PLAN_FIELDS) {
+    const from = stored(before[field]);
+    const to = stored(after[field]);
+    if (from !== to) changes.push({ field, from, to });
+  }
+
+  const ids = (row: PlanRow) => new Set(row.prices.map((p) => p.stripePriceId));
+  const beforeIds = ids(before);
+  const afterIds = ids(after);
+  const shape = (price: { stripePriceId: string; interval: string }) => ({
+    stripePriceId: price.stripePriceId,
+    interval: price.interval,
+  });
+  const added = after.prices.filter((p) => !beforeIds.has(p.stripePriceId));
+  const removed = before.prices.filter((p) => !afterIds.has(p.stripePriceId));
+  if (added.length > 0 || removed.length > 0) {
+    changes.push({
+      field: 'prices',
+      added: added.map(shape),
+      removed: removed.map(shape),
+    });
+  }
+
+  return changes;
+}
+
+/**
+ * A price taken between the check and the write, by a save that raced this
+ * one (a double submit, since a price fits only its product's plan): the same
+ * 409 as the check, from the unique index.
+ */
+function asTakenPrice(error: unknown): never {
+  if (
+    isUniqueConstraintViolation(
+      error,
+      'subscription_plan_prices_stripe_price_id_key',
+    )
+  ) {
+    throw new RpcException({
+      code: status.ALREADY_EXISTS,
+      message:
+        'A price you added is already on a plan. A price can belong to one plan only.',
+    });
+  }
+  throw error;
 }

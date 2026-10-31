@@ -627,6 +627,34 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsBoolean()
   readonly isActive?: boolean;
+
+  /**
+   * Prices to put on the plan, in create's shape: each is read from Stripe
+   * and must be of the plan's Stripe product. Absent or `[]`, none.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_PLAN_PRICES)
+  @ValidateNested({ each: true })
+  @Type(() => CreatePlanPriceDto)
+  @ApiPropertyOptional({ type: [CreatePlanPriceDto] })
+  readonly addPrices?: CreatePlanPriceDto[];
+
+  /**
+   * Stripe price ids to take off the plan. Refused while an organization's
+   * live subscription is on one. Absent or `[]`, none.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_PLAN_PRICES)
+  @IsString({ each: true })
+  @MaxLength(MAX_STRIPE_ID_LENGTH, { each: true })
+  @Matches(STRIPE_ID_PATTERN, {
+    each: true,
+    message:
+      'each removePrices entry must be alphanumeric with _ or - separators',
+  })
+  readonly removePrices?: string[];
 }
 
 export class ApplyPlanQueryDto {

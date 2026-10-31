@@ -71575,6 +71575,11 @@
           "planAssigned": {
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
+          },
+          "aiModelTier": {
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"],
+            "type": "string"
           }
         },
         "required": [
@@ -71587,7 +71592,8 @@
           "billedThroughStripe",
           "statusChangedAt",
           "entitlementsPinned",
-          "planAssigned"
+          "planAssigned",
+          "aiModelTier"
         ]
       },
       "CreatePlatformOrganizationResponseDto": {
@@ -71719,6 +71725,11 @@
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
           },
+          "aiModelTier": {
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"],
+            "type": "string"
+          },
           "usage": {
             "description": "Each meter is `READ_FAILED` when its service didn't answer; the page still loads.",
             "allOf": [
@@ -71739,6 +71750,7 @@
           "statusChangedAt",
           "entitlementsPinned",
           "planAssigned",
+          "aiModelTier",
           "usage"
         ]
       },
@@ -71821,6 +71833,11 @@
             "type": "boolean",
             "description": "On a negotiated plan the platform assigned (no Stripe product, not Free):\ncheckout refuses it, and only the platform releases it."
           },
+          "aiModelTier": {
+            "description": "The model tier its AI answers with, from its plan.",
+            "enum": ["FAST", "QUALITY"],
+            "type": "string"
+          },
           "revokedSessionCount": {
             "type": "number",
             "description": "Sessions the change ended: every one on a freeze, none otherwise."
@@ -71837,6 +71854,7 @@
           "statusChangedAt",
           "entitlementsPinned",
           "planAssigned",
+          "aiModelTier",
           "revokedSessionCount"
         ]
       },
@@ -72334,6 +72352,13 @@
       "UpdatePlanDto": {
         "type": "object",
         "properties": {
+          "addPrices": {
+            "description": "Prices to put on the plan, in create's shape: each is read from Stripe\nand must be of the plan's Stripe product. Absent or `[]`, none.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePlanPriceDto"
+            }
+          },
           "name": {
             "type": "string",
             "minLength": 2,
@@ -72385,6 +72410,14 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "removePrices": {
+            "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            }
           }
         }
       },

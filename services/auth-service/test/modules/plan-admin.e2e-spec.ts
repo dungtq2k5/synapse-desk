@@ -1104,7 +1104,17 @@ describe('The plan catalogue (e2e)', () => {
       price_monthly: { unit_amount: 2_900, currency: 'usd' },
       price_yearly: { unit_amount: 29_000, currency: 'usd' },
       price_tiered: { unit_amount: null, currency: 'usd' },
+      price_spare: { unit_amount: 4_900, currency: 'usd' },
+      price_held: { unit_amount: 1_500, currency: 'usd' },
+      price_other_product: { unit_amount: 1_000, currency: 'usd' },
     };
+    /** Every price is this product's, but one. */
+    const PRODUCT = 'prod_priced';
+    const productOf = (id: string) =>
+      id === 'price_other_product' ? 'prod_someone_else' : PRODUCT;
+    /** A plan sold through Stripe, so it can carry prices. */
+    const pricedPlan = (overrides: Record<string, unknown> = {}) =>
+      buildPlan({ stripeProductId: PRODUCT, ...overrides });
     /** Stripe as the fake answers it, or failing with `error`. */
     const stripeAnswers = (error?: Error) =>
       faults
@@ -1115,7 +1125,7 @@ describe('The plan catalogue (e2e)', () => {
               if (error) return Promise.reject(error);
               const amount = AMOUNTS[id];
               return amount
-                ? Promise.resolve({ id, ...amount })
+                ? Promise.resolve({ id, product: productOf(id), ...amount })
                 : Promise.reject(
                     new Stripe.errors.StripeInvalidRequestError({
                       type: 'invalid_request_error',
@@ -1130,7 +1140,7 @@ describe('The plan catalogue (e2e)', () => {
     it('reads each amount from Stripe, and the plan answers with them', async () => {
       stripeAnswers();
 
-      const created = await buildPlan({ prices: PRICES });
+      const created = await pricedPlan({ prices: PRICES });
       const read = await plans.getPlan(created.id, context());
 
       for (const plan of [created, read]) {
@@ -1153,7 +1163,7 @@ describe('The plan catalogue (e2e)', () => {
       );
       const before = await fx.prisma.subscriptionPlan.count();
 
-      await expectRpc(buildPlan({ prices: PRICES }), status.UNAVAILABLE);
+      await expectRpc(pricedPlan({ prices: PRICES }), status.UNAVAILABLE);
       expect(await fx.prisma.subscriptionPlan.count()).toBe(before);
     });
 
@@ -1161,13 +1171,13 @@ describe('The plan catalogue (e2e)', () => {
       stripeAnswers();
 
       await expectRpc(
-        buildPlan({
+        pricedPlan({
           prices: [{ stripePriceId: 'price_nope', interval: 'month' }],
         }),
         status.INVALID_ARGUMENT,
       );
       await expectRpc(
-        buildPlan({
+        pricedPlan({
           prices: [{ stripePriceId: 'price_tiered', interval: 'month' }],
         }),
         status.INVALID_ARGUMENT,
@@ -1180,6 +1190,204 @@ describe('The plan catalogue (e2e)', () => {
       await buildPlan({ prices: [] });
 
       expect(api).not.toHaveBeenCalled();
+    });
+
+    /** The refusal's code and message. */
+    const refusal = async (promise: Promise<unknown>) => {
+      const error = (await promise.catch((caught: unknown) => caught)) as {
+        error: { code: number; message: string };
+      };
+      return {
+        code: error.error.code,
+        message: error.error.message.replace(/^\[http:\d+\] /, ''),
+      };
+    };
+
+    const editPrices = (
+      planId: string,
+      change: {
+        addPrices?: { stripePriceId: string; interval: string }[];
+        removePrices?: string[];
+        stripeProductId?: string;
+      },
+    ) =>
+      plans.updatePlan(
+        {
+          planId,
+          clearStripeProductId: false,
+          addPrices: [],
+          removePrices: [],
+          ...change,
+        },
+        context(),
+      );
+
+    it('**a price of another Stripe product is refused, on create and on add**', async () => {
+      stripeAnswers();
+      const plan = await pricedPlan();
+      const other = [
+        { stripePriceId: 'price_other_product', interval: 'month' },
+      ];
+
+      for (const attempt of [
+        pricedPlan({ prices: other }),
+        editPrices(plan.id, { addPrices: other }),
+      ]) {
+        expect(await refusal(attempt)).toEqual({
+          code: status.INVALID_ARGUMENT,
+          message: expect.stringMatching(
+            /^price_other_product belongs to another Stripe product, not Plan \d+'s\.$/,
+          ),
+        });
+      }
+    });
+
+    it('a plan with no Stripe product takes no prices', async () => {
+      stripeAnswers();
+      const negotiated = await buildPlan();
+
+      for (const attempt of [
+        buildPlan({ prices: PRICES }),
+        editPrices(negotiated.id, { addPrices: [PRICES[0]] }),
+      ]) {
+        expect(await refusal(attempt)).toEqual({
+          code: status.INVALID_ARGUMENT,
+          message: 'A plan with no Stripe product has no prices.',
+        });
+      }
+    });
+
+    it('**a price already on a plan is refused with 409, on create and on add**', async () => {
+      stripeAnswers();
+      const held = [{ stripePriceId: 'price_held', interval: 'month' }];
+      const holder = await pricedPlan({ prices: held });
+      // Each plan has its own product (the column is unique); the duplicate
+      // is refused before the product is compared.
+      const plan = await buildPlan({ stripeProductId: 'prod_second' });
+
+      for (const attempt of [
+        buildPlan({ stripeProductId: 'prod_third', prices: held }),
+        editPrices(plan.id, { addPrices: held }),
+      ]) {
+        expect(await refusal(attempt)).toEqual({
+          code: status.ALREADY_EXISTS,
+          message: `price_held is already on ${holder.name}. A price can belong to one plan only.`,
+        });
+      }
+    });
+
+    it('a double submit of the same price gets a 409 from the unique index', async () => {
+      stripeAnswers();
+      const held = [{ stripePriceId: 'price_held', interval: 'month' }];
+      const plan = await pricedPlan({ prices: held });
+      // The second save's check ran before the first committed: it finds
+      // nothing.
+      faults.replace(fx.prisma.subscriptionPlanPrice, 'findFirst', (() =>
+        Promise.resolve(null)) as never);
+
+      expect(await refusal(editPrices(plan.id, { addPrices: held }))).toEqual({
+        code: status.ALREADY_EXISTS,
+        message:
+          'A price you added is already on a plan. A price can belong to one plan only.',
+      });
+    });
+
+    it('adds a price with what Stripe charges, and a product change checks against the new product', async () => {
+      stripeAnswers();
+      const plan = await buildPlan();
+
+      const edited = await editPrices(plan.id, {
+        stripeProductId: PRODUCT,
+        addPrices: [{ stripePriceId: 'price_spare', interval: 'month' }],
+      });
+
+      expect(
+        edited.prices.map((price) => [price.stripePriceId, price.unitAmount]),
+      ).toEqual([['price_spare', 4_900]]);
+    });
+
+    it('**removes a price nobody is subscribed on, and refuses one in use or not on the plan**', async () => {
+      stripeAnswers();
+      const plan = await pricedPlan({ prices: PRICES });
+      const subscriber = await subscriberOf(plan.id);
+      await fx.prisma.organization.update({
+        where: { id: subscriber.id },
+        data: { stripePriceId: 'price_monthly' },
+      });
+
+      expect(
+        await refusal(editPrices(plan.id, { removePrices: ['price_monthly'] })),
+      ).toEqual({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'Organizations are subscribed on price_monthly. Move them to another price in Stripe first.',
+      });
+      expect(
+        await refusal(editPrices(plan.id, { removePrices: ['price_spare'] })),
+      ).toEqual({
+        code: status.INVALID_ARGUMENT,
+        message: `price_spare isn't on ${plan.name}.`,
+      });
+
+      const edited = await editPrices(plan.id, {
+        removePrices: ['price_yearly'],
+      });
+      expect(edited.prices.map((price) => price.stripePriceId)).toEqual([
+        'price_monthly',
+      ]);
+    });
+
+    it('**an edit’s audit entry lists what changed, in the form’s order, prices last**', async () => {
+      stripeAnswers();
+      const plan = await pricedPlan({ prices: [PRICES[1]] });
+      auditRecord.mockClear();
+
+      await plans.updatePlan(
+        {
+          planId: plan.id,
+          clearStripeProductId: false,
+          maxAgentSeats: 30,
+          monthlyAiTokenBudget: 80_000_000,
+          addPrices: [{ stripePriceId: 'price_spare', interval: 'month' }],
+          removePrices: ['price_yearly'],
+        },
+        context(),
+      );
+
+      const updated = auditRecord.mock.calls.find(
+        (call) => call[1].action === AuditAction.PLATFORM_PLAN_UPDATED,
+      );
+      expect(updated?.[1].metadata.changes).toEqual([
+        { field: 'maxAgentSeats', from: 25, to: 30 },
+        { field: 'monthlyAiTokenBudget', from: 10_000_000, to: 80_000_000 },
+        {
+          field: 'prices',
+          added: [{ stripePriceId: 'price_spare', interval: 'month' }],
+          removed: [{ stripePriceId: 'price_yearly', interval: 'year' }],
+        },
+      ]);
+    });
+
+    it('a save that changes nothing writes no audit entry', async () => {
+      const plan = await buildPlan();
+      auditRecord.mockClear();
+
+      await plans.updatePlan(
+        {
+          planId: plan.id,
+          clearStripeProductId: false,
+          maxAgentSeats: 25,
+          addPrices: [],
+          removePrices: [],
+        },
+        context(),
+      );
+
+      expect(
+        auditRecord.mock.calls.filter(
+          (call) => call[1].action === AuditAction.PLATFORM_PLAN_UPDATED,
+        ),
+      ).toHaveLength(0);
     });
   });
 });

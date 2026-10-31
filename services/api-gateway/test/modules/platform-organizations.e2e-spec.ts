@@ -139,6 +139,14 @@ describe('Platform organizations (e2e)', () => {
     expect(response.body.data.organization.name).toBe('Northwind Health');
   });
 
+  it('names the AI model tier its plan gives it', async () => {
+    const response = await superAdmin()
+      .get(`${API}/platform/organizations/${organizationId}`)
+      .expect(200);
+
+    expect(response.body.data.aiModelTier).toBe('QUALITY');
+  });
+
   it('names the plan, whether Stripe grants it, and when the status changed', async () => {
     const response = await superAdmin()
       .get(`${API}/platform/organizations/${organizationId}`)

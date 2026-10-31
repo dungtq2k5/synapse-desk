@@ -245,6 +245,36 @@ describe('platform', () => {
     );
 
     rowFor('Platform')(
+      '**an organization carries the AI model tier its plan gives it**',
+      async () => {
+        peers.auth.on('PlatformService/GetOrganization').reply(
+          wirePlatformOrganization('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa', {
+            organization: wireOrganization(
+              'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+              { aiModelTier: 'AI_MODEL_TIER_QUALITY' },
+            ),
+          }),
+        );
+        peers.auth
+          .on('PlatformService/GetOrganizationUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'busy');
+        peers.ingestion
+          .on('IngestionPlatformService/GetPlatformUsage')
+          .fail(GrpcStatus.UNAVAILABLE, 'busy');
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { aiModelTier: 'QUALITY' },
+        });
+      },
+    );
+
+    rowFor('Platform')(
       '**an organization carries its plan, whether Stripe grants it, and when its status changed**',
       async () => {
         peers.auth.on('PlatformService/GetOrganization').reply(
@@ -727,6 +757,67 @@ describe('platform', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({ data: { id: 'plan-1' } });
+      },
+    );
+
+    rowFor('Platform')(
+      '**`updatePlan` sends the prices to add and remove, and a refusal keeps its 409**',
+      async () => {
+        peers.auth.on('PlatformService/UpdatePlan').reply(wirePlan('plan-1'));
+
+        const ok = await new Session(gateway.baseUrl).request(
+          'PATCH',
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          {
+            body: {
+              addPrices: [{ stripePriceId: 'price_new', interval: 'month' }],
+              removePrices: ['price_old'],
+            },
+            headers: superAdminHeaders(),
+          },
+        );
+
+        expect(ok.status).toBe(200);
+        const [call] = peers.auth.calls('PlatformService/UpdatePlan');
+        expect(call.request).toMatchObject({
+          addPrices: [{ stripePriceId: 'price_new', interval: 'month' }],
+          removePrices: ['price_old'],
+        });
+
+        peers.auth
+          .on('PlatformService/UpdatePlan')
+          .fail(
+            GrpcStatus.ALREADY_EXISTS,
+            'price_new is already on Pro. A price can belong to one plan only.',
+          );
+        const refused = await new Session(gateway.baseUrl).request(
+          'PATCH',
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          {
+            body: {
+              addPrices: [{ stripePriceId: 'price_new', interval: 'month' }],
+            },
+            headers: superAdminHeaders(),
+          },
+        );
+        expect(refused.status).toBe(409);
+      },
+    );
+
+    rowFor('Platform')(
+      '**`updatePlan` refuses a removal that isn’t a Stripe id**',
+      async () => {
+        const response = await new Session(gateway.baseUrl).request(
+          'PATCH',
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          {
+            body: { removePrices: ['not a price'] },
+            headers: superAdminHeaders(),
+          },
+        );
+
+        expect(response.status).toBe(400);
+        expect(peers.auth.calls('PlatformService/UpdatePlan')).toHaveLength(0);
       },
     );
 

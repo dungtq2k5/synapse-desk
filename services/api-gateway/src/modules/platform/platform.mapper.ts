@@ -105,6 +105,9 @@ export function toPlatformOrganizationResponseDto(
     statusChangedAt: fromProtoTimestamp(row.statusChangedAt) ?? null,
     entitlementsPinned: row.entitlementsPinned,
     planAssigned: row.planAssigned,
+    aiModelTier:
+      fromProtoAiModelTier(row.organization?.aiModelTier) ??
+      DEFAULT_AI_MODEL_TIER,
   };
 }
 
@@ -341,6 +344,9 @@ export function toUpdatePlanRequest(
     maxDocumentUploads: dto.maxDocumentUploads,
     maxAnalyticsRangeDays: dto.maxAnalyticsRangeDays,
     isActive: dto.isActive,
+    // `repeated`, so absent and empty are one value on the wire.
+    addPrices: dto.addPrices ?? [],
+    removePrices: dto.removePrices ?? [],
   };
 }
 

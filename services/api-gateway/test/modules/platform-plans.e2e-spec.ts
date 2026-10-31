@@ -141,6 +141,67 @@ describe('Platform plans (e2e)', () => {
     ]);
   });
 
+  it('1a. a PATCH sends the prices to add and remove, and none when it names none', async () => {
+    await superAdmin()
+      .patch(`${API}/platform/plans/${planId}`)
+      .send({
+        addPrices: [{ stripePriceId: 'price_new', interval: 'month' }],
+        removePrices: ['price_old'],
+      })
+      .expect(200);
+    await superAdmin()
+      .patch(`${API}/platform/plans/${planId}`)
+      .send({ name: 'Renamed' })
+      .expect(200);
+
+    const [[withPrices], [withoutPrices]] =
+      fx.stubs.platform.updatePlan.mock.calls;
+    expect(withPrices.addPrices).toEqual([
+      { stripePriceId: 'price_new', interval: 'month' },
+    ]);
+    expect(withPrices.removePrices).toEqual(['price_old']);
+    expect(withoutPrices.addPrices).toEqual([]);
+    expect(withoutPrices.removePrices).toEqual([]);
+  });
+
+  it('1c. a price refusal keeps its status and its words', async () => {
+    for (const [code, message, expected] of [
+      [
+        6,
+        'price_x is already on Pro. A price can belong to one plan only.',
+        409,
+      ],
+      [3, "price_x belongs to another Stripe product, not Pro's.", 400],
+      [
+        9,
+        '[http:409] Organizations are subscribed on price_x. Move them to another price in Stripe first.',
+        409,
+      ],
+    ] as const) {
+      fx.stubs.platform.updatePlan.mockReturnValueOnce(
+        throwError(() => grpcError(code, message)),
+      );
+
+      const res = await superAdmin()
+        .patch(`${API}/platform/plans/${planId}`)
+        .send({ removePrices: ['price_x'] });
+
+      expect(res.status).toBe(expected);
+      // Up to its final stop, which the edge's error wording settles.
+      expect(res.body.error).toContain(
+        message.replace('[http:409] ', '').slice(0, -1),
+      );
+    }
+  });
+
+  it('1d. a removal that isn’t a Stripe id is refused at the edge', async () => {
+    await superAdmin()
+      .patch(`${API}/platform/plans/${planId}`)
+      .send({ removePrices: ['not a price'] })
+      .expect(400);
+    expect(fx.stubs.platform.updatePlan).not.toHaveBeenCalled();
+  });
+
   it('1b. …and a PATCH that DOES name a grant still sends it', async () => {
     // The complement. Test 1 alone passes for a mapper that drops every field
     // on the floor, which would be a worse bug wearing the same green.
