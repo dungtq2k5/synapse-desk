@@ -167,7 +167,9 @@ describe('releasing to self-service', () => {
     answer = projection(false);
     await user.click(release);
     await waitFor(() => expect(onReleased).toHaveBeenCalled());
-    expect(calls.at(-1)?.body).toEqual({ reason: 'Agreement ended' });
+    expect(
+      calls.filter((call) => call.method === 'DELETE').at(-1)?.body,
+    ).toEqual({ reason: 'Agreement ended' });
   });
 });
 

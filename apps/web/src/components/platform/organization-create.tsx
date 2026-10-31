@@ -20,6 +20,7 @@ import { toastError } from '@/lib/toast';
 import { ConsoleStatusBadge } from './badges';
 import { ConsoleCard, ConsolePage, Facts } from './console-page';
 import { bytesOf, microsOf, UnitInput, wholeOf } from './fields';
+import { awaitNewAct } from './recent-acts';
 
 const CRUMBS = [
   { label: 'Organizations', href: '/platform/organizations' },
@@ -130,6 +131,12 @@ export function OrganizationCreate() {
       void queryClient.invalidateQueries({
         queryKey: ['/api/v1/platform/organizations'],
       });
+      if (answer.data) {
+        void awaitNewAct(
+          queryClient,
+          answer.data.organization.organization.id,
+        )();
+      }
       setCreated(answer.data ?? null);
       globalThis.scrollTo?.(0, 0);
     } catch (failed) {

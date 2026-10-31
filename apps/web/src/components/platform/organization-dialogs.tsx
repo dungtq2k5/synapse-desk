@@ -8,6 +8,7 @@ import {
 } from '@synapsedesk/api-client';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { CircleAlertIcon, LockIcon, TriangleAlertIcon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
@@ -31,6 +32,7 @@ import {
 } from '@/lib/platform';
 import { ConsoleStatusBadge } from './badges';
 import { ReasonField } from './fields';
+import { awaitNewAct } from './recent-acts';
 
 const REASON_REQUIRED = 'A reason is required.';
 
@@ -75,6 +77,7 @@ export function StatusDialog({
     onOpenChange(next);
   };
 
+  const queryClient = useQueryClient();
   const confirm = async (): Promise<Refusal | false | void> => {
     if (!reason.trim()) {
       setError(REASON_REQUIRED);
@@ -83,6 +86,7 @@ export function StatusDialog({
     }
     if (!to) return false;
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       const answer = await platformControllerSetStatusV1(organization.id, {
         status: to,
         reason: reason.trim(),
@@ -94,6 +98,7 @@ export function StatusDialog({
             ? `${count(signedOut, 'session')} were signed out.`
             : undefined,
       });
+      void landed();
       onChanged();
       reset(false);
     } catch (failed) {
@@ -183,6 +188,7 @@ export function ResetCycleDialog({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const queryClient = useQueryClient();
   const confirm = async (): Promise<Refusal | false | void> => {
     if (!reason.trim()) {
       setError(REASON_REQUIRED);
@@ -190,12 +196,14 @@ export function ResetCycleDialog({
       return false;
     }
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       await platformControllerResetBillingCycleV1(organization.id, {
         reason: reason.trim(),
       });
       announce(`Billing cycle reset for ${organization.name}.`);
       toast.success(`Billing cycle reset for ${organization.name}.`);
       setReason('');
+      void landed();
       onReset();
     } catch (failed) {
       return refusalOf(failed);
@@ -258,6 +266,7 @@ export function OffboardDialog({
   const [typed, setTyped] = useState('');
   const matches = typed.trim() === organization.name;
 
+  const queryClient = useQueryClient();
   const confirm = async (): Promise<Refusal | false | void> => {
     if (!reason.trim()) {
       setError(REASON_REQUIRED);
@@ -269,6 +278,7 @@ export function OffboardDialog({
       return false;
     }
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       const answer = await platformControllerOffboardV1(organization.id, {
         reason: reason.trim(),
       });
@@ -277,6 +287,7 @@ export function OffboardDialog({
       });
       setReason('');
       setTyped('');
+      void landed();
       onOffboarded();
     } catch (failed) {
       return refusalOf(failed);
@@ -350,6 +361,8 @@ export function RestoreDialog({
   onOpenChange: (open: boolean) => void;
   onRestored: () => void;
 }) {
+  const queryClient = useQueryClient();
+
   return (
     <ConfirmDialog
       open={open}
@@ -360,9 +373,11 @@ export function RestoreDialog({
       destructive={false}
       onConfirm={async () => {
         try {
+          const landed = awaitNewAct(queryClient, organization.id);
           await platformControllerRestoreV1(organization.id);
           announce(`${organization.name} is restored`);
           toast.success(`${organization.name} is restored`);
+          void landed();
           onRestored();
         } catch (failed) {
           return refusalOf(failed);

@@ -6,7 +6,7 @@ import {
   usePlatformControllerListPlansV1,
   type ApplyPlanResponseDto,
 } from '@synapsedesk/api-client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { TriangleAlertIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -28,6 +28,7 @@ import {
 import { andList } from '@/lib/format';
 import { changeLines, overLimitLine } from '@/lib/platform';
 import { ReasonField } from './fields';
+import { awaitNewAct } from './recent-acts';
 
 type Subject = { id: string; name: string };
 
@@ -137,6 +138,7 @@ export function AssignPlanDialog({
     onOpenChange(next);
   };
 
+  const queryClient = useQueryClient();
   const confirm = async (): Promise<Refusal | false | void> => {
     if (!chosen) {
       document.getElementById('assign-plan')?.focus();
@@ -148,11 +150,13 @@ export function AssignPlanDialog({
       return false;
     }
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       await platformControllerAssignPlanV1(organization.id, {
         planId,
         reason: reason.trim(),
       });
       toast.success(`${organization.name} is on ${chosen.name}`);
+      void landed();
       onAssigned();
       reset(false);
     } catch (failed) {
@@ -251,6 +255,7 @@ export function ReleasePlanDialog({
     onOpenChange(next);
   };
 
+  const queryClient = useQueryClient();
   const confirm = async (): Promise<Refusal | false | void> => {
     if (!reason.trim()) {
       setError(REASON_REQUIRED);
@@ -258,10 +263,12 @@ export function ReleasePlanDialog({
       return false;
     }
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       await platformControllerReleasePlanV1(organization.id, {
         reason: reason.trim(),
       });
       toast.success(`${organization.name} is released to self-service`);
+      void landed();
       onReleased();
       reset(false);
     } catch (failed) {

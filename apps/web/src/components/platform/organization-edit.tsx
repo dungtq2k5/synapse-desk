@@ -30,6 +30,7 @@ import { toastError } from '@/lib/toast';
 import { ConsoleCard, ConsolePage } from './console-page';
 import { conflictField } from './organization-create';
 import { bytesOf, gbOf, microsOf, UnitInput, usdOf, wholeOf } from './fields';
+import { awaitNewAct } from './recent-acts';
 
 type Form = {
   name: string;
@@ -147,7 +148,9 @@ function EditForm({ data }: { data: PlatformOrganizationDetailResponseDto }) {
 
     setBusy(true);
     try {
+      const landed = awaitNewAct(queryClient, organization.id);
       await platformControllerUpdateOrganizationV1(organization.id, change);
+      void landed();
       void queryClient.invalidateQueries({
         queryKey: [`/api/v1/platform/organizations/${organization.id}`],
       });

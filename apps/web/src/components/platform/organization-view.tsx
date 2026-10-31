@@ -58,6 +58,7 @@ import {
 } from './organization-dialogs';
 import { AssignPlanDialog, ReleasePlanDialog } from './plan-assignment-dialogs';
 import { tier } from './plans-view';
+import { recentActs } from './recent-acts';
 
 type Dialog =
   'status' | 'reset' | 'offboard' | 'restore' | 'assign' | 'release' | null;
@@ -79,12 +80,7 @@ export function OrganizationView({
     query: { retry: false },
   });
   const acts = usePlatformAuditLogsControllerListV1(
-    {
-      resourceType: 'ORGANIZATION',
-      resourceId: organizationId,
-      limit: 5,
-      sortOrder: 'DESC',
-    },
+    recentActs(organizationId),
     { query: { retry: false } },
   );
   const queryClient = useQueryClient();
