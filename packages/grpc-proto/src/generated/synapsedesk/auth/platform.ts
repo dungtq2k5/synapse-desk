@@ -571,7 +571,16 @@ export interface UpdatePlanRequest {
   maxAttachmentBytes?: number | undefined;
   maxDocumentUploads?: number | undefined;
   maxAnalyticsRangeDays?: number | undefined;
-  isActive?: boolean | undefined;
+  isActive?:
+    | boolean
+    | undefined;
+  /** Prices to put on the plan, read from Stripe as on create; empty, none. */
+  addPrices: CreatePlanPriceInput[];
+  /**
+   * Stripe price ids to take off the plan; empty, none. Refused while an
+   * organization's live subscription is on one.
+   */
+  removePrices: string[];
 }
 
 /** What ONE subscriber would get, and what that would mean for them. */

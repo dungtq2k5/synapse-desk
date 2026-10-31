@@ -122,4 +122,46 @@ describe('permissions', () => {
       expect(peers.auth.calls('RoleService/ListPermissions')).toHaveLength(0);
     },
   );
+
+  rowFor('Permissions')(
+    '**a platform Super Admin reads the catalog too**',
+    async () => {
+      peers.auth.on('RoleService/ListPermissions').reply({
+        items: [
+          {
+            id: 'p1',
+            code: 'ticket.read.all',
+            name: 'Read all tickets',
+            group: 'ticket',
+            isRetired: false,
+          },
+        ],
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/permissions`,
+        {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
+            {
+              sub: 'aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa',
+              organizationId: null,
+              isSuperAdmin: true,
+              departmentIds: [],
+              permissionCodes: [],
+              isEmailVerified: true,
+            },
+            TEST_KEYS.access(),
+            { algorithm: 'RS256', expiresIn: '15m' },
+          )}`,
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(
+        (response.body as { data: { code: string }[] }).data.map(
+          (item) => item.code,
+        ),
+      ).toEqual(['ticket.read.all']);
+    },
+  );
 });
