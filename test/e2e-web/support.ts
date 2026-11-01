@@ -20,6 +20,46 @@ export async function clearThrottles(): Promise<void> {
   }
 }
 
+/**
+ * Waits until the page's layout stops moving: the document's scroll size and
+ * `main`'s box hold for 500 ms, or 5 s pass. After a resize or a text-size
+ * change, measuring at once catches the layout mid-way.
+ *
+ * @example
+ * await page.setViewportSize({ width: 1280, height: 800 });
+ * await settled(page);
+ * expect(await sideways(page)).toEqual([]);
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const signature = () => {
+      const root = document.documentElement;
+      const main = document.querySelector('main')?.getBoundingClientRect();
+      return [
+        root.scrollWidth,
+        root.scrollHeight,
+        main?.x,
+        main?.y,
+        main?.width,
+        main?.height,
+      ].join();
+    };
+    const start = performance.now();
+    let last = signature();
+    let since = start;
+    while (performance.now() - start < 5000) {
+      await new Promise((frame) => requestAnimationFrame(frame));
+      const now = signature();
+      if (now !== last) {
+        last = now;
+        since = performance.now();
+      } else if (performance.now() - since >= 500) {
+        return;
+      }
+    }
+  });
+}
+
 /** The current code an authenticator app would show for this secret. */
 export function totp(secret: string): string {
   return generateSync({ secret: secret.replaceAll(' ', '') });

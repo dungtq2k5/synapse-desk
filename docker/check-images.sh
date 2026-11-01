@@ -72,7 +72,7 @@ ocr_checks() {
 
   echo "ocr-2. the USER round trip — installed as root, runs as node"
   who=$(docker run --rm --entrypoint sh "$OCR" -c 'id -un')
-  [ "$who" = "node" ] || fail "runtime-ocr runs as '$who', not node"
+  [[ "$who" = "node" ]] || fail "runtime-ocr runs as '$who', not node"
 
   # Executable BY that user, which is the half a `command -v` as root misses.
   docker run --rm --entrypoint sh "$OCR" -c 'tesseract --version >/dev/null 2>&1' \
@@ -92,7 +92,7 @@ ocr_checks() {
       grep -oE ":[[:space:]]*'[a-z_]+'" |
       grep -oE "[a-z_]+'" | tr -d "'"
   )
-  [ -n "$LANGS" ] || fail "could not read TESSERACT_CODE_BY_LANGUAGE — has the mapping moved?"
+  [[ -n "$LANGS" ]] || fail "could not read TESSERACT_CODE_BY_LANGUAGE — has the mapping moved?"
 
   INSTALLED=$(docker run --rm --entrypoint sh "$OCR" -c 'tesseract --list-langs 2>&1')
   for code in $LANGS; do
@@ -114,7 +114,7 @@ web_checks() {
     --build-arg BUILD_TIME="$BUILD_TIME" \
     -t synapsedesk/web . >/dev/null || fail "web did not build"
 
-  [ "$(docker image inspect synapsedesk/web --format '{{.Config.User}}')" = node ] \
+  [[ "$(docker image inspect synapsedesk/web --format '{{.Config.User}}')" = node ]] \
     || fail "web does not run as the node user"
   for var in SERVICE_NAME BUILD_SHA BUILD_TIME; do
     env_of synapsedesk/web | grep -q "^$var=.." \
@@ -132,7 +132,7 @@ web_checks() {
   page=$(curl -s -D - "http://127.0.0.1:$web_port/login") \
     || { stop_web; fail "web did not answer /login"; }
   nonce=$(printf '%s' "$page" | sed -n "s/.*'nonce-\([^']*\)'.*/\1/p" | head -1)
-  [ -n "$nonce" ] || { stop_web; fail "web's /login carries no CSP nonce"; }
+  [[ -n "$nonce" ]] || { stop_web; fail "web's /login carries no CSP nonce"; }
   printf '%s' "$page" | grep -qi '^x-content-type-options: nosniff' \
     || { stop_web; fail "web's /login lacks X-Content-Type-Options"; }
   printf '%s' "$page" | grep -q "nonce=\"$nonce\"" \
@@ -144,14 +144,14 @@ web_checks() {
   echo "   ok — non-root, identified, /login nonced, static served"
 }
 
-if [ "${1:-}" = "--web-only" ]; then
+if [[ "${1:-}" = "--web-only" ]]; then
   web_checks
   echo
   echo "Web checks passed."
   exit 0
 fi
 
-if [ "${1:-}" = "--ocr-only" ]; then
+if [[ "${1:-}" = "--ocr-only" ]]; then
   ocr_checks
   echo
   echo "OCR checks passed."
@@ -165,7 +165,7 @@ fi
 echo "1. every service image builds"
 for service in "${NODE_SERVICES[@]}"; do
   target=""
-  [ "$service" = "ingestion-service" ] && target="runtime-ocr"
+  [[ "$service" = "ingestion-service" ]] && target="runtime-ocr"
   echo "   building $service${target:+ ($target)}…"
   build_node "synapsedesk/$service" "$service" "$target" \
     || fail "$service did not build"
