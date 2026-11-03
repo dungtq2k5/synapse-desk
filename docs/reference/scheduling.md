@@ -122,4 +122,4 @@ It needs `METRICS_HOST = 0.0.0.0` in `services/api-gateway/.env`: the listener d
 | A step's heartbeat is stale while its siblings are fresh | that step threw; the others ran anyway — read its `job_runs.last_error` |
 | `chunk-usage-projection` fails nightly with `ProjectionCursorMissingError` | the database was never backfilled — run `projection:backfill` once |
 | Alerts never fire | is Prometheus running (`--profile observability`)? Is the target `UP` on `/targets` — if `DOWN`, `METRICS_HOST` is loopback. Does `/rules` show 18? A `rule_files` path that matches nothing loads zero rules and logs success |
-| Alerts are a job short | regenerate, and build the lib first |
+| Alerts are a job short | regenerate, and build `packages/contracts` first (the generator reads its `dist`) |

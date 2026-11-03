@@ -160,7 +160,7 @@ The package is deliberately **unversioned** (no `.v1`), so there is no v2-beside
 
 ### 6.2 Bootstrap
 
-Server (`main.ts`) and client (`ClientsModule.register`) **MUST** both pass `GRPC_LOADER_OPTIONS` and spread `GRPC_CHANNEL_OPTIONS`, using `AUTH_PACKAGE_NAME` / `AUTH_PROTO_PATHS` from the lib.
+Server (`main.ts`) and client (`ClientsModule.register`) **MUST** both pass `GRPC_LOADER_OPTIONS` and spread `GRPC_CHANNEL_OPTIONS`, using `AUTH_PACKAGE_NAME` / `AUTH_PROTO_PATHS` from `@synapsedesk/grpc-proto`.
 
 ### 6.4 Errors across the boundary
 
