@@ -2,8 +2,8 @@
   // The seeder is TypeScript because it imports the services' typed factories
   // and generated Prisma clients — `seed-plans.mjs`'s raw `pg` precedent does
   // not carry. `tsx` reads this file, and the `paths` below are why: without
-  // them `@synapsedesk/common` resolves through node_modules to the BUILT
-  // `dist/main.js`, whose named exports an ESM importer cannot always see —
+  // them `@synapsedesk/contracts` resolves through node_modules to the BUILT
+  // `dist/index.js`, whose named exports an ESM importer cannot always see —
   // the symptom is `does not provide an export named 'BillingEventStatus'` for
   // a symbol that is plainly there.
   //

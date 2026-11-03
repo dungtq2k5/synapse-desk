@@ -662,7 +662,7 @@ model UserInvitation {
   /// A plain string, not a Prisma enum — same convention as
   /// `organizations.status`.
   ///
-  /// The allowed values live in `InvitationStatus` in `@synapsedesk/common`,
+  /// The allowed values live in `InvitationStatus` in `@synapsedesk/contracts`,
   /// which is the single definition both services already share. A Postgres
   /// enum would be a SECOND source of truth that only auth-service can see, and
   /// adding a member to it requires a migration rather than an edit.
@@ -821,7 +821,7 @@ model BillingEvent {
 /// holding different rows is not duplication of facts; no single fact is stored
 /// twice.
 ///
-/// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
+/// The *behaviour* lives once, in `JobRunRecorder` (`packages/nest-common`), over a
 /// hand-written `JobRunStore` that each service binds to its own delegate.
 /// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
 /// had already begun to drift in comments before it existed.
@@ -1010,7 +1010,7 @@ model LimitAlertGeneration {
   organizationId String @map("organization_id") @db.Uuid
 
   /// `seats` | `storage` | `documents` — `LimitAlertDimension` in
-  /// `@synapsedesk/common`, stored VERBATIM in that union's own lowercase. A
+  /// `@synapsedesk/contracts`, stored VERBATIM in that union's own lowercase. A
   /// String, not a Prisma enum — see development-conventions §7.3.
   ///
   /// Lowercase deliberately, and it must stay that way: the same literal is a

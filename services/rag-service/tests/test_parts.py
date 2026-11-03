@@ -40,8 +40,9 @@ def test_an_attachment_becomes_a_provider_part():
     # The SDK's own part type, built from bytes and a mime type. Asserted
     # structurally rather than by class name so a provider SDK upgrade that
     # renames it fails on behaviour instead of on spelling.
-    assert getattr(contents[1], "inline_data", None) is not None
-    assert contents[1].inline_data.mime_type == "image/png"
+    inline_data = getattr(contents[1], "inline_data", None)
+    assert inline_data is not None
+    assert inline_data.mime_type == "image/png"
 
 
 def test_order_is_preserved():

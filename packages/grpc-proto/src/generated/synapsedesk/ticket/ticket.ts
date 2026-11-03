@@ -98,7 +98,7 @@ export interface UpdateTicketRequest {
 /**
  * The generic status change. `escalate`/`resolve`/`reopen`/`close` below are
  * convenience RPCs over this same validator — there is exactly one encoding of
- * the transition table (TICKET_STATUS_TRANSITIONS in @synapsedesk/common), or
+ * the transition table (TICKET_STATUS_TRANSITIONS in @synapsedesk/contracts), or
  * the two entry points would diverge the first time one was updated.
  */
 export interface ChangeTicketStatusRequest {

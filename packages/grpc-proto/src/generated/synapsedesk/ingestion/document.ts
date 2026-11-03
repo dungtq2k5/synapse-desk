@@ -719,7 +719,7 @@ export interface DocumentServiceClient {
   /**
    * Parse-as-a-service for ticket attachments. On this service because the
    * parser is, and because the alternative is mammoth in every service that
-   * imports `@synapsedesk/common`.
+   * imports `@synapsedesk/nest-common`.
    */
 
   extractAttachmentText(
@@ -891,7 +891,7 @@ export interface DocumentServiceController {
   /**
    * Parse-as-a-service for ticket attachments. On this service because the
    * parser is, and because the alternative is mammoth in every service that
-   * imports `@synapsedesk/common`.
+   * imports `@synapsedesk/nest-common`.
    */
 
   extractAttachmentText(

@@ -6,8 +6,8 @@ import baseConfig from '../jest.config.base.ts';
 /**
  * The demo seeder's unit tests.
  *
- * Its own project because `scripts/` is neither an app nor a lib, and the
- * default run globs `services/*` and `libs/*`.
+ * Its own project because `scripts/` is neither a service nor a package, and the
+ * default run globs `services/*` and `packages/*`.
  *
  * **Nothing here touches a database.** The seeder writes to the DEV databases
  * and a test that seeded one would be writing outside the boundary every suite

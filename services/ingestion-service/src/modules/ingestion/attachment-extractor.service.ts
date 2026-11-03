@@ -29,7 +29,7 @@ const MARKER_HEADROOM = 120;
  *
  * **Here rather than in ticket-service because the parser is here**, and
  * because the alternative is mammoth — and later a spreadsheet library — in
- * `@synapsedesk/common`, which every service imports. One rpc costs one hop; a
+ * `@synapsedesk/nest-common`, which every service imports. One rpc costs one hop; a
  * shared package costs the dependency in six processes to serve one.
  *
  * **It reuses `DocumentParserService` rather than reimplementing it.** A second

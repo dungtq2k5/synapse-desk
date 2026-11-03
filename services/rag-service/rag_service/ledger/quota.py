@@ -29,7 +29,7 @@ COUNTER_TTL_SECONDS = 70 * 24 * 60 * 60
 
 
 def quota_counter_key(organization_id: str, billing_cycle_start: datetime) -> str:
-    """THE key. The Python twin of `quotaCounterKey` in `@synapsedesk/common`.
+    """THE key. The Python twin of `quotaCounterKey` in `@synapsedesk/contracts`.
 
     **Seconds, not milliseconds.** `datetime.timestamp()` yields seconds and
     JavaScript's `getTime()` yields milliseconds, and that mismatch is the

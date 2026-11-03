@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiGenerator:
     def __init__(self, api_key: str) -> None:
-        from google import genai
+        import google.genai as genai
 
         self._client = genai.Client(api_key=api_key)
 

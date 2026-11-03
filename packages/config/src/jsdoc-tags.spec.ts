@@ -4,7 +4,7 @@ import { readListed, repoFiles } from '@synapsedesk/testing/repo-files';
  * An `@` in a doc comment is a TAG, whatever it was meant to be.
  *
  * TypeScript's JSDoc scanner starts a block tag at any `@` preceded by
- * whitespace, so a line that begins `@synapsedesk/common` or `@UseGuards(…)`
+ * whitespace, so a line that begins `@synapsedesk/contracts` or `@UseGuards(…)`
  * ends the description there and turns everything after it into the body of a
  * tag nobody declared. Measured on the real files, not argued from the spec:
  *

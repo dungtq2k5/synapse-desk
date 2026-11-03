@@ -31,7 +31,7 @@ export type PurposePolicy = {
    * matcher in `content-signature.ts` is accepted at presign and REJECTED at
    * confirm, once the bytes are already in the bucket. This type is what turns
    * that into a compile error at the assignment below, where the two lists
-   * meet: the constants stay `MimeType[]` in `libs/`, which cannot know about
+   * meet: the constants stay `MimeType[]` in `packages/contracts`, which cannot know about
    * this service's validator.
    */
   mimeAllowlist: readonly ValidatedMimeType[];
@@ -93,7 +93,7 @@ export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
 /**
  * Re-exported so call sites here need one import, not two.
  *
- * The table itself lives in `libs/common` beside the vocabulary: storage-service
+ * The table itself lives in `packages/contracts` beside the vocabulary: storage-service
  * names an object's extension and ingestion-service writes the same string into
  * `documents.file_type`, and they had drifted into two tables mapping the same
  * thing.

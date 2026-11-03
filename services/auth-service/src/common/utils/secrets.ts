@@ -65,7 +65,3 @@ export function decryptSecret(encrypted: string, masterKey: string): string {
     decipher.final(),
   ]).toString('utf8');
 }
-
-// ---------------------------------------------------------------------------
-// 2FA backup codes
-// ---------------------------------------------------------------------------

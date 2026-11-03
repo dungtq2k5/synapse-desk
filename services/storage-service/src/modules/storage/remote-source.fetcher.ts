@@ -27,7 +27,7 @@ export class RemoteSourceError extends Error {
 /**
  * Opens a URL somebody else chose, for storage-service to read an object from.
  *
- * The SSRF control is `libs/common`'s `guarded-target.ts`, applied the way the
+ * The SSRF control is `packages/nest-common`'s `guarded-target.ts`, applied the way the
  * outbound webhook sender applies it, on **every hop**:
  *
  * - `https:` only;

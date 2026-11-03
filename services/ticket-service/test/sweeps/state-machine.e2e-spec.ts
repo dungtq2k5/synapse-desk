@@ -17,7 +17,7 @@ import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
  *
  * The expectation is DERIVED from `canTransition`, never restated. That is the
  * whole design asks for: one data table which both the unit test (in
- * `libs/common`, where the table lives) and this test import, so the two can
+ * `packages/contracts`, where the table lives) and this test import, so the two can
  * never disagree about what "legal" means. A hand-written list of legal pairs
  * here would be a second source of truth, and the first edit to the table would
  * make one of them wrong without failing anything.

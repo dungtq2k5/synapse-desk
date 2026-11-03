@@ -29,7 +29,7 @@ export type ChunkPoint = {
  * worker that produces points is here, in the service that owns the Postgres
  * rows they mirror, while the queries that consume them are in the service that
  * owns retrieval. What they share is the collection name, the four payload
- * field names and the dimension — all in `@synapsedesk/common`, so the two
+ * field names and the dimension — all in `@synapsedesk/contracts`, so the two
  * halves cannot disagree about what a point looks like.
  *
  * **Everything this writes is a precondition for a filter it does not apply.**

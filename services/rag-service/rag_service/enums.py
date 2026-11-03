@@ -32,7 +32,7 @@ from enum import StrEnum
 
 
 class AiGenerationPurpose(StrEnum):
-    """What a generation was FOR. Mirrors `@synapsedesk/common`, via the proto."""
+    """What a generation was FOR. Mirrors `@synapsedesk/contracts`, via the proto."""
 
     CHAT_ANSWER = "CHAT_ANSWER"
     DRAFT = "DRAFT"

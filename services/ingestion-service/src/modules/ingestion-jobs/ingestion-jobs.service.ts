@@ -29,7 +29,7 @@ import { setStatusUnlessLive } from '../../common/live-version';
 import { toIngestionJobResponse } from './ingestion-job.mapper';
 
 /** What the tenant may sort a job worklist by. */
-// Local rather than in `libs/common`: one consumer, and §3.1 says a second has to exist or be imminent before a constant moves.
+// Local rather than in `packages/contracts`: one consumer, and §3.1 says a second has to exist or be imminent before a constant moves.
 const INGESTION_JOB_SORTABLE_FIELDS = ['createdAt', 'status'] as const;
 
 /** The statuses retry accepts once the source's queue entry is discarded. */

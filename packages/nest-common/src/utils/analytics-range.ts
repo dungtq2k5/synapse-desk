@@ -8,8 +8,8 @@
  * one surface and refused by the other is a difference a tenant experiences as
  * a bug in whichever page they opened second.
  *
- * Nothing here reaches for a proto type — `libs/common` must not depend on
- * `packages/grpc-proto`. The wire shapes are declared structurally instead, which
+ * Nothing here reaches for a proto type — `packages/nest-common` must not depend on
+ * `packages/grpc-proto`, which depends on it (a cycle turbo rejects). The wire shapes are declared structurally instead, which
  * is enough: TypeScript is structural, so the results assign to each service's
  * generated message without either importing the other's.
  */
@@ -152,7 +152,7 @@ export function toMeanWire(value: Mean): MeanWire {
  *
  * **Only the reduce is shared, deliberately.** Both analytics services wrap
  * this in `toProtoTimestamp` to answer "how fresh is this dashboard", and that
- * conversion cannot live here — `libs/` must not import `packages/grpc-proto`. The
+ * conversion cannot live here — this package must not import `packages/grpc-proto`. The
  * duplication worth removing was the fold; the two-line wrapper is not it.
  *
  * Generic over the row so neither service's Prisma type has to be named here.

@@ -11,7 +11,7 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 
 /**
- * Mirrors `NotificationPriority` in `@synapsedesk/common` — RDM Table 23.
+ * Mirrors `NotificationPriority` in `@synapsedesk/contracts` — RDM Table 23.
  *
  * **A CLOSED set, unlike `type` below.** The four levels come from the table
  * and no producer invents a fifth, which is exactly the property that makes an
@@ -37,7 +37,7 @@ export enum NotificationPriority {
 }
 
 /**
- * Mirrors `NOTIFICATION_TYPES` in `@synapsedesk/common` — RDM Table 23.
+ * Mirrors `NOTIFICATION_TYPES` in `@synapsedesk/contracts` — RDM Table 23.
  *
  * **This was a `string`, on the reasoning that the set was OPEN** — that every
  * producer emitting a new event adds a type, so an enum would mean a proto
@@ -81,7 +81,7 @@ export enum NotificationType {
 
 /**
  * What a notification is ABOUT — mirrors `NotificationResourceType` in
- * `@synapsedesk/common`, RDM Table 23's `resource_type`.
+ * `@synapsedesk/contracts`, RDM Table 23's `resource_type`.
  *
  * The same crossing `audit.proto` already enumerates, and for the same reason
  * recorded there: a resource type left as a string is one each caller narrows
@@ -97,7 +97,7 @@ export enum NotificationResourceType {
 }
 
 /**
- * Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
+ * Mirrors `NotificationChannel` in `@synapsedesk/contracts` — RDM Table 24.
  *
  * `WEBHOOK` is present for completeness and is NOT a valid preference: it has
  * no implementation, so a preference for it would control nothing.
@@ -115,7 +115,7 @@ export enum NotificationChannel {
 }
 
 /**
- * Mirrors `DigestMode` in `@synapsedesk/common` — RDM Table 25.
+ * Mirrors `DigestMode` in `@synapsedesk/contracts` — RDM Table 25.
  *
  * `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred,
  * so only `IMMEDIATE` and `OFF` change behaviour today. They are
@@ -133,7 +133,7 @@ export enum DigestMode {
 
 /**
  * Where a resolved value came from — mirrors `PreferenceSource` in
- * `@synapsedesk/common`.
+ * `@synapsedesk/contracts`.
  */
 export enum PreferenceSource {
   PREFERENCE_SOURCE_UNSPECIFIED = 0,
@@ -147,7 +147,7 @@ export enum PreferenceSource {
 }
 
 /**
- * Mirrors `DevicePlatform` in `@synapsedesk/common`.
+ * Mirrors `DevicePlatform` in `@synapsedesk/contracts`.
  *
  * An enum rather than a string, per the rule the block above records: a
  * persisted domain value crossing the wire gets the proto enum, so an unknown
@@ -165,7 +165,7 @@ export enum DevicePlatform {
 }
 
 /**
- * Mirrors `WebhookDeliveryStatus` in @synapsedesk/common -- a persisted domain
+ * Mirrors `WebhookDeliveryStatus` in @synapsedesk/nest-common -- a persisted domain
  * value, so an enum with a bridge rather than a string each caller narrows.
  */
 export enum WebhookDeliveryStatus {

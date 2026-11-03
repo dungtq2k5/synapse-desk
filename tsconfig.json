@@ -58,8 +58,8 @@
     "isolatedModules": true,
     "declaration": true,
     // Emits `.d.ts.map` beside every `.d.ts`. A library clears `paths` (see
-    // `libs/*/tsconfig.json`), so an editor resolving `@synapsedesk/common` from
-    // INSIDE another library lands on `dist/main.d.ts` — compiled output with no
+    // `packages/*/tsconfig.json`), so an editor resolving `@synapsedesk/contracts` from
+    // INSIDE another package lands on `dist/index.d.ts` — compiled output with no
     // comments and no implementation. The map is what lets "go to definition"
     // follow through to `src/`, which is where the answer actually is.
     "declarationMap": true,

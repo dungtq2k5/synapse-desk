@@ -354,7 +354,7 @@ describe('Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('**an unsupported OCR language is a 400**', async () => {
-      // Rule 1. The set lives in `@synapsedesk/common` beside the
+      // Rule 1. The set lives in `@synapsedesk/contracts` beside the
       // mime allowlist, because the gateway validates it and ingestion-service
       // consumes it.
       const res = await authenticatedAgent(fx.app, {

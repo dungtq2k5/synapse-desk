@@ -4,9 +4,9 @@ import type { Config } from 'jest';
  * Shared jest setup, spread by each workspace's own `jest.config.ts`.
  *
  * Every path below is written relative to a PROJECT directory (`services/<name>` or
- * `libs/<name>`), because each config sets `rootDir: __dirname`. Writing them as
+ * `packages/<name>`), because each config sets `rootDir: __dirname`. Writing them as
  * if `<rootDir>` were the repo root — which the previous version did — silently
- * resolves `@synapsedesk/common` to `services/auth-service/libs/common`, i.e. nothing.
+ * resolves `@synapsedesk/contracts` to `services/auth-service/packages/contracts`, i.e. nothing.
  */
 const baseConfig: Config = {
   // `mjs` is here for `pdfjs-dist`, which ships ESM-only and names its files

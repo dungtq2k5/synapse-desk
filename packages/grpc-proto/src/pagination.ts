@@ -3,9 +3,9 @@
  *
  * Lives HERE rather than in a service because two services now page: auth-
  * service since it was written, and ticket-service from its first list RPC.
- * And it lives in grpc-proto rather than in libs/common because it reads the
- * wire types (`PageRequest`, `SortOrder`, `clampLimit`) — putting it in common
- * would make common import grpc-proto, and grpc-proto already imports common: a
+ * And it lives in grpc-proto rather than in packages/contracts because it reads the
+ * wire types (`PageRequest`, `SortOrder`, `clampLimit`) — putting it in contracts
+ * would make contracts import grpc-proto, and grpc-proto already imports contracts: a
  * package cycle turbo's `dependsOn: ["^build"]` rejects outright.
  *
  * The output is a plain object shaped like Prisma's `findMany` arguments, not a

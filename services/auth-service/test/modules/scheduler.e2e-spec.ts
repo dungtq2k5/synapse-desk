@@ -201,7 +201,7 @@ describe('The scheduler (e2e)', () => {
   /**
    * The BINDING.
    *
-   * `JobRunRecorder` now lives in `libs/common` and takes a `JobRunStore`.
+   * `JobRunRecorder` now lives in `packages/nest-common` and takes a `JobRunStore`.
    * `JobRunsModule` binds it to THIS service's `prisma.jobRun`, and three thin
    * bindings are three chances to wire the wrong one — a mistake that would
    * compile, because every delegate satisfies the interface structurally.

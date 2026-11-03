@@ -10,7 +10,7 @@
  * Nothing here reads the repository, the environment or the network on
  * import. `export-openapi.mjs` does the I/O and calls these. The enum
  * canonicalization is not here: the gateway's e2e suite applies it too, so it
- * is `canonicalizeEnums` in `@synapsedesk/common`.
+ * is `canonicalizeEnums` in `@synapsedesk/core`.
  */
 
 'use strict';

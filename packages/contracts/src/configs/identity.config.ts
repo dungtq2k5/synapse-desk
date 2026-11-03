@@ -130,8 +130,8 @@ export type RequestOrigin = Pick<RequestContext, 'ip' | 'userAgent'>;
  * DOMAIN concept — who is calling — with no dependency on gRPC at all, and
  * `tenantScope()` needs it. Leaving it next to `packRequestContext` (which does
  * touch `Metadata` and therefore must stay in grpc-proto) would have forced
- * `libs/common` to import `packages/grpc-proto`, and grpc-proto already imports
- * common: a package cycle turbo's `dependsOn: ["^build"]` rejects outright.
+ * `packages/contracts` to import `packages/grpc-proto`, and grpc-proto already imports
+ * contracts: a package cycle turbo's `dependsOn: ["^build"]` rejects outright.
  * grpc-proto re-exports both symbols, so every existing import site is
  * unchanged.
  */

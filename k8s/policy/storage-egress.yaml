@@ -8,7 +8,7 @@
 # a NetworkPolicy or egress proxy that refuses the metadata endpoint and the
 # mesh regardless of what the application resolves."*
 #
-# **It does not replace `guarded-target.ts` (`libs/common`); it stands behind
+# **It does not replace `guarded-target.ts` (`packages/nest-common`); it stands behind
 # it.** The guard resolves, checks every address on every redirect hop and PINS
 # the connection to a checked one, which is the only layer that can say which
 # attachment was refused and why. What it cannot promise is completeness. A

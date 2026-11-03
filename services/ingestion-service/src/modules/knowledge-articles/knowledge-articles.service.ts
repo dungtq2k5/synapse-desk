@@ -32,7 +32,7 @@ import {
  */
 const LIVE_CHUNKS = { where: { isStaged: false } } as const;
 /** What an end user may sort a help centre by. */
-// Local rather than in `libs/common`: one consumer, and §3.1 says a second has
+// Local rather than in `packages/contracts`: one consumer, and §3.1 says a second has
 // to exist or be imminent before a constant moves.
 const KNOWLEDGE_ARTICLE_SORTABLE_FIELDS = ['updatedAt', 'title'] as const;
 

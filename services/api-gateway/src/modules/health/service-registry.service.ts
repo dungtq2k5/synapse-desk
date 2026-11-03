@@ -20,14 +20,14 @@ export type ServiceEndpoint = {
  * Tracks whether this gateway's gRPC peers are reachable — reported BY
  * `/health/ready`, and deliberately not gating it.
  *
- * **Lives in api-gateway, not `libs/common`.** Two reasons, and the second is
+ * **Lives in api-gateway, not a shared package.** Two reasons, and the second is
  * the binding one:
  *
  *   1. The gateway is the only consumer. Per the conventions, one consumer means
  *      keep it local — and the peer list it seeds itself from (`AUTH_SERVICE_URL`)
  *      is gateway configuration, so a second consumer could not reuse it as-is
  *      anyway.
- *   2. `libs/common` MUST NOT import `@grpc/grpc-js`. That library is the wire,
+ *   2. `packages/contracts` MUST NOT import `@grpc/grpc-js`. That library is the wire,
  *      and the wire lives in `packages/grpc-proto`. A domain-types package that
  *      transitively drags in a gRPC runtime is one every service pays for,
  *      including notification-service, which speaks only NATS.

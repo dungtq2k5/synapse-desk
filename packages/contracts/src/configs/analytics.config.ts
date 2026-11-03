@@ -13,7 +13,7 @@
  * responses. The shape is deliberately awkward to unwrap: a caller that wants
  * the number alone has to reach past the count that qualifies it.
  *
- * Lives in `libs/common` rather than in one service because THREE consumers
+ * Lives in `packages/contracts` rather than in one service because THREE consumers
  * need identical arithmetic — ticket-service and ingestion-service serving
  * their own rollups, and the gateway composing them — and a second copy is how
  * two dashboards start disagreeing.

@@ -97,7 +97,7 @@ describe('nothing here can be published, and the licence is one string', () => {
     // this file exists for, one toolchain over.
     //
     // A `.toml` read with a regex rather than a parser, deliberately: adding a
-    // TOML dependency to `libs/common` so one string can be asserted would cost
+    // TOML dependency to a shared package so one string can be asserted would cost
     // more than it buys, and the pattern-fires floor below is what keeps the
     // shortcut honest. `pyproject.toml` is found from git, so a second Python
     // package is covered on arrival rather than by editing this test.

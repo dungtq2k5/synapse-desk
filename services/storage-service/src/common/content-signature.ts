@@ -36,7 +36,7 @@ import type {
  * **This was a hand-written array, and that is exactly how it went wrong.** The
  * comment above it claimed "add one here and `MATCHERS` stops compiling until it
  * knows how to recognise it" — true, but it guarded the wrong edge. Nothing tied
- * it to `PURPOSE_POLICY`, so widening an allowlist in `libs/` left it behind,
+ * it to `PURPOSE_POLICY`, so widening an allowlist in `packages/contracts` left it behind,
  * and `matchesDeclaredType` fails closed: `image/heic` was accepted at presign
  * and rejected at confirm, once the bytes were already in the bucket.
  *

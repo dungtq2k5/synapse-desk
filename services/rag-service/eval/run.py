@@ -304,7 +304,7 @@ async def embed_documents(api_key: str, texts: list[str]) -> list[list[float]]:
     configuration that production never runs, and it would score slightly worse
     for a reason having nothing to do with any prompt change.
     """
-    from google import genai
+    import google.genai as genai
     from google.genai import types
 
     client = genai.Client(api_key=api_key)

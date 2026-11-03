@@ -2,7 +2,7 @@
  * @file The realtime wire vocabulary: the room names and event names a client
  * and the gateway must agree on exactly.
  *
- * **In `libs/common` rather than in the gateway** because three kinds of
+ * **In `packages/contracts` rather than in the gateway** because three kinds of
  * consumer need the same strings: the gateway itself, its test suites, and the
  * contract harness that drives a gateway as a black box from outside every
  * workspace — a relative import out of `services/api-gateway` is what

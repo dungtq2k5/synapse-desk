@@ -313,7 +313,7 @@ describe('The OpenAPI document', () => {
     // **Validity itself is asserted in the export script, not here.** This
     // suite cannot reach `scripts/lib/`: `image-contract.spec.ts` refuses a
     // workspace importing across a workspace boundary, which is why
-    // `canonicalizeEnums` lives in `@synapsedesk/common` rather than being
+    // `canonicalizeEnums` lives in `@synapsedesk/core` rather than being
     // importing it out of `scripts/`. The validator would have to move too,
     // and it is a devDependency of the root, used by one script. So
     // `openapi:check` owns "is this a valid document" and these rows own "does

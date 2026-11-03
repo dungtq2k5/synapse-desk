@@ -14,7 +14,10 @@ from typing import Any, cast
 
 import pytest
 import pytest_asyncio
-from grpc_health.v1 import _async as health_aio
+from grpc_health.v1 import (
+    # The stubs have no `_async.pyi` (see rag_service/server.py).
+    _async as health_aio,  # pyright: ignore[reportAttributeAccessIssue]
+)
 from grpc_health.v1 import health_pb2
 
 from rag_service.generated.synapsedesk.ops import ops_pb2

@@ -9,7 +9,7 @@
  * surface as an unhandled 500 — the same failure mode `SmartThrottlerGuard`
  * documents for `ThrottlerException`, and the same fix.
  *
- * Duck-typing also lets this live in `libs/common`, which has no Prisma
+ * Duck-typing also lets this live in `packages/core`, which has no Prisma
  * dependency and must not grow one: it is imported by the gateway, which owns
  * no database at all.
  */

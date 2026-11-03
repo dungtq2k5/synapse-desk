@@ -11,7 +11,7 @@ import { STRIPE_API_VERSION } from '@synapsedesk/contracts';
  * two API versions across that boundary is a shape mismatch nobody sees until a
  * field is missing from an object somebody already created.
  *
- * **The scripts CAN import from `libs/common/dist` — `generate-job-alerts.mjs`
+ * **The scripts CAN import from `packages/contracts/dist` — `generate-job-alerts.mjs`
  * and `provision-stripe.mjs` both do — and they still carry the literal.** A
  * `.mjs` file can read the built lib, so the reason is not capability: it is
  * that this test reads the scripts as TEXT. Replace a literal with an import

@@ -44,7 +44,7 @@ const ROOT = join(HERE, '..');
  * that the endpoint never enables is a figure that reads as zero rather than as
  * missing — which is the whole of known-gaps #25.
  *
- * Requires `npm run build -w @synapsedesk/common` first, the same instruction
+ * Requires `npm run build -w @synapsedesk/contracts` first, the same instruction
  * `scheduling.md` gives for `generate-job-alerts.mjs`: a stale `dist` silently
  * emits the old list.
  *

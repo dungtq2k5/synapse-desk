@@ -217,7 +217,7 @@ export const MIN_ORGANIZATION_NAME_LENGTH = 2;
 export const MAX_ORGANIZATION_SLUG_LENGTH = 100;
 export const MIN_ORGANIZATION_SLUG_LENGTH = 2;
 
-// The slug format moved to `@synapsedesk/common` (organization.config.ts):
+// The slug format moved to `@synapsedesk/contracts` (organization.config.ts):
 // it is a contract between auth-service's generator and this gateway's
 // validators, and a gateway spec asserting the producer's conformance had to
 // reach across workspaces to do it — an import a pruned image build refuses.

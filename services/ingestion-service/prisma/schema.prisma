@@ -2,7 +2,7 @@
 //
 // Six models, RDM Tables 17-20, 27 and 29. Enumerated columns are `String` per
 // development-conventions.md §7.3; the values live as TS enums in
-// `@synapsedesk/common` so the gateway, this service and the tests share one
+// `@synapsedesk/contracts` so the gateway, this service and the tests share one
 // definition.
 //
 // Cross-service ids carry NO foreign key (RDM §1.13): `created_by_id` and
@@ -73,7 +73,7 @@ model Document {
   /// falls back to `eng`.
   ///
   /// Stored in ISO 639-1 (`vi`, `ja`) rather than tesseract's own codes
-  /// (`vie`, `jpn`). The mapping lives in `@synapsedesk/common`, so a
+  /// (`vie`, `jpn`). The mapping lives in `@synapsedesk/contracts`, so a
   /// different OCR engine changes one table rather than every stored row.
   ///
   /// Almost always empty, and that is inherent: an uploader cannot know a PDF
@@ -467,7 +467,7 @@ model AiGenerationDailyStat {
 /// holding different rows is not duplication of facts; no single fact is stored
 /// twice.
 ///
-/// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
+/// The *behaviour* lives once, in `JobRunRecorder` (`packages/nest-common`), over a
 /// hand-written `JobRunStore` that each service binds to its own delegate.
 /// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
 /// had already begun to drift in comments before it existed.
@@ -521,7 +521,7 @@ model LimitAlertGeneration {
   organizationId String @map("organization_id") @db.Uuid
 
   /// `seats` | `storage` | `documents` — `LimitAlertDimension` in
-  /// `@synapsedesk/common`, stored VERBATIM in that union's own lowercase. A
+  /// `@synapsedesk/contracts`, stored VERBATIM in that union's own lowercase. A
   /// String, not a Prisma enum — see development-conventions §7.3.
   ///
   /// Lowercase deliberately, and it must stay that way: the same literal is a
@@ -557,7 +557,7 @@ model LimitAlertGeneration {
 /// A cursor that can disagree with its own counters is not a cursor.
 ///
 /// Its own table rather than a column on `job_runs`: that model is shared by
-/// four services through `JobRunRecorder` in `libs/common`, and teaching a
+/// four services through `JobRunRecorder` in `packages/nest-common`, and teaching a
 /// heartbeat about one rollup's progress couples the two.
 model ProjectionCursor {
   /// The step name from `scheduler.processor.ts`, so this row and the

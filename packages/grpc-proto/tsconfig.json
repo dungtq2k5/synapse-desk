@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist",
     // Overrides the repo-root rootDir so output is dist/<entry>.js rather than
-    // dist/libs/<name>/src/<entry>.js -- package.json "main" has to point at a
+    // dist/packages/<name>/src/<entry>.js -- package.json "main" has to point at a
     // stable path, and a nested one would also put the copied .proto tree at a
     // depth PROTO_ROOT does not expect.
     "rootDir": "./src",

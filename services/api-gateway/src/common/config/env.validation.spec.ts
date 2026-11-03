@@ -28,7 +28,7 @@ describe('the gateway’s inbound-email configuration', () => {
    * things at once: the schema accepts it, and it defines these three.
    */
   // The shared parser — this spec's local copy was PROMOTED to
-  // `@synapsedesk/common/testing/env-file` as the one counting rule for every
+  // `@synapsedesk/testing/env-file` as the one counting rule for every
   // env scan (the env-contract guard included), because two ways of counting
   // the same file is how a guard and a document disagree about whether they
   // agree.

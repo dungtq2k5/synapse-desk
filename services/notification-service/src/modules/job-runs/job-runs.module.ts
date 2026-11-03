@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 /**
  * The heartbeat, deduplicated.
  *
- * **The behaviour lives once, in `libs/common`; the TABLE stays here.** Four
+ * **The behaviour lives once, in `packages/nest-common`; the TABLE stays here.** Four
  * `job_runs` tables holding different rows is not duplication of facts —
  * auth's holds auth's jobs, ingestion's holds ingestion's, and no single fact
  * is stored twice. What was genuinely duplicated was 306 byte-identical lines
