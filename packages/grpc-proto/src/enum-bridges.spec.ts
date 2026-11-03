@@ -421,7 +421,7 @@ describe('every enum bridge round-trips', () => {
 });
 
 /**
- * `AnswerStatus` is declared THREE times — once in `@synapsedesk/common` and
+ * `AnswerStatus` is declared THREE times — once in `@synapsedesk/contracts` and
  * once in each of two proto packages — and `message.proto`'s copy exists
  * because importing rag's would point ticket at a package downstream of it.
  *

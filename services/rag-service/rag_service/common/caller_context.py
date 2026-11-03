@@ -1,6 +1,6 @@
 """The verified caller, as it arrives from the gateway.
 
-The Python mirror of `CallerContext` in `libs/common`. Same fields, same
+The Python mirror of `CallerContext` in `packages/contracts`. Same fields, same
 meanings, and the same rule: **nothing here is asserted by the client.** The
 gateway verifies the JWT and packs these into gRPC metadata; this service reads
 them and never re-derives or trusts a body field in their place.

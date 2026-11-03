@@ -63,7 +63,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   await seeder.seed();
 
   // Stubbed BEFORE anything can call it. `AuditPublisher` lives in
-  // `libs/common` and is provided by the @Global `EventsModule`, so one spy
+  // `packages/nest-common` and is provided by the @Global `EventsModule`, so one spy
   // covers every caller in the service.
   const auditPublisher = moduleRef.get(AuditPublisher);
   const audit = {

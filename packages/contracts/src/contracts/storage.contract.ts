@@ -1,7 +1,7 @@
 /**
  * @file The storage contract: the object path scheme and the async delete.
  *
- * Lives in `libs/common` rather than in `storage-service` because BOTH ends
+ * Lives in `packages/contracts` rather than in `storage-service` because BOTH ends
  * need it: the owning services build/consume object paths and emit the delete
  * event, and `storage-service` reads them. A second definition on either side
  * is how a path scheme drifts, and a drifted path is an orphaned file nobody

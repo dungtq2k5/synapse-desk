@@ -50,8 +50,8 @@ describe('Job staleness alerts', () => {
     // to be red.
     //
     // Tests 1, 2 and 4 read `SCHEDULED_JOBS` through ts-jest, from SOURCE. The
-    // generator imports `libs/common/dist/main.js`, which is a BUILD. When a job
-    // is added and the lib is not rebuilt, the generator cannot see it — so test
+    // generator imports `packages/contracts/dist/index.js`, which is a BUILD. When a job
+    // is added and the package is not rebuilt, the generator cannot see it — so test
     // 4 below regenerates stale content, finds it equal to the stale committed
     // file, and PASSES while the file is missing a job's alerts entirely.
     //

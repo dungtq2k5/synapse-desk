@@ -4,7 +4,7 @@ import { envValidationSchema } from './env.validation';
  * What `INGEST_ALLOW_PRIVATE_SOURCES`'s schema rule actually permits.
  *
  * This is the NOISE, not the control. `privateTargetsAllowed()`, in
- * `libs/common`'s `guarded-target.ts`, is what refuses a private source, and
+ * `packages/nest-common`'s `guarded-target.ts`, is what refuses a private source, and
  * it checks `NODE_ENV` itself. What the schema adds is that a production
  * `.env` carrying `=true` fails at `ConfigModule.forRoot` instead of booting
  * and silently ignoring the value.

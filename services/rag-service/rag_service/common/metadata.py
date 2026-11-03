@@ -55,7 +55,7 @@ GRPC_SERVER_OPTIONS: list[tuple[str, int]] = [
     ("grpc.keepalive_timeout_ms", GRPC_KEEPALIVE_TIMEOUT_MS),
 ]
 
-#: Mirrors `GRPC_CONTEXT_METADATA` in `libs/common/src/configs/app.config.ts`.
+#: Mirrors `GRPC_CONTEXT_METADATA` in `packages/contracts/src/configs/identity.config.ts`.
 #: Duplicated across the language boundary for the same reason the quota key is,
 #: and guarded the same way — by a test that pins the exact strings.
 CONTEXT_METADATA = {

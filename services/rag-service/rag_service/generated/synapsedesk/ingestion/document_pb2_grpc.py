@@ -332,7 +332,7 @@ class DocumentServiceServicer:
     def ExtractAttachmentText(self, request, context):
         """Parse-as-a-service for ticket attachments. On this service because the
         parser is, and because the alternative is mammoth in every service that
-        imports `@synapsedesk/common`.
+        imports `@synapsedesk/nest-common`.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

@@ -480,7 +480,7 @@ const GRANT_COLUMNS = [
  * first one preserved.
  */
 // **The `satisfies` is where the union is checked, and it is not decoration.**
-// The array lives in `libs/common`, which has no Stripe dependency, so its
+// The array lives in `packages/contracts`, which has no Stripe dependency, so its
 // members are bare strings there; here `Stripe.Event['type']` is a literal
 // union and `satisfies` turns a typo into a compile error. Unchecked,
 // `'invoice.payment_faild'` builds a set that matches nothing and every failed

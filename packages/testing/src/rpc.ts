@@ -7,8 +7,8 @@
  * failed, so a copy that drifted would weaken the suite that held it while
  * every other suite kept reporting correctly.
  *
- * **Test-only, and kept out of the shipped build**: `libs/common`'s
- * `tsconfig.build.json` excludes `src/testing`, so nothing here reaches `dist`.
+ * **Test-only, and kept out of the shipped build**: `packages/testing` is a
+ * dev dependency of every service, so nothing here reaches a service's `dist`.
  * `expectRpc` uses jest's `expect`, which exists only under a test runner —
  * this file must never be imported by service code.
  */

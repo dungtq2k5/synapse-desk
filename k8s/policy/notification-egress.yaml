@@ -6,7 +6,7 @@
 # which is a deployment artifact this repo does not contain."* This is that
 # artifact.
 #
-# **It does not replace `guarded-target.ts` (`libs/common`); it stands behind it.** The
+# **It does not replace `guarded-target.ts` (`packages/nest-common`); it stands behind it.** The
 # guard resolves, checks every address and PINS the connection to a checked one,
 # which is the only layer that can produce a useful error message to the tenant
 # who configured the URL. What it cannot promise is completeness — a novel

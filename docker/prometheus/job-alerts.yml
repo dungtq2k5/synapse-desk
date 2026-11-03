@@ -5,7 +5,7 @@
 #
 # Regenerate with:
 #
-#     npm run build -w @synapsedesk/common && node scripts/generate-job-alerts.mjs
+#     npm run build -w @synapsedesk/contracts -w @synapsedesk/core && node scripts/generate-job-alerts.mjs
 groups:
   - name: synapsedesk-scheduled-jobs
     rules:

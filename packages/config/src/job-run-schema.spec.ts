@@ -69,7 +69,7 @@ describe('model JobRun is identical across the three schemas', () => {
   });
 
   it('2. the block carries every column `JobRunStore` writes', () => {
-    // The interface in `libs/common` is hand-written — it cannot depend on
+    // The interface in `packages/nest-common` is hand-written — it cannot depend on
     // Prisma's generated delegate types, which differ per service by client
     // path. So nothing else checks that the shared writer's columns exist.
     const required = [

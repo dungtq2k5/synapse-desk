@@ -595,7 +595,7 @@ service DocumentService {
 
   // Parse-as-a-service for ticket attachments. On this service because the
   // parser is, and because the alternative is mammoth in every service that
-  // imports `@synapsedesk/common`.
+  // imports `@synapsedesk/nest-common`.
   rpc ExtractAttachmentText(ExtractAttachmentTextRequest) returns (ExtractAttachmentTextResponse);
 
   // On this service rather than its own: a second service would need a second

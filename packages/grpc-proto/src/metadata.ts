@@ -8,7 +8,7 @@ import {
 } from '@synapsedesk/contracts';
 
 // Re-exported, not redefined: `CallerContext` and `hasIdentity` live in
-// `libs/common` so `tenantScope()` can sit beside them without `common`
+// `packages/contracts` so `tenantScope()` can sit beside them without `contracts`
 // importing `grpc-proto` -- that would be a package cycle. Re-exporting keeps
 // every `from '@synapsedesk/grpc-proto'` call site working.
 //

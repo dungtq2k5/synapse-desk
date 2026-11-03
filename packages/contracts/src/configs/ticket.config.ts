@@ -4,8 +4,8 @@
  *
  * Separate file from `app.config.ts` because that one is already Domain A's
  * whole surface; a second domain appended to it would make the single most
- * imported module in the repo grow without bound. `main.ts` re-exports both, so
- * every import site still says `@synapsedesk/common`.
+ * imported module in the repo grow without bound. `index.ts` re-exports both, so
+ * every import site still says `@synapsedesk/contracts`.
  *
  * Every enumerated column is a `String` in `schema.prisma` (conventions §7.3),
  * so these TS enums are the ONLY definition of the legal values — there is no
@@ -416,7 +416,7 @@ export const MAX_BULK_TICKET_IDS = 50;
 /**
  * Longest reason accepted with a status change.
  *
- * In `libs/common` rather than the gateway's `dto.config.ts` because BOTH edges
+ * In `packages/contracts` rather than the gateway's `dto.config.ts` because BOTH edges
  * bound it: the DTO so a caller gets a 400 naming the field, and ticket-service
  * because it is reachable over gRPC where no `ValidationPipe` ever ran. Two
  * copies of the number would be two places for it to drift.

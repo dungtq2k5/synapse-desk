@@ -573,7 +573,7 @@ jobs:
       - run: npm run db:generate
 
       # **And the libraries BUILT, which the mappers hide.** Every jest project
-      # resolves `@synapsedesk/common` to `libs/common/src/main.ts`, so the
+      # resolves each `@synapsedesk/*` package to its `src/index.ts`, so the
       # suites themselves need no `dist` — but two things inside the run do:
       # the seeder specs spawn `scripts/generate-job-alerts.mjs`, a real child
       # process where Node resolves the package by its `main`

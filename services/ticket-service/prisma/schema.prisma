@@ -53,7 +53,7 @@ model Ticket {
 
   // Enumerated columns are plain strings, per conventions §7.3. The legal
   // values live in TicketSource / TicketStatus / TicketPriority in
-  // @synapsedesk/common, which both this service and the gateway import.
+  // @synapsedesk/contracts, which both this service and the gateway import.
   source   String @default("WEB") @db.VarChar(20)
   status   String @default("NEW") @db.VarChar(20)
   priority String @default("MEDIUM") @db.VarChar(20)
@@ -856,7 +856,7 @@ model Export {
 /// holding different rows is not duplication of facts; no single fact is stored
 /// twice.
 ///
-/// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
+/// The *behaviour* lives once, in `JobRunRecorder` (`packages/nest-common`), over a
 /// hand-written `JobRunStore` that each service binds to its own delegate.
 /// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
 /// had already begun to drift in comments before it existed.

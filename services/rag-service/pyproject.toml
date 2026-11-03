@@ -78,6 +78,11 @@ ignore = [
 venvPath = "."
 venv = ".venv"
 extraPaths = ["."]
+# Pyright's own default bar; basedpyright's ("recommended") is a different
+# project's, and it buries the real errors in thousands of `reportUnknown*`.
+typeCheckingMode = "standard"
+# Generated from the protos: not ours to type.
+exclude = ["rag_service/generated"]
 
 [tool.pytest.ini_options]
 # Flat layout: `rag_service/` and `tests/` are both directly under this

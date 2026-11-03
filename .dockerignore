@@ -20,7 +20,7 @@ coverage
 **/.turbo
 
 # **Both patterns.** A bare `*.tsbuildinfo` matches only the repo root, so the
-# nested ones (`libs/common/tsconfig.build.tsbuildinfo`) were copied into the
+# nested ones (`packages/contracts/tsconfig.build.tsbuildinfo`) were copied into the
 # build context while `dist/` was excluded — and `tsc --incremental` then reads
 # a buildinfo saying "everything is up to date", emits NOTHING, and the next
 # package fails with "has no exported member" for every symbol in the library

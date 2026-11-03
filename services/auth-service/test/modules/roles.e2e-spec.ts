@@ -445,7 +445,7 @@ describe('Roles & Permissions (e2e)', () => {
     });
 
     it('7b. there is no tenant-facing way to mint a permission', async () => {
-      // PERMISSION_CODES in libs/common is the source of truth and the table is
+      // PERMISSION_CODES in packages/contracts is the source of truth and the table is
       // seeded from it. A code created through an API is one no
       // `@RequirePermission` can reference and no `PermissionCode` type knows
       // about.

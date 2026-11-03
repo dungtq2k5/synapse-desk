@@ -32,7 +32,10 @@ import redis.asyncio as redis
 # make that swap type-check cleanly while breaking the health service at
 # runtime — a green checker paying for a probe timeout, which reads as the
 # process being unhealthy.
-from grpc_health.v1 import _async as health_aio
+from grpc_health.v1 import (
+    # The stubs have no `_async.pyi` (above): the one ignore this file needs.
+    _async as health_aio,  # pyright: ignore[reportAttributeAccessIssue]
+)
 
 # Typed, via `types-grpcio-health-checking` in `requirements-dev.txt`.
 from grpc_health.v1 import health_pb2, health_pb2_grpc
@@ -99,7 +102,7 @@ class ProviderClient(TextGenerator, StreamingGenerator, Protocol):
 MAX_SEARCH_LIMIT = 50
 
 #: The escalation summary's grace past the cap — RDM §1.14, mirroring
-#: `AT_CAP_POLICY[ESCALATION_SUMMARY].graceRatio` in `@synapsedesk/common`.
+#: `AT_CAP_POLICY[ESCALATION_SUMMARY].graceRatio` in `@synapsedesk/contracts`.
 #:
 #: Duplicated across the language boundary like the quota key, and bounded for
 #: the same reason it exists: at the cap, ticket volume spikes, and an
@@ -115,7 +118,7 @@ def with_http_status(status_code: int, message: str) -> str:
     a different instruction from "buy more". The marker carries the intent
     across a hop that would otherwise flatten it.
 
-    Mirrors `withHttpStatus` in `@synapsedesk/common`; the format is duplicated
+    Mirrors `withHttpStatus` in `@synapsedesk/core`; the format is duplicated
     here for the same reason the quota key is.
     """
     return f"[http:{status_code}] {message}"

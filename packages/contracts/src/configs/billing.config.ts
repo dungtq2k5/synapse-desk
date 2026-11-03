@@ -73,7 +73,7 @@ export const STRIPE_API_VERSION = '2026-07-29.dahlia';
  * SEND, and a type the writer handles that the endpoint never enables is a
  * figure that reads as zero rather than as missing. One array, both consumers.
  *
- * **Typed as bare strings here, and narrowed at the writer.** `libs/common` has
+ * **Typed as bare strings here, and narrowed at the writer.** `packages/contracts` has
  * no Stripe dependency and must not grow one, so the compile-time check lives
  * where `Stripe.Event['type']` exists: the writer builds its `Set` with a
  * `satisfies readonly Stripe.Event['type'][]`, which is where a typo becomes an
@@ -268,7 +268,7 @@ export const FREE_TIER_ORGANIZATION_GRANTS = {
  * field that makes the free tier unbuyable by construction.
  *
  * `Prisma.SubscriptionPlanCreateInput` would be the natural type and is
- * unreachable: `libs/` MUST NOT import from `apps/`. So the shape is declared
+ * unreachable: `packages/` MUST NOT import from `services/`. So the shape is declared
  * here, derived from `PlanEntitlements` rather than written out — a field added
  * there still has to be answered on all three constants, which is the guarantee
  * the whole arrangement exists for.

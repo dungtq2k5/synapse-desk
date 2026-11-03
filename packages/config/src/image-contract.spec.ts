@@ -34,7 +34,7 @@ describe('the image contract (static half)', () => {
      * declarations, and six packages failed it at once: npm hoists one
      * package's dependency to the root, a sibling resolves it by walking up,
      * and the accident holds until a pruned build removes it. The build half
-     * fails in the image (`packages/contracts`'s type-only `ioredis`); the RUNTIME
+     * fails in the image (the shared library's type-only `ioredis`); the RUNTIME
      * half is worse — `storage-service`'s `import 'dotenv/config'` on line 2
      * of `main.ts` compiled clean and would have died at `docker run`.
      *
@@ -447,8 +447,8 @@ describe('the image contract (static half)', () => {
       // Not a workspace, so reaching it proves the pathspec is not the
       // workspace globs in disguise.
       expect(manifests()).toContain('scripts/package.json');
-      // Four manifests declare it: the root, `packages/contracts`, `packages/grpc-proto`
-      // and `storage-service`.
+      // Ten manifests declare it: the root, `apps/web`, the seven packages and
+      // `storage-service`; four is the floor this row was written against.
       expect(found.length).toBeGreaterThanOrEqual(4);
     });
   });

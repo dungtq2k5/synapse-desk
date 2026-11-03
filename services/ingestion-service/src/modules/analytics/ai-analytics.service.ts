@@ -411,7 +411,7 @@ function clampLimit(limit: number | undefined): number {
 /**
  * How fresh this dashboard is, on the wire.
  *
- * The fold is shared; the proto conversion stays here because `libs/` cannot
+ * The fold is shared; the proto conversion stays here because `packages/nest-common` cannot
  * import `packages/grpc-proto`.
  */
 function latestComputedAt(rows: AiDailyRow[]) {

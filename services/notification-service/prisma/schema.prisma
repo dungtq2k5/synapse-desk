@@ -322,7 +322,7 @@ model DeviceToken {
 /// holding different rows is not duplication of facts; no single fact is stored
 /// twice.
 ///
-/// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
+/// The *behaviour* lives once, in `JobRunRecorder` (`packages/nest-common`), over a
 /// hand-written `JobRunStore` that each service binds to its own delegate.
 /// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
 /// had already begun to drift in comments before it existed.
@@ -371,7 +371,7 @@ model WebhookEndpoint {
   /// HTTPS only, and the string here is NOT the control: the URL is validated
   /// when saved and RESOLVED when delivered to, and DNS can change in between.
   /// The real check runs at connection time on every resolved address — see
-  /// `guarded-target.ts` in `libs/common`.
+  /// `guarded-target.ts` in `packages/nest-common`.
   url String @db.VarChar(2000)
 
   description String? @db.VarChar(500)

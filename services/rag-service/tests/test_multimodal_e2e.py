@@ -72,6 +72,7 @@ async def run_live(pipeline, caplog, **kwargs):
     to the raw message, which would read as the model ignoring the image (and
     pass the control for the wrong reason). Three tries, then a skip.
     """
+    refused: list[str] = []
     for attempt in range(3):
         caplog.clear()
         with caplog.at_level(logging.WARNING, logger="rag_service.ledger.metered"):

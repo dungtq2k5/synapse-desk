@@ -90,7 +90,7 @@ export const envValidationSchema = Joi.object({
 
   // The SSRF escape hatch for fetching an inbound attachment from a localhost
   // source. Honoured ONLY when NODE_ENV is development — `privateTargetsAllowed`
-  // in `libs/common`'s `guarded-target.ts` checks that itself, and that is the
+  // in `packages/nest-common`'s `guarded-target.ts` checks that itself, and that is the
   // control; this rule adds loudness, refusing to boot with `true` anywhere
   // else so a copied `.env` cannot suggest the setting works in production.
   //

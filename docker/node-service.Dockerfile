@@ -5,7 +5,7 @@
 # **One parameterized file rather than six near-identical ones.** The six differ
 # only in which workspace they build, and six copies of the same five-stage
 # build is six places for a fix to be applied five times. The same reasoning
-# `libs/common` applies to shared behaviour, applied to the build:
+# `packages/` applies to shared behaviour, applied to the build:
 #
 #     docker build -f docker/node-service.Dockerfile \
 #       --build-arg SERVICE=api-gateway \
@@ -241,8 +241,8 @@ ENV NODE_ENV=production \
 COPY --from=prod-deps /app/node_modules ./node_modules
 
 # The workspace libraries, at the SAME relative paths. npm workspaces links
-# `node_modules/@synapsedesk/common` to `././libs/common`, so a runtime image
-# that copied only `apps/` would carry a symlink pointing at nothing — and the
+# `node_modules/@synapsedesk/contracts` to `../../packages/contracts`, so a runtime image
+# that copied only `services/` would carry a symlink pointing at nothing — and the
 # failure is a module-not-found at boot, after the image has been pushed.
 COPY --from=build /app/packages/contracts/package.json ./packages/contracts/
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
@@ -319,7 +319,7 @@ CMD ["sh", "-c", "exec node \"$ENTRY\""]
 # tesseract's language data is `tesseract-ocr-data-<code>`, and the code is
 # tesseract's own — `chi_sim` with an underscore, the same string that goes to
 # `-l`, not the Debian `chi-sim`. `TESSERACT_CODE_BY_LANGUAGE` in
-# `@synapsedesk/common` is the mapping from the ISO 639-1 code the API speaks;
+# `@synapsedesk/contracts` is the mapping from the ISO 639-1 code the API speaks;
 # these package names are packaging and stay here.
 #
 # **Language data is per package, and only English is installed.** The CJK sets

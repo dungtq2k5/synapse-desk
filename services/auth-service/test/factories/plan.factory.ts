@@ -7,7 +7,7 @@ const MIB = 1024n * 1024n;
  * The catalogue, as rows.
  *
  * These are the entitlements `DEFAULT_PLAN_CATALOG` used to hardcode. They live
- * here now because the catalogue is a TABLE — a constant in `libs/common` could
+ * here now because the catalogue is a TABLE — a constant in `packages/contracts` could
  * only ever be right for the environment it was compiled for, and the Stripe
  * price ids differ between test and live modes.
  *
