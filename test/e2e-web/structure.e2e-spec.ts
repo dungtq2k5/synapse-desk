@@ -105,6 +105,40 @@ test('the main screens reflow at 320 px and at 200% text, with one h1, one main 
   await checkScreen(page, '/platform', true);
 });
 
+test('what can be clicked shows the pointer; a disabled button and a text field’s label don’t', async ({
+  page,
+}) => {
+  await page.goto('/login');
+  const signIn = page.getByRole('button', { name: 'Sign in' });
+  await expect(signIn).toBeVisible();
+  const cursor = (locator: ReturnType<Page['locator']>) =>
+    locator.evaluate((element) => getComputedStyle(element).cursor);
+
+  expect(await cursor(signIn)).toBe('pointer');
+  expect(await cursor(page.locator('label', { hasText: 'Email' }))).not.toBe(
+    'pointer',
+  );
+
+  await signIn.evaluate((button) => button.setAttribute('disabled', ''));
+  expect(await cursor(signIn)).toBe('not-allowed');
+
+  // A checkbox's label, as the role editors lay it out: the box, then its label.
+  await page.evaluate(() => {
+    const row = document.createElement('div');
+    row.innerHTML =
+      '<button type="button" role="checkbox" id="probe-box"></button>' +
+      '<div><label for="probe-box">A permission</label></div>';
+    document.body.append(row);
+  });
+  expect(await cursor(page.locator('label[for="probe-box"]'))).toBe('pointer');
+  await page
+    .locator('#probe-box')
+    .evaluate((button) => button.setAttribute('disabled', ''));
+  expect(await cursor(page.locator('label[for="probe-box"]'))).not.toBe(
+    'pointer',
+  );
+});
+
 test('reduced motion shortens what moves', async ({ page }) => {
   const { maya } = await tenant('structure');
   await signInAs(page, maya);

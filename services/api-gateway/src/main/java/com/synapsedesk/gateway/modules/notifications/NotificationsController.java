@@ -93,7 +93,7 @@ public class NotificationsController {
   );
 
   /**
-   * `NOTIFICATION_TYPES` (`@synapsedesk/common`), reproduced — the wire enum's
+   * `NOTIFICATION_TYPES` (`@synapsedesk/contracts`), reproduced — the wire enum's
    * member names do not match the REST DTO's dotted string values (the domain
    * side is a dotted-subject map, not a `NOTIFICATION_TYPE_*` suffix), so this
    * is an explicit table rather than the strip-the-prefix trick every other

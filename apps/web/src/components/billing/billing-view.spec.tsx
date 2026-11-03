@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fail, ok, stubApi, type Reply } from '@/test/api';
 import { renderSettings, stubMatchMedia, viewer } from '@/test/settings';
+import { celebrate } from '@/lib/celebrate';
 import { leaveFor } from '@/lib/leave';
 import { SupportEmailContext } from '@/lib/support';
 import { BillingView } from './billing-view';
@@ -15,11 +16,13 @@ jest.mock('next/navigation', () => ({
 }));
 jest.mock('@/components/shell/app-header', () => ({ AppHeader: () => null }));
 jest.mock('@/lib/leave', () => ({ leaveFor: jest.fn() }));
+jest.mock('@/lib/celebrate', () => ({ celebrate: jest.fn() }));
 
 beforeAll(stubMatchMedia);
 beforeEach(() => {
   search = new URLSearchParams();
   jest.mocked(leaveFor).mockClear();
+  jest.mocked(celebrate).mockClear();
   replace.mockClear();
 });
 
@@ -285,6 +288,35 @@ describe('changing plan', () => {
         'The difference for the rest of this period is on a new invoice.',
       ),
     ).toBeInTheDocument();
+    expect(celebrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('a smaller plan, confirmed, is said but not celebrated', async () => {
+    let paidFor = 'price_enterprise_monthly';
+    open({
+      'GET /api/v1/billing/subscription': () =>
+        ok(subscription({ priceId: paidFor, planName: 'Enterprise' })),
+      'POST /api/v1/billing/plan': () => {
+        paidFor = 'price_pro_monthly';
+        return ok({
+          planId: 'pro',
+          planName: 'Pro',
+          effectiveAt: '2026-10-19T00:00:00.000Z',
+          creditIssued: true,
+        });
+      },
+    });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Change to Pro' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Change to Pro' }),
+    );
+    expect(
+      await screen.findByText('You’re on Pro', {}, { timeout: 5_000 }),
+    ).toBeInTheDocument();
+    expect(celebrate).not.toHaveBeenCalled();
   });
 
   const refuse = async (reply: Reply, extra: Record<string, Reply> = {}) => {
@@ -444,6 +476,22 @@ describe('a free organization', () => {
     expect(
       await screen.findByText('Welcome to Pro', {}, { timeout: 5_000 }),
     ).toBeInTheDocument();
+    expect(celebrate).toHaveBeenCalledTimes(1);
+
+    // Re-rendered by its own refreshes: still the one celebration.
+    await act(() => new Promise((done) => setTimeout(done, 50)));
+    expect(celebrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('a reload after the welcome is the plain page: nothing celebrated', async () => {
+    open();
+    const current = (
+      await screen.findByRole('heading', { name: 'Current plan' })
+    ).closest('section')!;
+    expect(
+      await within(current).findByText('$99.00 per month'),
+    ).toBeInTheDocument();
+    expect(celebrate).not.toHaveBeenCalled();
   });
 
   it('back from a canceled Checkout says nothing changed', async () => {

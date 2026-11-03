@@ -133,6 +133,33 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  /*
+   * What can be clicked shows the pointer: Tailwind 4's preflight leaves
+   * buttons on `cursor: default`. A checkbox's, switch's or radio's label
+   * counts; a text field's label doesn't. Menu and select items keep the
+   * `cursor-default` their utilities set, as native menus do.
+   */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  :where(
+      :has(
+        > :is([role='checkbox'], [role='switch'], [role='radio']):not(:disabled)
+      )
+    )
+    label[for] {
+    cursor: pointer;
+  }
+
+  /*
+   * Disabled, as the form controls show it. Only where pointer events reach
+   * it: `Button` turns them off when disabled, so what's behind shows there.
+   */
+  button:disabled,
+  [role='button'][aria-disabled='true'] {
+    cursor: not-allowed;
+  }
 }
 
 /*

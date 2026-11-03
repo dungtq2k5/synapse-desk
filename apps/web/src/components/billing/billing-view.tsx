@@ -73,6 +73,7 @@ import {
   type Interval,
   type PlanAction,
 } from '@/lib/billing';
+import { celebrate } from '@/lib/celebrate';
 import { dayDate } from '@/lib/format';
 import { useSupportEmail } from '@/lib/support';
 import { announce } from '@/lib/toast';
@@ -103,6 +104,8 @@ type Waiting = {
   priceId: string | null;
   creditIssued?: boolean | null;
   oldPlan?: string;
+  /** A bigger plan: confirmed, it's celebrated, as a new subscription is. */
+  upgrade?: boolean;
   since: number;
 };
 
@@ -245,6 +248,7 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
     if (!waiting || !confirmed || said.current === waiting.since) return;
     said.current = waiting.since;
     void queryClient.invalidateQueries();
+    if (waiting.kind === 'checkout' || waiting.upgrade) void celebrate();
     if (waiting.kind === 'checkout') {
       toast.success(`Welcome to ${waiting.planName}`, {
         description:
@@ -347,6 +351,7 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
       priceId: intent.priceId,
       creditIssued: answer.creditIssued,
       oldPlan: currentGrants.name,
+      upgrade: intent.kind === 'upgrade',
       since: clock(),
     });
   };
