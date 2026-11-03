@@ -33,7 +33,7 @@ import {
   MinusIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Status } from '@/components/settings/badges';
@@ -165,7 +165,6 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
   const { can } = useViewer();
   const admin = can('organization.update');
   const queryClient = useQueryClient();
-  const router = useRouter();
   const search = useSearchParams();
   const organization = useOrganizationsControllerGetV1({
     query: { retry: false },
@@ -218,10 +217,14 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
     items: OverLimit[];
   } | null>(null);
 
+  // The Checkout return's query goes without a navigation: `router.replace`
+  // would refetch the route and reconcile the head, and the page has no
+  // `<title>` for that moment. Next keeps `useSearchParams` in step.
   const returned = search.get('checkout');
   useEffect(() => {
-    if (returned) router.replace('/settings/billing', { scroll: false });
-  }, [returned, router]);
+    if (returned)
+      globalThis.history.replaceState(null, '', '/settings/billing');
+  }, [returned]);
 
   // The wait: re-read the subscription until it names the new price.
   const confirmed =

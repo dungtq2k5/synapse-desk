@@ -19,11 +19,13 @@ jest.mock('@/lib/leave', () => ({ leaveFor: jest.fn() }));
 jest.mock('@/lib/celebrate', () => ({ celebrate: jest.fn() }));
 
 beforeAll(stubMatchMedia);
+const replaceState = jest.spyOn(globalThis.history, 'replaceState');
 beforeEach(() => {
   search = new URLSearchParams();
   jest.mocked(leaveFor).mockClear();
   jest.mocked(celebrate).mockClear();
   replace.mockClear();
+  replaceState.mockClear();
 });
 
 const GIB = 1024 ** 3;
@@ -470,9 +472,7 @@ describe('a free organization', () => {
     expect(
       await screen.findByText('Confirming your subscription…'),
     ).toBeInTheDocument();
-    expect(replace).toHaveBeenCalledWith('/settings/billing', {
-      scroll: false,
-    });
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/settings/billing');
     expect(
       await screen.findByText('Welcome to Pro', {}, { timeout: 5_000 }),
     ).toBeInTheDocument();

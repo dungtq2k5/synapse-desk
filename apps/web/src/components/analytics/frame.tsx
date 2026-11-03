@@ -3,7 +3,7 @@
 import { useOrganizationsControllerGetV1 } from '@synapsedesk/api-client';
 import { ClockIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AppHeader } from '@/components/shell/app-header';
@@ -75,7 +75,6 @@ export const SECTIONS: Record<
 export function useAnalyticsFilters() {
   const organization = useOrganizationsControllerGetV1();
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const limit = organization.data?.data?.analyticsRangeDays ?? 0;
   const [today] = useState(todayIso);
@@ -83,10 +82,15 @@ export function useAnalyticsFilters() {
     () => readFilters(new URLSearchParams(params.toString()), limit, today),
     [params, limit, today],
   );
+  // The filters live in the address, rewritten in place: `router.replace`
+  // would refetch the route and reconcile the head, and the page has no
+  // `<title>` for that moment. Next keeps `useSearchParams` in step.
   const set = (next: Partial<Filters>) =>
-    router.replace(`${pathname}?${writeFilters({ ...filters, ...next })}`, {
-      scroll: false,
-    });
+    globalThis.history.replaceState(
+      null,
+      '',
+      `${pathname}?${writeFilters({ ...filters, ...next })}`,
+    );
   const told = useRef('');
   useEffect(() => {
     if (!clamped || told.current === params.toString()) return;
@@ -94,8 +98,12 @@ export function useAnalyticsFilters() {
     toast(`Showing the last ${limit} days`, {
       description: `Your plan shows up to ${limit} days at a time.`,
     });
-    router.replace(`${pathname}?${writeFilters(filters)}`, { scroll: false });
-  }, [clamped, filters, limit, params, pathname, router]);
+    globalThis.history.replaceState(
+      null,
+      '',
+      `${pathname}?${writeFilters(filters)}`,
+    );
+  }, [clamped, filters, limit, params, pathname]);
 
   return {
     filters,

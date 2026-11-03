@@ -44,6 +44,9 @@ jest.mock('next/navigation', () => ({
 }));
 jest.mock('@/components/shell/app-header', () => ({ AppHeader: () => null }));
 
+// The filters are written with `history.replaceState`, not the router.
+const replaceState = jest.spyOn(globalThis.history, 'replaceState');
+
 beforeAll(() => {
   stubMatchMedia();
   // jsdom lays nothing out; the charts draw at a card's width.
@@ -60,6 +63,7 @@ beforeEach(() => {
   search = new URLSearchParams(`from=${FROM}&to=${TO}`);
   pathname = '/analytics';
   replace.mockClear();
+  replaceState.mockClear();
   localStorage.clear();
 });
 afterEach(() => jest.useRealTimers());
@@ -129,15 +133,17 @@ describe('the Analytics frame', () => {
   it('keeps the granularity and the department in the address', async () => {
     open(<OverviewView />);
     await user().click(await screen.findByRole('radio', { name: 'Week' }));
-    expect(replace).toHaveBeenLastCalledWith(
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
       expect.stringContaining('by=week'),
-      { scroll: false },
     );
     await user().click(screen.getByRole('combobox', { name: 'Department' }));
     await user().click(await screen.findByRole('option', { name: 'HR' }));
-    expect(replace).toHaveBeenLastCalledWith(
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
       expect.stringContaining('department=hr'),
-      { scroll: false },
     );
   });
 
@@ -147,7 +153,7 @@ describe('the Analytics frame', () => {
     expect(
       await screen.findByText('Showing the last 30 days'),
     ).toBeInTheDocument();
-    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replaceState).toHaveBeenCalledTimes(1);
   });
 
   it('applies a preset from the range picker, and locks those past the plan', async () => {
@@ -169,9 +175,10 @@ describe('the Analytics frame', () => {
       { key: 'Enter' },
     );
     await user().click(screen.getByRole('button', { name: 'Apply' }));
-    expect(replace).toHaveBeenLastCalledWith(
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
       expect.stringContaining('from=2026-10-13&to=2026-10-19'),
-      { scroll: false },
     );
   });
 
@@ -195,9 +202,10 @@ describe('the Analytics frame', () => {
     ).toBeInTheDocument();
     await user().click(screen.getByRole('button', { name: 'Next month' }));
     await user().click(screen.getByRole('button', { name: 'Apply' }));
-    expect(replace).toHaveBeenLastCalledWith(
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
       expect.stringContaining('from=2026-10-05&to=2026-10-12'),
-      { scroll: false },
     );
   });
 });
@@ -351,9 +359,10 @@ describe('Agents', () => {
     await user().click(
       screen.getByRole('button', { name: 'Clear the department' }),
     );
-    expect(replace).toHaveBeenLastCalledWith(
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      '',
       expect.not.stringContaining('department='),
-      { scroll: false },
     );
   });
 });
