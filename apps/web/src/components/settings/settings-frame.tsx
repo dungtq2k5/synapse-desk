@@ -1,6 +1,5 @@
 'use client';
 
-import type { CurrentUserResponseDtoPermissionCodesItem as PermissionCode } from '@synapsedesk/api-client';
 import {
   Building2Icon,
   CreditCardIcon,
@@ -18,66 +17,31 @@ import { AppHeader } from '@/components/shell/app-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useViewer } from '@/hooks/use-viewer';
+import {
+  SETTINGS_SECTIONS,
+  type SettingsSection,
+} from '@/lib/settings-sections';
 import { cn } from '@/lib/utils';
 
-type Section = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  /** Holding any of these shows the section. */
-  read: PermissionCode[];
+type Section = SettingsSection & { icon: LucideIcon };
+
+/** Each section's icon, by its address. */
+const ICONS: Record<string, LucideIcon> = {
+  '/settings/organization': Building2Icon,
+  '/settings/people': UsersIcon,
+  '/settings/departments': NetworkIcon,
+  '/settings/roles': ShieldIcon,
+  '/settings/webhooks': WebhookIcon,
+  '/settings/audit-log': ScrollTextIcon,
+  '/settings/billing': CreditCardIcon,
 };
 
-/** The Settings area's sections, in order, each with what reads it. */
-export const SETTINGS_SECTIONS: Section[] = [
-  {
-    label: 'Organization',
-    href: '/settings/organization',
-    icon: Building2Icon,
-    read: ['organization.read'],
-  },
-  {
-    label: 'People',
-    href: '/settings/people',
-    icon: UsersIcon,
-    read: ['user.read'],
-  },
-  {
-    label: 'Departments',
-    href: '/settings/departments',
-    icon: NetworkIcon,
-    read: ['department.read'],
-  },
-  {
-    label: 'Roles',
-    href: '/settings/roles',
-    icon: ShieldIcon,
-    read: ['role.read'],
-  },
-  {
-    label: 'Webhooks',
-    href: '/settings/webhooks',
-    icon: WebhookIcon,
-    read: ['organization.read'],
-  },
-  {
-    label: 'Audit log',
-    href: '/settings/audit-log',
-    icon: ScrollTextIcon,
-    read: ['audit.read'],
-  },
-  {
-    label: 'Billing',
-    href: '/settings/billing',
-    icon: CreditCardIcon,
-    read: ['organization.read'],
-  },
-];
-
-/** The sections someone holding these codes may open, in order. */
+/** The sections the viewer may open, in order, each with its icon. */
 export function useSettingsSections(): Section[] {
   const { can } = useViewer();
-  return SETTINGS_SECTIONS.filter((section) => section.read.some(can));
+  return SETTINGS_SECTIONS.filter((section) => section.read.some(can)).map(
+    (section) => ({ ...section, icon: ICONS[section.href] }),
+  );
 }
 
 /**

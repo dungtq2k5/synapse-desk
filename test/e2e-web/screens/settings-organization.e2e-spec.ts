@@ -8,7 +8,7 @@ import {
   settings,
   type Overrides,
 } from './settings-data';
-import { signInAs, tenant } from './tenant';
+import { giveOnly, signInAs, tenant } from './tenant';
 
 /**
  * Settings › Organization (design 08): the whole page, the meters that
@@ -236,4 +236,27 @@ test('the sidebar: Settings only for someone who holds one of its permissions', 
     'People',
     'Departments',
   ]);
+});
+
+test('from /settings, one section held: straight to it', async ({ page }) => {
+  const { maya, priya } = await tenant('settings-one-section');
+  await giveOnly(maya, priya, 'Auditor', ['audit.read']);
+  await signInAs(page, priya);
+  await page.goto('/settings');
+  await expect(page).toHaveURL(/\/settings\/audit-log$/);
+  await expect(
+    page.getByRole('navigation', { name: 'Settings' }).getByRole('link'),
+  ).toHaveText(['Audit log']);
+});
+
+test('from /settings, no section held: the area isn’t theirs', async ({
+  page,
+}) => {
+  const { priya } = await tenant('settings');
+  await signInAs(page, priya);
+  await page.goto('/settings');
+  await expect(
+    page.getByRole('heading', { name: 'This page isn’t available' }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
 });

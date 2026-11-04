@@ -161,6 +161,28 @@ test.describe('the composer', () => {
     });
   }
 
+  /**
+   * Waits until the composer is hydrated: files set before it are lost, since
+   * no handler is attached yet. A drag over it answers once it is, so drag
+   * until it does, then leave.
+   */
+  async function hydrated(page: Page) {
+    const composer = page.getByRole('form', { name: /^Reply to / });
+    const dataTransfer = await page.evaluateHandle(() => {
+      const data = new DataTransfer();
+      data.items.add(new File(['x'], 'probe.pdf', { type: 'application/pdf' }));
+      return data;
+    });
+    await expect(async () => {
+      await composer.dispatchEvent('dragover', { dataTransfer });
+      await expect(page.getByText('Drop files to attach')).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
+    await composer.dispatchEvent('dragleave', { dataTransfer });
+    await expect(page.getByText('Drop files to attach')).toBeHidden();
+  }
+
   const file = (name: string, mimeType: string, bytes = 1024) => ({
     name,
     mimeType,
@@ -171,6 +193,7 @@ test.describe('the composer', () => {
     const { maya, tickets } = await tenant('composer');
     await storage(page);
     await open(page, maya, tickets.desk);
+    await hydrated(page);
     await page
       .locator('form input[type="file"]')
       .setInputFiles([
@@ -205,6 +228,7 @@ test.describe('the composer', () => {
     const { maya, tickets } = await tenant('composer');
     await storage(page);
     await open(page, maya, tickets.desk);
+    await hydrated(page);
     await page
       .locator('form input[type="file"]')
       .setInputFiles(

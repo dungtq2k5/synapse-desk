@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { keepNormalized, stopNormalizing } from './normalize';
+import { titleFaults } from './title-watch';
 
 /** The two widths every state is drawn at: a laptop, and a phone. */
 const WIDTHS = [
@@ -64,6 +65,10 @@ export async function look(
   const held = await holdToasts(page);
   try {
     await settledBell(page);
+    // The page never went without its title, or held two, since it loaded.
+    expect(await titleFaults(page), `${name}: the document's <title>`).toEqual(
+      [],
+    );
     for (const scheme of SCHEMES) {
       await page.emulateMedia({ colorScheme: scheme });
       await accessible(page, options.disabled ?? [], options.heldClock);
