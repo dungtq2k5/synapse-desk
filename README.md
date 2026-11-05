@@ -284,6 +284,8 @@ The suite starts rag-service in its model-free mode (`RAG_OFFLINE_MODEL=true`, r
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares. **Don't run another suite against the dev stack while it runs:** rag-service's pytest uses the same Qdrant (`QDRANT_URL` in its `.env.test`) and errors when the collection is dropped under it.
 
+**A test run never reaches Resend, Stripe or Firebase for real, whatever your `.env` holds.** Every stack starts through `startStack` (`test/system/stack.ts`), whose providers step points the services at a fake Resend and a fake Stripe (`test/system/fake-resend.ts`, `fake-stripe.ts`) and at the Firebase Auth and Storage emulators, then refuses to start if any of the three would still reach the real service. The fake Resend records every mail (`GET /__sent`) and prints a count when the stack stops. **Gemini is the exception, on purpose:** `test:system`'s AI steps and rag-service's `test_multimodal_e2e.py` call the real models with the `GEMINI_API_KEY` in `.env`, and are billed for it; `test:e2e:web` uses the offline models, since its screens need the same answer every run.
+
 The specs under `packages/config/src/` are contract guards rather than unit tests — they check the manifests against the application, the images against the Dockerfiles, the env schemas against the `.env.example` files, and the flow documents against the symbols they cite. A `.env.example` that gains a key without a schema entry fails there.
 
 ## Docker images
