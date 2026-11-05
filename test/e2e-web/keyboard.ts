@@ -124,16 +124,28 @@ export async function expectFocusOn(target: Locator): Promise<void> {
 /**
  * In an open menu, moves with ArrowDown to the item named `name` and picks it
  * with Enter.
+ *
+ * The menu moves focus a frame after the key, so each press waits for focus
+ * to move before the next check: a slow frame must not let a second press skip
+ * the item, since the menu doesn't wrap back to it. At the last item focus
+ * stays put, and the wait gives up.
  */
 export async function chooseMenuItem(page: Page, name: string): Promise<void> {
   const item = page.getByRole('menuitem', { name });
   await expect(item).toBeVisible();
+  const focused = () =>
+    page.evaluate(() => document.activeElement?.textContent ?? '');
   for (let presses = 0; presses <= 30; presses++) {
     if (await item.evaluate((element) => element === document.activeElement)) {
       await page.keyboard.press('Enter');
       return;
     }
+    const before = await focused();
     await page.keyboard.press('ArrowDown');
+    await expect
+      .poll(focused, { timeout: 1_000 })
+      .not.toBe(before)
+      .catch(() => undefined);
   }
   throw new Error(`Menu item not reachable with the arrow keys: ${name}`);
 }
