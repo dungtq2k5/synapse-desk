@@ -40,6 +40,8 @@ import {
   READINESS_SERVICE,
 } from '@synapsedesk/grpc-proto';
 import { REPO_ROOT, SERVICES, type ServiceSpec } from './services';
+import { startFakeResend, stopFakeResend } from './fake-resend';
+import { realProviders, useTestProviders } from './providers';
 
 /** A started process, with what is needed to kill and to blame it. */
 type Running = { spec: ServiceSpec; child: ChildProcess; output: string[] };
@@ -393,6 +395,17 @@ export async function startStack(
   const services = options.services ?? SERVICES;
   const readyTimeoutMs = options.readyTimeoutMs ?? READY_TIMEOUT_MS;
 
+  // No service may reach a real provider, whatever a developer's `.env` holds:
+  // the test values first, then a check of what the services will inherit.
+  useTestProviders();
+  const real = realProviders();
+  if (real.length > 0) {
+    throw new Error(
+      `The test stack would reach a real provider, so nothing was started:\n${real.map((line) => `  - ${line}`).join('\n')}`,
+    );
+  }
+  await startFakeResend();
+
   for (const spec of services) start(spec);
 
   const deadline = Date.now() + readyTimeoutMs;
@@ -447,6 +460,7 @@ export async function stopStack(): Promise<void> {
 
   running.length = 0;
   rmSync(PID_FILE, { force: true });
+  await stopFakeResend();
 }
 
 /**
