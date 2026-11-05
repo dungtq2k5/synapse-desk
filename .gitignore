@@ -94,3 +94,6 @@ graphify-out/
 .env.sonar
 .mcp.json
 .sonar-config.json
+
+# The test stack's own Firebase-emulator key (test/system/providers.ts).
+test/system/.firebase/
