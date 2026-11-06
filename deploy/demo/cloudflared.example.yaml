@@ -1,0 +1,19 @@
+# The tunnel's rules for the demo. Copy to cloudflared/config.yaml beside the
+# tunnel's credentials JSON (both gitignored); the paths are the container's.
+tunnel: synapsedesk-local
+credentials-file: /etc/cloudflared/<tunnel-id>.json
+
+ingress:
+  # Mail Resend receives: the demo's gateway takes it.
+  - hostname: inbound.synapsedeskapp.com
+    service: http://api-gateway:3000
+  # The site: the gateway's socket, its API, then the web for everything else.
+  - hostname: synapsedeskapp.com
+    path: ^/socket\.io/
+    service: http://api-gateway:3001
+  - hostname: synapsedeskapp.com
+    path: ^/(api|graphql)(/|$)
+    service: http://api-gateway:3000
+  - hostname: synapsedeskapp.com
+    service: http://web:5173
+  - service: http_status:404

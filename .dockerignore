@@ -93,3 +93,7 @@ sonar-project.properties
 .playwright-mcp
 # Next.js build output: the image builds its own.
 **/.next
+
+# The demo's Compose project holds its real env files, the tunnel's
+# credentials and the seed's manifest; nothing in it belongs in an image.
+deploy

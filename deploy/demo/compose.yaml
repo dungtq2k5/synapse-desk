@@ -1,0 +1,353 @@
+# The public demo on the PC: every process in Docker, behind the Cloudflare
+# Tunnel. The same images the cluster will run, built from a clean worktree at
+# one commit (DEMO_SOURCE, DEMO_SHA); see README.md for the commands.
+#
+# **No host ports.** Everything talks over this project's network by service
+# name, so nothing collides with the development stack, and `db:reset` and the
+# test harness can't reach these volumes. Only cloudflared reaches the gateway
+# and the web.
+name: synapsedesk-demo
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 20m
+    max-file: '5'
+
+x-build: &build-args
+  GIT_SHA: ${DEMO_SHA:?set DEMO_SHA to the commit being built}
+  BUILD_TIME: ${DEMO_BUILD_TIME:-unknown}
+
+x-postgres: &postgres
+  image: postgres:18.4-alpine
+  restart: unless-stopped
+  logging: *logging
+  healthcheck:
+    test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER"']
+    interval: 5s
+    timeout: 5s
+    retries: 10
+
+# A Node service: its image, its env file, its gRPC health.
+x-node-service: &node-service
+  restart: unless-stopped
+  logging: *logging
+  volumes:
+    - ./healthcheck:/healthcheck:ro
+    - ./secrets:/run/secrets/synapsedesk:ro
+
+x-migrate: &migrate
+  restart: 'no'
+  logging: *logging
+
+services:
+  # ---------------------------------------------------------------- stores
+  postgres-auth:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: synapsedesk_auth
+    volumes: [pgdata_auth:/var/lib/postgresql]
+  postgres-ticket:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: synapsedesk_ticket
+    volumes: [pgdata_ticket:/var/lib/postgresql]
+  postgres-ingestion:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: synapsedesk_ingestion
+    volumes: [pgdata_ingestion:/var/lib/postgresql]
+  postgres-notification:
+    <<: *postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:?}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: synapsedesk_notification
+    volumes: [pgdata_notification:/var/lib/postgresql]
+
+  redis:
+    image: redis:8.8.0-alpine
+    command:
+      [redis-server, --maxmemory, 512mb, --maxmemory-policy, noeviction]
+    restart: unless-stopped
+    logging: *logging
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nats:
+    image: nats:2.10-alpine
+    # JetStream with a persistent store, and monitoring for the health check.
+    command: ['-js', '-sd', '/data', '-m', '8222']
+    restart: unless-stopped
+    logging: *logging
+    volumes: [nats_data:/data]
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8222/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.18.3
+    restart: unless-stopped
+    logging: *logging
+    volumes: [qdrant_data:/qdrant/storage]
+    healthcheck:
+      # The image has no HTTP client: a TCP connect to its HTTP port.
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/6333']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ------------------------------------------------- migrations, run first
+  # Each schema service's `migrate` target, run to completion before its
+  # runtime starts: the cluster's init container, rehearsed.
+  auth-migrate:
+    <<: *migrate
+    image: synapsedesk-demo/auth-service-migrate:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?set DEMO_SOURCE to the demo worktree}
+      dockerfile: docker/node-service.Dockerfile
+      target: migrate
+      args: { <<: *build-args, SERVICE: auth-service }
+    env_file: env/auth-service.env
+    depends_on:
+      postgres-auth: { condition: service_healthy }
+  ticket-migrate:
+    <<: *migrate
+    image: synapsedesk-demo/ticket-service-migrate:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: migrate
+      args: { <<: *build-args, SERVICE: ticket-service }
+    env_file: env/ticket-service.env
+    depends_on:
+      postgres-ticket: { condition: service_healthy }
+  ingestion-migrate:
+    <<: *migrate
+    image: synapsedesk-demo/ingestion-service-migrate:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: migrate
+      args: { <<: *build-args, SERVICE: ingestion-service }
+    env_file: env/ingestion-service.env
+    depends_on:
+      postgres-ingestion: { condition: service_healthy }
+  notification-migrate:
+    <<: *migrate
+    image: synapsedesk-demo/notification-service-migrate:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: migrate
+      args: { <<: *build-args, SERVICE: notification-service }
+    env_file: env/notification-service.env
+    depends_on:
+      postgres-notification: { condition: service_healthy }
+
+  # ------------------------------------------------------------- services
+  auth-service:
+    <<: *node-service
+    image: synapsedesk-demo/auth-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: runtime
+      args: { <<: *build-args, SERVICE: auth-service }
+    env_file: env/auth-service.env
+    healthcheck: &grpc-health
+      test: ['CMD', 'sh', '-c', 'NODE_PATH=/app/node_modules node /healthcheck/grpc-health.cjs $$GRPC_PORT']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      auth-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  ticket-service:
+    <<: *node-service
+    image: synapsedesk-demo/ticket-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: runtime
+      args: { <<: *build-args, SERVICE: ticket-service }
+    env_file: env/ticket-service.env
+    healthcheck: *grpc-health
+    depends_on:
+      ticket-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  ingestion-service:
+    <<: *node-service
+    image: synapsedesk-demo/ingestion-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      # Tesseract and its languages, for scanned documents.
+      target: runtime-ocr
+      args: { <<: *build-args, SERVICE: ingestion-service }
+    env_file: env/ingestion-service.env
+    healthcheck: *grpc-health
+    depends_on:
+      ingestion-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+
+  notification-service:
+    <<: *node-service
+    image: synapsedesk-demo/notification-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: runtime
+      args: { <<: *build-args, SERVICE: notification-service }
+    env_file: env/notification-service.env
+    healthcheck: *grpc-health
+    depends_on:
+      notification-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  storage-service:
+    <<: *node-service
+    image: synapsedesk-demo/storage-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/node-service.Dockerfile
+      target: runtime
+      args: { <<: *build-args, SERVICE: storage-service }
+    env_file: env/storage-service.env
+    healthcheck: *grpc-health
+    depends_on:
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  rag-service:
+    image: synapsedesk-demo/rag-service:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/rag-service.Dockerfile
+      args: *build-args
+    env_file: env/rag-service.env
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os, grpc, sys
+          from grpc_health.v1 import health_pb2, health_pb2_grpc
+          channel = grpc.insecure_channel(f"127.0.0.1:{os.environ.get('GRPC_PORT', '50255')}")
+          reply = health_pb2_grpc.HealthStub(channel).Check(health_pb2.HealthCheckRequest(), timeout=3)
+          sys.exit(0 if reply.status == health_pb2.HealthCheckResponse.SERVING else 1)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      ingestion-migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+
+  api-gateway:
+    image: synapsedesk-demo/api-gateway:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/java-service.Dockerfile
+      args: *build-args
+    env_file: env/api-gateway.env
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./secrets:/run/secrets/synapsedesk:ro
+    healthcheck:
+      # Ready means its peers answer too: busybox `wget` is in the JRE image.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health/ready']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      auth-service: { condition: service_healthy }
+      ticket-service: { condition: service_healthy }
+      ingestion-service: { condition: service_healthy }
+      notification-service: { condition: service_healthy }
+      rag-service: { condition: service_healthy }
+      # Not the gateway's peer, but auth, ticket and ingestion call it.
+      storage-service: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
+  web:
+    image: synapsedesk-demo/web:${DEMO_SHA:?}
+    build:
+      context: ${DEMO_SOURCE:?}
+      dockerfile: docker/web.Dockerfile
+      args: *build-args
+    env_file: env/web.env
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173/login').then((r)=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      api-gateway: { condition: service_healthy }
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    command: ['tunnel', '--no-autoupdate', '--config', '/etc/cloudflared/config.yaml', 'run']
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      web: { condition: service_healthy }
+
+  # ------------------------------------------------------- on demand only
+  # Seeds and one-off scripts, run by hand on this network (README.md):
+  #   docker compose --profile tools run --rm tools npm run plans:seed:apply
+  tools:
+    image: node:24.19.0-trixie-slim
+    profiles: [tools]
+    working_dir: /src
+    env_file: env/tools.env
+    logging: *logging
+    volumes:
+      - ${DEMO_SOURCE:?}:/src:ro
+      # The seed's manifest needs somewhere to write, kept on the PC.
+      - ./.demo-seed:/src/.demo-seed
+
+volumes:
+  pgdata_auth:
+  pgdata_ticket:
+  pgdata_ingestion:
+  pgdata_notification:
+  redis_data:
+  nats_data:
+  qdrant_data:

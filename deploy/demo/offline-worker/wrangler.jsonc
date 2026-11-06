@@ -1,0 +1,16 @@
+// The demo's offline page: a Worker in front of the site that passes every
+// request through, and answers a page load with the offline page when the
+// PC isn't answering. Deployed by hand (deploy/demo/README.md).
+{
+  "name": "synapsedesk-demo-offline",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-20",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "synapsedeskapp.com/*", "zone_name": "synapsedeskapp.com" },
+    {
+      "pattern": "www.synapsedeskapp.com/*",
+      "zone_name": "synapsedeskapp.com",
+    },
+  ],
+}

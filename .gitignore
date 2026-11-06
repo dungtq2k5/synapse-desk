@@ -101,3 +101,10 @@ test/e2e-web/playwright-report/
 test/e2e-web/results.xml
 # The test stack's own Firebase-emulator key (test/system/providers.ts).
 test/system/.firebase/
+
+# The demo on the PC (deploy/demo/README.md): its real env files, secrets,
+# tunnel config and credentials, and the seed's manifest.
+deploy/demo/env/*.env
+deploy/demo/secrets/
+deploy/demo/cloudflared/
+deploy/demo/.demo-seed/
