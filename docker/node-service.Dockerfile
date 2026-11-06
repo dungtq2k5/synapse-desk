@@ -201,9 +201,12 @@ RUN npx turbo run build --filter="@synapsedesk/${SERVICE}..."
 # Over the pruned tree this checks the target service and the libs — the root
 # include globs over absent workspaces match nothing.
 #
+# `typecheck:root`, not `typecheck`: where a branch adds an app's typecheck to
+# `typecheck`, the pruned tree has no such app and the step would fail.
+#
 # MOVE THIS TO CI when CI exists — it is a relocation, not a deletion, and the
 # image build gets its minute back.
-RUN npm run typecheck
+RUN npm run typecheck:root
 
 # --------------------------------------------------------------- deps (runtime)
 # A SECOND install rather than pruning the first. `npm prune --omit=dev` across
