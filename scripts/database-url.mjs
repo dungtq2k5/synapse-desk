@@ -60,6 +60,29 @@ export function isLocalDatabase(url) {
   return /@(?:localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)[:/]/.test(url);
 }
 
+/**
+ * {@link isLocalDatabase}, or a host `SEED_DATABASE_HOSTS` names (a comma list).
+ *
+ * The demo's databases are reached by their Compose names on the demo's own
+ * network (`postgres-auth`), which the local check can't know. Only the
+ * demo's `tools` container sets the variable, and only the seeders read this:
+ * `db:reset` keeps {@link isLocalDatabase}, so nothing resets the demo.
+ *
+ * @example isSeedableDatabase('postgresql://u:p@postgres-auth:5432/auth', { SEED_DATABASE_HOSTS: 'postgres-auth' }) // true
+ */
+export function isSeedableDatabase(url, env = process.env) {
+  if (isLocalDatabase(url)) return true;
+  const hosts = (env.SEED_DATABASE_HOSTS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+  try {
+    return hosts.includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Hides the password, for a line that is about to be printed. */
 export function redact(url) {
   return url.replace(/:[^:@/]*@/, ':***@');

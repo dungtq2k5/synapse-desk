@@ -150,7 +150,7 @@ async function main(): Promise<void> {
 
     say(
       args.apply
-        ? `Seeded. Manifest at .demo-seed/manifest.json — every demo user's password is the one in auth.step.ts.`
+        ? `Seeded. Manifest at .demo-seed/manifest.json — every demo user's password is SEED_DEMO_PASSWORD, or the one in auth.step.ts without it.`
         : 'Dry run — nothing written. Re-run with --apply.',
     );
   } finally {
