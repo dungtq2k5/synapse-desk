@@ -218,6 +218,31 @@ describe('the image contract (static half)', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('a service whose main starts an HTTP app declares @nestjs/platform-express', () => {
+    // Nest loads its HTTP driver by name at start, so no import names it and
+    // the scan above can't see it. Hoisting hides it in development; a pruned
+    // image doesn't have it, and the service dies at start with "No driver
+    // (HTTP) has been selected", as notification-service's did on its first
+    // container run.
+    const mains = readListed(repoFiles('services/*/src/main.ts')).filter(
+      ({ text }) => /NestFactory\.create\s*[<(]/.test(stripComments(text)),
+    );
+    expect(mains.length).toBeGreaterThanOrEqual(3);
+
+    const offenders = mains.flatMap(({ path: file }) => {
+      const manifestPath = file.replace(/src\/main\.ts$/, 'package.json');
+      const [{ text }] = readListed([manifestPath]);
+      const manifest = JSON.parse(text) as {
+        dependencies?: Record<string, string>;
+      };
+      return manifest.dependencies?.['@nestjs/platform-express']
+        ? []
+        : [manifestPath];
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
   // ----------------------------------------------- cross-workspace relatives
 
   describe('no relative import escapes its workspace', () => {
