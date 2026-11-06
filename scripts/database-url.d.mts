@@ -14,5 +14,11 @@ export function readDatabaseUrl(fileUrl: URL, key?: string): string | undefined;
 /** Whether a connection string points at this machine. */
 export function isLocalDatabase(url: string): boolean;
 
+/** `isLocalDatabase`, or a host `SEED_DATABASE_HOSTS` names; for the seeders only. */
+export function isSeedableDatabase(
+  url: string,
+  env?: Record<string, string | undefined>,
+): boolean;
+
 /** Hides the password, for a line about to be printed. */
 export function redact(url: string): string;

@@ -5,7 +5,7 @@ import { OrgStatus } from '@synapsedesk/contracts';
 import { DEFAULT_SEED, parseArgs } from './args';
 import { SEED_EDGES, STEPS } from './registry';
 import { PROFILES, bytesFor, countFor, type Profile } from './profiles';
-import { planTenant } from './steps/auth.step';
+import { DEMO_PASSWORD, planTenant, seedPassword } from './steps/auth.step';
 import { historyFor, ticketCountFor } from './steps/ticket.step';
 import {
   DOCUMENT_FIXTURES,
@@ -425,5 +425,27 @@ describe('a ticket’s history, as the dashboards count it', () => {
     for (const time of times) {
       expect(time.getTime()).toBeLessThanOrEqual(Date.now());
     }
+  });
+});
+
+describe('seedPassword', () => {
+  it("is the repository's without SEED_DEMO_PASSWORD", () => {
+    expect(seedPassword({})).toBe(DEMO_PASSWORD);
+    expect(seedPassword({ SEED_DEMO_PASSWORD: '' })).toBe(DEMO_PASSWORD);
+  });
+
+  it('is SEED_DEMO_PASSWORD when it is strong enough', () => {
+    expect(seedPassword({ SEED_DEMO_PASSWORD: 'Tunnel-Lantern-42' })).toBe(
+      'Tunnel-Lantern-42',
+    );
+  });
+
+  it('refuses a weak one, naming what it lacks', () => {
+    expect(() => seedPassword({ SEED_DEMO_PASSWORD: 'short1!A' })).toThrow(
+      'SEED_DEMO_PASSWORD needs at least 12 characters.',
+    );
+    expect(() =>
+      seedPassword({ SEED_DEMO_PASSWORD: 'alllowercaseletters' }),
+    ).toThrow(/an uppercase letter, a number, a symbol/);
   });
 });

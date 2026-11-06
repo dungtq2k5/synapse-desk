@@ -11,7 +11,11 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { REPO_ROOT } from './paths';
-import { isLocalDatabase, readDatabaseUrl, redact } from '../database-url.mjs';
+import {
+  isSeedableDatabase,
+  readDatabaseUrl,
+  redact,
+} from '../database-url.mjs';
 import { PrismaClient as AuthPrismaClient } from '../../services/auth-service/src/generated/prisma/client';
 import { PrismaClient as TicketPrismaClient } from '../../services/ticket-service/src/generated/prisma/client';
 import { PrismaClient as IngestionPrismaClient } from '../../services/ingestion-service/src/generated/prisma/client';
@@ -26,6 +30,13 @@ const ENV_FILES: Record<'auth' | 'ticket' | 'ingestion', string> = {
   ingestion: 'services/ingestion-service/.env',
 };
 
+/** The variable that names it instead, read first: the demo's `tools` sets them. */
+const ENV_VARIABLES: Record<keyof typeof ENV_FILES, string> = {
+  auth: 'AUTH_DATABASE_URL',
+  ticket: 'TICKET_DATABASE_URL',
+  ingestion: 'INGESTION_DATABASE_URL',
+};
+
 /**
  * The safety helpers, from the module every destructive script already uses.
  *
@@ -33,22 +44,31 @@ const ENV_FILES: Record<'auth' | 'ticket' | 'ingestion', string> = {
  * Node and has no reason to become TypeScript, and re-deriving `isLocalDatabase` here would be a second copy of the one check
  * standing between this script and a production database.
  */
-/** Reads a service's dev `DATABASE_URL`, refusing anything not on this machine. */
+/**
+ * A service's database: its `*_DATABASE_URL` variable when set, else the
+ * `DATABASE_URL` in its dev `.env`. Refuses anything not on this machine, or
+ * not a host `SEED_DATABASE_HOSTS` names.
+ */
 export function urlFor(service: keyof typeof ENV_FILES): string {
-  const file = pathToFileURL(join(REPO_ROOT, ENV_FILES[service]));
+  const variable = ENV_VARIABLES[service];
+  const source = process.env[variable] ? variable : ENV_FILES[service];
   // The types returned by 'searchParams.entries()' are incompatible between these types.
   // Property 'next' is missing in type 'URLSearchParamsIterator<[string, string]>' but required in type 'IterableIterator<[string, string]>'.
-  const url = readDatabaseUrl(file);
+  const url =
+    process.env[variable] ||
+    readDatabaseUrl(pathToFileURL(join(REPO_ROOT, ENV_FILES[service])));
 
   if (!url) {
-    throw new Error(`No DATABASE_URL in ${ENV_FILES[service]}`);
+    throw new Error(
+      `No ${variable}, and no DATABASE_URL in ${ENV_FILES[service]}`,
+    );
   }
 
-  // The same bar `reset-databases.mjs` sets, by the same function rather than a
-  // second copy of the regex.
-  if (!isLocalDatabase(url)) {
+  // The bar `reset-databases.mjs` sets, by the same module rather than a second
+  // copy of the regex, plus the demo's named hosts.
+  if (!isSeedableDatabase(url)) {
     throw new Error(
-      `${ENV_FILES[service]} does not point at this machine (${redact(url)}). The demo seeder writes only to local databases.`,
+      `${source} does not point at this machine (${redact(url)}). The demo seeder writes only to local databases, or to hosts SEED_DATABASE_HOSTS names.`,
     );
   }
 
@@ -56,9 +76,7 @@ export function urlFor(service: keyof typeof ENV_FILES): string {
   // cross-suite failure that reads as flakiness — a family this repository
   // already has three known-gap rows about.
   if (/_test(\?|$)/.test(url)) {
-    throw new Error(
-      `${ENV_FILES[service]} names a TEST database. The suites own those.`,
-    );
+    throw new Error(`${source} names a TEST database. The suites own those.`);
   }
 
   return url;

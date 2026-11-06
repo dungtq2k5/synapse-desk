@@ -162,25 +162,32 @@ export async function seedDocuments(
   apply: boolean,
 ): Promise<string[]> {
   const lines: string[] = [];
-  const emulator = apply ? storageEmulator() : null;
-  if (apply && !emulator) {
+  // Documents only where their files can go: a document with a row and no
+  // file can't be opened, and with no vector nothing finds it. Without an
+  // emulator (a site on the real bucket) they come in through the app.
+  const emulator = storageEmulator();
+  if (!emulator) {
     lines.push(
-      'No Storage emulator in services/storage-service/.env: documents get no files, so download, reindex and replace will fail.',
+      'Documents skipped: no Storage emulator; upload them through the app.',
     );
   }
 
   for (const tenant of tenants) {
     const plan = documentPlanFor(tenant);
-    lines.push(
-      `${tenant.slug.padEnd(24)} ${String(plan.documents).padStart(4)} documents  ` +
-        `${(Number(plan.bytesEach * BigInt(plan.documents)) / 1024 ** 3).toFixed(2)} GiB`,
-    );
+    if (emulator) {
+      lines.push(
+        `${tenant.slug.padEnd(24)} ${String(plan.documents).padStart(4)} documents  ` +
+          `${(Number(plan.bytesEach * BigInt(plan.documents)) / 1024 ** 3).toFixed(2)} GiB`,
+      );
+    }
 
     if (!apply) continue;
 
     const files = await prisma.$transaction(
       async (tx) => {
-        const written = await writeDocuments(tx as PrismaService, tenant, plan);
+        const written = emulator
+          ? await writeDocuments(tx as PrismaService, tenant, plan)
+          : [];
         await writeGenerations(tx as PrismaService, tenant);
         return written;
       },

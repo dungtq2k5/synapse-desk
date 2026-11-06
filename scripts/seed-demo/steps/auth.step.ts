@@ -9,6 +9,8 @@ import { faker } from '@faker-js/faker';
 import {
   BillingEventStatus,
   OrgStatus,
+  PASSWORD_POLICY,
+  SUPER_ADMIN_PASSWORD_MIN_LENGTH,
   SystemRoleName,
 } from '@synapsedesk/contracts';
 import {
@@ -23,8 +25,40 @@ import type { ManifestTenant } from '../manifest';
 import type { SeedStep } from '../registry';
 import { bytesFor, countFor, type Profile } from '../profiles';
 
-/** The one password every demo user shares, hashed once — see `seedAuth`. */
+/** The one password every demo user shares in development, hashed once — see `seedAuth`. */
 export const DEMO_PASSWORD = 'DemoPassw0rd!';
+
+/**
+ * The password the seeded users get: `SEED_DEMO_PASSWORD` when set, else
+ * {@link DEMO_PASSWORD}. A site others can reach sets it, because the
+ * repository's is public and every seeded user shares it. A set one meets
+ * `PASSWORD_POLICY` at the Super Admin's length, or the seed refuses to run.
+ *
+ * @example seedPassword({}) // 'DemoPassw0rd!'
+ */
+export function seedPassword(env: NodeJS.ProcessEnv = process.env): string {
+  const chosen = env.SEED_DEMO_PASSWORD;
+  if (chosen === undefined || chosen === '') return DEMO_PASSWORD;
+  const count = (test: (char: string) => boolean) =>
+    [...chosen].filter(test).length;
+  const weak = [
+    chosen.length < SUPER_ADMIN_PASSWORD_MIN_LENGTH &&
+      `at least ${SUPER_ADMIN_PASSWORD_MIN_LENGTH} characters`,
+    count((c) => c >= 'a' && c <= 'z') < PASSWORD_POLICY.minLowercase &&
+      'a lowercase letter',
+    count((c) => c >= 'A' && c <= 'Z') < PASSWORD_POLICY.minUppercase &&
+      'an uppercase letter',
+    count((c) => c >= '0' && c <= '9') < PASSWORD_POLICY.minNumbers &&
+      'a number',
+    count((c) => PASSWORD_POLICY.symbols.includes(c)) <
+      PASSWORD_POLICY.minSymbols && 'a symbol',
+    chosen === DEMO_PASSWORD && "something other than the repository's",
+  ].filter((missing): missing is string => typeof missing === 'string');
+  if (weak.length > 0) {
+    throw new Error(`SEED_DEMO_PASSWORD needs ${weak.join(', ')}.`);
+  }
+  return chosen;
+}
 
 /** Ceilings copied from `DatabaseSeeder`, which solved this first. */
 const TRANSACTION_TIMEOUT_MS = 30_000;
@@ -230,7 +264,7 @@ export async function seedAuth(
   // needed: `buildUser` spreads its overrides last, so `createUser` accepts the
   // digest directly and `createUserWithPassword` — the one that hashes per
   // call — simply is not the factory to use here.
-  const passwordHash = await hashTestPassword(DEMO_PASSWORD);
+  const passwordHash = await hashTestPassword(seedPassword());
 
   const tenants: ManifestTenant[] = [];
   const lines: string[] = [];
