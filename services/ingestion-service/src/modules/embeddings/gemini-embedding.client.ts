@@ -29,7 +29,10 @@ export class GeminiEmbeddingClient implements EmbeddingClient {
 
     const response = await this.client.models.embedContent({
       model,
-      contents: texts,
+      // **One content per text, not the strings themselves.** The SDK reads a
+      // string array as the parts of ONE content, and the model then answers
+      // with one vector for the whole batch (measured: 3 texts, 1 vector).
+      contents: texts.map((text) => ({ role: 'user', parts: [{ text }] })),
       config: {
         // `RETRIEVAL_DOCUMENT`, not the default. Gemini embeds asymmetrically:
         // documents and queries go into the same space through different task
