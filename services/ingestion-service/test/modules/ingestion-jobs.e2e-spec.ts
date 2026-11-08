@@ -7,6 +7,7 @@ import {
   DocumentStatus,
   INGESTION_QUEUE,
   IngestionJobStatus,
+  IngestionWaitingReason,
 } from '@synapsedesk/contracts';
 import {
   IngestionJobResponse,
@@ -552,6 +553,28 @@ describe('Ingestion jobs (e2e)', () => {
         status.FAILED_PRECONDITION,
       );
 
+      expect(await fx.prisma.ingestionJob.count()).toBe(1);
+    });
+
+    it('15b. **a job waiting to be tried again is refused, and says so**', async () => {
+      // BullMQ holds it in its backoff, so a manual retry would supersede the
+      // row while BullMQ's own retry of it still runs.
+      const document = await createDocument(fx.prisma, tenant);
+      const waiting = await createIngestionJob(fx.prisma, tenant, document.id, {
+        waitingReason: IngestionWaitingReason.RETRYING,
+      });
+      await queue.add(
+        'ingest',
+        { ingestionJobId: waiting.id },
+        { jobId: waiting.id, delay: 60_000 },
+      );
+
+      const refused = jobs.retryIngestionJob({ id: waiting.id }, caller());
+
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toThrow(
+        'This document is already being tried again. Wait for it to finish.',
+      );
       expect(await fx.prisma.ingestionJob.count()).toBe(1);
     });
 

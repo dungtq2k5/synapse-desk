@@ -79,6 +79,7 @@ enum IngestionStage {
 enum IngestionWaitingReason {
   INGESTION_WAITING_REASON_UNSPECIFIED = 0;
   INGESTION_WAITING_REASON_AI_ALLOWANCE = 1;
+  INGESTION_WAITING_REASON_RETRYING = 2;
 }
 
 // The EXTENSION a document is filed under, not its MIME type — the distinction

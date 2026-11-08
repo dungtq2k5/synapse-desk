@@ -50,6 +50,7 @@ class IngestionWaitingReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     INGESTION_WAITING_REASON_UNSPECIFIED: _ClassVar[IngestionWaitingReason]
     INGESTION_WAITING_REASON_AI_ALLOWANCE: _ClassVar[IngestionWaitingReason]
+    INGESTION_WAITING_REASON_RETRYING: _ClassVar[IngestionWaitingReason]
 
 class DocumentFileType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -109,6 +110,7 @@ INGESTION_STAGE_CHUNKING: IngestionStage
 INGESTION_STAGE_EMBEDDING: IngestionStage
 INGESTION_WAITING_REASON_UNSPECIFIED: IngestionWaitingReason
 INGESTION_WAITING_REASON_AI_ALLOWANCE: IngestionWaitingReason
+INGESTION_WAITING_REASON_RETRYING: IngestionWaitingReason
 DOCUMENT_FILE_TYPE_UNSPECIFIED: DocumentFileType
 DOCUMENT_FILE_TYPE_PDF: DocumentFileType
 DOCUMENT_FILE_TYPE_TXT: DocumentFileType

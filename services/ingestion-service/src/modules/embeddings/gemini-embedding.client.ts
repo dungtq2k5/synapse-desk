@@ -1,8 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI } from '@google/genai';
+import { ApiError, GoogleGenAI } from '@google/genai';
 import { EMBEDDING_DIMENSION } from '@synapsedesk/contracts';
-import { EmbeddingClient, EmbeddingResult } from './embedding.contract';
+import {
+  DEFAULT_RATE_LIMIT_WAIT_MS,
+  EmbeddingClient,
+  EmbeddingResult,
+  RateLimited,
+} from './embedding.contract';
+
+/**
+ * The wait a Gemini 429 asks for, in milliseconds: its `RetryInfo` detail's
+ * `retryDelay` (`"7s"`, `"0.5s"`), which the SDK leaves inside the error's
+ * message as JSON. The default when it carries none.
+ *
+ * @example retryDelayMs('{"error":{"details":[{"retryDelay":"7s"}]}}') // 7000
+ */
+export function retryDelayMs(message: string): number {
+  const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(message);
+  return match
+    ? Math.ceil(Number(match[1]) * 1000)
+    : DEFAULT_RATE_LIMIT_WAIT_MS;
+}
 
 /**
  * The real embedding provider.
@@ -27,22 +46,29 @@ export class GeminiEmbeddingClient implements EmbeddingClient {
   async embedBatch(texts: string[], model: string): Promise<EmbeddingResult> {
     if (texts.length === 0) return { vectors: [], promptTokens: 0 };
 
-    const response = await this.client.models.embedContent({
-      model,
-      // **One content per text, not the strings themselves.** The SDK reads a
-      // string array as the parts of ONE content, and the model then answers
-      // with one vector for the whole batch (measured: 3 texts, 1 vector).
-      contents: texts.map((text) => ({ role: 'user', parts: [{ text }] })),
-      config: {
-        // `RETRIEVAL_DOCUMENT`, not the default. Gemini embeds asymmetrically:
-        // documents and queries go into the same space through different task
-        // types, and using one type for both measurably degrades retrieval.
-        // The query side passes `RETRIEVAL_QUERY` — in the other service, in
-        // the other language, which is exactly why it is stated here too.
-        taskType: 'RETRIEVAL_DOCUMENT',
-        outputDimensionality: EMBEDDING_DIMENSION,
-      },
-    });
+    const response = await this.client.models
+      .embedContent({
+        model,
+        // **One content per text, not the strings themselves.** The SDK reads a
+        // string array as the parts of ONE content, and the model then answers
+        // with one vector for the whole batch (measured: 3 texts, 1 vector).
+        contents: texts.map((text) => ({ role: 'user', parts: [{ text }] })),
+        config: {
+          // `RETRIEVAL_DOCUMENT`, not the default. Gemini embeds asymmetrically:
+          // documents and queries go into the same space through different task
+          // types, and using one type for both measurably degrades retrieval.
+          // The query side passes `RETRIEVAL_QUERY` — in the other service, in
+          // the other language, which is exactly why it is stated here too.
+          taskType: 'RETRIEVAL_DOCUMENT',
+          outputDimensionality: EMBEDDING_DIMENSION,
+        },
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 429) {
+          throw new RateLimited(retryDelayMs(error.message), error);
+        }
+        throw error;
+      });
 
     const embeddings = response.embeddings ?? [];
 
