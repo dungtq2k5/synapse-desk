@@ -18,29 +18,54 @@
  * unset" is information; a red step is a false report that something is broken.
  */
 
+import { ConfigService } from '@nestjs/config';
+import { EMBEDDING_DIMENSION, EMBEDDING_MODEL } from '@synapsedesk/contracts';
 import { config } from 'dotenv';
+import { GeminiEmbeddingClient } from '../../services/ingestion-service/src/modules/embeddings/gemini-embedding.client';
 import { REPO_ROOT } from './services';
 
 /**
- * Whether the AI dependency is configured at all.
+ * The AI key, or `undefined` when the AI dependency isn't configured at all.
  *
  * Read from `ingestion-service`'s own `.env` rather than `process.env`, because
  * that is where the running service reads it from — a harness that checked its
  * own environment would skip on a machine where the services are perfectly
  * configured, and run on one where they are not.
  */
-function aiConfigured(): boolean {
+function geminiApiKey(): string | undefined {
   const parsed = config({
     path: `${REPO_ROOT}/services/ingestion-service/.env`,
     processEnv: {},
   });
 
-  return Boolean(parsed.parsed?.GEMINI_API_KEY);
+  return parsed.parsed?.GEMINI_API_KEY || undefined;
 }
 
-const describeAi = aiConfigured() ? describe : describe.skip;
+const apiKey = geminiApiKey();
+const describeAi = apiKey ? describe : describe.skip;
 
 describeAi('The AI journey (needs GEMINI_API_KEY and network)', () => {
+  // The real provider, not a fake of it: a unit test can pin the request's
+  // shape, but only the real model can say how many vectors that shape gets
+  // back. A string list once came back as ONE vector for the whole batch.
+  it('embeds a batch as one vector per text, each of the collection size', async () => {
+    const client = new GeminiEmbeddingClient(
+      new ConfigService({ GEMINI_API_KEY: apiKey }),
+    );
+    const texts = [
+      'How do I reset my password?',
+      'Refunds are issued within five business days.',
+      'The API rate limit is 600 requests per minute.',
+    ];
+
+    const { vectors } = await client.embedBatch(texts, EMBEDDING_MODEL);
+
+    expect(vectors).toHaveLength(texts.length);
+    for (const vector of vectors) {
+      expect(vector).toHaveLength(EMBEDDING_DIMENSION);
+    }
+  });
+
   it.todo(
     '4. upload a document and wait for INDEXED — gateway, ingestion, storage, BullMQ, Qdrant',
   );
