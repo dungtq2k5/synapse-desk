@@ -545,6 +545,8 @@ const ingestionWaitingReason = enumBridge<
   {
     [IngestionWaitingReason.AI_ALLOWANCE]:
       ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_AI_ALLOWANCE,
+    [IngestionWaitingReason.RETRYING]:
+      ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_RETRYING,
   },
   ProtoIngestionWaitingReason.INGESTION_WAITING_REASON_UNSPECIFIED,
 );

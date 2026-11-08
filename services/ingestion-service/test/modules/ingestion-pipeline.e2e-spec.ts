@@ -4,6 +4,7 @@ import {
   DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
+  DOCUMENT_PATTERNS,
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_MODEL,
@@ -31,7 +32,12 @@ import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { memberContext } from '../utils/context';
 import { INGESTION_OUTCOMES } from '../../src/common/configs/ingestion.config';
 import { DocumentChunkerService } from '../../src/modules/ingestion/document-chunker.service';
-import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
+import {
+  EMBEDDING_RATE_LIMIT_WAITS,
+  IngestionProcessor,
+} from '../../src/modules/ingestion/ingestion.processor';
+import { RateLimited } from '../../src/modules/embeddings/embedding.contract';
+import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { OcrService } from '../../src/modules/ingestion/ocr.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
@@ -1469,6 +1475,173 @@ describe('The ingestion pipeline (e2e)', () => {
         where: { id: data.ingestionJobId },
       });
       expect(job.status).toBe(IngestionJobStatus.FAILED);
+    });
+  });
+
+  describe('an attempt that will be tried again', () => {
+    /** Spies before the run; the returned reader counts failure events. */
+    const watchFailures = () => {
+      const publish = faults.spy(
+        fx.moduleRef.get(DocumentEventPublisher),
+        'publish',
+      );
+      return () =>
+        publish.mock.calls.filter(
+          ([event]) =>
+            (event as { pattern: string }).pattern ===
+            DOCUMENT_PATTERNS.ingestionFailed,
+        ).length;
+    };
+
+    it('20. **waits as RETRYING: the error on the job, the document PROCESSING, nothing published**', async () => {
+      const failures = watchFailures();
+      fx.embeddings.failNext = new Error('embedding provider is down');
+      const data = await queueDocument();
+
+      await expect(processor.process(data, false)).rejects.toThrow(
+        'embedding provider is down',
+      );
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      const document = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: data.documentId },
+      });
+      expect(job.status).toBe(IngestionJobStatus.QUEUED);
+      expect(job.waitingReason).toBe(IngestionWaitingReason.RETRYING);
+      expect(job.errorLog).toContain('embedding provider is down');
+      expect(job.errorCode).toBe(IngestionErrorCode.PROVIDER_FAILURE);
+      expect(job.failedStage).toBe(IngestionStage.EMBEDDING);
+      expect(job.processedAt).toBeNull();
+      expect(document.status).toBe(DocumentStatus.PROCESSING);
+      expect(failures()).toBe(0);
+    });
+
+    it('21. The next attempt clears the error as it starts, then completes', async () => {
+      fx.embeddings.failNext = new Error('transient');
+      const data = await queueDocument();
+      await processor.process(data, false).catch(() => undefined);
+
+      // Read as the next attempt chunks: after its first move, before the end.
+      let midRun: { waitingReason: string | null; errorLog: string | null } = {
+        waitingReason: 'unread',
+        errorLog: 'unread',
+      };
+      const realChunk = chunker.chunk.bind(chunker);
+      faults.replace(chunker, 'chunk', async (...args: unknown[]) => {
+        midRun = await fx.prisma.ingestionJob.findUniqueOrThrow({
+          where: { id: data.ingestionJobId },
+        });
+        return (realChunk as (...a: unknown[]) => unknown)(...args) as never;
+      });
+
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+      expect(midRun).toMatchObject({ waitingReason: null, errorLog: null });
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job).toMatchObject({
+        status: IngestionJobStatus.COMPLETED,
+        errorLog: null,
+        errorCode: null,
+        failedStage: null,
+      });
+    });
+
+    it('22. **Only the last attempt fails, and publishes once**', async () => {
+      const failures = watchFailures();
+      const data = await queueDocument();
+
+      fx.embeddings.failNext = new Error('down');
+      await processor.process(data, false).catch(() => undefined);
+      fx.embeddings.failNext = new Error('still down');
+      await processor.process(data, true).catch(() => undefined);
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.status).toBe(IngestionJobStatus.FAILED);
+      expect(job.waitingReason).toBeNull();
+      expect(job.errorLog).toContain('still down');
+      expect(failures()).toBe(1);
+    });
+
+    it("23. **A 429 waits the provider's delay and sends the same batch again, uncharged**", async () => {
+      const charge = faults.spy(fx.moduleRef.get(AiLedgerService), 'charge');
+      fx.embeddings.failNext = new RateLimited(1500);
+      const data = await queueDocument();
+
+      const startedAt = Date.now();
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+      const elapsed = Date.now() - startedAt;
+
+      // The asked-for wait, not the 10 s default and not none.
+      expect(elapsed).toBeGreaterThanOrEqual(1500);
+      expect(elapsed).toBeLessThan(6000);
+      const [refused, sentAgain] = fx.embeddings.calls;
+      expect(sentAgain.texts).toEqual(refused.texts);
+      // One charge per batch that came back; the refused call costs nothing.
+      expect(charge).toHaveBeenCalledTimes(fx.embeddings.calls.length - 1);
+    });
+
+    it('24. Up to EMBEDDING_RATE_LIMIT_WAITS waits in a row, the batch still goes through', async () => {
+      fx.embeddings.failNext = new RateLimited(1);
+      fx.embeddings.failTimes = EMBEDDING_RATE_LIMIT_WAITS;
+      const data = await queueDocument();
+
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+    });
+
+    it('25. **One wait past the bound gives up the attempt, which then waits as RETRYING**', async () => {
+      const failures = watchFailures();
+      fx.embeddings.failNext = new RateLimited(1);
+      fx.embeddings.failTimes = EMBEDDING_RATE_LIMIT_WAITS + 1;
+      const data = await queueDocument();
+
+      await expect(processor.process(data, false)).rejects.toThrow(
+        'rate limited',
+      );
+
+      expect(fx.embeddings.calls).toHaveLength(EMBEDDING_RATE_LIMIT_WAITS + 1);
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.waitingReason).toBe(IngestionWaitingReason.RETRYING);
+      expect(job.errorCode).toBe(IngestionErrorCode.PROVIDER_FAILURE);
+      expect(failures()).toBe(0);
+    });
+
+    it('26. **A retry after a 429 pays only for the batches it did not embed**', async () => {
+      downloadObject.mockResolvedValue(markdownFixture(40));
+      const real = fx.embeddings.embedBatch.bind(fx.embeddings);
+      let call = 0;
+      faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
+          call += 1;
+          // Batch 1 goes through; batch 2 is refused past the bound; the
+          // retry's calls go through.
+          if (call >= 2 && call <= EMBEDDING_RATE_LIMIT_WAITS + 2) {
+            throw new RateLimited(1);
+          }
+          return real(texts, model);
+        },
+      );
+      const data = await queueDocument();
+      await processor.process(data, false).catch(() => undefined);
+      expect(call).toBe(EMBEDDING_RATE_LIMIT_WAITS + 2);
+      const total = await fx.prisma.documentChunk.count({
+        where: { documentId: data.documentId },
+      });
+      expect(total).toBeGreaterThan(EMBEDDING_BATCH_SIZE);
+
+      fx.embeddings.reset();
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+
+      const retried = fx.embeddings.calls.flatMap((batch) => batch.texts);
+      expect(retried).toHaveLength(total - EMBEDDING_BATCH_SIZE);
     });
   });
 

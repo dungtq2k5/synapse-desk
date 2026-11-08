@@ -211,7 +211,8 @@ model IngestionJob {
   failedStage String? @map("failed_stage") @db.VarChar(20)
 
   /// IngestionWaitingReason, on a QUEUED job put back for a reason (the AI
-  /// allowance ran out mid-job). Cleared when the job moves again.
+  /// allowance ran out mid-job, or an attempt failed and will be tried
+  /// again). Cleared when the job moves again.
   waitingReason String? @map("waiting_reason") @db.VarChar(30)
 
   /// The retry that replaced this attempt, if one did.

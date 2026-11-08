@@ -17,6 +17,7 @@ import {
   CallerContext,
   DocumentStatus,
   IngestionJobStatus,
+  IngestionWaitingReason,
   RESUMABLE_INGESTION_STATUSES,
 } from '@synapsedesk/contracts';
 import { requireTenant } from '@synapsedesk/nest-common';
@@ -61,6 +62,17 @@ function supersededError(successorId: string | null): RpcException {
  */
 function statusOf(job: IngestionJob): IngestionJobStatus {
   return job.status as IngestionJobStatus;
+}
+
+/** What a refused manual retry tells the person who asked for it. */
+function refusalMessage(job: IngestionJob, jobStatus: IngestionJobStatus) {
+  if (jobStatus === IngestionJobStatus.COMPLETED) {
+    return 'This document is already indexed; reindexing it is a separate operation';
+  }
+  if (job.waitingReason === IngestionWaitingReason.RETRYING) {
+    return 'This document is already being tried again. Wait for it to finish.';
+  }
+  return `Ingestion job is still ${jobStatus.toLowerCase()}`;
 }
 
 /** `ingestion_jobs`, scoped to the caller's tenant. */
@@ -357,10 +369,7 @@ export class IngestionJobsService {
 
     throw new RpcException({
       code: status.FAILED_PRECONDITION,
-      message:
-        jobStatus === IngestionJobStatus.COMPLETED
-          ? 'This document is already indexed; reindexing it is a separate operation'
-          : `Ingestion job is still ${jobStatus.toLowerCase()}`,
+      message: refusalMessage(job, jobStatus),
     });
   }
 

@@ -37,11 +37,30 @@ export type EmbeddingResult = {
   promptTokens: number;
 };
 
+/** The wait when a rate-limit answer doesn't say how long. */
+export const DEFAULT_RATE_LIMIT_WAIT_MS = 10_000;
+
+/**
+ * The provider refused the call for its rate limit, and asks for a wait. The
+ * caller waits `waitMs` and sends the same batch again; a refused call costs
+ * nothing, so nothing is charged for it.
+ */
+export class RateLimited extends Error {
+  constructor(
+    readonly waitMs: number,
+    readonly cause?: unknown,
+  ) {
+    super(`The embedding provider is rate limited; retry in ${waitMs} ms`);
+    this.name = 'RateLimited';
+  }
+}
+
 export interface EmbeddingClient {
   /**
    * Embeds a batch, returning one vector per text in input order.
    *
-   * @throws when the provider fails. The caller marks the job FAILED and
+   * @throws RateLimited when the provider refuses the call for its rate limit.
+   * @throws when the provider fails otherwise. The caller marks the job FAILED and
    *   leaves the chunk rows without a `vector_point_id` — recoverable by
    *   re-running, which is why it must throw rather than return empties.
    */

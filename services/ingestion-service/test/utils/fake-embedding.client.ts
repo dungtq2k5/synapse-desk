@@ -32,6 +32,9 @@ export class FakeEmbeddingClient implements EmbeddingClient {
   /** Set to make the next call fail, for the FAILED-path tests. */
   failNext: Error | null = null;
 
+  /** How many calls in a row `failNext` fails; one unless a test says more. */
+  failTimes = 1;
+
   // `async` with nothing to await, deliberately. It implements an async
   // interface, and the keyword is what turns the `failNext` throw below into a
   // REJECTED promise rather than a synchronous throw — which is the difference
@@ -45,7 +48,11 @@ export class FakeEmbeddingClient implements EmbeddingClient {
     if (this.failNext) {
       const error = this.failNext;
       // Cleared so a test can prove RECOVERY: fail once, re-run, complete.
-      this.failNext = null;
+      this.failTimes -= 1;
+      if (this.failTimes <= 0) {
+        this.failNext = null;
+        this.failTimes = 1;
+      }
       throw error;
     }
 
@@ -61,6 +68,7 @@ export class FakeEmbeddingClient implements EmbeddingClient {
   reset(): void {
     this.calls.length = 0;
     this.failNext = null;
+    this.failTimes = 1;
   }
 }
 

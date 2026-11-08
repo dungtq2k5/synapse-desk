@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { setTimeout } from 'node:timers/promises';
 import {
   AiGenerationPurpose,
   AiGenerationStatus,
@@ -38,6 +39,8 @@ import { DocumentEventPublisher } from '../events/document-event.publisher';
 import {
   EMBEDDING_CLIENT,
   EmbeddingClient,
+  EmbeddingResult,
+  RateLimited,
 } from '../embeddings/embedding.contract';
 import {
   DocumentParserService,
@@ -46,6 +49,13 @@ import {
 import { MAX_OCR_PAGES } from './ocr.service';
 import { Chunk, DocumentChunkerService } from './document-chunker.service';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
+
+/**
+ * How many rate-limit waits one embedding batch gets before the attempt
+ * fails. At Gemini's usual 7–10 s, about a minute; a hard quota then reaches
+ * BullMQ's retry instead of holding a worker forever.
+ */
+export const EMBEDDING_RATE_LIMIT_WAITS = 6;
 
 export type IngestionJobData = {
   organizationId: string;
@@ -436,8 +446,16 @@ export class IngestionProcessor {
         return INGESTION_OUTCOMES.DEFERRED;
       }
 
-      await this.fail(data, error, stage);
-      if (lastAttempt) await this.purgeStaged(data);
+      // **Only the last attempt fails.** An earlier one waits for BullMQ's
+      // retry: the job back to QUEUED with the error on it, the document left
+      // PROCESSING, nothing published. Still rethrown, which is what makes
+      // BullMQ retry it.
+      if (lastAttempt) {
+        await this.fail(data, error, stage);
+        await this.purgeStaged(data);
+      } else {
+        await this.waitForRetry(data, error, stage);
+      }
       throw error;
     }
   }
@@ -752,14 +770,10 @@ export class IngestionProcessor {
       if (!decision.allowed) throw new BudgetExhausted();
 
       const startedAt = Date.now();
-      const result = await this.embeddings
-        .embedBatch(
-          batch.map((chunk) => chunk.contentText),
-          settings.embeddingModel,
-        )
-        .catch((cause: unknown) => {
-          throw new ProviderFailure(cause);
-        });
+      const result = await this.embedWaitingOutRateLimits(
+        batch.map((chunk) => chunk.contentText),
+        settings.embeddingModel,
+      );
 
       // CHARGE first, awaited. One INCRBY, and the only thing standing between
       // a burst of concurrent jobs and all of them passing a stale gate.
@@ -932,6 +946,72 @@ export class IngestionProcessor {
   }
 
   /**
+   * One batch, sent again after each rate-limit answer once the provider's
+   * wait has passed, up to {@link EMBEDDING_RATE_LIMIT_WAITS} waits for this
+   * batch. Per batch, so the bound counts consecutive waits: any batch that
+   * succeeds starts the count again. Past the bound, or on any other error, the
+   * attempt fails as a `ProviderFailure`.
+   */
+  private async embedWaitingOutRateLimits(
+    texts: string[],
+    model: string,
+  ): Promise<EmbeddingResult> {
+    for (let waits = 0; ; waits += 1) {
+      try {
+        return await this.embeddings.embedBatch(texts, model);
+      } catch (cause) {
+        if (
+          !(cause instanceof RateLimited) ||
+          waits >= EMBEDDING_RATE_LIMIT_WAITS
+        ) {
+          throw new ProviderFailure(cause);
+        }
+        this.logger.warn(
+          `Embedding rate limited; waiting ${cause.waitMs} ms (${waits + 1}/${EMBEDDING_RATE_LIMIT_WAITS})`,
+        );
+        await setTimeout(cause.waitMs);
+      }
+    }
+  }
+
+  /**
+   * Puts a job whose attempt failed, but will be tried again, back to `QUEUED`
+   * with `RETRYING` and the error on it. The document isn't touched: it stays
+   * `PROCESSING` (or, with a live version, keeps answering from it), so nobody
+   * reads a failure that the retry may undo. The next attempt's first move
+   * clears the error.
+   *
+   * A job canceled meanwhile isn't written; the retry finds it no longer
+   * runnable.
+   */
+  private async waitForRetry(
+    data: IngestionJobData,
+    error: unknown,
+    stage: IngestionStage,
+  ): Promise<void> {
+    try {
+      await this.prisma.ingestionJob.updateMany({
+        where: {
+          id: data.ingestionJobId,
+          status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
+        },
+        data: {
+          status: IngestionJobStatus.QUEUED,
+          waitingReason: IngestionWaitingReason.RETRYING,
+          errorLog: formatErrorMsg(error),
+          errorCode: errorCodeOf(error),
+          failedStage: stage,
+        },
+      });
+    } catch (writeError) {
+      // As in `fail()`: the original error is the one being rethrown.
+      this.logger.error(
+        `Could not record the retry of ${data.documentId}: ${formatErrorMsg(writeError)}`,
+      );
+    }
+  }
+
+  /**
    * Moves the job and its document to the phase they represent TOGETHER.
    *
    * One transaction, because the two rows are one fact stated twice and an
@@ -971,6 +1051,10 @@ export class IngestionProcessor {
    *   document at PROCESSING throughout.
    * @param waitingReason written with the status, so a job that moves again
    *   (or is put back for another reason) never keeps a stale one.
+   *
+   * Clears the error a `RETRYING` wait recorded: every move here is the job
+   * moving again, and a `COMPLETED` job never carries an earlier attempt's
+   * error. `fail()` and `waitForRetry()` write the error themselves.
    */
   private async setJobStatus(
     ingestionJobId: string,
@@ -986,7 +1070,13 @@ export class IngestionProcessor {
         id: ingestionJobId,
         status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
       },
-      data: { status, waitingReason },
+      data: {
+        status,
+        waitingReason,
+        errorLog: null,
+        errorCode: null,
+        failedStage: null,
+      },
     });
 
     if (count === 0) throw new JobNoLongerRunnableError(ingestionJobId);

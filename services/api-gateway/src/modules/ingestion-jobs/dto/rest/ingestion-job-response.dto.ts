@@ -25,7 +25,9 @@ export class IngestionJobResponseDto {
   /**
    * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because
    * the organization's AI allowance ran out mid-run; it starts again by itself
-   * once the allowance resets or the plan changes. `null` is an ordinary queue.
+   * once the allowance resets or the plan changes. `RETRYING` when it was put
+   * back after an error, and is tried again shortly; the error is on the
+   * attempt while it waits. `null` is an ordinary queue.
    */
   waitingReason!: IngestionWaitingReason | null;
   /** `null` while the attempt is still running. */

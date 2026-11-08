@@ -187,6 +187,7 @@ enum IngestionStage {
 """Why a QUEUED ingestion attempt waits. Null is an ordinary queue."""
 enum IngestionWaitingReason {
   AI_ALLOWANCE
+  RETRYING
 }
 
 type KnowledgeGapFlag {

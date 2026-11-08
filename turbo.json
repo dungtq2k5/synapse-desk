@@ -17,7 +17,11 @@
     // Every task that consumes the client depends on it below, so nothing has
     // to be remembered at all.
     "db:generate": {
-      "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
+      "inputs": [
+        "prisma/schema.prisma",
+        "prisma.config.ts",
+        "$TURBO_ROOT$/scripts/trim-erd.mjs"
+      ],
       "outputs": ["src/generated/**", "**/docs/reference/erd/**.md"]
     },
     "build": {

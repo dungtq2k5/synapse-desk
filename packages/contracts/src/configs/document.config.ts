@@ -83,9 +83,12 @@ export const INGESTION_STAGES = Object.values(IngestionStage);
  *
  * - `AI_ALLOWANCE`: put back mid-job because the organization's AI allowance
  *   ran out; it starts again once the allowance resets or the plan changes.
+ * - `RETRYING`: put back after an error, and tried again shortly. The error is
+ *   on the job while it waits; the last attempt's error makes it `FAILED`.
  */
 export enum IngestionWaitingReason {
   AI_ALLOWANCE = 'AI_ALLOWANCE',
+  RETRYING = 'RETRYING',
 }
 
 export const INGESTION_WAITING_REASONS = Object.values(IngestionWaitingReason);
