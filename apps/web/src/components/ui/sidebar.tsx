@@ -164,6 +164,8 @@ function Sidebar({
   collapsible?: 'offcanvas' | 'icon' | 'none';
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  // Set when a link inside the sheet closed it, so focus goes to the page.
+  const navigated = React.useRef(false);
 
   if (collapsible === 'none') {
     return (
@@ -194,6 +196,34 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          // A link chosen in the sheet closes it, the account menu's too (its
+          // portal's clicks bubble here through React). A link opened in a new
+          // tab leaves the sheet as it was.
+          onClick={(event) => {
+            const link = (event.target as Element).closest('a[href]');
+            if (
+              !link ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey ||
+              link.getAttribute('target') === '_blank'
+            ) {
+              return;
+            }
+            navigated.current = true;
+            setOpenMobile(false);
+          }}
+          // After a navigation, focus lands on the page (the skip link's
+          // target), not back on the menu button.
+          onCloseAutoFocus={(event) => {
+            if (!navigated.current) return;
+            navigated.current = false;
+            const main = document.getElementById('main');
+            if (!main) return;
+            event.preventDefault();
+            main.focus();
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>

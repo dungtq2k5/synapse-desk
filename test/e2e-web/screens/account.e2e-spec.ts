@@ -349,6 +349,17 @@ test.describe('phone number', () => {
     await code(page).fill('481920');
     await expect(page.getByText('Phone number verified')).toBeVisible();
     await expect(dialog(page)).toHaveCount(0);
+    // The toast icon: a 28 px tile, the 16 px icon centered in it, which
+    // sonner's own rules would push against the tile's left edge.
+    const tile = page.locator('[data-sonner-toast] [data-icon]');
+    const [box, icon] = await Promise.all([
+      tile.boundingBox(),
+      tile.locator('svg').boundingBox(),
+    ]);
+    expect(box).toMatchObject({ width: 28, height: 28 });
+    expect(icon).toMatchObject({ width: 16, height: 16 });
+    expect(icon!.x - box!.x).toBeCloseTo(6, 0);
+    expect(icon!.y - box!.y).toBeCloseTo(6, 0);
     await look(page, 'phone-verified', { viewportOnly: true });
   });
 
@@ -466,6 +477,43 @@ test.describe('security', () => {
       page.getByText('7 of 10 left · They expire on Oct 12, 2027.'),
     ).toBeVisible();
     await look(page, 'security');
+  });
+
+  test('the buttons that close a card sit right at desktop, left on a phone', async ({
+    page,
+  }) => {
+    await openSecurity(page);
+    // Each button against the card it closes: its right edge
+    // on the content's right at 1440, its left edge on the content's left at
+    // 390.
+    const edges = async (name: string) => {
+      const button = page.getByRole('button', { name, exact: true });
+      const card = page.locator('[data-slot="card-content"]', { has: button });
+      const b = (await button.boundingBox())!;
+      // The content box: the card's padding is not where a button can sit.
+      const c = await card.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          left: box.left + Number.parseFloat(style.paddingLeft),
+          right: box.right - Number.parseFloat(style.paddingRight),
+        };
+      });
+      return {
+        left: Math.round(b.x - c.left),
+        right: Math.round(c.right - (b.x + b.width)),
+      };
+    };
+    const names = ['Change password', 'Sign out everywhere'];
+
+    // Polled: the page reflows for a moment after the viewport changes.
+    for (const name of names) {
+      await expect.poll(async () => (await edges(name)).right).toBe(0);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const name of names) {
+      await expect.poll(async () => (await edges(name)).left).toBe(0);
+    }
   });
 
   test('its focus order', async ({ page }) => {

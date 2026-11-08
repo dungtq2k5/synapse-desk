@@ -18,13 +18,13 @@ import {
   FileTextIcon,
   FilterIcon,
   InfoIcon,
-  LoaderCircleIcon,
   MessageCircleIcon,
   SearchIcon,
   SearchXIcon,
   XIcon,
   ZapOffIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -345,10 +345,7 @@ function AnswerCard({
       {state.isPending ? (
         <>
           <p className="flex items-center gap-2">
-            <LoaderCircleIcon
-              aria-hidden
-              className="size-4 motion-safe:animate-spin"
-            />
+            <Spinner className="size-4" />
             Writing an answer… This takes a few seconds.
           </p>
           <div className="flex flex-col gap-2">

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -180,7 +181,7 @@ export function SessionsSection() {
           })}
         </ul>
       )}
-      <div className="flex flex-wrap gap-2">
+      <ClosingActions>
         {list.some((session) => session.isTrusted) && (
           <Button
             variant="outline"
@@ -205,7 +206,7 @@ export function SessionsSection() {
           <LogOutIcon />
           Sign out everywhere
         </Button>
-      </div>
+      </ClosingActions>
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>

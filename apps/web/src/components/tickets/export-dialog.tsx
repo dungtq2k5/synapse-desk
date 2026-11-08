@@ -10,8 +10,8 @@ import {
   CircleCheckIcon,
   DownloadIcon,
   FileDownIcon,
-  LoaderCircleIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/auth/field';
@@ -160,11 +160,7 @@ export function ExportButton() {
         aria-label={running ? 'Export, running' : undefined}
         onClick={() => show(true)}
       >
-        {running ? (
-          <LoaderCircleIcon aria-hidden className="motion-safe:animate-spin" />
-        ) : (
-          <FileDownIcon aria-hidden />
-        )}
+        {running ? <Spinner /> : <FileDownIcon aria-hidden />}
         {running ? 'Exporting…' : 'Export'}
       </Button>
       <DialogContent showCloseButton={false}>
@@ -229,10 +225,7 @@ export function ExportButton() {
               className="flex flex-col gap-1 rounded-md border p-3 text-sm"
             >
               <span className="flex items-center gap-2 font-medium">
-                <LoaderCircleIcon
-                  aria-hidden
-                  className="size-4 motion-safe:animate-spin"
-                />
+                <Spinner className="size-4" />
                 Preparing your export…
               </span>
               <span className="text-muted-foreground">

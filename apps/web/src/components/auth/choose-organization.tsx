@@ -2,11 +2,8 @@ import {
   authControllerLoginWithTenantV1,
   type TenantOptionResponseDto,
 } from '@synapsedesk/api-client';
-import {
-  ChevronRightIcon,
-  CircleAlertIcon,
-  LoaderCircleIcon,
-} from 'lucide-react';
+import { ChevronRightIcon, CircleAlertIcon } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -79,11 +76,7 @@ export function ChooseOrganization({
                     {tenant.slug}
                   </span>
                 </span>
-                {busy ? (
-                  <LoaderCircleIcon className="motion-safe:animate-spin" />
-                ) : (
-                  <ChevronRightIcon />
-                )}
+                {busy ? <Spinner /> : <ChevronRightIcon />}
               </Button>
             </li>
           );

@@ -29,10 +29,10 @@ import {
   HandshakeIcon,
   InfoIcon,
   LifeBuoyIcon,
-  LoaderCircleIcon,
   MinusIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -545,11 +545,7 @@ function WaitingAlert({
   const what = waiting.kind === 'checkout' ? 'subscription' : 'new plan';
   return (
     <Alert variant="info" role="status">
-      {longWait ? (
-        <ClockIcon aria-hidden />
-      ) : (
-        <LoaderCircleIcon aria-hidden className="animate-spin" />
-      )}
+      {longWait ? <ClockIcon aria-hidden /> : <Spinner />}
       <AlertTitle>
         {longWait
           ? `Still confirming your ${what}`
@@ -930,9 +926,7 @@ function PaymentDetails() {
         disabled={portal.busy}
         onClick={() => void portal.open()}
       >
-        {portal.busy && (
-          <LoaderCircleIcon aria-hidden className="animate-spin" />
-        )}
+        {portal.busy && <Spinner />}
         {portal.busy ? 'Opening Stripe…' : 'Manage billing on Stripe'}
         {!portal.busy && <span className="sr-only"> (opens Stripe)</span>}
         {!portal.busy && <ExternalLinkIcon aria-hidden />}

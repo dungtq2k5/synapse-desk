@@ -11,11 +11,11 @@ import {
   CheckIcon,
   CircleAlertIcon,
   InfoIcon,
-  LoaderCircleIcon,
   MailIcon,
   SmartphoneIcon,
   type LucideIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { Fragment, useId, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -162,10 +162,7 @@ export function NotificationPreferences() {
         >
           {saving === 'saving' && (
             <>
-              <LoaderCircleIcon
-                aria-hidden
-                className="size-4 motion-safe:animate-spin"
-              />
+              <Spinner className="size-4" />
               Saving…
             </>
           )}

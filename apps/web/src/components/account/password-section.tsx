@@ -8,6 +8,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { CircleCheckIcon, InfoIcon, KeyRoundIcon } from 'lucide-react';
 import { useRef, useState, type SubmitEvent } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { PasswordChecklist } from '@/components/auth/password-checklist';
 import { PasswordInput } from '@/components/auth/password-input';
@@ -121,86 +122,86 @@ function ChangePassword() {
     <form
       noValidate
       onSubmit={(event) => void submit(event)}
-      className="flex max-w-xs flex-col gap-5 sm:max-w-sm"
+      className="flex flex-col gap-5"
     >
-      {changed !== null && (
-        <Alert variant="success" role="status">
-          <CircleCheckIcon />
-          <AlertTitle>Password changed</AlertTitle>
-          <AlertDescription>{signedOutElsewhere(changed)}</AlertDescription>
-        </Alert>
-      )}
-      {failure?.kind === 'throttled' && (
-        <RetryAlert
-          title="Too many attempts"
-          what="changing your password is paused"
-          seconds={failure.seconds}
-          onOver={() => setFailure(null)}
-        />
-      )}
-      {failure?.kind === 'other' && (
-        <Alert variant="destructive" role="alert">
-          <AlertTitle>Couldn’t change your password</AlertTitle>
-          <AlertDescription>{failure.message}</AlertDescription>
-        </Alert>
-      )}
-      <Field
-        id="current-password"
-        label="Current password"
-        error={errors.current}
-      >
-        {(aria) => (
-          <PasswordInput
-            ref={currentRef}
-            id="current-password"
-            autoComplete="current-password"
-            value={current}
-            onChange={(event) => setCurrent(event.target.value)}
-            {...aria}
+      {/* The fields keep a readable width; the footer spans the card. */}
+      <div className="flex max-w-xs flex-col gap-5 sm:max-w-sm">
+        {changed !== null && (
+          <Alert variant="success" role="status">
+            <CircleCheckIcon />
+            <AlertTitle>Password changed</AlertTitle>
+            <AlertDescription>{signedOutElsewhere(changed)}</AlertDescription>
+          </Alert>
+        )}
+        {failure?.kind === 'throttled' && (
+          <RetryAlert
+            title="Too many attempts"
+            what="changing your password is paused"
+            seconds={failure.seconds}
+            onOver={() => setFailure(null)}
           />
         )}
-      </Field>
-      <Field
-        id="new-password"
-        label="New password"
-        error={errors.next}
-        description={<PasswordChecklist value={next} />}
-      >
-        {(aria) => (
-          <PasswordInput
-            ref={nextRef}
-            id="new-password"
-            autoComplete="new-password"
-            value={next}
-            onChange={(event) => setNext(event.target.value)}
-            {...aria}
-          />
+        {failure?.kind === 'other' && (
+          <Alert variant="destructive" role="alert">
+            <AlertTitle>Couldn’t change your password</AlertTitle>
+            <AlertDescription>{failure.message}</AlertDescription>
+          </Alert>
         )}
-      </Field>
-      <Field
-        id="confirm-password"
-        label="Confirm new password"
-        error={errors.confirm}
-      >
-        {(aria) => (
-          <PasswordInput
-            ref={confirmRef}
-            id="confirm-password"
-            autoComplete="new-password"
-            value={confirm}
-            onChange={(event) => setConfirm(event.target.value)}
-            {...aria}
-          />
-        )}
-      </Field>
-      <Button
-        type="submit"
-        className="self-start"
-        disabled={busy}
-        aria-busy={busy || undefined}
-      >
-        {busy ? 'Changing password…' : 'Change password'}
-      </Button>
+        <Field
+          id="current-password"
+          label="Current password"
+          error={errors.current}
+        >
+          {(aria) => (
+            <PasswordInput
+              ref={currentRef}
+              id="current-password"
+              autoComplete="current-password"
+              value={current}
+              onChange={(event) => setCurrent(event.target.value)}
+              {...aria}
+            />
+          )}
+        </Field>
+        <Field
+          id="new-password"
+          label="New password"
+          error={errors.next}
+          description={<PasswordChecklist value={next} />}
+        >
+          {(aria) => (
+            <PasswordInput
+              ref={nextRef}
+              id="new-password"
+              autoComplete="new-password"
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+              {...aria}
+            />
+          )}
+        </Field>
+        <Field
+          id="confirm-password"
+          label="Confirm new password"
+          error={errors.confirm}
+        >
+          {(aria) => (
+            <PasswordInput
+              ref={confirmRef}
+              id="confirm-password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+              {...aria}
+            />
+          )}
+        </Field>
+      </div>
+      <ClosingActions>
+        <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
+          {busy ? 'Changing password…' : 'Change password'}
+        </Button>
+      </ClosingActions>
     </form>
   );
 }
@@ -273,17 +274,18 @@ function SetPassword({ email }: { email: string }) {
           <AlertDescription>{failure.message}</AlertDescription>
         </Alert>
       )}
-      <Button
-        id="set-password"
-        variant="outline"
-        className="self-start"
-        disabled={busy}
-        aria-busy={busy || undefined}
-        onClick={() => void send()}
-      >
-        <KeyRoundIcon />
-        {busy ? 'Sending link…' : 'Set a password'}
-      </Button>
+      <ClosingActions>
+        <Button
+          id="set-password"
+          variant="outline"
+          disabled={busy}
+          aria-busy={busy || undefined}
+          onClick={() => void send()}
+        >
+          <KeyRoundIcon />
+          {busy ? 'Sending link…' : 'Set a password'}
+        </Button>
+      </ClosingActions>
     </div>
   );
 }

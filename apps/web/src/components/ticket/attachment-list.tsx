@@ -1,11 +1,11 @@
 import {
   CircleAlertIcon,
   FileTextIcon,
-  LoaderCircleIcon,
   RotateCwIcon,
   UploadIcon,
   XIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useState, type DragEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -84,10 +84,7 @@ export function AttachmentList({
             )}
           >
             {item.state === 'uploading' ? (
-              <LoaderCircleIcon
-                aria-hidden
-                className="size-4 shrink-0 text-muted-foreground motion-safe:animate-spin"
-              />
+              <Spinner className="size-4 shrink-0 text-muted-foreground" />
             ) : bad ? (
               <CircleAlertIcon
                 aria-hidden

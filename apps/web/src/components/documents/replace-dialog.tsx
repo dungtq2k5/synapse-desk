@@ -12,8 +12,8 @@ import {
   FileTextIcon,
   FileUpIcon,
   InfoIcon,
-  LoaderCircleIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { serverMessage } from '@/components/ticket/use-directory';
@@ -268,11 +268,7 @@ function ReplaceForm({
               disabled={!file || Boolean(refusal) || busy}
               onClick={() => void replace()}
             >
-              {busy ? (
-                <LoaderCircleIcon aria-hidden className="animate-spin" />
-              ) : (
-                <FileUpIcon aria-hidden />
-              )}
+              {busy ? <Spinner /> : <FileUpIcon aria-hidden />}
               Replace file
             </Button>
           </>

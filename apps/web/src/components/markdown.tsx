@@ -1,4 +1,5 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 
 /** The only URLs that become links; anything else stays as its text. */
@@ -49,12 +50,29 @@ const COMPONENTS: Components = {
   ol: ({ children }) => (
     <ol className="flex list-decimal flex-col gap-1 pl-5">{children}</ol>
   ),
+  // A table scrolls within itself, so a wide one never scrolls the page.
+  table: ({ children }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  th: ({ children }) => (
+    <th className="border px-2 py-1 text-left font-semibold">{children}</th>
+  ),
+  td: ({ children }) => <td className="border px-2 py-1">{children}</td>,
 };
+
+/** GitHub's tables, strikethrough and bare-URL links, where a source has them. */
+const GFM = [remarkGfm];
 
 /**
  * Markdown, one style wherever it renders: agents' replies, internal notes,
- * the AI's messages and summaries, and the composer's preview. End users'
- * messages are never passed here; they stay plain text.
+ * the AI's messages and summaries, the composer's preview, and a knowledge
+ * article's passages. End users' messages are never passed here; they stay
+ * plain text.
+ *
+ * `gfm` adds GitHub's tables and strikethrough, for text extracted from
+ * documents (a `.docx` table arrives as a pipe table).
  *
  * **No raw HTML, ever:** without a rehype plugin, react-markdown shows a
  * message's HTML as the text it is. No images either, and links only to
@@ -65,13 +83,20 @@ const COMPONENTS: Components = {
 export function Markdown({
   children,
   className,
+  gfm = false,
 }: {
   children: string;
   className?: string;
+  gfm?: boolean;
 }) {
   return (
     <div className={cn('flex flex-col gap-2 wrap-break-word', className)}>
-      <ReactMarkdown components={COMPONENTS}>{children}</ReactMarkdown>
+      <ReactMarkdown
+        components={COMPONENTS}
+        remarkPlugins={gfm ? GFM : undefined}
+      >
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }

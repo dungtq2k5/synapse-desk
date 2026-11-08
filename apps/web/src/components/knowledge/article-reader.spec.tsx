@@ -112,6 +112,54 @@ describe('the article reader', () => {
     ]);
   });
 
+  it('reads passages as prose: line breaks reflow, blank lines part paragraphs, lists and tables stay', async () => {
+    const texts = [
+      // A PDF's line ends, mid-sentence.
+      'Employees may work remotely up to three\ndays a week with their\nmanager’s approval.',
+      'First paragraph.\n\nSecond paragraph.',
+      '- Laptop\n- Badge',
+      '| Item | Days |\n| --- | --- |\n| Laptop | 5 |',
+      'Before <script>alert(1)</script> after',
+    ];
+    show(() =>
+      ok({
+        article: ARTICLE,
+        blocks: texts.map((contentText, chunkIndex) => ({
+          chunkIndex,
+          pageNumber: 1,
+          contentText,
+        })),
+        meta: {
+          currentPage: 1,
+          itemsPerPage: 20,
+          totalItems: texts.length,
+          totalPages: 1,
+          itemCount: texts.length,
+        },
+        hasUnindexedPages: false,
+        passageIndex: 4,
+      }),
+    );
+
+    const reflowed = await screen.findByText(
+      'Employees may work remotely up to three days a week with their manager’s approval.',
+    );
+    expect(reflowed.tagName).toBe('P');
+    expect(screen.getByText('First paragraph.')).not.toBe(
+      screen.getByText('Second paragraph.'),
+    );
+    expect(screen.getByText('Second paragraph.').tagName).toBe('P');
+    expect(
+      screen.getAllByRole('listitem').map((item) => item.textContent),
+    ).toEqual(['Laptop', 'Badge']);
+    expect(screen.getByRole('columnheader', { name: 'Days' })).toBeVisible();
+    expect(screen.getByRole('cell', { name: '5' })).toBeVisible();
+    // The cited block too, and its HTML stays text.
+    const cited = screen.getByRole('region', { name: 'Cited passage' });
+    expect(cited).toHaveTextContent('Before <script>alert(1)</script> after');
+    expect(document.querySelector('script')).toBeNull();
+  });
+
   it('says an article isn’t available, for a missing one and one out of reach alike', async () => {
     show(() => fail(404, 'Not found'));
 

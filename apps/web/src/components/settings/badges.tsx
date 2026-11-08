@@ -2,7 +2,6 @@ import {
   CircleCheckIcon,
   CircleXIcon,
   ClockIcon,
-  LoaderCircleIcon,
   LockIcon,
   PowerIcon,
   ShieldCheckIcon,
@@ -11,9 +10,10 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
   XIcon,
-  type LucideIcon,
+  type LucideProps,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Spinner } from '@/components/ui/spinner';
+import type { ComponentType, ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +35,7 @@ export function Status({
   children,
 }: {
   tone: Tone;
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
   children: ReactNode;
 }) {
   return (
@@ -256,7 +256,7 @@ export function ExportStatus({ status }: { status: string | null }) {
       );
     case 'PENDING':
       return (
-        <Status tone="info" icon={LoaderCircleIcon}>
+        <Status tone="info" icon={Spinner}>
           Preparing
         </Status>
       );

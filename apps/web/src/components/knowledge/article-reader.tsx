@@ -10,6 +10,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { CircleAlertIcon, DownloadIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, useCallback, useRef, useState } from 'react';
+import { Markdown } from '@/components/markdown';
 import { AppHeader } from '@/components/shell/app-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -257,9 +258,9 @@ function Block({
 }) {
   if (!cited) {
     return (
-      <p className="text-base whitespace-pre-wrap wrap-break-word">
+      <Markdown gfm className="text-base">
         {block.contentText}
-      </p>
+      </Markdown>
     );
   }
   return (
@@ -271,9 +272,9 @@ function Block({
       className="flex flex-col gap-1 rounded-r-md border-l-3 border-primary bg-accent px-4 py-3 text-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="text-xs font-medium">Cited passage</span>
-      <p className="text-base whitespace-pre-wrap wrap-break-word">
+      <Markdown gfm className="text-base">
         {block.contentText}
-      </p>
+      </Markdown>
     </div>
   );
 }

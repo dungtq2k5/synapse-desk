@@ -388,6 +388,23 @@ test.describe('documents', () => {
     await look(page, 'documents');
   });
 
+  test('the Processing badge turns, and stops for reduced motion', async ({
+    page,
+  }) => {
+    await open(page);
+    const icon = page
+      .getByText('Processing', { exact: true })
+      .first()
+      .locator('svg');
+    const animation = () =>
+      icon.evaluate((svg) => getComputedStyle(svg).animationName);
+
+    // The project asks for reduced motion, as a careful viewer's device does.
+    expect(await animation()).toBe('none');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect(await animation()).toBe('spin');
+  });
+
   test('row actions', async ({ page }) => {
     await open(page);
     await page

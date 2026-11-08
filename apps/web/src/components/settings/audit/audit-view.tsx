@@ -16,10 +16,10 @@ import {
   CircleCheckIcon,
   CircleXIcon,
   DownloadIcon,
-  LoaderCircleIcon,
   SearchXIcon,
   XIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useMemo, useState, type SubmitEvent } from 'react';
 import { Field } from '@/components/auth/field';
 import {
@@ -873,10 +873,7 @@ function ExportStatusCard({
   }
   return (
     <Alert variant="info">
-      <LoaderCircleIcon
-        aria-hidden
-        className="animate-spin motion-reduce:animate-none"
-      />
+      <Spinner />
       <AlertTitle>Preparing your export</AlertTitle>
       <AlertDescription>
         {covers}. You can leave this page; it’ll be waiting here when it’s

@@ -12,11 +12,11 @@ import {
   ClockIcon,
   FlagIcon,
   InfoIcon,
-  LoaderCircleIcon,
   Trash2Icon,
   TriangleAlertIcon,
   UsersIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { DOCUMENT_STATUS_LABEL, type DocumentStatus } from '@/lib/documents';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,7 @@ const STATUS_CLASS: Record<DocumentStatus, string> = {
 
 const STATUS_ICON = {
   PENDING: ClockIcon,
-  PROCESSING: LoaderCircleIcon,
+  PROCESSING: Spinner,
   INDEXED: CircleCheckIcon,
   FAILED: CircleXIcon,
 } as const;
@@ -154,7 +154,7 @@ export function JobResult({
     default:
       return (
         <Badge variant="info">
-          <LoaderCircleIcon aria-hidden />
+          <Spinner />
           In progress
         </Badge>
       );

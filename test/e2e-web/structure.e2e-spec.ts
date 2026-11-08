@@ -161,3 +161,28 @@ test('reduced motion shortens what moves', async ({ page }) => {
   // The fast duration (120 ms) at most.
   expect(seconds).toBeLessThanOrEqual(0.12);
 });
+
+test('on a phone, a link chosen in the menu closes it and focus lands on the page', async ({
+  page,
+}) => {
+  const { maya } = await tenant('structure');
+  await signInAs(page, maya);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/tickets');
+
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('link', { name: 'Ask' }).click();
+
+  await expect(page).toHaveURL(/\/ask/);
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('#main')).toBeFocused();
+
+  // A link to the page already open closes the sheet too.
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('link', { name: 'Ask' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('#main')).toBeFocused();
+});

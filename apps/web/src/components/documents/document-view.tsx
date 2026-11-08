@@ -27,7 +27,6 @@ import {
   EllipsisIcon,
   FileUpIcon,
   InfoIcon,
-  LoaderCircleIcon,
   LockIcon,
   RefreshCwIcon,
   RotateCcwIcon,
@@ -35,6 +34,7 @@ import {
   Trash2Icon,
   Undo2Icon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -539,7 +539,7 @@ function Stepper({ state }: { state: Record<Stage, StepState> }) {
         const step = state[stage];
         const Icon = {
           done: CircleCheckIcon,
-          current: LoaderCircleIcon,
+          current: Spinner,
           waiting: CircleDashedIcon,
           failed: CircleXIcon,
         }[step];
@@ -556,8 +556,7 @@ function Stepper({ state }: { state: Record<Stage, StepState> }) {
                   className={cn(
                     'size-4',
                     step === 'done' && 'text-primary',
-                    step === 'current' &&
-                      'animate-spin text-primary motion-reduce:animate-none',
+                    step === 'current' && 'text-primary',
                     step === 'waiting' && 'text-muted-foreground',
                     step === 'failed' && 'text-destructive',
                   )}

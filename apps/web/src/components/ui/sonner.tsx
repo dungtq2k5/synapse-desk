@@ -3,16 +3,17 @@
 import {
   CircleCheckIcon,
   InfoIcon,
-  Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useTheme } from 'next-themes';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 /**
- * Toasts: a popover surface with a border, and a solid square in the kind's
- * color holding its icon. Bottom right; full width at the bottom on phones.
+ * Toasts: a popover surface with a border, and a solid 28 px square in the
+ * kind's color with its 16 px icon centered. Bottom right; full width at the
+ * bottom on phones.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme();
@@ -27,13 +28,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
         info: <InfoIcon className="size-4" />,
         warning: <TriangleAlertIcon className="size-4" />,
         error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 motion-safe:animate-spin" />,
+        loading: <Spinner className="size-4" />,
       }}
       toastOptions={{
         classNames: {
           toast: 'group/toast shadow-lg',
+          // `!` throughout: sonner's own `[data-sonner-toast][data-styled]
+          // [data-icon]` rule sets a 16 px box, `justify-content: flex-start`
+          // and negative margins, and outranks a plain utility, putting the
+          // icon against the tile's left edge.
           icon: [
-            'size-6! rounded-md flex items-center justify-center',
+            'size-7! ms-0! justify-center! rounded-md flex items-center [&_svg]:m-0!',
             'group-data-[type=success]/toast:bg-success group-data-[type=success]/toast:text-success-foreground',
             'group-data-[type=warning]/toast:bg-warning group-data-[type=warning]/toast:text-warning-foreground',
             'group-data-[type=info]/toast:bg-info group-data-[type=info]/toast:text-info-foreground',

@@ -8,7 +8,6 @@ import {
   CircleAlertIcon,
   EyeOffIcon,
   FileTextIcon,
-  LoaderCircleIcon,
   LockIcon,
   RotateCwIcon,
   SearchXIcon,
@@ -17,6 +16,7 @@ import {
   UsersIcon,
   ZapOffIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useId, type ReactNode } from 'react';
 import { Citations } from '@/components/knowledge/citations';
 import { Markdown } from '@/components/markdown';
@@ -449,10 +449,7 @@ export function LiveAnswerEntry({
       {streaming && (
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="inline-flex items-center gap-2">
-            <LoaderCircleIcon
-              aria-hidden
-              className="size-3.5 motion-safe:animate-spin"
-            />
+            <Spinner className="size-3.5" />
             Writing an answer…
           </span>
           <Button variant="outline" size="xs" onClick={onStop}>
@@ -484,10 +481,7 @@ export function AnsweringEntry({ at }: { at: string }) {
   return (
     <AiFrame label="AI" at={at} busy>
       <span className="inline-flex items-center gap-2 text-xs">
-        <LoaderCircleIcon
-          aria-hidden
-          className="size-3.5 motion-safe:animate-spin"
-        />
+        <Spinner className="size-3.5" />
         Writing an answer…
       </span>
     </AiFrame>

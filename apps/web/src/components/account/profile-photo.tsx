@@ -9,12 +9,8 @@ import {
 } from '@synapsedesk/api-client';
 import { AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from '@synapsedesk/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  CircleAlertIcon,
-  LoaderCircleIcon,
-  Trash2Icon,
-  UploadIcon,
-} from 'lucide-react';
+import { CircleAlertIcon, Trash2Icon, UploadIcon } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useRef, useState } from 'react';
 import { UserAvatar } from '@/components/shell/user-avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -148,10 +144,7 @@ export function ProfilePhoto({ user }: { user: UserResponseDto }) {
                 className="w-44"
               />
               <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <LoaderCircleIcon
-                  aria-hidden
-                  className="size-4 motion-safe:animate-spin"
-                />
+                <Spinner className="size-4" />
                 Uploading photo… {progress}%
               </p>
             </div>

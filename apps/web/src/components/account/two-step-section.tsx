@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { PasswordInput } from '@/components/auth/password-input';
 import { RetryAlert } from '@/components/auth/retry-alert';
@@ -106,10 +107,12 @@ export function TwoStepSection({
         badge={<Badge variant="secondary">Off</Badge>}
         lead="Add a second step when you sign in, so a stolen password isn’t enough."
       >
-        <Button className="self-start" onClick={() => setTurningOn(true)}>
-          <ShieldCheckIcon />
-          Turn on
-        </Button>
+        <ClosingActions>
+          <Button onClick={() => setTurningOn(true)}>
+            <ShieldCheckIcon />
+            Turn on
+          </Button>
+        </ClosingActions>
         <TurnOnDialog
           open={turningOn}
           onOpenChange={setTurningOn}

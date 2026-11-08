@@ -23,8 +23,8 @@ const config: Config = {
 };
 
 /**
- * The Markdown renderer and its unified/micromark dependencies ship as ES
- * modules only, so they are compiled like the source, as Next compiles its
+ * The Markdown renderer, `remark-gfm`, and their unified/micromark
+ * dependencies ship as ES modules only, so they are compiled like the source, as Next compiles its
  * own client code.
  */
 const ESM_ONLY = [
@@ -48,6 +48,8 @@ const ESM_ONLY = [
   'estree-util-.*',
   'html-url-attributes',
   'longest-streak',
+  'markdown-table',
+  'escape-string-regexp',
   'parse-entities',
   'property-information',
   'stringify-entities',

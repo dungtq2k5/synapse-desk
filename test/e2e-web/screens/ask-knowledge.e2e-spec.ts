@@ -667,7 +667,10 @@ test.describe('the article reader', () => {
     ],
     [
       4,
-      'Claims go through Expenses with the receipt attached. See the Expenses FAQ for the deadlines and the approval steps.',
+      // A PDF's line ends mid-sentence, and a long address: the passage
+      // reflows, and the address wraps rather than scrolling a phone sideways
+      // (look() checks no sideways scroll at both widths).
+      'Claims go through Expenses with the receipt\nattached. See https://intranet.northwind.health/finance/expenses/frequently-asked-questions/home-office-allowance for the deadlines and the approval steps.',
     ],
     [
       5,

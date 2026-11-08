@@ -20,12 +20,12 @@ import {
   CircleXIcon,
   FileTextIcon,
   FileUpIcon,
-  LoaderCircleIcon,
   RotateCcwIcon,
   TriangleAlertIcon,
   UploadIcon,
   XIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useId, useRef, useState, type DragEvent } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -455,7 +455,7 @@ function UploadForm({ onClose }: { onClose: () => void }) {
             >
               {busy ? (
                 <>
-                  <LoaderCircleIcon aria-hidden className="animate-spin" />
+                  <Spinner />
                   Uploading…
                 </>
               ) : sendable.length > 0 ? (

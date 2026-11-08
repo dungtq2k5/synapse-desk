@@ -9,9 +9,9 @@ import {
   CircleCheckIcon,
   CircleXIcon,
   DownloadIcon,
-  LoaderCircleIcon,
   RotateCwIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useEffect, useId, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -355,10 +355,7 @@ function ExportCard({
   }
   return (
     <Alert variant="info">
-      <LoaderCircleIcon
-        aria-hidden
-        className="animate-spin motion-reduce:animate-none"
-      />
+      <Spinner />
       <AlertTitle>Preparing your export…</AlertTitle>
       <AlertDescription>
         {covers(requested)}. You can leave this page; it keeps going.

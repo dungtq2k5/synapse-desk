@@ -17,6 +17,7 @@ import {
 import Link from 'next/link';
 import { useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -196,7 +197,7 @@ export function ProfileForm({ user }: { user: UserResponseDto }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center justify-end gap-3">
+            <ClosingActions className="items-center gap-3">
               <p
                 aria-live="polite"
                 className="flex items-center gap-1.5 text-sm text-muted-foreground"
@@ -217,7 +218,7 @@ export function ProfileForm({ user }: { user: UserResponseDto }) {
               >
                 Save changes
               </Button>
-            </div>
+            </ClosingActions>
           </form>
         </CardContent>
       </Card>

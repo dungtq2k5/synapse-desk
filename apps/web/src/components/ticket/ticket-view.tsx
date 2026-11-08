@@ -11,7 +11,8 @@ import {
   useTicketsControllerListStatusChangesV1,
   type TicketResponseDto,
 } from '@synapsedesk/api-client';
-import { LoaderCircleIcon, UsersIcon } from 'lucide-react';
+import { UsersIcon } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import {
   useCallback,
@@ -221,11 +222,7 @@ function Loaded({
       disabled={asking}
       onClick={() => void askAPerson()}
     >
-      {asking ? (
-        <LoaderCircleIcon aria-hidden className="motion-safe:animate-spin" />
-      ) : (
-        <UsersIcon aria-hidden />
-      )}
+      {asking ? <Spinner /> : <UsersIcon aria-hidden />}
       {asking ? 'Asking…' : 'Ask a person'}
     </Button>
   );

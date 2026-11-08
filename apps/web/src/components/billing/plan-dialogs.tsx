@@ -15,8 +15,8 @@ import {
   CircleAlertIcon,
   ExternalLinkIcon,
   LifeBuoyIcon,
-  LoaderCircleIcon,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -275,9 +275,7 @@ export function ChangeDialog({
                   disabled={busy}
                   onClick={() => void submit()}
                 >
-                  {busy && (
-                    <LoaderCircleIcon aria-hidden className="animate-spin" />
-                  )}
+                  {busy && <Spinner />}
                   {busy
                     ? 'Changing plan…'
                     : refusal === 'unreachable'
@@ -386,9 +384,7 @@ export function StartDialog({
                 </Button>
               </DialogClose>
               <Button disabled={busy} onClick={() => void start()}>
-                {busy && (
-                  <LoaderCircleIcon aria-hidden className="animate-spin" />
-                )}
+                {busy && <Spinner />}
                 {busy ? 'Opening Stripe…' : 'Continue to Stripe'}
                 {!busy && <span className="sr-only"> (opens Stripe)</span>}
                 {!busy && <ExternalLinkIcon aria-hidden />}
