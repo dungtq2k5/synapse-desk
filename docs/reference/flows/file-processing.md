@@ -83,6 +83,10 @@ The status is written at each stage boundary, so a stuck job says where it stuck
 
 **A job put back at the AI cap says so:** `waitingReason = AI_ALLOWANCE` on its `QUEUED` row. Every other status move clears it, and so does a cancel.
 
+**An attempt BullMQ will retry is not a failure.** A retryable error on any attempt but the last puts the job back to `QUEUED` with `waitingReason = RETRYING` and the error recorded on it (`errorCode`, `failedStage`); the document stays as it was (`PROCESSING`, or `INDEXED` with a live version), and nothing is published. The next attempt clears the recorded error, so a job that ends `COMPLETED` never carries an earlier attempt's error. Only the last attempt is `FAILED`, and only it publishes `ingestionFailed`. A manual retry is refused while BullMQ still holds the job.
+
+**A rate limit waits instead of failing the attempt.** When Gemini answers 429, the embedding loop waits the delay it asks for (`RetryInfo`; 10 s when it gives none) and sends the same batch again, up to six waits in a row (the count starts over after any batch that succeeds). A refused call is never charged. Past the sixth wait the attempt ends, and the rule above applies.
+
 ---
 
 ## 4. Parsing, and the branch most files skip
@@ -152,6 +156,7 @@ Each chunk is embedded and upserted to Qdrant with a payload carrying the four f
 | **Unrecognized OCR language** | `FAILED`, carrying the code | Better than OCR'ing in the wrong language and reporting success |
 | **Object missing from storage** | `FAILED` at download | Nothing to parse; the `PendingUpload` record is how this is diagnosed |
 | **`.doc` uploaded** | not parsed | A real `.doc` is an OLE compound file, not a zip; the parser fails with a bare error that costs three retries |
+| **An attempt fails, and BullMQ will retry it** | the job back to `QUEUED` with `RETRYING`, the document unchanged, nothing published | A retry that's still coming isn't a failure; announcing one would be false, and the list would stop following the job |
 | **Job retried** | previous job → `CANCELLED`; a document with no live version → `FAILED` until the new one completes, one with a live version stays `INDEXED` | A retry supersedes; two live jobs on one document is the state to avoid |
 | **A replace or reindex fails** | the document stays `INDEXED` and answers from its live version; `latestJob` is `FAILED` with its code | The update failed, not the document |
 | **A crash between the swap's two halves** | the retry reuses the staged rows, re-stages the points it keeps, and swaps again | Both halves are idempotent by filter, so any interrupted state converges |

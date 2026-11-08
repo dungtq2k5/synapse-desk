@@ -476,8 +476,8 @@ _Audit actions:_ `DOCUMENT_FLAG_RESOLVED`, `DOCUMENT_FLAG_DISMISSED`, `DOCUMENT_
 | Method | Path | Description | Auth |
 | :--- | :--- | :--- | :--- |
 | GET | `/ingestion-jobs` | Pipeline dashboard. Filter `?status=&documentId=` over `QUEUED\|PARSING\|CHUNKING\|EMBEDDING\|COMPLETED\|FAILED\|CANCELLED`. | perm:`document.read` |
-| GET | `/ingestion-jobs/:id` | Job detail + `error_log` + `bullmq_job_id`. **A failed job says why and where:** `errorCode` (`TOO_LONG\|NO_READABLE_TEXT\|OCR_UNAVAILABLE\|PROVIDER_FAILURE\|OTHER`) and `failedStage` (`PARSING\|CHUNKING\|EMBEDDING`), with `error_log` kept as the detail. **A waiting job says why:** `waitingReason` is `AI_ALLOWANCE` on a job put back to `QUEUED` at the AI cap, `null` for an ordinary queue. Every list of jobs carries the same three fields. | perm:`document.read` |
-| POST | `/ingestion-jobs/:id/retry` ✎ | Queue a fresh attempt as a NEW job. Accepts `FAILED`, `CANCELLED`, and a `QUEUED` job the queue no longer holds. | perm:`document.reindex` |
+| GET | `/ingestion-jobs/:id` | Job detail + `error_log` + `bullmq_job_id`. **A failed job says why and where:** `errorCode` (`TOO_LONG\|NO_READABLE_TEXT\|OCR_UNAVAILABLE\|PROVIDER_FAILURE\|OTHER`) and `failedStage` (`PARSING\|CHUNKING\|EMBEDDING`), with `error_log` kept as the detail. **A waiting job says why:** `waitingReason` is `AI_ALLOWANCE` on a job put back to `QUEUED` at the AI cap, `RETRYING` on one put back after an error BullMQ will retry (its `errorCode` and `failedStage` say which, until the next attempt starts), `null` for an ordinary queue. Every list of jobs carries the same three fields. | perm:`document.read` |
+| POST | `/ingestion-jobs/:id/retry` ✎ | Queue a fresh attempt as a NEW job. Accepts `FAILED`, `CANCELLED`, and a `QUEUED` job the queue no longer holds. A job BullMQ still holds, `RETRYING` included, is refused ("This document is already being tried again. Wait for it to finish."). | perm:`document.reindex` |
 | DELETE | `/ingestion-jobs/:id` | Cancel a queued/running job. | perm:`document.reindex` |
 | GET | `/documents/:id/ingestion-jobs` | Job history for one document. | perm:`document.read` |
 
