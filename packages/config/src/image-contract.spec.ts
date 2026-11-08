@@ -247,6 +247,39 @@ describe('the image contract (static half)', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('every root script a build-stage task runs is copied into the build stage', () => {
+    // Prune leaves `scripts/` behind, and the build stage runs each
+    // workspace's `build` and its `db:generate` (a dependency of `build`). A
+    // script one of them calls that the Dockerfile doesn't copy fails every
+    // image build, as `trim-erd.mjs` did on its first demo build.
+    const called = readListed(
+      repoFiles('services/*/package.json').concat(
+        repoFiles('packages/*/package.json'),
+      ),
+    ).flatMap(({ path: file, text }) => {
+      const { scripts = {} } = JSON.parse(text) as {
+        scripts?: Record<string, string>;
+      };
+      return ['build', 'db:generate'].flatMap((task) =>
+        [
+          ...(scripts[task] ?? '').matchAll(/\.\.\/\.\.\/scripts\/([\w.-]+)/g),
+        ].map(([, script]) => ({ file, script })),
+      );
+    });
+    // copy-protos (grpc-proto) and trim-erd (four services).
+    expect(called.length).toBeGreaterThanOrEqual(5);
+
+    const dockerfile = read('docker/node-service.Dockerfile');
+    const missing = called.filter(
+      ({ script }) =>
+        !new RegExp(
+          String.raw`COPY --from=prune [^\n]*/app/scripts/${script.replaceAll('.', String.raw`\.`)}\b`,
+        ).test(dockerfile),
+    );
+
+    expect(missing).toEqual([]);
+  });
+
   // ----------------------------------------------- cross-workspace relatives
 
   describe('no relative import escapes its workspace', () => {

@@ -144,13 +144,16 @@ ARG SERVICE
 COPY --from=prune /app/out/full/ ./
 # `scripts/` sits outside every workspace, so prune leaves it behind — and
 # `grpc-proto`'s build shells out to `scripts/copy-protos.mjs`, without which
-# the image has compiled types and no.proto files to load at boot.
+# the image has compiled types and no.proto files to load at boot, and every
+# Prisma service's `db:generate` runs `scripts/trim-erd.mjs`.
+# `image-contract.spec.ts` holds this list to what `build` and `db:generate`
+# call.
 #
-# ONLY that file, not `scripts/`: the directory also holds `seed-demo/`, whose
+# ONLY those files, not `scripts/`: the directory also holds `seed-demo/`, whose
 # TypeScript imports the generated Prisma clients of TWO services — code that
 # cannot typecheck in a pruned single-service context, and the typecheck below
 # is the point of this stage.
-COPY --from=prune /app/scripts/copy-protos.mjs ./scripts/
+COPY --from=prune /app/scripts/copy-protos.mjs /app/scripts/trim-erd.mjs ./scripts/
 # The ROOT tsconfig, which `prisma.config.ts` extends. Prisma 7 loads that config
 # through the TypeScript compiler, so without it `db:generate` fails with
 # `File '././tsconfig.json' not found`. Copied from the prune stage's own
