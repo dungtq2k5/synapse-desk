@@ -63,7 +63,9 @@ public class LatestIngestionJobResponseDto {
    * Why a `QUEUED` attempt waits; `null` is an ordinary queue.
    */
   public enum WaitingReasonEnum {
-    AI_ALLOWANCE("AI_ALLOWANCE");
+    AI_ALLOWANCE("AI_ALLOWANCE"),
+
+    RETRYING("RETRYING");
 
     private final String value;
 

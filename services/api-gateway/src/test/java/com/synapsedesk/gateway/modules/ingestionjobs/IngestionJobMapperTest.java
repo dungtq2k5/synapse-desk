@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.Timestamp;
+import com.synapsedesk.gateway.modules.documents.dto.rest.LatestIngestionJobResponseDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobGqlDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.rest.IngestionJobResponseDto;
 import java.time.OffsetDateTime;
@@ -162,6 +163,10 @@ class IngestionJobMapperTest {
     ).isEqualTo(name);
     assertThat(
       IngestionJobMapper.toIngestionJobGqlDto(job).waitingReason().name()
+    ).isEqualTo(name);
+    // The documents list reads the same member into its own DTO, by name.
+    assertThat(
+      LatestIngestionJobResponseDto.WaitingReasonEnum.fromValue(name).getValue()
     ).isEqualTo(name);
   }
 

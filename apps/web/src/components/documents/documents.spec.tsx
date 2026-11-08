@@ -222,6 +222,26 @@ describe('the documents list', () => {
     expect(screen.getAllByText('Not searchable yet').length).toBeGreaterThan(0);
   });
 
+  it('a job trying again reads the words in the list, not Failed', async () => {
+    show(<DocumentsView />, MANAGER, {
+      'GET /api/v1/documents': page([
+        doc({
+          status: 'PROCESSING',
+          latestJob: latest({
+            status: 'QUEUED',
+            waitingReason: 'RETRYING',
+            errorCode: 'PROVIDER_FAILURE',
+          }),
+        }),
+      ]),
+    });
+
+    expect(
+      (await screen.findAllByText('Trying again after a problem.')).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText('Failed')).not.toBeInTheDocument();
+  });
+
   it('a failed update reads "Update failed" and stays Indexed', async () => {
     show(<DocumentsView />, MANAGER, {
       'GET /api/v1/documents': page([
@@ -345,6 +365,42 @@ describe('one document', () => {
       ),
     ).toBeInTheDocument();
     expect(processing).not.toHaveTextContent('briefly answers nothing');
+  });
+
+  it('a job trying again says so with its reason, not that processing failed', async () => {
+    show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(
+        doc({
+          status: 'PROCESSING',
+          latestJob: latest({
+            status: 'QUEUED',
+            waitingReason: 'RETRYING',
+            errorCode: 'PROVIDER_FAILURE',
+          }),
+        }),
+      ),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({
+          id: 'b',
+          status: 'QUEUED',
+          waitingReason: 'RETRYING',
+          errorCode: 'PROVIDER_FAILURE',
+          failedStage: 'EMBEDDING',
+          processedAt: null,
+        }),
+      ]),
+    });
+
+    const processing = await screen.findByRole('region', {
+      name: 'Processing',
+    });
+    expect(
+      await within(processing).findByText('Trying again after a problem.'),
+    ).toBeInTheDocument();
+    expect(processing).toHaveTextContent(
+      'The AI service didn’t respond while preparing the passages.',
+    );
+    expect(processing).not.toHaveTextContent('Processing failed');
   });
 
   it('an update waiting for the allowance says answers use the current version', async () => {

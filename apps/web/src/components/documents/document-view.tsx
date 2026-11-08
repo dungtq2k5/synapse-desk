@@ -77,6 +77,7 @@ import {
 import { useViewer } from '@/hooks/use-viewer';
 import {
   OCR_LANGUAGE_LABEL,
+  RETRYING,
   RUNNING,
   STAGES,
   STAGE_LABEL,
@@ -85,6 +86,7 @@ import {
   fileTypeLabel,
   isUpdating,
   isWorking,
+  retryReason,
   updateFailed,
   updatedLabel,
   visibilityLabel,
@@ -612,6 +614,8 @@ function Processing({
   const failedUpdate = updateFailed(document);
   const waitingForAllowance =
     latest?.status === 'QUEUED' && latest.waitingReason === 'AI_ALLOWANCE';
+  const retrying =
+    latest?.status === 'QUEUED' && latest.waitingReason === 'RETRYING';
   const running =
     latest !== null &&
     ['QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING'].includes(
@@ -732,6 +736,18 @@ function Processing({
             again by itself once the allowance resets or the plan changes.
             {updating && ' Answers use the current version meanwhile.'}
             {can('organization.update') && <PlanLink canChange />}
+          </AlertDescription>
+        </Alert>
+      ) : retrying ? (
+        <Alert
+          role="status"
+          className="border-info-border bg-info-subtle text-info-subtle-foreground"
+        >
+          <RotateCcwIcon aria-hidden />
+          <AlertTitle>{RETRYING}</AlertTitle>
+          <AlertDescription className="text-info-subtle-foreground">
+            {retryReason(latest.errorCode)}
+            {updating && ' Answers use the current version meanwhile.'}
           </AlertDescription>
         </Alert>
       ) : running && updating ? (

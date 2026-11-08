@@ -109,12 +109,29 @@ export function updateFailed(document: WithLatestJob): boolean {
   );
 }
 
+/** A job put back after an error, about to be tried again. */
+export const RETRYING = 'Trying again after a problem.';
+
+/**
+ * Why a `RETRYING` job is trying again, under {@link RETRYING}. No
+ * instruction: the retry is already on its way. Only a retryable error waits;
+ * the others fail at once.
+ */
+export function retryReason(code: ErrorCode | null): string {
+  return code === 'PROVIDER_FAILURE'
+    ? 'The AI service didn’t respond while preparing the passages.'
+    : 'The file couldn’t be processed.';
+}
+
 /** The stage a running job is in, for the list's caption. */
 export function stageCaption(
   job: Pick<IngestionJobResponseDto, 'status' | 'waitingReason'> | null,
 ): string {
   if (job?.status === 'QUEUED' && job.waitingReason === 'AI_ALLOWANCE') {
     return 'Waiting for the AI allowance to reset';
+  }
+  if (job?.status === 'QUEUED' && job.waitingReason === 'RETRYING') {
+    return RETRYING;
   }
   switch (job?.status) {
     case 'PARSING':

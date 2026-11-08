@@ -115,6 +115,7 @@ public final class IngestionJobMapper {
   ) {
     return switch (reason) {
       case INGESTION_WAITING_REASON_AI_ALLOWANCE -> IngestionWaitingReasonGql.AI_ALLOWANCE;
+      case INGESTION_WAITING_REASON_RETRYING -> IngestionWaitingReasonGql.RETRYING;
       default -> null;
     };
   }

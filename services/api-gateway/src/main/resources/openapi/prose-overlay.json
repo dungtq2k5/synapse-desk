@@ -1081,7 +1081,7 @@
       "description": "`null` only if the peer sent a member this build does not know."
     },
     "IngestionJobResponseDto.waitingReason": {
-      "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `null` is an ordinary queue."
+      "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `RETRYING` when it was put\nback after an error, and is tried again shortly; the error is on the\nattempt while it waits. `null` is an ordinary queue."
     },
     "InvitationPreviewRowResponseDto.unknownRoleIds": {
       "description": "Reported even on an OK row: these are skipped at redemption, not fatal."

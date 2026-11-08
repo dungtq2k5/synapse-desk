@@ -5,6 +5,7 @@ import {
   failure,
   isUpdating,
   isWorking,
+  retryReason,
   ocrLanguageAllowed,
   stageCaption,
   storageLevel,
@@ -69,6 +70,27 @@ describe('document wording', () => {
     expect(
       stageCaption(job({ status: 'QUEUED', waitingReason: 'AI_ALLOWANCE' })),
     ).toBe('Waiting for the AI allowance to reset');
+    expect(
+      stageCaption(job({ status: 'QUEUED', waitingReason: 'RETRYING' })),
+    ).toBe('Trying again after a problem.');
+  });
+
+  it('a job trying again is working, and says why without telling anyone to retry', () => {
+    expect(
+      isWorking({
+        status: 'PROCESSING',
+        latestJob: {
+          status: 'QUEUED',
+          waitingReason: 'RETRYING',
+          errorCode: 'PROVIDER_FAILURE',
+        },
+      }),
+    ).toBe(true);
+    expect(retryReason('PROVIDER_FAILURE')).toBe(
+      'The AI service didn’t respond while preparing the passages.',
+    );
+    expect(retryReason('OTHER')).toBe('The file couldn’t be processed.');
+    expect(retryReason(null)).not.toMatch(/retry/i);
   });
 
   it('reads working, updating and a failed update off the newest job', () => {

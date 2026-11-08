@@ -63156,7 +63156,7 @@
           "waitingReason": {
             "type": ["string", "null"],
             "description": "Why a `QUEUED` attempt waits; `null` is an ordinary queue.",
-            "enum": ["AI_ALLOWANCE", null]
+            "enum": ["AI_ALLOWANCE", "RETRYING", null]
           },
           "errorCode": {
             "type": ["string", "null"],
@@ -67133,8 +67133,8 @@
           },
           "waitingReason": {
             "type": ["string", "null"],
-            "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `null` is an ordinary queue.",
-            "enum": ["AI_ALLOWANCE", null]
+            "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `RETRYING` when it was put\nback after an error, and is tried again shortly; the error is on the\nattempt while it waits. `null` is an ordinary queue.",
+            "enum": ["AI_ALLOWANCE", "RETRYING", null]
           },
           "processedAt": {
             "type": ["string", "null"],

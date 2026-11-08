@@ -13,7 +13,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * IngestionJobResponseDto
  */
-
 public class IngestionJobResponseDto {
 
   private String id;
@@ -154,10 +153,12 @@ public class IngestionJobResponseDto {
   private FailedStageEnum failedStage = null;
 
   /**
-   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `null` is an ordinary queue.
+   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `RETRYING` when it was put back after an error, and is tried again shortly; the error is on the attempt while it waits. `null` is an ordinary queue.
    */
   public enum WaitingReasonEnum {
-    AI_ALLOWANCE("AI_ALLOWANCE");
+    AI_ALLOWANCE("AI_ALLOWANCE"),
+
+    RETRYING("RETRYING");
 
     private final String value;
 
@@ -373,7 +374,7 @@ public class IngestionJobResponseDto {
   }
 
   /**
-   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `null` is an ordinary queue.
+   * Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because the organization's AI allowance ran out mid-run; it starts again by itself once the allowance resets or the plan changes. `RETRYING` when it was put back after an error, and is tried again shortly; the error is on the attempt while it waits. `null` is an ordinary queue.
    * @return waitingReason
    */
 
