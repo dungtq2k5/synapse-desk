@@ -307,6 +307,14 @@ export interface BillingServiceClient {
   listTenantPlans(request: BillingEmptyRequest, metadata?: Metadata): Observable<ListTenantPlansResponse>;
 
   /**
+   * What anyone can get, for the public pricing: Free, then the active plans
+   * with at least one price. No caller and no tenant; negotiated plans (no
+   * price) stay out. Same shape as `ListTenantPlans`.
+   */
+
+  listPublicPlans(request: BillingEmptyRequest, metadata?: Metadata): Observable<ListTenantPlansResponse>;
+
+  /**
    * *Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
    * is everything auth can decide alone; the gateway then reads ingestion's
    * TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.
@@ -374,6 +382,17 @@ export interface BillingServiceController {
   ): Promise<ListTenantPlansResponse> | Observable<ListTenantPlansResponse> | ListTenantPlansResponse;
 
   /**
+   * What anyone can get, for the public pricing: Free, then the active plans
+   * with at least one price. No caller and no tenant; negotiated plans (no
+   * price) stay out. Same shape as `ListTenantPlans`.
+   */
+
+  listPublicPlans(
+    request: BillingEmptyRequest,
+    metadata?: Metadata,
+  ): Promise<ListTenantPlansResponse> | Observable<ListTenantPlansResponse> | ListTenantPlansResponse;
+
+  /**
    * *Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
    * is everything auth can decide alone; the gateway then reads ingestion's
    * TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.
@@ -413,6 +432,7 @@ export function BillingServiceControllerMethods() {
       "createPortalSession",
       "listInvoices",
       "listTenantPlans",
+      "listPublicPlans",
       "previewPlanChange",
       "changePlan",
       "previewCheckout",

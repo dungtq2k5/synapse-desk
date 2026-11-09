@@ -270,6 +270,77 @@ describe('billing', () => {
   );
 
   rowFor('Billing')(
+    '**`listPublicPlans`: no cookie, a 200, Free first, and no caller sent to auth**',
+    async () => {
+      peers.auth.on('BillingService/ListPublicPlans').reply({
+        items: [
+          {
+            id: 'plan_free',
+            name: 'Free',
+            maxAgentSeats: 3,
+            maxStorageBytes: '1000000000',
+            monthlyAiTokenBudget: '100000',
+            aiModelTier: 'AI_MODEL_TIER_FAST',
+            maxDocumentBytes: '10485760',
+            maxAttachmentBytes: '5242880',
+            maxDocumentUploads: 50,
+            maxAnalyticsRangeDays: 30,
+            prices: [],
+          },
+          {
+            id: 'plan_pro',
+            name: 'Pro',
+            maxAgentSeats: 10,
+            maxStorageBytes: '1000000000',
+            monthlyAiTokenBudget: '5000000',
+            aiModelTier: 'AI_MODEL_TIER_FAST',
+            maxDocumentBytes: '104857600',
+            maxAttachmentBytes: '10485760',
+            maxDocumentUploads: 1000,
+            maxAnalyticsRangeDays: 90,
+            prices: [
+              {
+                stripePriceId: 'price_123',
+                interval: 'month',
+                unitAmount: '9900',
+                currency: 'usd',
+              },
+            ],
+          },
+        ],
+      });
+
+      // A fresh session: no cookie at all.
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/public-plans`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: [
+          { id: 'plan_free', name: 'Free', prices: [] },
+          {
+            id: 'plan_pro',
+            name: 'Pro',
+            prices: [
+              {
+                stripePriceId: 'price_123',
+                interval: 'month',
+                unitAmount: 9900,
+                currency: 'usd',
+              },
+            ],
+          },
+        ],
+      });
+      // Auth hears an origin and no caller: no user, no tenant.
+      const [call] = peers.auth.calls('BillingService/ListPublicPlans');
+      expect(call.metadata.user_id ?? '').toBe('');
+      expect(call.metadata.organization_id ?? '').toBe('');
+    },
+  );
+
+  rowFor('Billing')(
     '**`changePlan`: a widening change dials nothing else and reaches Stripe**',
     async () => {
       peers.auth.on('BillingService/PreviewPlanChange').reply({

@@ -238,6 +238,11 @@ service BillingService {
   // offers a plan the endpoint rejects is worse than no list.
   rpc ListTenantPlans(BillingEmptyRequest) returns (ListTenantPlansResponse);
 
+  // What anyone can get, for the public pricing: Free, then the active plans
+  // with at least one price. No caller and no tenant; negotiated plans (no
+  // price) stay out. Same shape as `ListTenantPlans`.
+  rpc ListPublicPlans(BillingEmptyRequest) returns (ListTenantPlansResponse);
+
   // **Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
   // is everything auth can decide alone; the gateway then reads ingestion's
   // TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.

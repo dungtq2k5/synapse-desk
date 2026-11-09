@@ -104,6 +104,14 @@ export class BillingService {
     );
   }
 
+  async listPublicPlans(
+    origin: RequestOrigin,
+  ): Promise<TenantPlanResponseDto[]> {
+    return toTenantPlanResponseDtos(
+      await this.billingGrpcClient.listPublicPlans(origin),
+    );
+  }
+
   async listPlans(context: RequestContext): Promise<TenantPlanResponseDto[]> {
     return toTenantPlanResponseDtos(
       await this.billingGrpcClient.listTenantPlans(context),

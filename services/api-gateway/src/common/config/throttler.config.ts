@@ -67,6 +67,11 @@ export const ROUTE_THROTTLE = {
   otpVerify: { ttl: 10 * 60_000, limit: 10 },
   /** Token guessing here discloses the customer list. */
   invitationPreview: { ttl: 60 * 60_000, limit: 20 },
+  /**
+   * The public price list. Its real caller is the web server, which caches it
+   * for five minutes, so this only bounds a client hammering it directly.
+   */
+  publicPlans: { ttl: 60_000, limit: 20 },
   /** Mail bomb aimed at one invitee. */
   invitationResend: { ttl: 60 * 60_000, limit: 3 },
   /** Brute-forcing the second factor. */

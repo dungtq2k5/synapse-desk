@@ -5,6 +5,7 @@ import { PlanChangeGuard } from './plan-change.guard';
 import { BillingGrpcClient } from './billing-grpc.client';
 import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
+import { PublicPlansController } from './public-plans.controller';
 import { WebhooksController } from './webhooks.controller';
 
 /**
@@ -20,7 +21,7 @@ import { WebhooksController } from './webhooks.controller';
   // ingestion's TENANT-SCOPED usage, which is the only surface that cannot be
   // asked about another tenant.
   imports: [AuthModule, DocumentsModule],
-  controllers: [BillingController, WebhooksController],
+  controllers: [BillingController, PublicPlansController, WebhooksController],
   providers: [BillingGrpcClient, BillingService, PlanChangeGuard],
   exports: [BillingService],
 })

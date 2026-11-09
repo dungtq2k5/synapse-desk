@@ -108,6 +108,14 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
+  /** Public: the caller has no session, so only its origin travels. */
+  listPublicPlans(origin: RequestOrigin): Promise<ListTenantPlansResponse> {
+    return this.call(
+      (metadata) => this.billingGrpcService.listPublicPlans({}, metadata),
+      origin,
+    );
+  }
+
   listTenantPlans(context: RequestContext): Promise<ListTenantPlansResponse> {
     return this.call(
       (metadata) => this.billingGrpcService.listTenantPlans({}, metadata),

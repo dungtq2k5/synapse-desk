@@ -47,6 +47,7 @@
   ["POST", "/api/v1/billing/plan", "BILLING", true, false],
   ["GET", "/api/v1/billing/plans", "BILLING", true, false],
   ["POST", "/api/v1/billing/portal-session", "BILLING", true, false],
+  ["GET", "/api/v1/billing/public-plans", "AUTH", false, false],
   ["GET", "/api/v1/billing/subscription", "BILLING", true, false],
   ["GET", "/api/v1/chat/conversations", "READ", true, false],
   ["POST", "/api/v1/chat/conversations", "WRITE", true, false],
