@@ -98,6 +98,13 @@ test('Core Web Vitals on the main screens, median of three, at 1440 and 390', as
   const { maya, tickets } = await tenant('vitals');
   const screens: (Screen & { as: 'none' | 'maya' | 'super' })[] = [
     {
+      // Signed out, motion allowed: at 1440 the live scene loads after the
+      // page and fades in over the still; it mustn't shift anything.
+      name: 'landing',
+      path: '/',
+      as: 'none',
+    },
+    {
       name: 'sign-in',
       path: '/login',
       as: 'none',

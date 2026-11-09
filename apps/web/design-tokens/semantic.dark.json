@@ -593,6 +593,92 @@
           }
         }
       }
+    },
+    "scene": {
+      "backdrop": {
+        "$type": "color",
+        "$value": "{color.neutral.950}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-backdrop)"
+            }
+          }
+        },
+        "$description": "The landing hero’s full-bleed backdrop, behind the scene and the words. Light teal.50, Dark neutral.950."
+      },
+      "glow": {
+        "$type": "color",
+        "$value": "{color.teal.400}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-glow)"
+            }
+          }
+        },
+        "$description": "The scene’s neon: question shapes, the core’s edges, the travelling light, a highlighted step’s ring. Light teal.600 (3:1 on the page for the ring), Dark teal.400."
+      },
+      "glow-soft": {
+        "$type": "color",
+        "$value": "{color.teal.800}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-glow-soft)"
+            }
+          }
+        },
+        "$description": "The scene’s blurred halos behind the core and the shapes. Light teal.200, Dark teal.800."
+      },
+      "line": {
+        "$type": "color",
+        "$value": "{color.teal.700}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-line)"
+            }
+          }
+        },
+        "$description": "The scene’s wireframe and trails, and the flow graph’s paths. Light teal.300, Dark teal.700."
+      },
+      "surface": {
+        "$type": "color",
+        "$value": "{color.teal.950}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-surface)"
+            }
+          }
+        },
+        "$description": "The scene’s solid faces: the core’s facets and the passage card. Light white, Dark teal.950."
+      },
+      "handoff": {
+        "$type": "color",
+        "$value": "{color.violet.400}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-handoff)"
+            }
+          }
+        },
+        "$description": "A question passed on to a person: its shape, path and the person node. Light violet.500, Dark violet.400."
+      },
+      "handoff-soft": {
+        "$type": "color",
+        "$value": "{color.violet.800}",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--scene-handoff-soft)"
+            }
+          }
+        },
+        "$description": "The halo around the person node. Light violet.200, Dark violet.800."
+      }
     }
   },
   "status": {

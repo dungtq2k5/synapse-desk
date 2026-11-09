@@ -107,6 +107,13 @@
   --color-google-button-bg: var(--google-button-bg);
   --color-google-button-fg: var(--google-button-fg);
   --color-google-button-border: var(--google-button-border);
+  --color-scene-backdrop: var(--scene-backdrop);
+  --color-scene-glow: var(--scene-glow);
+  --color-scene-glow-soft: var(--scene-glow-soft);
+  --color-scene-line: var(--scene-line);
+  --color-scene-surface: var(--scene-surface);
+  --color-scene-handoff: var(--scene-handoff);
+  --color-scene-handoff-soft: var(--scene-handoff-soft);
 
   --font-sans: var(--font-family-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-family-mono), ui-monospace, monospace;
@@ -124,6 +131,25 @@
   --ease-standard: var(--motion-easing-standard);
   --ease-enter: var(--motion-easing-enter);
   --ease-exit: var(--motion-easing-exit);
+}
+
+/*
+ * The type styles the token export defines as composites (`type.display`,
+ * `type.hero`), built from their size and line-height tokens. Inter
+ * semibold, -0.02em, as both are drawn.
+ */
+@utility type-display {
+  font-size: var(--font-size-3xl);
+  line-height: var(--font-line-height-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@utility type-hero {
+  font-size: var(--font-size-4xl);
+  line-height: var(--font-line-height-4xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 @layer base {

@@ -31,6 +31,8 @@ describe('the web client', () => {
   const FETCHERS = new Set([
     'packages/api-client/src/browser-fetcher.ts',
     'apps/web/src/server/server-fetcher.ts',
+    // The web server's cached, cookie-less read of a public route.
+    'apps/web/src/server/public-fetcher.ts',
   ]);
 
   /** A call of `fetch` (bare or as a member), not `customFetch(` or `prefetch(`. */
@@ -42,7 +44,7 @@ describe('the web client', () => {
         /\.(ts|tsx|mjs|js)$/.test(path) && !/\.spec\.tsx?$/.test(path),
     );
 
-  it('**no `fetch(` outside the two fetchers**', () => {
+  it('**no `fetch(` outside the three fetchers**', () => {
     const sources = clientSources();
     // The floor: the scan reads the client at all.
     expect(sources.map(({ path }) => path)).toContain(
@@ -218,5 +220,28 @@ describe('the web client', () => {
       'GATEWAY_URL',
       'SUPPORT_EMAIL',
     ]);
+  });
+
+  it('**the web’s session cookie names are the gateway’s**', () => {
+    // The root page shows the landing page when neither cookie is present; a
+    // gateway that renamed one alone would show it to people signed in.
+    const web = readRepoFiles('apps/web/src/lib/session-cookies.ts')[0].text;
+    const named = (constant: string) =>
+      new RegExp(`${constant} = '([^']+)'`).exec(web)?.[1];
+    const gateways = [
+      'services/api-gateway/.env.example',
+      'deploy/demo/env/api-gateway.env.example',
+    ];
+
+    expect(gateways).toHaveLength(2);
+    for (const path of gateways) {
+      const env = parseEnvFile(readRepoFiles(path)[0].text);
+      expect([path, env.JWT_ACCESS_NAME, env.JWT_REFRESH_NAME]).toEqual([
+        path,
+        named('ACCESS_COOKIE'),
+        named('REFRESH_COOKIE'),
+      ]);
+    }
+    expect(named('ACCESS_COOKIE')).toBe('access_token');
   });
 });

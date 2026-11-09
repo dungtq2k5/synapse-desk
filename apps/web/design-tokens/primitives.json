@@ -1425,6 +1425,17 @@
             }
           }
         }
+      },
+      "4xl": {
+        "$type": "dimension",
+        "$value": "48px",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--font-size-4xl)"
+            }
+          }
+        }
       }
     },
     "line-height": {
@@ -1512,6 +1523,17 @@
           "com.figma": {
             "codeSyntax": {
               "WEB": "var(--font-line-height-3xl)"
+            }
+          }
+        }
+      },
+      "4xl": {
+        "$type": "dimension",
+        "$value": "56px",
+        "$extensions": {
+          "com.figma": {
+            "codeSyntax": {
+              "WEB": "var(--font-line-height-4xl)"
             }
           }
         }
@@ -1976,6 +1998,17 @@
           "letterSpacing": "0em"
         }
       }
+    },
+    "hero": {
+      "$type": "typography",
+      "$value": {
+        "fontFamily": "{font.family.sans}",
+        "fontWeight": "{font.weight.semibold}",
+        "fontSize": "{font.size.4xl}",
+        "lineHeight": "{font.line-height.4xl}",
+        "letterSpacing": "-0.02em"
+      },
+      "$description": "The landing hero’s headline at 1440 (48/56). At 390 the headline uses type.display."
     }
   }
 }

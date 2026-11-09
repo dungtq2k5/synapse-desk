@@ -55,7 +55,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useViewer } from '@/hooks/use-viewer';
 import {
   comparison,
@@ -77,6 +76,7 @@ import { celebrate } from '@/lib/celebrate';
 import { dayDate } from '@/lib/format';
 import { useSupportEmail } from '@/lib/support';
 import { announce } from '@/lib/toast';
+import { IntervalSwitch } from './interval-switch';
 import { cn } from '@/lib/utils';
 import {
   ChangeDialog,
@@ -210,6 +210,9 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
       : null,
   );
   const [canceled] = useState(() => search.get('checkout') === 'canceled');
+  // From the landing page's Choose {plan}, through sign-up: that plan's card
+  // is brought into view with focus on its button. Read once, like `checkout`.
+  const [picked] = useState(() => search.get('choose'));
   const [change, setChange] = useState<ChangeIntent | null>(null);
   const [start, setStart] = useState<StartIntent | null>(null);
   const [refused, setRefused] = useState<{
@@ -220,7 +223,7 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
   // The Checkout return's query goes without a navigation: `router.replace`
   // would refetch the route and reconcile the head, and the page has no
   // `<title>` for that moment. Next keeps `useSearchParams` in step.
-  const returned = search.get('checkout');
+  const returned = search.get('checkout') ?? search.get('choose');
   useEffect(() => {
     if (returned)
       globalThis.history.replaceState(null, '', '/settings/billing');
@@ -429,34 +432,7 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
             )}
           </div>
           {!negotiated && (
-            <ToggleGroup
-              type="single"
-              aria-label="Billing interval"
-              value={interval}
-              onValueChange={(value) => {
-                if (value !== 'month' && value !== 'year') return;
-                setInterval(value);
-                announce(
-                  value === 'year'
-                    ? 'Showing yearly prices'
-                    : 'Showing monthly prices',
-                );
-              }}
-              className="w-full rounded-lg bg-muted p-1 sm:w-50"
-            >
-              <ToggleGroupItem
-                value="month"
-                className="flex-1 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-              >
-                Monthly
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="year"
-                className="flex-1 data-[state=on]:bg-background data-[state=on]:shadow-sm"
-              >
-                Yearly
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <IntervalSwitch value={interval} onValueChange={setInterval} />
           )}
         </header>
         {negotiated ? (
@@ -478,6 +454,7 @@ function Billing({ subscription }: { subscription: SubscriptionResponseDto }) {
                 tooSmall={tooSmall(plan, inUse)}
                 disabled={pending}
                 onChoose={(action) => choose(plan, action)}
+                picked={plan.id === picked}
               />
             ))}
           </ul>
@@ -765,6 +742,7 @@ function PlanCard({
   tooSmall: overLimit,
   disabled,
   onChoose,
+  picked,
 }: {
   plan: TenantPlanResponseDto;
   interval: Interval;
@@ -774,6 +752,8 @@ function PlanCard({
   tooSmall: OverLimit[];
   disabled: boolean;
   onChoose: (action: PlanAction) => void;
+  /** Named by `?choose=`: brought into view with focus on its button, once. */
+  picked: boolean;
 }) {
   const warningId = useId();
   const headingId = useId();
@@ -783,6 +763,22 @@ function PlanCard({
   // Too small only blocks moving onto it; the plan held is the plan held.
   const blocked = !isCurrent && overLimit.length > 0;
   const primary = action?.kind === 'upgrade' || action?.kind === 'choose';
+  const button = useRef<HTMLButtonElement>(null);
+  const shown = useRef(false);
+  // Only a plan the viewer can move to: not the current one, and not for a
+  // viewer with no button (they can't choose a plan).
+  const choosable = picked && action !== null && action.kind !== 'current';
+  useEffect(() => {
+    if (!choosable || shown.current || !button.current) return;
+    shown.current = true;
+    button.current.scrollIntoView({
+      block: 'center',
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+    });
+    button.current.focus({ preventScroll: true });
+  }, [choosable]);
 
   return (
     <li
@@ -866,6 +862,7 @@ function PlanCard({
       )}
       {action && price && (
         <Button
+          ref={button}
           variant={primary && !blocked ? 'default' : 'outline'}
           // Unavailable, and still focusable so its reason is read.
           className={cn('w-full', blocked && 'opacity-50')}
