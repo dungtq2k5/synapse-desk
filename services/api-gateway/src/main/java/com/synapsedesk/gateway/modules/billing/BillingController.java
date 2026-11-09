@@ -3,13 +3,19 @@ package com.synapsedesk.gateway.modules.billing;
 import com.synapsedesk.gateway.common.auth.CurrentRequest;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
+import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.error.RefusalException;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
+import com.synapsedesk.gateway.common.openapi.RouteSecurity;
 import com.synapsedesk.gateway.common.security.RequirePermission;
+import com.synapsedesk.gateway.common.throttle.AuthThrottle;
+import com.synapsedesk.gateway.common.throttle.RouteThrottle;
+import com.synapsedesk.gateway.common.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.common.throttle.ThrottlerTiers;
 import com.synapsedesk.gateway.common.web.AcceptsUndeclaredQuery;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
@@ -231,6 +237,44 @@ public class BillingController {
       .getItemsList()
       .stream()
       .map(BillingController::toInvoiceResponseDto)
+      .toList();
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
+  }
+
+  /**
+   * The price list anyone can read, for the landing page: Free, then the active plans
+   * with at least one price. No session and no tenant; auth hears only the origin.
+   */
+  @OrgAccessKind(OrgAccess.AUTH)
+  @RouteSecurity(RouteSecurity.Scheme.NONE)
+  @GetMapping(
+    value = "/billing/public-plans",
+    produces = { "application/json" }
+  )
+  @ApiErrors({})
+  @AuthThrottle
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
+    ttlMs = RouteThrottle.PUBLIC_PLANS_TTL_MS,
+    limit = RouteThrottle.PUBLIC_PLANS_LIMIT
+  )
+  public ResponseEntity<
+    ApiResponse<List<TenantPlanResponseDto>>
+  > publicPlansControllerListPublicPlansV1() {
+    RequestOrigin origin = currentUser.origin(CurrentRequest.request());
+
+    var response = stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin))
+      )
+      .listPublicPlans(BillingEmptyRequest.getDefaultInstance());
+
+    List<TenantPlanResponseDto> data = response
+      .getItemsList()
+      .stream()
+      .map(BillingController::toTenantPlanResponseDto)
       .toList();
 
     return ResponseEntity.ok(ApiResponse.of(200, "OK", data));

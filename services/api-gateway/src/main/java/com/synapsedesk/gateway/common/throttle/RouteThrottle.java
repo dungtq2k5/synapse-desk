@@ -50,6 +50,13 @@ public final class RouteThrottle {
   public static final long INVITATION_PREVIEW_TTL_MS = 60 * 60_000;
   public static final int INVITATION_PREVIEW_LIMIT = 20;
 
+  /**
+   * The public price list. Its real caller is the web server, which caches it
+   * for five minutes, so this only bounds a client hammering it directly.
+   */
+  public static final long PUBLIC_PLANS_TTL_MS = 60_000;
+  public static final int PUBLIC_PLANS_LIMIT = 20;
+
   /** Mail bomb aimed at one invitee. */
   public static final long INVITATION_RESEND_TTL_MS = 60 * 60_000;
   public static final int INVITATION_RESEND_LIMIT = 3;

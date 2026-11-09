@@ -56005,6 +56005,112 @@
         ]
       }
     },
+    "/api/v1/billing/public-plans": {
+      "get": {
+        "tags": ["Billing"],
+        "summary": "Plans anyone can get",
+        "operationId": "PublicPlansController_listPublicPlans_v1",
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListTenantPlanResponseDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited. Nearly every route is throttled — see the tier on the route. The exceptions are the webhook intakes, which carry no 429 at all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 429
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error. The response body carries no internals.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 500
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "path",
+                    "statusCode",
+                    "success",
+                    "timestamp"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/v1/billing/plans": {
       "get": {
         "tags": ["Billing"],

@@ -160,6 +160,9 @@
     "GET /api/v1/billing/plans": {
       "summary": "Plans this workspace can move to"
     },
+    "GET /api/v1/billing/public-plans": {
+      "summary": "Plans anyone can get"
+    },
     "GET /api/v1/billing/subscription": {
       "summary": "Current plan, status, period, and the entitlements it granted"
     },
