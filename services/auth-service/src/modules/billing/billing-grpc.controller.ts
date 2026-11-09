@@ -89,6 +89,11 @@ export class BillingGrpcController implements BillingServiceController {
     return this.billing.listInvoices(request, unpackCallerContext(metadata));
   }
 
+  /** Public: no caller, no tenant. The gateway sends only the origin. */
+  listPublicPlans(): Promise<ListTenantPlansResponse> {
+    return this.planChange.listPublicPlans();
+  }
+
   listTenantPlans(
     _request: BillingEmptyRequest,
     metadata?: Metadata,

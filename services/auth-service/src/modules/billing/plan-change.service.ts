@@ -6,6 +6,7 @@ import {
   BillingEventSource,
   BillingEventStatus,
   CallerContext,
+  FREE_PLAN_SEED,
   type OverLimitItem,
 } from '@synapsedesk/contracts';
 import {
@@ -27,10 +28,40 @@ import {
   type PlanChangeRequest,
   type PlanChangeResponse,
 } from '@synapsedesk/grpc-proto';
+import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { StripeService } from './stripe.service';
 import { isAssignedPlan } from './plan-assignment';
+
+/** A plan's prices, in interval order, as both lists read them. */
+const PLAN_PRICES = {
+  prices: { orderBy: { interval: 'asc' } },
+} satisfies Prisma.SubscriptionPlanInclude;
+
+/** One catalogue row as the gRPC answer carries it. */
+function toTenantPlan(
+  plan: Prisma.SubscriptionPlanGetPayload<{ include: typeof PLAN_PRICES }>,
+): ListTenantPlansResponse['items'][number] {
+  return {
+    id: plan.id,
+    name: plan.name,
+    maxAgentSeats: plan.maxAgentSeats,
+    maxStorageBytes: Number(plan.maxStorageBytes),
+    monthlyAiTokenBudget: Number(plan.monthlyAiTokenBudget),
+    aiModelTier: toProtoAiModelTier(plan.aiModelTier),
+    maxDocumentBytes: Number(plan.maxDocumentBytes),
+    maxAttachmentBytes: Number(plan.maxAttachmentBytes),
+    maxDocumentUploads: plan.maxDocumentUploads,
+    maxAnalyticsRangeDays: plan.maxAnalyticsRangeDays,
+    prices: plan.prices.map((price) => ({
+      stripePriceId: price.stripePriceId,
+      interval: price.interval,
+      unitAmount: price.unitAmount ?? undefined,
+      currency: price.currency ?? undefined,
+    })),
+  };
+}
 
 /**
  * A tenant moving between catalogue plans.
@@ -89,30 +120,37 @@ export class PlanChangeService {
       // `changePlan` resolves the target through a price. A catalogue that
       // shows a plan the endpoint rejects is worse than one that omits it.
       where: { deletedAt: null, isActive: true, prices: { some: {} } },
-      include: { prices: { orderBy: { interval: 'asc' } } },
+      include: PLAN_PRICES,
       orderBy: { maxAgentSeats: 'asc' },
     });
 
-    return {
-      items: plans.map((plan) => ({
-        id: plan.id,
-        name: plan.name,
-        maxAgentSeats: plan.maxAgentSeats,
-        maxStorageBytes: Number(plan.maxStorageBytes),
-        monthlyAiTokenBudget: Number(plan.monthlyAiTokenBudget),
-        aiModelTier: toProtoAiModelTier(plan.aiModelTier),
-        maxDocumentBytes: Number(plan.maxDocumentBytes),
-        maxAttachmentBytes: Number(plan.maxAttachmentBytes),
-        maxDocumentUploads: plan.maxDocumentUploads,
-        maxAnalyticsRangeDays: plan.maxAnalyticsRangeDays,
-        prices: plan.prices.map((price) => ({
-          stripePriceId: price.stripePriceId,
-          interval: price.interval,
-          unitAmount: price.unitAmount ?? undefined,
-          currency: price.currency ?? undefined,
-        })),
-      })),
-    };
+    return { items: plans.map(toTenantPlan) };
+  }
+
+  /**
+   * What anyone can get, for the public pricing: Free, then the active plans
+   * with at least one price, by seats. No caller and no tenant.
+   *
+   * A negotiated plan has no price, so it stays out; Free has none either and
+   * is let in by name, the identity the seeder keys it on (as `isAssignedPlan`
+   * tells it apart).
+   *
+   * @example await planChange.listPublicPlans() // { items: [Free, Starter, Pro, Enterprise] }
+   */
+  async listPublicPlans(): Promise<ListTenantPlansResponse> {
+    const plans = await this.prisma.subscriptionPlan.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        OR: [{ prices: { some: {} } }, { name: FREE_PLAN_SEED.name }],
+      },
+      include: PLAN_PRICES,
+      orderBy: { maxAgentSeats: 'asc' },
+    });
+    const free = plans.filter((plan) => plan.name === FREE_PLAN_SEED.name);
+    const priced = plans.filter((plan) => plan.name !== FREE_PLAN_SEED.name);
+
+    return { items: [...free, ...priced].map(toTenantPlan) };
   }
 
   /**

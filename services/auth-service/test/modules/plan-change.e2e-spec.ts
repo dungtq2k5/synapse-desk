@@ -4,7 +4,11 @@ import { RpcException } from '@nestjs/microservices';
 import { readErrorDetails, withHttpStatus } from '@synapsedesk/core';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { waitFor } from '@synapsedesk/testing/wait';
-import { BillingEventSource, BillingEventStatus } from '@synapsedesk/contracts';
+import {
+  BillingEventSource,
+  BillingEventStatus,
+  FREE_PLAN_SEED,
+} from '@synapsedesk/contracts';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   PLAN_FIXTURES,
@@ -421,6 +425,98 @@ describe('Plan change (e2e)', () => {
         ),
         status.NOT_FOUND,
       );
+    });
+  });
+
+  // ------------------------------------------------------- the public catalogue
+
+  describe('The public catalogue: what anyone can get', () => {
+    /** A negotiated plan the platform assigns: no Stripe product, no price. */
+    const negotiated = () =>
+      fx.prisma.subscriptionPlan.create({
+        data: {
+          name: `Agreement ${(fixtureSeq += 1)}`,
+          stripeProductId: null,
+          maxAgentSeats: 60,
+          maxStorageBytes: 10n * 1024n ** 3n,
+          monthlyAiTokenBudget: 1_000_000n,
+          aiModelTier: 'FAST',
+          maxDocumentBytes: 10n * 1024n ** 2n,
+          maxAttachmentBytes: 5n * 1024n ** 2n,
+          maxDocumentUploads: 1000,
+          maxAnalyticsRangeDays: 90,
+        },
+      });
+
+    it('Free first, then every priced plan by seats, and no negotiated plan', async () => {
+      const agreement = await negotiated();
+
+      const listed = await planChange.listPublicPlans();
+      const names = listed.items.map((plan) => plan.name);
+
+      expect(names[0]).toBe(FREE_PLAN_SEED.name);
+      expect(names).not.toContain(agreement.name);
+      // Free plus every seeded priced plan: not vacuous.
+      expect(names).toHaveLength(PLAN_FIXTURES.length + 1);
+      const seats = listed.items.slice(1).map((plan) => plan.maxAgentSeats);
+      expect(seats).toEqual([...seats].sort((a, b) => a - b));
+      // Free carries no price; the priced plans carry theirs.
+      expect(listed.items[0].prices).toEqual([]);
+      expect(listed.items.find((plan) => plan.name === 'Pro')?.prices).toEqual([
+        {
+          stripePriceId: 'price_pro_monthly',
+          interval: 'month',
+          unitAmount: 9_900,
+          currency: 'usd',
+        },
+        {
+          stripePriceId: 'price_pro_annual',
+          interval: 'year',
+          unitAmount: 99_000,
+          currency: 'usd',
+        },
+      ]);
+    });
+
+    it('a retired plan and a soft-deleted one stay out', async () => {
+      const starter = await planNamed('Starter');
+      const pro = await planNamed('Pro');
+      await fx.prisma.subscriptionPlan.update({
+        where: { id: starter.id },
+        data: { isActive: false },
+      });
+      await fx.prisma.subscriptionPlan.update({
+        where: { id: pro.id },
+        data: { deletedAt: new Date() },
+      });
+
+      const names = (await planChange.listPublicPlans()).items.map(
+        (plan) => plan.name,
+      );
+
+      expect(names).not.toContain('Starter');
+      expect(names).not.toContain('Pro');
+      expect(names).toHaveLength(PLAN_FIXTURES.length - 1);
+    });
+
+    it('a retired Free stays out too: only the active plans', async () => {
+      // `reset()` keeps the Free row as it finds it, so this test puts it back.
+      const retire = (isActive: boolean) =>
+        fx.prisma.subscriptionPlan.updateMany({
+          where: { name: FREE_PLAN_SEED.name },
+          data: { isActive },
+        });
+      await retire(false);
+      try {
+        const names = (await planChange.listPublicPlans()).items.map(
+          (plan) => plan.name,
+        );
+
+        expect(names).not.toContain(FREE_PLAN_SEED.name);
+        expect(names).toHaveLength(PLAN_FIXTURES.length);
+      } finally {
+        await retire(true);
+      }
     });
   });
 
