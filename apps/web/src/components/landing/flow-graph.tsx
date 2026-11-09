@@ -333,11 +333,11 @@ export function FlowGraph() {
               >
                 <Icon aria-hidden className="size-5 xl:size-6" />
               </span>
-              <span className="flex flex-col gap-1 xl:mt-4">
+              <span className="flex flex-col gap-1 pt-3 xl:mt-4 xl:pt-0">
                 <span className="text-sm font-medium">{step.label}</span>
                 <span
                   className={cn(
-                    'text-sm text-muted-foreground xl:px-2',
+                    'type-small text-muted-foreground xl:px-2 xl:text-sm',
                     'xl:opacity-0 xl:translate-y-1 xl:transition-[opacity,translate] xl:duration-(--motion-duration-fast) xl:ease-exit',
                     'motion-reduce:xl:translate-y-0',
                     lit &&
@@ -351,7 +351,7 @@ export function FlowGraph() {
           );
         })}
       </ol>
-      <p className="mt-3 border-l-2 border-dashed border-scene-line pl-4 text-sm text-muted-foreground xl:hidden">
+      <p className="mt-4 border-l-2 border-dashed border-scene-line pl-4 type-small text-muted-foreground xl:hidden">
         Then back to step 2: the next answer uses what was fixed.
       </p>
     </div>
