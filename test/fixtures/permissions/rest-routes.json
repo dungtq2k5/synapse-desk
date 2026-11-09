@@ -46,6 +46,7 @@
   "GET /api/v1/billing/invoices": ["organization.update"],
   "POST /api/v1/billing/plan": ["organization.update"],
   "GET /api/v1/billing/plans": ["organization.read"],
+  "GET /api/v1/billing/public-plans": [],
   "POST /api/v1/billing/portal-session": ["organization.update"],
   "GET /api/v1/billing/subscription": ["organization.read"],
   "GET /api/v1/chat/conversations": [],
