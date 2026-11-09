@@ -14,8 +14,8 @@
 #     ./docker/check-images.sh --ocr-only # just the OCR section
 #     ./docker/check-images.sh --web-only # just the web client's image
 #
-# Minutes, not seconds — run it when the Dockerfiles change, and from CI the
-# day there is one.
+# Minutes, not seconds. CI runs it on every push, last in the `stack` job
+# (`npm run images:stack`); run it locally when the Dockerfiles change.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -37,8 +37,19 @@ trap 'docker rmi "$PLAIN" "$OCR" >/dev/null 2>&1 || true' EXIT
 fail() { echo "  FAIL: $1" >&2; exit 1; }
 env_of() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1"; }
 
+# `IMAGE_CACHE=gha` (CI sets it): each image reads and writes its own scope in
+# the GitHub Actions cache. One scope per image, because a `mode=max` write
+# replaces its scope's whole manifest, so a shared scope would keep only the
+# last image built. Unset, a plain local build.
+cache_args() { # tag
+  [ "${IMAGE_CACHE:-}" = gha ] || return 0
+  local scope="${1//[^a-zA-Z0-9-]/-}"
+  echo "--load --cache-from type=gha,scope=$scope --cache-to type=gha,mode=max,scope=$scope"
+}
+
 build_node() { # tag, service, [target]
-  docker build -f docker/node-service.Dockerfile \
+  # shellcheck disable=SC2046 # cache_args prints separate flags on purpose
+  docker build -f docker/node-service.Dockerfile $(cache_args "$1") \
     ${3:+--target "$3"} \
     --build-arg SERVICE="$2" \
     --build-arg GIT_SHA="$GIT_SHA" \
@@ -171,7 +182,8 @@ for service in "${NODE_SERVICES[@]}"; do
     || fail "$service did not build"
 done
 echo "   building rag-service…"
-docker build -f docker/rag-service.Dockerfile \
+# shellcheck disable=SC2046
+docker build -f docker/rag-service.Dockerfile $(cache_args synapsedesk/rag-service) \
   --build-arg GIT_SHA="$GIT_SHA" \
   --build-arg BUILD_TIME="$BUILD_TIME" \
   -t synapsedesk/rag-service . >/dev/null || fail "rag-service did not build"
@@ -264,15 +276,15 @@ echo "   ok — all seven"
 #     reason the stage is `FROM build`.
 echo "7a. the migrate target builds where a schema is and refuses where it is not"
 
-docker build -f docker/node-service.Dockerfile --target migrate \
-  --build-arg SERVICE=auth-service \
-  --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
-  -t synapsedesk/auth-service-migrate . >/dev/null \
-  || fail "migrate target failed to build for auth-service"
-
-docker run --rm --entrypoint sh synapsedesk/auth-service-migrate \
-  -c 'test -f prisma/schema.prisma && npx prisma --version >/dev/null' \
-  || fail "migrate image lacks the schema or the Prisma CLI"
+# Every service that owns a schema, as CD builds them.
+for service in auth-service ticket-service ingestion-service notification-service; do
+  echo "   building $service (migrate)…"
+  build_node "synapsedesk/$service-migrate" "$service" migrate \
+    || fail "migrate target failed to build for $service"
+  docker run --rm --entrypoint sh "synapsedesk/$service-migrate" \
+    -c 'test -f prisma/schema.prisma && npx prisma --version >/dev/null' \
+    || fail "$service's migrate image lacks the schema or the Prisma CLI"
+done
 
 # storage-service owns no schema. The stage must refuse it rather than produce an
 # image whose init container would hang the pod at Init:Error forever.
@@ -282,7 +294,7 @@ if docker build -f docker/node-service.Dockerfile --target migrate \
      -t synapsedesk/gateway-migrate-should-not-exist . >/dev/null 2>&1; then
   fail "migrate target built for storage-service, which owns no prisma/schema.prisma"
 fi
-echo "   ok — built for auth-service, refused storage-service"
+echo "   ok — built for all four, refused storage-service"
 
 # --------------------------------------------------------------- 8. OCR section
 
