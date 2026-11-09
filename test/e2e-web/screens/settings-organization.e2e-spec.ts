@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../coverage';
+import { expectClosingRows } from './closing';
 import { look } from './look';
 import {
   SETTINGS,
@@ -46,6 +47,13 @@ test('an Org Admin: every card', async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByText('62% used')).toBeVisible();
   await look(page, 'organization', { mask: profile(page) });
+});
+
+test('each card’s Save sits right at desktop, left on a phone', async ({
+  page,
+}) => {
+  await open(page);
+  await expectClosingRows(page);
 });
 
 test('a meter that couldn’t be read, and one that isn’t available', async ({

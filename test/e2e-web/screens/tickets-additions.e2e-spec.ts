@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '../coverage';
+import { expectClosingRows } from './closing';
 import { look } from './look';
 import { sessionAs, signInAs, tenant, type Person } from './tenant';
 
@@ -223,6 +224,14 @@ test.describe('a new ticket', () => {
       page.getByText('Tell us what you need. We’ll reply in the ticket.'),
     ).toBeVisible();
     await look(page, 'new-ticket');
+  });
+
+  test('Cancel and Create ticket sit right at desktop, left on a phone', async ({
+    page,
+  }) => {
+    const { priya } = await tenant('new');
+    await form(page, priya);
+    await expectClosingRows(page);
   });
 
   test('uploading, one failed', async ({ page }) => {

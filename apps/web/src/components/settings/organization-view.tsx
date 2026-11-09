@@ -11,6 +11,7 @@ import {
 import { ChevronRightIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type SubmitEvent } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { SectionCard } from '@/components/account/section-card';
 import { serverMessage } from '@/components/ticket/use-directory';
@@ -221,14 +222,14 @@ function ProfileCard({
           )}
         </Field>
         {editable && (
-          <div className="flex justify-end">
+          <ClosingActions>
             <Button
               type="submit"
               disabled={!changed || saving || name.trim().length < 2}
             >
               Save changes
             </Button>
-          </div>
+          </ClosingActions>
         )}
       </form>
     </SectionCard>

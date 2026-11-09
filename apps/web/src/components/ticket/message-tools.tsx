@@ -23,6 +23,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
@@ -407,7 +408,9 @@ function Editor({
           You can only edit a message for 15 minutes after sending it.
         </p>
       )}
-      <div className="flex items-center justify-between gap-2">
+      {/* On a phone the buttons come first, on the left, and the keyboard
+          hint goes under them; from md, the hint left and the buttons right. */}
+      <div className="flex flex-col-reverse items-start gap-2 md:flex-row md:items-center md:justify-between">
         <span className="text-xs text-muted-foreground">Esc cancels.</span>
         <span className="flex gap-2">
           <Button
@@ -679,7 +682,7 @@ function AiFeedback({
               </ToggleGroup>
             </div>
           )}
-          <div className="flex justify-end gap-2">
+          <ClosingActions>
             <Button
               variant="ghost"
               size="sm"
@@ -691,7 +694,7 @@ function AiFeedback({
             <Button size="sm" disabled={busy} onClick={() => void submit(true)}>
               Send feedback
             </Button>
-          </div>
+          </ClosingActions>
         </div>
       )}
     </div>

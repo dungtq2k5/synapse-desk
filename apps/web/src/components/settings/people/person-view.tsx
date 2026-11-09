@@ -32,6 +32,7 @@ import {
 import Link from 'next/link';
 import { useMemo, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { SectionCard } from '@/components/account/section-card';
 import { DeviceIcon, sessionName } from '@/components/account/sessions-section';
@@ -416,14 +417,14 @@ function Details({ summary }: { summary: UserSummaryResponseDto }) {
             </Select>
           </div>
         </div>
-        <div className="flex justify-end">
+        <ClosingActions>
           <Button
             type="submit"
             disabled={!changed || busy || draft.fullName.trim().length < 2}
           >
             Save changes
           </Button>
-        </div>
+        </ClosingActions>
       </form>
     </SectionCard>
   );

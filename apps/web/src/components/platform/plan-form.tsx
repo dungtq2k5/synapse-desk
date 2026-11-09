@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { ConfirmDialog } from '@/components/settings/confirm-dialog';
 import { LoadError, Loading } from '@/components/settings/settings-frame';
@@ -643,7 +644,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
                 />
               )}
         </ConsoleCard>
-        <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+        <ClosingActions>
           <Link
             href="/platform/plans"
             className={buttonVariants({ variant: 'outline' })}
@@ -653,7 +654,7 @@ function PlanForm({ plan }: { plan: SubscriptionPlanResponseDto | null }) {
           <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
             {plan ? 'Save' : 'Create plan'}
           </Button>
-        </div>
+        </ClosingActions>
       </form>
       {plan && removing && (
         <RemovePriceDialog

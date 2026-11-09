@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Popover } from 'radix-ui';
 import { useEffect, useId, useRef, useState, type SubmitEvent } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import {
   AttachmentList,
@@ -197,7 +198,7 @@ export function NewTicketForm() {
           )}
         </Field>
         <AttachmentsField files={files} disabled={busy} />
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <ClosingActions className="items-center">
           {files.uploading && (
             <p
               id="new-uploading"
@@ -219,7 +220,7 @@ export function NewTicketForm() {
           >
             {busy ? 'Creating…' : 'Create ticket'}
           </Button>
-        </div>
+        </ClosingActions>
       </form>
     </div>
   );

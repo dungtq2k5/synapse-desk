@@ -23,6 +23,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { useId, useMemo, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -264,14 +265,14 @@ function NameCard({ role }: { role: RoleResponseDto }) {
             />
           )}
         </Field>
-        <div className="flex justify-end">
+        <ClosingActions>
           <Button
             type="submit"
             disabled={busy || !changed || name.trim().length < 2}
           >
             Save changes
           </Button>
-        </div>
+        </ClosingActions>
       </form>
     </Section>
   );
@@ -382,7 +383,7 @@ function Catalog({ role }: { role: RoleResponseDto }) {
           ))}
           {refusal && <RefusalAlert refusal={refusal} />}
           {editable && (
-            <div className="flex items-center justify-end gap-3">
+            <ClosingActions className="items-center gap-3">
               {unsaved && (
                 <span className="text-sm text-muted-foreground">
                   Unsaved changes
@@ -391,7 +392,7 @@ function Catalog({ role }: { role: RoleResponseDto }) {
               <Button disabled={busy || !unsaved} onClick={() => void save()}>
                 Save permissions
               </Button>
-            </div>
+            </ClosingActions>
           )}
         </div>
       )}

@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, type SubmitEvent } from 'react';
 import { toast } from 'sonner';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { LoadError, Loading } from '@/components/settings/settings-frame';
 import { PageUnavailable } from '@/components/shell/page-unavailable';
@@ -302,14 +303,14 @@ function EditForm({ data }: { data: PlatformOrganizationDetailResponseDto }) {
             </div>
           </ConsoleCard>
         </div>
-        <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+        <ClosingActions>
           <Link href={back} className={buttonVariants({ variant: 'outline' })}>
             Cancel
           </Link>
           <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
             Save changes
           </Button>
-        </div>
+        </ClosingActions>
       </form>
     </ConsolePage>
   );

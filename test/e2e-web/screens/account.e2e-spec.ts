@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { expect, test, type Page, type Route } from '../coverage';
 import { REPO_ROOT } from '../../system/services';
+import { expectClosingRows } from './closing';
 import { look, tabsThrough } from './look';
 import {
   givePhoto,
@@ -95,6 +96,17 @@ test.describe('profile', () => {
       page.getByRole('button', { name: 'Change photo' }),
     ).toBeVisible();
     await look(page, 'profile');
+  });
+
+  test('its save row sits right at desktop, left on a phone', async ({
+    page,
+  }) => {
+    const { maya } = await tenant('profile-photo');
+    await openProfile(page, maya);
+    // Changed, so the row holds "Unsaved changes" beside the button.
+    await page.getByLabel('Full name').fill('Maya Chen-Ortiz');
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
+    await expectClosingRows(page);
   });
 
   test('initials, an unverified email and a verified phone', async ({
@@ -483,37 +495,7 @@ test.describe('security', () => {
     page,
   }) => {
     await openSecurity(page);
-    // Each button against the card it closes: its right edge
-    // on the content's right at 1440, its left edge on the content's left at
-    // 390.
-    const edges = async (name: string) => {
-      const button = page.getByRole('button', { name, exact: true });
-      const card = page.locator('[data-slot="card-content"]', { has: button });
-      const b = (await button.boundingBox())!;
-      // The content box: the card's padding is not where a button can sit.
-      const c = await card.evaluate((element) => {
-        const box = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return {
-          left: box.left + Number.parseFloat(style.paddingLeft),
-          right: box.right - Number.parseFloat(style.paddingRight),
-        };
-      });
-      return {
-        left: Math.round(b.x - c.left),
-        right: Math.round(c.right - (b.x + b.width)),
-      };
-    };
-    const names = ['Change password', 'Sign out everywhere'];
-
-    // Polled: the page reflows for a moment after the viewport changes.
-    for (const name of names) {
-      await expect.poll(async () => (await edges(name)).right).toBe(0);
-    }
-    await page.setViewportSize({ width: 390, height: 844 });
-    for (const name of names) {
-      await expect.poll(async () => (await edges(name)).left).toBe(0);
-    }
+    await expectClosingRows(page);
   });
 
   test('its focus order', async ({ page }) => {
@@ -682,6 +664,43 @@ test.describe('security', () => {
       dialog(page).getByRole('button', { name: 'Cancel' }),
     ).toBeFocused();
     await look(page, 'security-sign-out-everywhere');
+  });
+
+  test('on a phone, a dialog’s buttons stack full width, the confirming one on top', async ({
+    page,
+  }) => {
+    await reply(page, 'POST', '/auth/2fa/backup-codes', 200, {
+      backupCodes: BACKUP_CODES,
+    });
+    await openSecurity(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const footer = (scope: ReturnType<Page['getByRole']>) =>
+      scope.locator('[data-slot$="dialog-footer"]');
+    const box = async (locator: ReturnType<Page['locator']>) =>
+      (await locator.boundingBox())!;
+
+    // Two buttons: Sign out everywhere above Cancel, each the footer's width.
+    await page.getByRole('button', { name: 'Sign out everywhere' }).click();
+    const confirm = dialog(page);
+    const row = await box(footer(confirm));
+    const signOut = await box(
+      confirm.getByRole('button', { name: 'Sign out everywhere' }),
+    );
+    const cancel = await box(confirm.getByRole('button', { name: 'Cancel' }));
+    expect(signOut.y).toBeLessThan(cancel.y);
+    expect(signOut.width).toBeCloseTo(row.width, 0);
+    expect(cancel.width).toBeCloseTo(row.width, 0);
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+
+    // One button: Done, the footer's width.
+    await page.getByRole('button', { name: 'Regenerate codes' }).click();
+    await dialog(page).getByLabel('Password', { exact: true }).fill(STRONG);
+    await dialog(page)
+      .getByRole('button', { name: 'Regenerate codes' })
+      .click();
+    const codes = page.getByRole('dialog', { name: 'Your new backup codes' });
+    const done = await box(codes.getByRole('button', { name: 'Done' }));
+    expect(done.width).toBeCloseTo((await box(footer(codes))).width, 0);
   });
 
   test('turning two-step on: scan, then confirm', async ({ page }) => {

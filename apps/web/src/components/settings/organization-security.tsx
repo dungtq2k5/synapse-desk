@@ -13,6 +13,7 @@ import {
 } from '@synapsedesk/contracts';
 import { ShieldCheckIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
 import { useId, useState, type KeyboardEvent, type SubmitEvent } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { SectionCard } from '@/components/account/section-card';
 import { serverMessage } from '@/components/ticket/use-directory';
@@ -229,11 +230,11 @@ export function SecurityCard({
             </Alert>
           ))}
         {editable && (
-          <div className="flex justify-end">
+          <ClosingActions>
             <Button type="submit" disabled={!changed || saving}>
               Save changes
             </Button>
-          </div>
+          </ClosingActions>
         )}
       </form>
       <RequireTwoStepDialog
@@ -448,11 +449,11 @@ export function UploadLimitsCard({
           </Field>
         ))}
         {editable && (
-          <div className="flex justify-end">
+          <ClosingActions>
             <Button type="submit" disabled={!changed || saving}>
               Save changes
             </Button>
-          </div>
+          </ClosingActions>
         )}
       </form>
     </SectionCard>

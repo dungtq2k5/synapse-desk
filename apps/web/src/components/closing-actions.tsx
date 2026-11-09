@@ -16,7 +16,10 @@ export function ClosingActions({
   children: ReactNode;
 }) {
   return (
-    <div className={cn('flex flex-wrap gap-2 md:justify-end', className)}>
+    <div
+      data-slot="closing-actions"
+      className={cn('flex flex-wrap gap-2 md:justify-end', className)}
+    >
       {children}
     </div>
   );

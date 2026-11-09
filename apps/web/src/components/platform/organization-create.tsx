@@ -11,6 +11,7 @@ import { CircleCheckIcon, MailIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState, type SubmitEvent } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Field } from '@/components/auth/field';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -290,7 +291,7 @@ export function OrganizationCreate() {
             {limit('ai', 'AI allowance a month', 'USD')}
           </div>
         </ConsoleCard>
-        <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+        <ClosingActions>
           <Link
             href="/platform/organizations"
             className={buttonVariants({ variant: 'outline' })}
@@ -304,7 +305,7 @@ export function OrganizationCreate() {
           >
             {create.isPending ? 'Creating…' : 'Create organization'}
           </Button>
-        </div>
+        </ClosingActions>
       </form>
     </ConsolePage>
   );
@@ -348,14 +349,14 @@ function Created({
             ['Password', `${first} gets an email with a link to set one.`],
           ]}
         />
-        <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+        <ClosingActions>
           <Button onClick={() => onOpen(organization.id)}>
             {`Open ${organization.name}`}
           </Button>
           <Button variant="outline" onClick={onAnother}>
             Create another
           </Button>
-        </div>
+        </ClosingActions>
       </ConsoleCard>
     </ConsolePage>
   );

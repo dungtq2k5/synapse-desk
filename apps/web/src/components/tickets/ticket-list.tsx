@@ -189,7 +189,9 @@ export function TicketList() {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+        {/* The whole line on a phone, so a long count ("134 tickets · 2
+            deleted") never squeezes beside the buttons; they wrap under it. */}
+        <div className="flex w-full flex-col gap-1 md:w-auto">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p aria-live="polite" className="text-sm text-muted-foreground">
             {page &&

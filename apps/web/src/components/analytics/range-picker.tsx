@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
+import { ClosingActions } from '@/components/closing-actions';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -241,7 +242,7 @@ function PickerBody({
             </span>
           </p>
         )}
-        <div className="flex justify-end gap-2">
+        <ClosingActions>
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
@@ -253,7 +254,7 @@ function PickerBody({
           >
             Apply
           </Button>
-        </div>
+        </ClosingActions>
       </div>
     </div>
   );
