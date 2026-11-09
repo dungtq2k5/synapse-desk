@@ -229,8 +229,8 @@ describe('the CI contract', () => {
         why: 'the web client in a browser over the whole system; unrun, a page that breaks against the real gateway is first found by a person',
       },
       {
-        script: 'images:boot-gateway',
-        why: 'the gateway image builds and answers /health; unrun, an image that cannot start is first found by a deploy',
+        script: 'images:stack',
+        why: 'every image a deploy runs builds, the whole stack starts healthy and answers, and the daemon checks hold; unrun, an image that cannot build or start is first found by a deploy',
       },
     ];
 

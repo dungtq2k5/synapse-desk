@@ -168,7 +168,7 @@ services:
       args: { <<: *build-args, SERVICE: auth-service }
     env_file: env/auth-service.env
     healthcheck: &grpc-health
-      test: ['CMD', 'sh', '-c', 'NODE_PATH=/app/node_modules node /healthcheck/grpc-health.cjs $$GRPC_PORT']
+      test: ['CMD', 'sh', '-c', 'NODE_PATH=/app/node_modules node /healthcheck/grpc-health.cjs']
       interval: 10s
       timeout: 5s
       retries: 12

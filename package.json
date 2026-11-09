@@ -40,6 +40,7 @@
     "//test:e2e:gateway-java": "failsafe, the `*IT` rows — needs Redis. These rows assert what Redis itself does; a fake would be a reimplementation of Redis, which is the one thing it must not be — see `pom.xml`'s own comment on the failsafe plugin.",
     "test:e2e:gateway-java": "cd services/api-gateway && ./mvnw verify",
     "images:boot-gateway": "./docker/boot-gateway.sh",
+    "images:stack": "./deploy/demo/ci-stack.sh",
     "test:e2e": "npm run test:e2e:auth && npm run test:e2e:ticket && npm run test:e2e:notification && npm run test:e2e:ingestion && npm run test:e2e:storage",
     "//test:system": "DESTRUCTIVE to three stores on every run, in setup AND teardown: flushes the entire dev Redis (BullMQ schedules, throttler counters, AI quota counters, socket channels, alert levels), drops the Qdrant collection, and resets the JetStream streams. Postgres alone is spared — wipe it first with `node scripts/reset-databases.mjs --dev-only`; seeding happens inside the run, after the stack is up, because both seeders depend on rows a service writes at boot.",
     "test:system": "jest --config test/system/jest.config.ts",

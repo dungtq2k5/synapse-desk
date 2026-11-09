@@ -7,12 +7,21 @@
  * empty request encodes to no bytes, and SERVING is field 1 set to 1, which
  * encodes to `08 01`.
  *
- * Run inside the service's container with its modules on the path:
- *   NODE_PATH=/app/node_modules node /healthcheck/grpc-health.cjs 5001
+ * The port is the service's own `GRPC_PORT`, read from its environment (every
+ * Node service's env file sets it); anything but a whole number from 1 to
+ * 65535 exits 1 with a message. Run inside the service's container with its
+ * modules on the path:
+ *   NODE_PATH=/app/node_modules node /healthcheck/grpc-health.cjs
  */
 const grpc = require('@grpc/grpc-js');
 
-const port = process.argv[2];
+const raw = process.env.GRPC_PORT ?? '';
+const port = /^\d{1,5}$/.test(raw) ? Number(raw) : 0;
+if (port < 1 || port > 65535) {
+  console.error(`GRPC_PORT must be a port from 1 to 65535, not "${raw}"`);
+  process.exit(1);
+}
+
 const client = new grpc.Client(
   `127.0.0.1:${port}`,
   grpc.credentials.createInsecure(),

@@ -147,6 +147,16 @@ npx wrangler@4 delete          # to remove it
 To see it work: `docker compose stop cloudflared`, open the site, and the
 page shows; `docker compose start cloudflared` brings the site back.
 
+## The same file in CI
+
+CI's `stack` job (`npm run images:stack`, `ci-stack.sh`) builds and starts
+this file with `compose.ci.yaml` layered on top: the Firebase emulator instead
+of a Google project, placeholder Stripe, Resend and Gemini keys, and no
+cloudflared. It runs as its own project (`synapsedesk-ci`) with `ci-<sha>`
+image tags and writes its env files to a temporary directory, so running it
+on this PC never touches the demo's containers, volumes, images or
+`env/*.env`.
+
 ## When the site doesn't answer
 
 1. **`docker compose ps`:** which one isn't healthy. Its `logs` say why.

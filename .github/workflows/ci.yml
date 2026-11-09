@@ -266,39 +266,37 @@ jobs:
             services/api-gateway/target/site/jacoco/jacoco.xml
           if-no-files-found: error
 
-  # -------------------------------------------------------- gateway images
+  # ----------------------------------------------------------------- stack
   #
-  # **The image that ships, started.** Every other gateway job runs the code
-  # from the checkout; this one builds the gateway image, runs it, and waits
-  # for `/health`. Nothing is pushed: an image that cannot start is a PR
-  # failure here instead of a deploy failure in CD.
+  # **Every image a deploy runs, built and started together.** The demo's
+  # compose file builds all twelve (the gateway, the web, rag, five Node
+  # services and four `migrate` images) from this commit; the stack must come
+  # up healthy, with every migrate exiting 0, and answer one request to the
+  # web and one to the gateway's `/health/ready`. Then `check-images.sh`'s
+  # daemon checks (the runtime trees resolve, the stage guards fire, OCR, the
+  # web's nonce and headers). Nothing is pushed and no real provider is
+  # reached: the Firebase emulator stands in for Google, and Stripe, Resend
+  # and Gemini get placeholder keys. `deploy/demo/ci-stack.sh` holds the
+  # steps, so a local run is this job.
   #
-  # The stores come from compose, as `contract` gets them, and the image joins
-  # compose's network to reach them.
-  gateway-images:
-    name: gateway image (build and boot)
+  # Cold on purpose: no layer cache across runs.
+  stack:
+    name: stack (every image builds and starts healthy)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: stack env
-        run: cp .env.example .env
-      - name: start the stores the gateway reads
-        run: docker compose up -d --wait redis nats
-      - run: npm run images:boot-gateway
-
-  # -------------------------------------------------------------- web image
-  #
-  # The web client's image, built and booted with nothing behind it: the
-  # sign-in page renders without the gateway, so this proves the image (the
-  # standalone server, its static files, the per-request CSP), not the system.
-  web-image:
-    name: web image (build and boot)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - run: ./docker/check-images.sh --web-only
+      # Twelve images and their build stages outgrow a runner's free disk. Not
+      # in the job's script: this deletes system directories, so it's CI-only.
+      - name: free the runner's disk
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: npm run images:stack
 
   # ---------------------------------------------------------------- e2e-web
   #

@@ -312,7 +312,7 @@ docker build -f docker/java-service.Dockerfile \
 | `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry |
 | `migrate` | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
 
-rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds every Node and rag image and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change. `npm run images:boot-gateway` builds the gateway's image, starts it and waits for `/health`.
+rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds every Node and rag image and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change. `npm run images:boot-gateway` builds the gateway's image, starts it and waits for `/health`. `npm run images:stack` (CI's `stack` job) builds every image the demo runs, starts the whole stack with placeholder keys and the Firebase emulator, and waits for every service to be healthy, then runs `check-images.sh`; it uses its own Compose project, never the demo's.
 
 To run a locally built image against the Compose stack, generate the per-service container env first — it rewrites host addresses to Compose service names:
 

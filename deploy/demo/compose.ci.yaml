@@ -1,0 +1,25 @@
+# CI only, layered over compose.yaml by `ci-stack.sh`: the Firebase emulator
+# on the stack's network, so Google sign-in starts with no Google project. The
+# emulator is the one the development stack runs (`docker-compose.yml`); the
+# env files `scripts/write-ci-demo-env.mjs` writes point auth-service at it.
+# Not storage-service: it refuses an emulator under NODE_ENV=production.
+services:
+  firebase:
+    image: andreysenov/firebase-tools:15.25.1
+    working_dir: /home/node
+    command: firebase emulators:start --only storage,auth --project synapsedesk-test
+    volumes:
+      - ${DEMO_SOURCE:?}/docker/firebase:/home/node
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const g=(p)=>new Promise((y,n)=>require('http').get('http://127.0.0.1:'+p+'/',()=>y()).on('error',n));Promise.all([g(9199),g(9099)]).then(()=>process.exit(0),()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-service:
+    depends_on:
+      firebase: { condition: service_healthy }
