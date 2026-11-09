@@ -9,8 +9,8 @@ import {
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { CircleAlertIcon, DownloadIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { Fragment, useCallback, useRef, useState } from 'react';
-import { Markdown } from '@/components/markdown';
 import { AppHeader } from '@/components/shell/app-header';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -18,6 +18,15 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { dayDate } from '@/lib/format';
 import { toastError } from '@/lib/toast';
+
+/**
+ * The Markdown parser (react-markdown with GFM) in its own chunk, so it isn't
+ * part of the page's first load. The server still renders each block's HTML;
+ * the chunk arrives after the page and the blocks hydrate then.
+ */
+const Markdown = dynamic(() =>
+  import('@/components/markdown').then((module) => module.Markdown),
+);
 
 /** Blocks per page: the reader's paging, not the document's. */
 const BLOCKS = 20;
