@@ -27,7 +27,7 @@ export function Hero() {
             <SceneStill />
           </SceneLoader>
         </div>
-        <div className="flex flex-col justify-center px-4 pt-2 pb-16 lg:w-160 lg:shrink-0 lg:py-0 lg:pr-0 lg:pl-30">
+        <div className="flex flex-col justify-center px-4 pt-2 pb-12 lg:w-160 lg:shrink-0 lg:py-0 lg:pr-0 lg:pl-30">
           <h1 id="hero-title" className="type-display lg:type-hero">
             Support that answers from your own documents
           </h1>
@@ -47,7 +47,7 @@ export function Hero() {
               Sign in
             </Link>
           </div>
-          <p className="mt-6 text-sm text-muted-foreground">
+          <p className="mt-6 type-small text-muted-foreground">
             Free plan. No card needed.
           </p>
         </div>

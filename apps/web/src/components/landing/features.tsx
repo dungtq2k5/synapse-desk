@@ -60,7 +60,7 @@ export function Features() {
           title="What’s inside"
           lead="Everything here works in this demo, today."
         />
-        <ul className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="mt-6 grid gap-6 md:mt-10 md:grid-cols-2 xl:auto-rows-fr xl:grid-cols-3">
           {FEATURES.map((feature) => {
             const Icon = feature.icon;
             return (
@@ -69,7 +69,7 @@ export function Features() {
                   <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
                     <Icon aria-hidden className="size-5" />
                   </span>
-                  <h3 className="mt-1 text-base font-semibold">
+                  <h3 className="text-base font-semibold tracking-[-0.005em]">
                     {feature.name}
                   </h3>
                   <p className="text-sm text-muted-foreground">

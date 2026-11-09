@@ -74,15 +74,15 @@ const WIDE = (() => {
   const up = 36;
   const curve = cubicLength([
     [1050, 114],
-    [1050, 0],
-    [450, 0],
+    [1050, -20],
+    [450, -20],
     [450, 114],
   ]);
   const total = solid + up + curve;
   const at = (distance: number) => (distance / total).toFixed(4);
   const seconds = [0, 1.2, 1.6, 2.8, 3.2, 4.4, 4.8, 6.4];
   return {
-    path: 'M150 150 L1050 150 L1050 114 C1050 0 450 0 450 114',
+    path: 'M150 150 L1050 150 L1050 114 C1050 -20 450 -20 450 114',
     duration: 6.4,
     keyTimes: seconds.map((s) => (s / 6.4).toFixed(4)).join(';'),
     keyPoints: [0, 300, 300, 600, 600, 900, 900, total].map(at).join(';'),
@@ -250,12 +250,14 @@ export function FlowGraph() {
   useLight(graph, !reduced);
 
   return (
-    <div ref={graph} className="relative mt-10">
+    <div ref={graph} className="relative mt-6 md:mt-10">
       {/* 1440: the row, with the return path above. */}
       <svg
         viewBox="0 0 1200 300"
         aria-hidden="true"
         focusable="false"
+        // The return arc peaks just above the box, as drawn.
+        overflow="visible"
         className="absolute inset-0 hidden h-75 w-full xl:block"
       >
         <path
@@ -265,7 +267,7 @@ export function FlowGraph() {
           fill="none"
         />
         <path
-          d="M1050 114 C1050 0 450 0 450 114"
+          d="M1050 114 C1050 -20 450 -20 450 114"
           className="stroke-scene-line"
           strokeWidth={1.5}
           strokeDasharray="6 6"
@@ -275,7 +277,7 @@ export function FlowGraph() {
       </svg>
       <p
         aria-hidden="true"
-        className="absolute top-8 left-[62.5%] hidden -translate-x-1/2 text-xs text-muted-foreground xl:block"
+        className="absolute top-8 left-[62.5%] hidden -translate-x-1/2 whitespace-nowrap type-small text-muted-foreground xl:block"
       >
         The next answer uses what was fixed
       </p>
@@ -313,7 +315,7 @@ export function FlowGraph() {
               onBlur={() => setActive((was) => (was === index ? null : was))}
               data-active={lit || undefined}
               className={cn(
-                'group flex min-h-26 gap-4 rounded-md outline-none xl:absolute xl:top-28.5 xl:w-60 xl:flex-col xl:items-center xl:gap-0 xl:text-center',
+                'group flex min-h-26 gap-4 last:min-h-22.5 rounded-md outline-none xl:absolute xl:top-28.5 xl:w-60 xl:flex-col xl:items-center xl:gap-0 xl:text-center',
                 '',
               )}
               // The row's slots: each step centered on its node, 300 px apart.
@@ -349,7 +351,7 @@ export function FlowGraph() {
           );
         })}
       </ol>
-      <p className="mt-2 border-l-2 border-dashed border-scene-line pl-4 text-sm text-muted-foreground xl:hidden">
+      <p className="mt-3 border-l-2 border-dashed border-scene-line pl-4 text-sm text-muted-foreground xl:hidden">
         Then back to step 2: the next answer uses what was fixed.
       </p>
     </div>

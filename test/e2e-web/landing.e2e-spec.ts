@@ -202,6 +202,85 @@ test.describe('the page', () => {
   });
 });
 
+test.describe('the return path’s label', () => {
+  /** The label against the arc: its box, the arc's peak, and any arc point inside the box. */
+  const measure = (page: Page) =>
+    page.evaluate(() => {
+      const label = [...document.querySelectorAll('#how-it-works p')].find(
+        (p) => p.textContent === 'The next answer uses what was fixed',
+      )!;
+      const arc = [...document.querySelectorAll('#how-it-works path')].find(
+        (path) => path.getAttribute('stroke-dasharray'),
+      ) as SVGPathElement;
+      const box = label.getBoundingClientRect();
+      const shown = (element: Element) =>
+        getComputedStyle(element).display !== 'none' &&
+        getComputedStyle(element.closest('svg') ?? element).display !== 'none';
+      if (!shown(label) || !shown(arc)) {
+        return { drawn: false, peak: 0, top: 0, touching: 0 };
+      }
+      const matrix = arc.getScreenCTM()!;
+      const length = arc.getTotalLength();
+      const points = Array.from({ length: 400 }, (_, index) => {
+        const { x, y } = arc.getPointAtLength((index / 399) * length);
+        return new DOMPoint(x, y).matrixTransform(matrix);
+      });
+      return {
+        drawn: true,
+        peak: Math.min(...points.map((point) => point.y)),
+        top: box.top,
+        // A stroke 1.5 wide: a point within 1 px of the box touches it.
+        touching: points.filter(
+          (point) =>
+            point.x >= box.left - 1 &&
+            point.x <= box.right + 1 &&
+            point.y >= box.top - 1 &&
+            point.y <= box.bottom + 1,
+        ).length,
+      };
+    });
+
+  test('at 1440 it sits under the arc’s peak, clear of the arc; at 200% text the graph is the rail', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.locator('#how-it-works').scrollIntoViewIfNeeded();
+
+    const normal = await measure(page);
+    expect(normal.drawn).toBe(true);
+    expect(normal.top).toBeGreaterThan(normal.peak);
+    expect(normal.touching).toBe(0);
+
+    // Text at 200%: the default font size, as a person sets it. The rem
+    // breakpoints move with it, so a 1440 window gets the rail, where the
+    // return path is a sentence under the steps and no arc is drawn.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Page.setFontSizes', {
+      fontSizes: { standard: 32, fixed: 26 },
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => getComputedStyle(document.documentElement).fontSize,
+        ),
+      )
+      .toBe('32px');
+    const doubled = await measure(page);
+    expect(doubled.drawn ? doubled.touching : 0).toBe(0);
+    expect(doubled.drawn).toBe(false);
+    await expect(
+      page.getByText(
+        'Then back to step 2: the next answer uses what was fixed.',
+      ),
+    ).toBeVisible();
+    await cdp.send('Page.setFontSizes', {
+      fontSizes: { standard: 16, fixed: 13 },
+    });
+    await cdp.detach();
+  });
+});
+
 test.describe('the scene', () => {
   test('reduced motion: no canvas and no flow light in the DOM', async ({
     page,

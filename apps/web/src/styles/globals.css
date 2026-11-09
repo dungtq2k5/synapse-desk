@@ -145,6 +145,12 @@
   letter-spacing: -0.02em;
 }
 
+/* `type.small`: 13/18, the hero's note, the demo line and the footer. */
+@utility type-small {
+  font-size: var(--font-size-sm);
+  line-height: var(--font-line-height-sm);
+}
+
 @utility type-hero {
   font-size: var(--font-size-4xl);
   line-height: var(--font-line-height-4xl);

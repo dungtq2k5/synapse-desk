@@ -28,14 +28,14 @@ export function PricingCards({ plans }: { plans: TenantPlanResponseDto[] }) {
   const [interval, setInterval] = useState<Interval>('month');
 
   return (
-    <div className="mt-10">
-      {/* 150 px at both widths, as the landing frames draw it. */}
+    <div className="mt-6 md:mt-10">
+      {/* 150 × 36 at both widths, as the landing frames draw it: smaller than Billing's. */}
       <IntervalSwitch
         value={interval}
         onValueChange={setInterval}
-        className="w-38 sm:w-38"
+        className="w-38 sm:w-38 *:h-7"
       />
-      <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid gap-4 md:mt-10 md:grid-cols-2 xl:grid-cols-4">
         {plans.map((plan) => (
           <PlanCard key={plan.id} plan={plan} interval={interval} />
         ))}

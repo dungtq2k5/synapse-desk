@@ -11,7 +11,7 @@ export function SectionHeader({
 }) {
   return (
     <div className="flex max-w-160 flex-col gap-2">
-      <h2 id={id} className="text-3xl font-semibold tracking-tight">
+      <h2 id={id} className="text-3xl/9.5 font-semibold tracking-[-0.02em]">
         {title}
       </h2>
       <p className="text-base text-muted-foreground">{lead}</p>

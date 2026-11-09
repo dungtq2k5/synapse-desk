@@ -13,7 +13,7 @@ import { SECTIONS } from './sections';
 export function LandingHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background">
-      <div className="relative mx-auto flex h-14 max-w-300 items-center gap-2 px-4 md:h-16 md:gap-3 xl:px-0">
+      <div className="relative mx-auto flex h-13.75 max-w-300 items-center gap-2 px-4 md:h-15.75 md:gap-3 xl:px-0">
         <Link href="/" aria-label="SynapseDesk" className="mr-auto rounded-md">
           <Lockup className="hidden md:inline-flex" />
           <span className="inline-flex md:hidden">

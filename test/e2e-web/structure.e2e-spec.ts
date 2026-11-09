@@ -86,6 +86,8 @@ test('the main screens reflow at 320 px and at 200% text, with one h1, one main 
 }) => {
   test.setTimeout(240_000);
   await checkScreen(page, '/login', false);
+  // Signed out, `/` is the landing page.
+  await checkScreen(page, '/', true);
 
   const { maya, tickets } = await tenant('structure');
   await signInAs(page, maya);

@@ -74,7 +74,9 @@ async function Plans({ only }: { only?: readonly string[] }) {
   return (
     <>
       <PricingCards plans={plans} />
-      <p className="mt-10 text-sm text-muted-foreground">{DEMO_LINE}</p>
+      <p className="mt-6 type-small text-muted-foreground md:mt-10">
+        {DEMO_LINE}
+      </p>
     </>
   );
 }
@@ -82,7 +84,7 @@ async function Plans({ only }: { only?: readonly string[] }) {
 /** A skeleton card per plan, in the cards' shape, under the switch. */
 function Loading() {
   return (
-    <div className="mt-10">
+    <div className="mt-6 md:mt-10">
       <p role="status" className="sr-only">
         Loading plans
       </p>
@@ -92,7 +94,7 @@ function Loading() {
       </div>
       <div
         aria-hidden="true"
-        className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+        className="mt-6 grid gap-4 md:mt-10 md:grid-cols-2 xl:grid-cols-4"
       >
         {[4, 7, 7, 7].map((lines, card) => (
           <div key={card} className="flex flex-col gap-3 rounded-xl border p-6">
@@ -105,7 +107,9 @@ function Loading() {
           </div>
         ))}
       </div>
-      <p className="mt-10 text-sm text-muted-foreground">{DEMO_LINE}</p>
+      <p className="mt-6 type-small text-muted-foreground md:mt-10">
+        {DEMO_LINE}
+      </p>
     </div>
   );
 }
@@ -113,7 +117,7 @@ function Loading() {
 /** The plans couldn't be read: the heading stays, with one card and Start free. */
 function Unavailable() {
   return (
-    <div className="mt-10 flex max-w-150 flex-col items-start gap-4 rounded-xl border p-6">
+    <div className="mt-6 flex max-w-150 md:mt-10 flex-col items-start gap-4 rounded-xl border p-6">
       <p className="text-sm">
         The plans couldn’t be loaded just now. You’ll see them after you sign
         up.
