@@ -16,6 +16,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 for (const file of process.argv.slice(2)) {
   const text = readFileSync(file, 'utf8');
-  const trimmed = text.replaceAll(/[ \t]+$/gm, '');
+  // Line by line, not `/[ \t]+$/gm`: that regex rescans a long run of
+  // spaces from every start position inside it.
+  const trimmed = text
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n');
   if (trimmed !== text) writeFileSync(file, trimmed);
 }

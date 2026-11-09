@@ -40,7 +40,7 @@ fail() { echo "  FAIL: $1" >&2; exit 1; }
 # replaces its scope's whole manifest, so a shared scope would keep only the
 # last image built. Unset, a plain local build.
 cache_args() { # tag
-  [ "${IMAGE_CACHE:-}" = gha ] || return 0
+  [[ "${IMAGE_CACHE:-}" == gha ]] || return 0
   local scope="${1//[^a-zA-Z0-9-]/-}"
   echo "--load --cache-from type=gha,scope=$scope --cache-to type=gha,mode=max,scope=$scope"
 }
