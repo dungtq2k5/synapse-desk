@@ -11,8 +11,9 @@
 # `synapsedesk-demo`; this always passes its own project name and tags its
 # images `ci-<sha>`, so it can't start into the demo or retag its images, and
 # its `down -v` removes only its own volumes. Its env files and secrets are
-# placeholders and synthetic credentials in a temporary project directory
-# (`scripts/write-ci-demo-env.mjs`), never `deploy/demo/env/`.
+# placeholders and synthetic credentials that `scripts/write-ci-demo-env.mjs`
+# writes into a temporary project directory (`CI_DEMO_DIR`), never
+# `deploy/demo/env/`.
 #
 # No real provider and no cloudflared: compose.ci.yaml adds the Firebase
 # emulator, and Stripe, Resend and Gemini get keys that reach nothing.
@@ -50,7 +51,7 @@ trap cleanup EXIT
 
 fail() { echo "  FAIL: $1" >&2; exit 1; }
 
-node scripts/write-ci-demo-env.mjs "$dir"
+CI_DEMO_DIR="$dir" node scripts/write-ci-demo-env.mjs
 
 echo "1. every image the stack runs builds"
 start=$SECONDS

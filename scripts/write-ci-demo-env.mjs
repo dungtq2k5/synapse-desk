@@ -2,13 +2,16 @@
  * @file The demo stack's env files and secrets for CI: every value a real
  * provider would read is a placeholder, and every credential is synthetic.
  *
- *     node scripts/write-ci-demo-env.mjs <dir>
+ *     CI_DEMO_DIR=/an/existing/absolute/dir node scripts/write-ci-demo-env.mjs
  *
- * Writes `<dir>/env/<service>.env` from `deploy/demo/env/<service>.env.example`
- * (the overrides below replace or add keys) and `<dir>/secrets/`: two JWT key
- * pairs and a synthetic Firebase service account. `deploy/demo/ci-stack.sh`
- * runs the demo's compose file with `<dir>` as its project directory, so the
- * file's `env/` and `./secrets` paths resolve there.
+ * Writes, under `CI_DEMO_DIR` only: `env/<service>.env` from
+ * `deploy/demo/env/<service>.env.example` (the overrides below replace or add
+ * keys) and `secrets/`: two JWT key pairs and a synthetic Firebase service
+ * account. `deploy/demo/ci-stack.sh` makes that directory, runs the demo's
+ * compose file with it as the project directory (so the file's `env/` and
+ * `./secrets` paths resolve there) and removes it afterwards. It takes no
+ * argument; it exits 1 unless `CI_DEMO_DIR` is an absolute path to an existing
+ * directory.
  *
  * Google sign-in points at the Firebase emulator that
  * `deploy/demo/compose.ci.yaml` adds. Storage, Stripe, Resend and Gemini get keys that
@@ -17,18 +20,29 @@
  */
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const examples = join(repoRoot, 'deploy/demo/env');
 
-if (!process.argv[2]) {
-  console.error('usage: node scripts/write-ci-demo-env.mjs <dir>');
+const out = process.env.CI_DEMO_DIR ?? '';
+if (
+  !isAbsolute(out) ||
+  !statSync(out, { throwIfNoEntry: false })?.isDirectory()
+) {
+  console.error(
+    'usage: CI_DEMO_DIR=<an existing absolute directory> node scripts/write-ci-demo-env.mjs',
+  );
   process.exit(1);
 }
-const out = resolve(process.argv[2]);
 
 const hex = (bytes) => randomBytes(bytes).toString('hex');
 // Gateway and notification-service must share it.
