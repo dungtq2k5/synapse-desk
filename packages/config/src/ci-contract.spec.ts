@@ -213,8 +213,8 @@ describe('the CI contract', () => {
         why: 'the committed OpenAPI document equals what the gateway exports, and is a valid OpenAPI document; unrun, the published contract drifts from the code',
       },
       {
-        script: 'images:boot-gateway',
-        why: 'the gateway image builds and answers /health; unrun, an image that cannot start is first found by a deploy',
+        script: 'images:check',
+        why: 'every image CD ships builds, the daemon checks hold, and the gateway image answers /health; unrun, an image that cannot build or start is first found by a deploy',
       },
     ];
 

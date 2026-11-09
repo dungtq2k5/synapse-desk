@@ -271,7 +271,7 @@ docker build -f docker/node-service.Dockerfile \
 | `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry |
 | `migrate` | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
 
-rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds everything and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change.
+rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds everything and asserts the runtime trees resolve; CI runs it on every push (`npm run images:check`), and locally it is minutes, not seconds, so run it when the Dockerfiles change.
 
 To run a locally built image against the Compose stack, generate the per-service container env first — it rewrites host addresses to Compose service names:
 

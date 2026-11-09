@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The gateway image builds, starts, and answers `/health`. Nothing is pushed.
 #
-#     ./docker/boot-gateway.sh
+#     ./docker/boot-gateway.sh                         # builds it first
+#     ./docker/boot-gateway.sh synapsedesk/api-gateway # boots one already built
 #
 # Every other gateway check runs the code from a checkout, from `dist/`. The image is the thing that ships, and until this ran per PR
 # an image that could not start was first found by a deploy.
@@ -57,12 +58,16 @@ boot() { # image
   fail "$1 did not answer /health within 180s"
 }
 
-echo "building api-gateway…"
-docker build -f docker/node-service.Dockerfile --target runtime \
-  --build-arg SERVICE=api-gateway \
-  --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
-  -t synapsedesk/api-gateway:boot-check . >/dev/null
+image="${1:-}"
+if [[ -z "$image" ]]; then
+  image=synapsedesk/api-gateway:boot-check
+  echo "building api-gateway…"
+  docker build -f docker/node-service.Dockerfile --target runtime \
+    --build-arg SERVICE=api-gateway \
+    --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
+    -t "$image" . >/dev/null
+fi
 
-boot synapsedesk/api-gateway:boot-check
+boot "$image"
 
 echo "The gateway image boots."

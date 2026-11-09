@@ -147,26 +147,47 @@ jobs:
       - run: npm run build
       - run: npm run test:contract
 
-  # -------------------------------------------------------- gateway images
+  # ---------------------------------------------------------------- images
   #
-  # **The image that ships, started.** Every other gateway job runs the code
-  # from the checkout; this one builds the gateway image, runs it, and waits
-  # for `/health`. Nothing is pushed: an image that cannot start is a PR
-  # failure here instead of a deploy failure in CD.
+  # **Every image CD ships, built, and the gateway's started.** Six Node
+  # services (ingestion as `runtime-ocr`), the four `migrate` images and
+  # rag-service, with `check-images.sh`'s daemon checks (the runtime trees
+  # resolve, the stage guards fire, the OCR languages); then the gateway image
+  # runs and answers `/health`. Nothing is pushed: an image that can't build or
+  # start is a PR failure here instead of a deploy failure in CD.
   #
-  # The stores come from compose, and the image joins compose's network to
-  # reach them.
-  gateway-images:
-    name: gateway image (build and boot)
+  # The stores come from compose, and the gateway joins compose's network to
+  # reach them. Layers come from the GitHub Actions cache, one scope per image.
+  images:
+    name: images (every image builds, the gateway boots)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # The images and their build stages outgrow a runner's free disk. Not in
+      # the job's script: this deletes system directories, so it's CI-only.
+      - name: free the runner's disk
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: docker/setup-buildx-action@v3
+      # `type=gha` needs the runtime's cache credentials, which only an action
+      # sees; this hands them to the steps after it.
+      - name: expose the cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            for (const name of ['ACTIONS_RUNTIME_TOKEN', 'ACTIONS_CACHE_URL', 'ACTIONS_RESULTS_URL', 'ACTIONS_CACHE_SERVICE_V2']) {
+              if (process.env[name]) core.exportVariable(name, process.env[name]);
+            }
       - name: stack env
         run: cp .env.example .env
       - name: start the stores the gateway reads
         run: docker compose up -d --wait redis nats
-      - run: npm run images:boot-gateway
+      - run: npm run images:check
+        env:
+          IMAGE_CACHE: gha
 
   # ------------------------------------------------------------------ unit
   #

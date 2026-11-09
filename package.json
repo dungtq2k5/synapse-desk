@@ -36,6 +36,7 @@
     "//test:contract": "The gateway CONTRACT harness: it starts the gateway as a PROCESS and asserts what a client sees. Not a `npm test` project — it pulls two containers and starts a process, and `npm test` must stay runnable on a machine with nothing started. `run-contract-suite.mjs` BUILDS the gateway first: the harness starts a built gateway, and a built-output check can see an absent build but never a stale one.",
     "test:contract": "node scripts/run-contract-suite.mjs",
     "images:boot-gateway": "./docker/boot-gateway.sh",
+    "images:check": "./docker/check-images.sh && ./docker/boot-gateway.sh synapsedesk/api-gateway",
     "test:e2e": "npm run test:e2e:gateway && npm run test:e2e:auth && npm run test:e2e:ticket && npm run test:e2e:notification && npm run test:e2e:ingestion && npm run test:e2e:storage",
     "//test:system": "DESTRUCTIVE to three stores on every run, in setup AND teardown: flushes the entire dev Redis (BullMQ schedules, throttler counters, AI quota counters, socket channels, alert levels), drops the Qdrant collection, and resets the JetStream streams. Postgres alone is spared — wipe it first with `node scripts/reset-databases.mjs --dev-only`; seeding happens inside the run, after the stack is up, because both seeders depend on rows a service writes at boot.",
     "test:system": "jest --config test/system/jest.config.ts",
