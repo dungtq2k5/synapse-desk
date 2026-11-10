@@ -259,13 +259,13 @@ describe('the bell', () => {
       ).toHaveFocus(),
     );
     const item = await screen.findByRole('link', {
-      name: /^Unread\., Jordan Lee assigned #1051 to you, .*High priority$/,
+      name: /^Jordan Lee assigned #1051 to you , Unread, .*High priority$/,
     });
     // A ticket by number, marked as coming from a notification.
     expect(item).toHaveAttribute('href', '/tickets/1051?from=notification');
     // An off-site actionUrl opens nothing.
     expect(
-      screen.getByRole('button', { name: /^Unread\., A payment failed/ }),
+      screen.getByRole('button', { name: /^A payment failed.*, Unread, / }),
     ).toBeInTheDocument();
     expect(screen.getByText('Critical')).toBeInTheDocument();
 

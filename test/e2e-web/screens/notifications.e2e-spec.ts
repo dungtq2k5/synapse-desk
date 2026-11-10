@@ -515,7 +515,7 @@ test.describe('live', () => {
     await expect(bell(page)).toHaveAccessibleName('Notifications, 1 unread');
     await bell(page).click();
     await expect(
-      panel(page).getByRole('link', { name: /^Unread\., You’ve used 95%/ }),
+      panel(page).getByRole('link', { name: /^You’ve used 95%.*, Unread, / }),
     ).toBeVisible();
     await look(page, 'live-read-elsewhere', {
       viewportOnly: true,

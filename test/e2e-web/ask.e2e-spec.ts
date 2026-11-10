@@ -31,7 +31,7 @@ test('an end user asks; the answer comes, they hand over, and an agent replies i
   await page
     .getByRole('textbox', { name: 'Your question' })
     .fill('Is a standing desk covered by the home-office allowance?');
-  await page.getByRole('button', { name: 'Ask' }).click();
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
   const ticketId = page.url().split('/').at(-1)!;
   await expect(
@@ -122,7 +122,7 @@ test('**an end user asks with a screenshot**: the answer comes, and the file is 
   const files = page.getByRole('list', { name: 'Attachments' });
   await expect(files.getByText('avatar.png')).toBeVisible();
   await expect(files.getByText('Uploading…', { exact: false })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Ask' }).click();
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
 
   const question = opening(page, 'Why does the expenses page show this error?');
@@ -231,7 +231,7 @@ test('an agent asks from Ask, and finds it under their latest questions', async 
   await page
     .getByRole('textbox', { name: 'Your question' })
     .fill('Which VPN client do we support on Linux?');
-  await page.getByRole('button', { name: 'Ask' }).click();
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
   await expect(page).toHaveURL(/\/tickets\/[0-9a-f-]{36}$/);
   // An agent's ticket hangs from the queue.
   await expect(
@@ -333,7 +333,7 @@ test.describe('the knowledge base', () => {
       card.getByText('This answer comes from the offline model, citing [1].'),
     ).toBeVisible();
     await card
-      .getByRole('link', { name: 'Remote Work Policy.pdf, page 22, source 1' })
+      .getByRole('link', { name: '[1] Remote Work Policy.pdf, p. 22' })
       .click();
     await expect(
       page.getByRole('region', { name: 'Cited passage' }),

@@ -610,11 +610,11 @@ describe('the ticket page', () => {
       // Each source opens the reader at its passage.
       expect(
         within(log).getByRole('link', {
-          name: 'Refund policy, page 2, source 1',
+          name: '[1] Refund policy, p. 2',
         }),
       ).toHaveAttribute('href', '/knowledge/articles/d1?passage=c1');
       expect(
-        within(log).getByRole('link', { name: 'FAQ, source 2' }),
+        within(log).getByRole('link', { name: '[2] FAQ' }),
       ).toHaveAttribute('href', '/knowledge/articles/d2?passage=c2');
       expect(within(log).getByText(/from 2 sources/)).toBeInTheDocument();
       expect(
@@ -946,7 +946,7 @@ describe('the ticket page', () => {
       expect(within(bar).getAllByRole('button')).toHaveLength(1);
       await user.click(
         within(bar).getByRole('button', {
-          name: 'Status: Open. Change status',
+          name: /^Status Open , change status$/,
         }),
       );
       expect(

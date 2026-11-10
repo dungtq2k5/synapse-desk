@@ -198,7 +198,7 @@ describe('a paid organization', () => {
     expect(await screen.findAllByText('8F3A-0012')).toHaveLength(2);
     expect(
       screen.getAllByRole('link', {
-        name: 'View invoice 8F3A-0012 on Stripe (opens in a new tab)',
+        name: 'View on Stripe : invoice 8F3A-0012, opens in a new tab',
       })[0],
     ).toHaveAttribute('href', 'https://invoice.stripe.test/8F3A-0012');
   });
@@ -525,7 +525,7 @@ describe('the subscription’s states', () => {
     expect(screen.getByText('Past due')).toBeInTheDocument();
     expect(
       screen.getAllByRole('link', {
-        name: 'Pay invoice 8F3A-0012 on Stripe (opens in a new tab)',
+        name: 'Pay on Stripe : invoice 8F3A-0012, opens in a new tab',
       })[0],
     ).toBeInTheDocument();
   });

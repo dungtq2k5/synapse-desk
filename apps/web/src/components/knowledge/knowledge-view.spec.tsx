@@ -111,7 +111,7 @@ describe('Knowledge', () => {
     ).toBeInTheDocument();
     expect(
       within(answer).getByRole('link', {
-        name: 'Remote Work Policy.pdf, page 4, source 1',
+        name: '[1] Remote Work Policy.pdf, p. 4',
       }),
     ).toHaveAttribute('href', '/knowledge/articles/d1?passage=c1');
 

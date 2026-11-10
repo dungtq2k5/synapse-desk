@@ -162,7 +162,7 @@ describe('the app shell', () => {
 describe('the account menu', () => {
   it('shows who is signed in and switches the theme', async () => {
     const { user } = shell();
-    const account = screen.getByRole('button', { name: 'Account' });
+    const account = screen.getByRole('button', { name: /account/i });
     await waitFor(() => expect(account).toHaveTextContent('Priya Shah'));
     expect(account).toHaveTextContent('priya@acme.test');
 
@@ -181,7 +181,7 @@ describe('the account menu', () => {
   it('signs out and goes to the sign-in page', async () => {
     const { calls, user } = shell();
 
-    await user.click(screen.getByRole('button', { name: 'Account' }));
+    await user.click(screen.getByRole('button', { name: /account/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     await waitFor(() =>
@@ -203,7 +203,7 @@ describe('the account menu', () => {
       failing ? fail(503, 'Service unavailable') : ok(null),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Account' }));
+    await user.click(screen.getByRole('button', { name: /account/i }));
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }));
 
     await waitFor(() =>

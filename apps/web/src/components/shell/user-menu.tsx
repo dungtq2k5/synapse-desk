@@ -57,7 +57,8 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuButton size="lg" aria-label="Account">
+        {/* Named by what it shows, the name and the second line, then what it opens. */}
+        <SidebarMenuButton size="lg">
           <UserAvatar
             name={user?.fullName ?? null}
             src={user?.avatarUrl}
@@ -68,6 +69,7 @@ export function UserMenu() {
             <span className="truncate text-xs text-muted-foreground">
               {email}
             </span>
+            <span className="sr-only">, account menu</span>
           </span>
           <ChevronsUpDownIcon className="ml-auto size-4" />
         </SidebarMenuButton>

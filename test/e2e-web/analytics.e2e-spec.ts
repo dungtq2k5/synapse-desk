@@ -275,10 +275,10 @@ test('Export: tickets per day, preparing then ready, and the file downloads', as
   page,
 }) => {
   await open(page);
-  await page.getByRole('button', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Export analytics' });
   await dialog.getByRole('radio', { name: 'Tickets per day' }).click();
-  await dialog.getByRole('button', { name: 'Export' }).click();
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click();
   await expect(
     page
       .getByRole('main')

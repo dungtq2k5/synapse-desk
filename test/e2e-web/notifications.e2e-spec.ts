@@ -95,9 +95,11 @@ test('three replies on one ticket while unread: one item, count 3, one toast', a
   await expect(
     page
       .getByRole('dialog', { name: 'Notifications' })
-      .getByRole('link', { name: /New reply on ticket #\d+, .*3 updates/ }),
+      .getByRole('link', { name: /New reply on ticket #\d+ , .*3 updates/ }),
   ).toBeVisible();
-  await expect(page.getByText(/^New reply on ticket #\d+$/)).toHaveCount(2);
+  // Still the one toast: the panel's item says more than its title, so it
+  // isn't counted here.
+  await expect(page.getByText(/^New reply on ticket #\d+$/)).toHaveCount(1);
 });
 
 test('read on a second browser: the first one’s badge and item follow', async ({
@@ -129,7 +131,7 @@ test('read on a second browser: the first one’s badge and item follow', async 
   await expect(
     page
       .getByRole('dialog', { name: 'Notifications' })
-      .getByRole('link', { name: /^Unread\./ }),
+      .getByRole('link', { name: /, Unread, / }),
   ).toHaveCount(0);
   await other.context.close();
 });

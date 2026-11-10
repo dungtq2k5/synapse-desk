@@ -1135,12 +1135,11 @@ function Passages({ document }: { document: DocumentResponseDto }) {
         <>
           <ul className="flex flex-col gap-2">
             {pageData.items.map((chunk) => {
-              const name = `Passage ${chunk.chunkIndex + 1}${chunk.pageNumber ? `, page ${chunk.pageNumber}` : ''}`;
+              // Named by what it shows: the passage's line, then its text.
               return (
                 <li key={chunk.id}>
                   <Link
                     href={`/knowledge/articles/${document.id}?passage=${chunk.id}`}
-                    aria-label={name}
                     className="flex items-center gap-3 rounded-lg border p-3 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-1">

@@ -104,14 +104,14 @@ test('three files, one of each type, are indexed live; Ask then cites one', asyn
   await page
     .getByRole('textbox', { name: 'Your question' })
     .fill('When does the home-office allowance reset?');
-  await page.getByRole('button', { name: 'Ask' }).click();
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
   const thread = page.getByRole('log', { name: 'Conversation' });
   await expect(
     thread.getByText(/This answer comes from the offline model, citing \[1\]/),
   ).toBeVisible({ timeout: 30_000 });
   await expect(
     thread.getByRole('link', {
-      name: /^(remote-work-policy\.pdf|expenses-faq\.md)(, page \d+)?, source 1$/,
+      name: /^\[1\] (remote-work-policy\.pdf|expenses-faq\.md)(, p\. \d+)?$/,
     }),
   ).toBeVisible();
 });
@@ -149,10 +149,10 @@ test('by keyboard alone: upload a document, then ask and open its citation', asy
     page.getByRole('textbox', { name: 'Your question' }),
     'How do I claim expenses?',
   );
-  await pressOn(page, page.getByRole('button', { name: 'Ask' }));
+  await pressOn(page, page.getByRole('button', { name: 'Ask', exact: true }));
   const citation = page
     .getByRole('log', { name: 'Conversation' })
-    .getByRole('link', { name: /^expenses-faq\.md(, page \d+)?, source 1$/ });
+    .getByRole('link', { name: /^\[1\] expenses-faq\.md(, p\. \d+)?$/ });
   await expect(citation).toBeVisible({ timeout: 30_000 });
   await pressOn(page, citation);
   await expect(

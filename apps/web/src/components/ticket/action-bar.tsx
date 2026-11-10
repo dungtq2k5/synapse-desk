@@ -44,7 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useViewer } from '@/hooks/use-viewer';
-import { STATUS_LABEL, statusMoves, type StatusMove } from '@/lib/tickets';
+import { statusMoves, type StatusMove } from '@/lib/tickets';
 import { toastError } from '@/lib/toast';
 import { AssignDialog } from './assign-dialog';
 import { EditDialog } from './edit-dialog';
@@ -164,13 +164,11 @@ export function ActionBar({ ticket }: { ticket: TicketResponseDto }) {
           <DropdownMenu>
             <Toolbar.Button asChild>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  aria-label={`Status: ${STATUS_LABEL[status]}. Change status`}
-                >
+                {/* Named by what it shows, "Status Open", then what it does. */}
+                <Button variant="outline" size="sm">
                   <span className="text-muted-foreground">Status</span>
                   <StatusBadge status={status} />
+                  <span className="sr-only">, change status</span>
                   <ChevronDownIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>

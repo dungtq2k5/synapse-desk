@@ -156,7 +156,7 @@ describe('the ticket list for an agent', () => {
     const rows = within(table()).getAllByRole('row').slice(1);
     expect(
       within(rows[0]).getByRole('link', {
-        name: '#1042 Printer jam 1042, 2 unread messages',
+        name: '#1042 Printer jam 1042 2 unread messages',
       }),
     ).toHaveAttribute('href', '/tickets/t-1042');
     expect(within(rows[0]).getByText('Open')).toBeInTheDocument();
@@ -168,7 +168,7 @@ describe('the ticket list for an agent', () => {
 
     expect(
       within(rows[1]).getByRole('link', {
-        name: '#1043 Printer jam 1043, 1 unread message',
+        name: '#1043 Printer jam 1043 1 unread message',
       }),
     ).toBeInTheDocument();
     expect(within(rows[1]).getByText('Escalated')).toBeInTheDocument();

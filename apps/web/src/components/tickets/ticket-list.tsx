@@ -447,19 +447,16 @@ export function TicketList() {
 }
 
 /**
- * The ticket's number and title, as a link covering its whole row. Its name
- * carries the unread count, so the count needs no announcement of its own.
+ * The ticket's number and title, as a link covering its whole row. It's named
+ * by what it shows, in the row's order ("#14026 Can't sign in on mobile 3
+ * unread messages"), so a voice user can say what they see; the unread count
+ * says what it counts to a screen reader only.
  */
 function TicketLink({ ticket }: { ticket: TicketResponseDto }) {
   const unread = ticket.unreadCount;
   return (
     <Link
       href={`/tickets/${ticket.id}`}
-      aria-label={`#${ticket.ticketNumber} ${ticket.title}${
-        unread
-          ? `, ${unread} unread ${unread === 1 ? 'message' : 'messages'}`
-          : ''
-      }`}
       className="flex min-w-0 items-center gap-2 outline-none after:absolute after:inset-0 after:rounded-[inherit] focus-visible:after:ring-2 focus-visible:after:ring-ring"
     >
       <span className="font-mono text-sm text-muted-foreground">
@@ -485,6 +482,9 @@ function TicketLink({ ticket }: { ticket: TicketResponseDto }) {
       {unread > 0 && (
         <span className="ml-auto inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
           {unread}
+          <span className="sr-only">
+            {` unread ${unread === 1 ? 'message' : 'messages'}`}
+          </span>
         </span>
       )}
     </Link>

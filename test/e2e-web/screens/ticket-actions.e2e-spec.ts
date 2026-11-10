@@ -34,9 +34,7 @@ test.describe('status', () => {
   test('the menu offers only the moves from Escalated', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.vpn);
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     const menu = page.getByRole('menu');
     await expect(menu.getByRole('menuitem')).toHaveText(['Resolve…', 'Close…']);
     await look(page, 'actions-status-menu', MENU_OPEN);
@@ -45,9 +43,7 @@ test.describe('status', () => {
   test('the Resolve dialog, with a reason', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.vpn);
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
     const dialog = page.getByRole('dialog', {
       name: /^Resolve ticket #\d+\?$/,
@@ -64,9 +60,7 @@ test.describe('status', () => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.vpn);
     await page.route('**/api/v1/tickets/*/resolve', () => undefined);
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
     await page.getByRole('button', { name: 'Resolve', exact: true }).click();
     const dialog = page.getByRole('dialog');
@@ -84,9 +78,7 @@ test.describe('status', () => {
     await page.route('**/api/v1/tickets/*/resolve', (route) =>
       route.fulfill(failure),
     );
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Reason (optional)').fill('Reset the VPN profile.');
@@ -103,9 +95,7 @@ test.describe('status', () => {
   test('the Close dialog', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.vpn);
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Close…' }).click();
     await expect(
       page.getByRole('dialog', { name: /^Close ticket #\d+\?$/ }),
@@ -116,9 +106,7 @@ test.describe('status', () => {
   test('the Reopen dialog, from Resolved', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.billing);
-    await page
-      .getByRole('button', { name: 'Status: Resolved. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Resolved' }).click();
     await expect(page.getByRole('menuitem')).toHaveText(['Close…', 'Reopen…']);
     await page.getByRole('menuitem', { name: 'Reopen…' }).click();
     await expect(
@@ -130,9 +118,7 @@ test.describe('status', () => {
   test('the Escalate dialog, from Open', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
     await open(page, maya, tickets.desk);
-    await page
-      .getByRole('button', { name: 'Status: Open. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Open' }).click();
     await expect(page.getByRole('menuitem')).toHaveText([
       'Mark as pending agent…',
       'Escalate…',
@@ -149,9 +135,7 @@ test.describe('status', () => {
   test('resolved: the toast, the badge and the history', async ({ page }) => {
     const { maya, tickets } = await tenant('resolved');
     await open(page, maya, tickets.vpn);
-    await page
-      .getByRole('button', { name: 'Status: Escalated. Change status' })
-      .click();
+    await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
     await page.getByRole('button', { name: 'Resolve', exact: true }).click();
     await expect(
@@ -160,7 +144,7 @@ test.describe('status', () => {
         .getByText('Status changed to Resolved'),
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Status: Resolved. Change status' }),
+      page.getByRole('button', { name: 'Status Resolved' }),
     ).toBeVisible();
     await look(page, 'actions-resolved', { viewportOnly: true });
   });

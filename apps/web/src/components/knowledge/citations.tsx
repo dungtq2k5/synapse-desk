@@ -9,8 +9,9 @@ export function passageHref(documentId: string, chunkId: string): string {
 }
 
 /**
- * One source of an answer, as a link to the reader at its passage:
- * "[1] Remote Work Policy.pdf, p. 4". Its edge follows the surface it sits on.
+ * One source of an answer, as a link to the reader at its passage, named by
+ * what it shows: "[1] Remote Work Policy.pdf, p. 4". Its edge follows the
+ * surface it sits on.
  */
 export function CitationChip({
   number,
@@ -25,7 +26,6 @@ export function CitationChip({
   return (
     <Link
       href={passageHref(citation.documentId, citation.chunkId)}
-      aria-label={`${citation.documentTitle}${page !== null ? `, page ${page}` : ''}, source ${number}`}
       className={cn(
         'inline-flex max-w-full items-center gap-1 rounded-sm border px-1.5 py-0.5 font-mono text-xs outline-none hover:bg-accent hover:text-accent-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 visited:text-muted-foreground',
         surface === 'ai' ? 'border-author-ai-border' : 'border-input',

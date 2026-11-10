@@ -233,7 +233,7 @@ test.describe('Ask, as an end user', () => {
     await knowledge(page);
     await open(page);
     await page.getByRole('textbox', { name: 'Your question' }).fill('Hi');
-    await page.getByRole('button', { name: 'Ask' }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await expect(
       page.getByText('Ask a little more so we can help.'),
     ).toBeVisible();
@@ -267,7 +267,7 @@ test.describe('Ask, as an end user', () => {
     await page.route(START, hang);
     await open(page);
     await page.getByRole('textbox', { name: 'Your question' }).fill(QUESTION);
-    await page.getByRole('button', { name: 'Ask' }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Sending…' })).toBeVisible();
     await look(page, 'ask-sending');
   });
@@ -277,7 +277,7 @@ test.describe('Ask, as an end user', () => {
     await page.route(START, (route) => route.fulfill(failed(500)));
     await open(page);
     await page.getByRole('textbox', { name: 'Your question' }).fill(QUESTION);
-    await page.getByRole('button', { name: 'Ask' }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await expect(alert(page)).toContainText('Couldn’t send your question');
     await look(page, 'ask-failed');
   });
@@ -289,7 +289,7 @@ test.describe('Ask, as an end user', () => {
     );
     await open(page);
     await page.getByRole('textbox', { name: 'Your question' }).fill(QUESTION);
-    await page.getByRole('button', { name: 'Ask' }).click();
+    await page.getByRole('button', { name: 'Ask', exact: true }).click();
     await expect(alert(page)).toContainText('Try again in 5 minutes.');
     await look(page, 'ask-429');
   });
@@ -512,7 +512,7 @@ test.describe('Knowledge', () => {
     await passages(page);
     await expect(
       page.getByRole('link', {
-        name: 'Remote Work Policy.pdf, page 4, source 1',
+        name: '[1] Remote Work Policy.pdf, p. 4',
       }),
     ).toBeVisible();
     await look(page, 'knowledge-results');

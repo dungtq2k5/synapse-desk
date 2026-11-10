@@ -974,10 +974,13 @@ function InvoiceLink({ invoice }: { invoice: InvoiceResponseDto }) {
       href={invoice.hostedInvoiceUrl}
       target="_blank"
       rel="noreferrer"
-      aria-label={`${open ? 'Pay' : 'View'} invoice ${invoice.number} on Stripe (opens in a new tab)`}
       className="inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap text-primary underline-offset-4 hover:underline"
     >
+      {/* Named by the words it shows, then which invoice and where it opens. */}
       {open ? 'Pay on Stripe' : 'View on Stripe'}
+      <span className="sr-only">
+        {`: invoice ${invoice.number}, opens in a new tab`}
+      </span>
       <ExternalLinkIcon aria-hidden className="size-4" />
     </a>
   );

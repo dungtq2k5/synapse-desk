@@ -175,7 +175,7 @@ test.describe('the app shell', () => {
       /^Ask$/,
       /^Analytics$/,
       /^Settings$/,
-      /^Account$/,
+      /, account menu$/,
       /^Toggle sidebar$/,
     ]);
   });

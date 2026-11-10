@@ -97,9 +97,7 @@ test('an agent takes a ticket, replies from an edited AI draft and resolves it; 
     ['New', 'Mark as open…', 'Mark as open'],
     ['Open', 'Resolve…', 'Resolve'],
   ]) {
-    await agent.page
-      .getByRole('button', { name: `Status: ${from}. Change status` })
-      .click();
+    await agent.page.getByRole('button', { name: `Status ${from}` }).click();
     await agent.page.getByRole('menuitem', { name: move }).click();
     await agent.page
       .getByRole('dialog')
@@ -359,7 +357,7 @@ test('an export: started, the page reloaded, resumed, downloaded', async ({
   await signInAs(page, maya);
   await page.goto('/tickets');
 
-  await page.getByRole('button', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByRole('button', { name: 'Start export' }).click();
   await expect(
     page
@@ -368,7 +366,7 @@ test('an export: started, the page reloaded, resumed, downloaded', async ({
   ).toBeVisible();
 
   await page.reload();
-  await page.getByRole('button', { name: 'Export' }).click();
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Export tickets' });
   await expect(dialog.getByText('Your export is ready')).toBeVisible({
     timeout: 90_000,
@@ -440,10 +438,7 @@ test.describe('by keyboard alone', () => {
       ['New', 'Mark as open…', 'Mark as open', 'Open'],
       ['Open', 'Resolve…', 'Resolve', 'Resolved'],
     ]) {
-      await pressOn(
-        page,
-        page.getByRole('button', { name: `Status: ${from}. Change status` }),
-      );
+      await pressOn(page, page.getByRole('button', { name: `Status ${from}` }));
       await chooseMenuItem(page, move);
       await pressOn(
         page,
@@ -452,9 +447,7 @@ test.describe('by keyboard alone', () => {
           .getByRole('button', { name: confirm, exact: true }),
       );
       // Focus goes back to the status control, which now says the new one.
-      await expectFocusOn(
-        page.getByRole('button', { name: `Status: ${to}. Change status` }),
-      );
+      await expectFocusOn(page.getByRole('button', { name: `Status ${to}` }));
     }
     await expect(status(page, 'Resolved')).toBeVisible();
 

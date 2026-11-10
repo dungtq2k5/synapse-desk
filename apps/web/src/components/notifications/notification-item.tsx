@@ -96,11 +96,14 @@ export function PriorityLabel({
   );
 }
 
-/** The words a notification's link is read as: its state, text, time, count and priority. */
-function accessibleName(notification: NotificationResponseDto): string {
+/**
+ * What a notification's link says after its title, to a screen reader only:
+ * its state, text, time, count and priority. The title comes first, as it's
+ * shown, so the link's name starts with what a voice user sees.
+ */
+function spokenAfterTitle(notification: NotificationResponseDto): string {
   return [
-    notification.readAt ? null : 'Unread.',
-    notification.title,
+    notification.readAt ? null : 'Unread',
     notification.body,
     relativeTime(notification.createdAt),
     notification.groupCount > 1 ? `${notification.groupCount} updates` : null,
@@ -139,7 +142,7 @@ export function NotificationItem({
   const unread = !notification.readAt;
   const critical = notification.priority === 'CRITICAL';
   const href = notificationHref(notification.actionUrl);
-  const name = accessibleName(notification);
+  const after = spokenAfterTitle(notification);
   const linkClass =
     'text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset';
 
@@ -169,20 +172,20 @@ export function NotificationItem({
         {href ? (
           <Link
             href={href}
-            aria-label={name}
             onClick={onOpen}
             className={cn(linkClass, unread ? 'font-semibold' : 'font-medium')}
           >
             {notification.title}
+            <span className="sr-only">, {after}</span>
           </Link>
         ) : (
           <button
             type="button"
-            aria-label={name}
             onClick={onOpen}
             className={cn(linkClass, unread ? 'font-semibold' : 'font-medium')}
           >
             {notification.title}
+            <span className="sr-only">, {after}</span>
           </button>
         )}
         {notification.body && (

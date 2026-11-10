@@ -503,7 +503,7 @@ test.describe('Export and access', () => {
 
   test('Export: what, the range and a department', async ({ page }) => {
     await open(page, '/analytics', 'Overview');
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     await expect(
       page.getByRole('dialog', { name: 'Export analytics' }),
     ).toBeVisible();
@@ -520,12 +520,14 @@ test.describe('Export and access', () => {
         query: 'from=2026-04-23&to=2026-10-19',
       },
     );
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Export analytics' });
     await expect(
       dialog.getByText('An export can cover up to 92 days. This range is 180.'),
     ).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Export' })).toBeDisabled();
+    await expect(
+      dialog.getByRole('button', { name: 'Export', exact: true }),
+    ).toBeDisabled();
     await look(page, 'analytics-export-too-long', { viewportOnly: true });
   });
 
@@ -536,10 +538,10 @@ test.describe('Export and access', () => {
   ] as const) {
     test(`Export: ${status.toLowerCase()}`, async ({ page }) => {
       await open(page, '/analytics', 'Overview', exporting(status));
-      await page.getByRole('button', { name: 'Export' }).click();
+      await page.getByRole('button', { name: 'Export', exact: true }).click();
       await page
         .getByRole('dialog', { name: 'Export analytics' })
-        .getByRole('button', { name: 'Export' })
+        .getByRole('button', { name: 'Export', exact: true })
         .click();
       await expect(page.locator('#main').getByText(words)).toBeVisible();
       await look(page, `analytics-export-${status.toLowerCase()}`, {

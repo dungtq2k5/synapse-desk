@@ -125,7 +125,7 @@ test.describe('the export', () => {
   async function openDialog(page: Page) {
     const { maya } = await tenant('export');
     await list(page, maya);
-    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Export tickets' });
     await dialog.getByLabel('From').fill('2026-10-01');
     await dialog.getByLabel('To').fill('2026-10-14');

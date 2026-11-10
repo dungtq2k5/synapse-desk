@@ -346,21 +346,20 @@ function RequesterField({
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={`${listId}-label`} className="text-sm font-medium">
-        Requester
-      </span>
+      <span className="text-sm font-medium">Requester</span>
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
           <Button
             type="button"
             variant="outline"
-            aria-labelledby={`${listId}-label ${listId}-value`}
             aria-describedby={`${listId}-help`}
             className="w-full justify-between font-normal"
           >
-            <span id={`${listId}-value`} className="flex items-center gap-2">
+            {/* Named by the person it shows, then the field it fills. */}
+            <span className="flex items-center gap-2">
               <UserAvatar name={chosen.fullName} />
               {chosen.id === me.id ? `${me.fullName} (you)` : chosen.fullName}
+              <span className="sr-only">, requester</span>
             </span>
             <ChevronsUpDownIcon aria-hidden className="text-muted-foreground" />
           </Button>
