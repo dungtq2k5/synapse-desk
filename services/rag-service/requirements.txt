@@ -4,7 +4,7 @@
 # state.
 
 # The vector store. `qdrant-client` bundles both the REST and gRPC transports.
-qdrant-client==1.12.1
+qdrant-client==1.19.1
 
 # Postgres, async. rag-service is READ-ONLY against postgres_ingestion — it
 # never writes chunk rows — so no ORM: the lexical arm is one hand-written
@@ -14,9 +14,9 @@ asyncpg==0.30.0
 # The quota counter. rag-service increments `quota:{org}:{cycle}` DIRECTLY
 # rather than over gRPC, because a cross-service hop on the charge path would
 # add a network round trip to every AI request (RDM §1.14).
-redis==5.2.1
+redis==5.3.1
 
-python-dotenv==1.0.1
+python-dotenv==1.2.4
 
 # The Gemini client — embeddings and generation.
 #
@@ -29,7 +29,7 @@ python-dotenv==1.0.1
 # That one fails LOUDLY at least — `GeminiEmbeddingClient.__init__` imports it
 # and `build_dependencies` runs at boot, so a missing package is an ImportError
 # on startup rather than a surprise later.
-google-genai==1.44.0
+google-genai==1.75.0
 
 # The reranker.
 #
@@ -51,5 +51,5 @@ flashrank==0.2.10
 # `qdrant-client` before, which meant this service's gRPC runtime version was
 # decided by a vector-store client's dependency range — for the library it
 # imports directly on every line of `server.py`.
-grpcio==1.83.0
-grpcio-health-checking==1.83.0
+grpcio==1.85.0
+grpcio-health-checking==1.85.0

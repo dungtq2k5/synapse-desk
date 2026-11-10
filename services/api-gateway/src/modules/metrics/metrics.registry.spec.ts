@@ -1,4 +1,4 @@
-import { Gauge, Registry } from 'prom-client';
+import { Gauge, Registry } from '@prometheus-io/client';
 import { MetricsRegistry } from './metrics.registry';
 
 /**

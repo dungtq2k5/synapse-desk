@@ -30,7 +30,9 @@ import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
  */
 @Injectable()
 export class SmartThrottlerGuard extends ThrottlerGuard {
-  private readonly logger = new Logger(SmartThrottlerGuard.name);
+  // Not `logger`: ThrottlerGuard has a protected one of its own (named after
+  // itself); this keeps the log context this guard's.
+  private readonly log = new Logger(SmartThrottlerGuard.name);
 
   /**
    * Read from `process.env` rather than injected, and lazily.
@@ -166,7 +168,7 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
       // the ones with no limit worth enforcing. The trade is explicit — while
       // Redis is down the strict tiers are not enforced, so this log line is
       // the signal that the protection is off, and it must be alerted on.
-      this.logger.error(
+      this.log.error(
         `Rate-limit storage unavailable; allowing request unthrottled: ${
           error instanceof Error ? error.message : String(error)
         }`,

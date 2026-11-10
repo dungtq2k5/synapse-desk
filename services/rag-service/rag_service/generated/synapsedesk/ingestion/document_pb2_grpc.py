@@ -5,7 +5,7 @@ import warnings
 
 from rag_service.generated.synapsedesk.ingestion import document_pb2 as synapsedesk_dot_ingestion_dot_document__pb2
 
-GRPC_GENERATED_VERSION = '1.83.0'
+GRPC_GENERATED_VERSION = '1.85.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

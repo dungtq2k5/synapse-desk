@@ -97,7 +97,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 | **Email delivery** | **`resend`** (Node SDK) | Domain E's email channel in both directions: notification-service sends through the Resend API with an idempotency key per send, and the gateway receives inbound mail as a Resend `email.received` webhook. Driven off NATS rather than gRPC — a caller never waits for a provider round trip. |
 | **SMS delivery** | **`twilio`** | Domain E's SMS channel, same fire-and-forget shape. |
 | **2FA** | **`otplib` + `qrcode`** | TOTP secrets and the enrolment QR. |
-| **Metrics** | **`prom-client`** | RED metrics per route, exposed on a **separate internal listener** rather than a route, so "unreachable from the internet" is a property of the process. |
+| **Metrics** | **`@prometheus-io/client`** | RED metrics per route, exposed on a **separate internal listener** rather than a route, so "unreachable from the internet" is a property of the process. |
 | **Containerization** | **Docker & Kubernetes (GKE)** | Multi-stage Docker builds orchestrating local services (docker-compose) and production K8s clusters. |
 | **Infrastructure as Code** | **Terraform** | Declarative provisioning for GKE, Memorystore (Redis), Cloud SQL (PostgreSQL), and the Firebase Storage bucket. Terraform is cloud-agnostic and unchanged by the AWS → GCP move; only the providers and resource types differ. |
 

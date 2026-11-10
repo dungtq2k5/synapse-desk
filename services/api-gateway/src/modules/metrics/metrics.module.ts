@@ -8,7 +8,7 @@ import { PlatformJobsModule } from '../platform-jobs/platform-jobs.module';
 /**
  * Metrics.
  *
- * `@Global` for one reason: `MetricsRegistry` is a single prom-client registry,
+ * `@Global` for one reason: `MetricsRegistry` is a single `@prometheus-io/client` registry,
  * and providing it twice would give the process two disjoint sets of counters —
  * one of which nothing scrapes. The same argument `QdrantModule` makes for its
  * client.

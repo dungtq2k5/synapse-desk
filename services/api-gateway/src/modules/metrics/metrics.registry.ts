@@ -5,7 +5,7 @@ import {
   Gauge,
   Histogram,
   Registry,
-} from 'prom-client';
+} from '@prometheus-io/client';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /**
@@ -106,7 +106,7 @@ export class MetricsRegistry {
   readonly grpcDuration: Histogram<'peer' | 'code'>;
 
   /** Currently invisible without this. */
-  readonly websocketConnections: Gauge<string>;
+  readonly websocketConnections: Gauge<never>;
   readonly websocketEvents: Counter<'event'>;
 
   /**

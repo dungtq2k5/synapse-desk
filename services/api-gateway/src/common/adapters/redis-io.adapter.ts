@@ -31,7 +31,9 @@ import { Server, ServerOptions } from 'socket.io';
  * second set of retry semantics for no gain.
  */
 export class RedisIoAdapter extends IoAdapter {
-  private readonly logger = new Logger(RedisIoAdapter.name);
+  // Not `logger`: IoAdapter has a protected one of its own; this keeps the
+  // log context this adapter's.
+  private readonly log = new Logger(RedisIoAdapter.name);
 
   private pubClient: Redis | null = null;
   private subClient: Redis | null = null;
@@ -66,14 +68,14 @@ export class RedisIoAdapter extends IoAdapter {
     // Logged, never thrown: a Redis blip must degrade real-time delivery, not
     // take the whole gateway down with it. The HTTP API does not depend on this.
     this.pubClient.on('error', (error) =>
-      this.logger.error(`Redis pub client error: ${error.message}`),
+      this.log.error(`Redis pub client error: ${error.message}`),
     );
     this.subClient.on('error', (error) =>
-      this.logger.error(`Redis sub client error: ${error.message}`),
+      this.log.error(`Redis sub client error: ${error.message}`),
     );
 
     this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
-    this.logger.log('Socket.IO Redis adapter connected');
+    this.log.log('Socket.IO Redis adapter connected');
 
     return Promise.resolve();
   }
@@ -91,7 +93,7 @@ export class RedisIoAdapter extends IoAdapter {
     if (this.adapterConstructor) {
       server.adapter(this.adapterConstructor);
     } else {
-      this.logger.warn(
+      this.log.warn(
         'Socket.IO is running WITHOUT the Redis adapter — events will not ' +
           'cross replicas. connect() was not awaited before useWebSocketAdapter().',
       );
@@ -123,7 +125,7 @@ export class RedisIoAdapter extends IoAdapter {
       try {
         await client.quit();
       } catch (error) {
-        this.logger.error(
+        this.log.error(
           `Error closing Redis ${name} client: ${(error as Error).message}`,
         );
       }

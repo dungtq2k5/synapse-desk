@@ -50,7 +50,7 @@
 # the release that changed whether install scripts run at all. Read the new
 # value off the registry when bumping; a tag still moves for security rebuilds
 # of the same version, which is the pin's deliberate looseness.
-ARG NODE_VERSION=24.19.0-alpine3.24
+ARG NODE_VERSION=24.22.1-alpine3.24
 
 # --------------------------------------------------------------- build-args gate
 # **First stage, and it depends on nothing** — so a missing arg fails in seconds
@@ -92,7 +92,7 @@ ARG SERVICE
 # image's dependency tree a function of the build DATE — measured: the prune
 # stage ran 2.10.12 from the network while the build stage ran the lockfile's
 # 2.10.9. `image-contract.spec.ts` asserts this ARG equals the lockfile.
-ARG TURBO_VERSION=2.10.9
+ARG TURBO_VERSION=2.11.10
 RUN npx --yes "turbo@${TURBO_VERSION}" prune "@synapsedesk/${SERVICE}" --docker
 
 # --------------------------------------------------------------- deps (full)
@@ -107,7 +107,7 @@ WORKDIR /app
 # engine in-package, the native modules resolve prebuilds at require time),
 # and pinning converts that from luck into construction.
 # `image-contract.spec.ts` asserts this ARG equals the manifest.
-ARG NPM_VERSION=11.9.0
+ARG NPM_VERSION=11.19.1
 RUN npm i -g --ignore-scripts "npm@${NPM_VERSION}"
 
 # Manifests only, before the source. This layer is keyed on the pruned

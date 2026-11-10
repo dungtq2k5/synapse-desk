@@ -12,6 +12,10 @@ ruff==0.16.1
 # — its methods `raise NotImplementedError`, so a checker infers `-> Never` and
 # reports every real implementation as an inconsistent override.
 mypy-protobuf==5.1.0
+# `python -m grpc_tools.protoc`: scripts/generate-python-protos.mjs runs it
+# from this venv. Declared, at grpcio's version, because it used to arrive
+# only through qdrant-client 1.12's own dependencies.
+grpcio-tools==1.85.0
 
 # Type checker. `[tool.pyright]` in pyproject is what points it (and Pylance)
 # at this service's venv rather than the workspace interpreter.
