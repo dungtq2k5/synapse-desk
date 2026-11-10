@@ -27,7 +27,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.1</version>
+    <version>4.1.2</version>
     <relativePath />
   </parent>
 
@@ -53,11 +53,11 @@
       gRPC and protobuf, pinned together: `protoc-gen-grpc-java` is released per grpc version, and the
       stubs it writes are compiled against `grpc-stub` of that version.
     -->
-    <grpc.version>1.78.0</grpc.version>
-    <protobuf.version>4.33.0</protobuf.version>
+    <grpc.version>1.85.1</grpc.version>
+    <protobuf.version>4.36.2</protobuf.version>
 
     <!-- The plugin below and the contract suite's agent, one version. -->
-    <jacoco.version>0.8.15</jacoco.version>
+    <jacoco.version>0.8.16</jacoco.version>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -78,7 +78,7 @@
     <dependency>
       <groupId>org.springdoc</groupId>
       <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
-      <version>3.1.1</version>
+      <version>3.2.0</version>
     </dependency>
     <!--
       Schema-first: `docs/reference/schema.gql` is the tracked contract,
@@ -148,7 +148,7 @@
     <dependency>
       <groupId>io.nats</groupId>
       <artifactId>jnats</artifactId>
-      <version>2.26.3</version>
+      <version>2.26.4</version>
     </dependency>
 
     <!--
@@ -222,7 +222,7 @@
     <dependency>
       <groupId>com.googlecode.libphonenumber</groupId>
       <artifactId>libphonenumber</artifactId>
-      <version>9.0.40</version>
+      <version>9.0.42</version>
     </dependency>
     <!-- `@Generated` on the generated stubs; provided, not shipped. -->
     <dependency>

@@ -1,5 +1,5 @@
 {
-  "/": 820495,
+  "/": 827092,
   "/_not-found": 778240,
   "/analytics": 1157120,
   "/analytics/agents": 1139712,
@@ -49,7 +49,7 @@
   "/settings/webhooks": 1157120,
   "/settings/webhooks/[endpointId]": 1168384,
   "/sign-up": 1045504,
-  "/test-pages/landing": 817390,
+  "/test-pages/landing": 823987,
   "/test-pages/render-error": 1034240,
   "/test-pages/throw": 778240,
   "/tickets": 1129472,

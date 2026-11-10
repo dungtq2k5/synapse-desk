@@ -333,7 +333,7 @@ services:
   # Seeds and one-off scripts, run by hand on this network (README.md):
   #   docker compose --profile tools run --rm tools npm run plans:seed:apply
   tools:
-    image: node:24.19.0-trixie-slim
+    image: node:24.22.1-trixie-slim
     profiles: [tools]
     working_dir: /src
     env_file: env/tools.env
