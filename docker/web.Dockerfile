@@ -18,7 +18,7 @@
 
 # The same pin as `node-service.Dockerfile`, for the same reason;
 # `image-contract.spec.ts` asserts the two agree.
-ARG NODE_VERSION=24.19.0-alpine3.24
+ARG NODE_VERSION=24.22.1-alpine3.24
 
 # --------------------------------------------------------------- build-args gate
 # First, depending on nothing, so a missing arg fails in seconds:
@@ -37,7 +37,7 @@ FROM node:${NODE_VERSION} AS prune
 WORKDIR /app
 COPY . .
 # The lockfile's turbo; `image-contract.spec.ts` asserts it.
-ARG TURBO_VERSION=2.10.9
+ARG TURBO_VERSION=2.11.10
 RUN npm i -g --ignore-scripts "turbo@${TURBO_VERSION}" \
   && turbo prune @synapsedesk/web --docker
 
@@ -45,7 +45,7 @@ RUN npm i -g --ignore-scripts "turbo@${TURBO_VERSION}" \
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
 # The manifest's `packageManager`; `image-contract.spec.ts` asserts it.
-ARG NPM_VERSION=11.9.0
+ARG NPM_VERSION=11.19.1
 RUN npm i -g --ignore-scripts "npm@${NPM_VERSION}"
 # Manifests only, so a source change reuses the install.
 COPY --from=prune /app/out/json/ ./

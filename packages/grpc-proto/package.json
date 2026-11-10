@@ -17,13 +17,13 @@
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.8.1",
-    "@types/node": "^24.13.3",
-    "ts-proto": "^2.12.0"
+    "@types/node": "^24.19.2",
+    "ts-proto": "^2.18.3"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.14.4",
-    "@nestjs/common": "^11.1.28",
-    "@nestjs/microservices": "^11.1.28",
+    "@grpc/grpc-js": "^1.14.6",
+    "@nestjs/common": "^11.2.8",
+    "@nestjs/microservices": "^11.2.8",
     "@synapsedesk/contracts": "*",
     "@synapsedesk/nest-common": "*",
     "rxjs": "^7.8.2"

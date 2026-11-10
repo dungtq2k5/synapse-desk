@@ -70,7 +70,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 
 | Tool | Version | Why |
 | :--- | :--- | :--- |
-| Node | **24.19.0** — see `.nvmrc` | `nvm use` picks it up |
+| Node | **24.22.1** — see `.nvmrc` | `nvm use` picks it up |
 | npm | **11.9.0** — pinned by `packageManager` | Workspaces |
 | Docker + Compose | any current | The eight backing services |
 | Python | **3.12** | `rag-service`; matches the image base |

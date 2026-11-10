@@ -46,7 +46,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
         new GrpcHealthService([
           postgresProbe(prisma),
           natsProbe(nats),
-          // `queue.client` is the connection BullMQ already holds, so this
+          // The backend's client is the connection BullMQ already holds, so this
           // opens nothing. `info()` rather than `ping()` because BullMQ's
           // `IRedisClient` abstracts over ioredis and node-redis and only the
           // former has PING — and reaching past the interface to the concrete
@@ -55,7 +55,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
           {
             name: 'bullmq-redis',
             check: async () => {
-              const client = await queue.client;
+              const client = await queue.getBackend().client;
               return (await client.info()).length > 0;
             },
           },

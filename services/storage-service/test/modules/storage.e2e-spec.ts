@@ -461,9 +461,10 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
           systemContext(organizationId),
         ).toHttp2Headers();
         const sent = Object.fromEntries(
+          // grpc-js gives a single value as itself and several as an array.
           Object.entries(headers).map(([key, values]) => [
             key,
-            (values as unknown[]).map(String),
+            [values].flat().map(String),
           ]),
         );
         return unpackCallerContext(Metadata.fromHttp2Headers(sent));
