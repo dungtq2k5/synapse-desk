@@ -19,6 +19,29 @@ async function open(page: Page, person: Person, ticketId: string) {
 }
 
 /**
+ * The seed leaves Maya three unread notices: Priya's two replies on `desk` and
+ * the escalation of `vpn`. A row reads its own ticket's notices as it opens
+ * it, so the bell depends on what ran before. Each row says what it starts
+ * from instead: a badge row uses `actions-unread`, a tenant no row opens
+ * `desk` in, so its replies stay unread; a badge-free row reads every notice
+ * first, as Mark all as read does.
+ */
+async function allRead(person: Person): Promise<void> {
+  const session = await sessionAs(person);
+  const { items } = await api<{ items: { id: string }[] }>(
+    session,
+    'GET',
+    '/notifications?unreadOnly=true&limit=50',
+  );
+  if (items.length > 0) {
+    await api(session, 'POST', '/notifications/read', {
+      ids: items.map((item) => item.id),
+    });
+  }
+  await session.dispose();
+}
+
+/**
  * Radix's modal menu hides the rest of the page with aria-hidden and traps
  * focus inside the menu, so nothing hidden can be reached; axe sees the hiding
  * but not the trap.
@@ -32,7 +55,7 @@ const failure = {
 
 test.describe('status', () => {
   test('the menu offers only the moves from Escalated', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.vpn);
     await page.getByRole('button', { name: 'Status Escalated' }).click();
     const menu = page.getByRole('menu');
@@ -41,7 +64,7 @@ test.describe('status', () => {
   });
 
   test('the Resolve dialog, with a reason', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.vpn);
     await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Resolve…' }).click();
@@ -57,7 +80,7 @@ test.describe('status', () => {
   });
 
   test('resolving: both buttons wait', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.vpn);
     await page.route('**/api/v1/tickets/*/resolve', () => undefined);
     await page.getByRole('button', { name: 'Status Escalated' }).click();
@@ -73,7 +96,7 @@ test.describe('status', () => {
   });
 
   test('resolving failed: the reason is kept', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.vpn);
     await page.route('**/api/v1/tickets/*/resolve', (route) =>
       route.fulfill(failure),
@@ -93,7 +116,7 @@ test.describe('status', () => {
   });
 
   test('the Close dialog', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.vpn);
     await page.getByRole('button', { name: 'Status Escalated' }).click();
     await page.getByRole('menuitem', { name: 'Close…' }).click();
@@ -104,7 +127,7 @@ test.describe('status', () => {
   });
 
   test('the Reopen dialog, from Resolved', async ({ page }) => {
-    const { maya, tickets } = await tenant('actions');
+    const { maya, tickets } = await tenant('actions-unread');
     await open(page, maya, tickets.billing);
     await page.getByRole('button', { name: 'Status Resolved' }).click();
     await expect(page.getByRole('menuitem')).toHaveText(['Close…', 'Reopen…']);
@@ -117,6 +140,7 @@ test.describe('status', () => {
 
   test('the Escalate dialog, from Open', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'Status Open' }).click();
     await expect(page.getByRole('menuitem')).toHaveText([
@@ -153,6 +177,7 @@ test.describe('status', () => {
 test.describe('assigning', () => {
   test('unassigned, with Assign to me in two departments', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.mobile);
     await page.getByRole('button', { name: 'Assign to me' }).click();
     await expect(page.getByRole('menuitem')).toHaveText([
@@ -164,6 +189,7 @@ test.describe('assigning', () => {
 
   test('the Assign dialog, a person chosen', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.mobile);
     await page.getByRole('button', { name: 'Assign…' }).click();
     const dialog = page.getByRole('dialog', { name: /^Assign ticket #\d+$/ });
@@ -181,6 +207,7 @@ test.describe('assigning', () => {
 
   test('Reassign: a new department sets the reason', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.vpn);
     await page.getByRole('button', { name: 'Reassign…' }).click();
     const dialog = page.getByRole('dialog', { name: /^Reassign ticket #\d+$/ });
@@ -202,6 +229,7 @@ test.describe('assigning', () => {
 
   test('More: Unassign and Delete ticket', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'More actions' }).click();
     await expect(
@@ -235,6 +263,7 @@ test.describe('assigning', () => {
 test.describe('editing and deleting', () => {
   test('the Edit dialog', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: /^Edit ticket #\d+$/ });
@@ -245,6 +274,7 @@ test.describe('editing and deleting', () => {
 
   test('editing: the field errors', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     const dialog = page.getByRole('dialog');
@@ -264,6 +294,7 @@ test.describe('editing and deleting', () => {
 
   test('the Delete confirmation focuses Cancel', async ({ page }) => {
     const { maya, tickets } = await tenant('actions');
+    await allRead(maya);
     await open(page, maya, tickets.desk);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete ticket' }).click();
