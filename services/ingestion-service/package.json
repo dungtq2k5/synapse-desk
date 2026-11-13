@@ -17,9 +17,10 @@
     "projection:backfill": "nest start --entryFile projection-backfill",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "clean": "rimraf dist *.tsbuildinfo"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "ai:reembed": "nest start --entryFile ai-reembed --"
   },
-  "//@langchain/core": "A required PEER of @langchain/textsplitters, declared here even though NOTHING in src/ imports it — so a dependency-pruning pass reads it as unused and removing it is a one-line change that looks free. It is not: `text_splitter.cjs` requires `@langchain/core/documents` at LOAD time, so the service builds cleanly and then dies at boot with MODULE_NOT_FOUND, and its whole test suite fails to collect. It was missing from the lockfile for exactly that reason before anyone noticed.",
+  "//@langchain/core": "A required PEER of @langchain/textsplitters, declared here even though NOTHING in src/ imports it \u2014 so a dependency-pruning pass reads it as unused and removing it is a one-line change that looks free. It is not: `text_splitter.cjs` requires `@langchain/core/documents` at LOAD time, so the service builds cleanly and then dies at boot with MODULE_NOT_FOUND, and its whole test suite fails to collect. It was missing from the lockfile for exactly that reason before anyone noticed.",
   "dependencies": {
     "@google/genai": "^2.31.0",
     "@grpc/grpc-js": "^1.14.6",

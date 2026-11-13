@@ -60,6 +60,22 @@ class Config:
     #: it is multilingual because the provider is.
     injection_llm_enabled: bool
 
+    #: `gemini` or `ollama`, per role. Generation can switch with a restart;
+    #: embedding is a migration (`npm run ai:reembed`).
+    generation_provider: str = "gemini"
+    embedding_provider: str = "gemini"
+    ollama_base_url: str = ""
+    #: The context every Ollama call asks for. Ollama's own default is small
+    #: and truncates a long prompt silently.
+    ollama_num_ctx: int = 8192
+    #: Deadlines, in seconds. An embedding call has a total one; a generation
+    #: stream an IDLE one between frames, because a long answer legitimately
+    #: takes minutes and a stream that stops sending is the fault.
+    gemini_embed_timeout_s: float = 30.0
+    gemini_idle_timeout_s: float = 60.0
+    ollama_embed_timeout_s: float = 120.0
+    ollama_idle_timeout_s: float = 300.0
+
 
 def load_config() -> Config:
     """Reads the environment, failing LOUDLY on anything missing.
@@ -90,7 +106,37 @@ def load_config() -> Config:
         injection_llm_enabled=_flag("INJECTION_LLM_ENABLED", default=True),
         app_env=os.environ.get("APP_ENV", "development"),
         offline_model=_flag("RAG_OFFLINE_MODEL", default=False),
+        generation_provider=_provider(
+            "AI_GENERATION_PROVIDER",
+            os.environ.get("AI_GENERATION_PROVIDER", "gemini"),
+        ),
+        embedding_provider=_provider(
+            "AI_EMBEDDING_PROVIDER",
+            os.environ.get("AI_EMBEDDING_PROVIDER", "gemini"),
+        ),
+        ollama_base_url=os.environ.get("OLLAMA_BASE_URL", ""),
+        ollama_num_ctx=int(os.environ.get("OLLAMA_NUM_CTX", "8192")),
+        gemini_embed_timeout_s=int(os.environ.get("GEMINI_EMBED_TIMEOUT_MS", "30000"))
+        / 1000,
+        gemini_idle_timeout_s=int(os.environ.get("GEMINI_IDLE_TIMEOUT_MS", "60000"))
+        / 1000,
+        ollama_embed_timeout_s=int(os.environ.get("OLLAMA_EMBED_TIMEOUT_MS", "120000"))
+        / 1000,
+        ollama_idle_timeout_s=int(os.environ.get("OLLAMA_IDLE_TIMEOUT_MS", "300000"))
+        / 1000,
     )
+
+
+def _provider(name: str, raw: str) -> str:
+    """`gemini` (the default) or `ollama`; anything else fails the boot.
+
+    The value is read by the caller, literally, so the env-contract test sees
+    the variable's name.
+    """
+    value = raw.strip().lower() or "gemini"
+    if value not in {"gemini", "ollama"}:
+        raise RuntimeError(f"{name} is {value!r}; it must be gemini or ollama.")
+    return value
 
 
 def _flag(name: str, *, default: bool) -> bool:

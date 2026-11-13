@@ -19,7 +19,13 @@
 
 import { execFileSync } from 'node:child_process';
 import Redis from 'ioredis';
-import { QDRANT_COLLECTION } from '@synapsedesk/contracts';
+import {
+  EMBEDDING_DIMENSION,
+  EMBEDDING_MODEL,
+  QDRANT_COLLECTION,
+  QDRANT_MODEL_METADATA_KEY,
+  collectionAlias,
+} from '@synapsedesk/contracts';
 import { REPO_ROOT } from './services';
 
 const QDRANT_URL = process.env.QDRANT_URL ?? 'http://localhost:6333';
@@ -42,12 +48,14 @@ function assertLocal(url: string, what: string): void {
 }
 
 /**
- * Drops the chunk collection.
+ * Drops every model's chunk collection (aliases go with them), then recreates
+ * Gemini's empty collection and its alias.
  *
- * `DELETE` rather than "delete the points matching this tenant": the collection
- * is recreated on the next write by `ensureCollection`, and a filtered delete
- * would leave the collection's own configuration — vector size, distance —
- * from whatever wrote it last.
+ * Recreated here rather than left to the services' boot: Postgres keeps its
+ * chunk rows across this reset, and a service that finds embedded chunks but
+ * no alias holds its work until `ai:reembed` runs, which is right for a real
+ * deployment and wrong for a suite. The services then find the alias and
+ * ensure its payload indexes as on any boot.
  */
 // **Teardown EMPTIES; it does not restore.** After a run, Postgres still holds
 // document rows with `status: INDEXED` while Qdrant holds no vectors for them.
@@ -58,15 +66,60 @@ function assertLocal(url: string, what: string): void {
 async function resetQdrant(): Promise<void> {
   assertLocal(QDRANT_URL, 'Qdrant');
 
-  const response = await fetch(
-    `${QDRANT_URL}/collections/${QDRANT_COLLECTION}`,
-    { method: 'DELETE' },
-  );
+  const listed = await qdrant('GET', '/collections');
+  const { result } = (await listed.json()) as {
+    result: { collections: { name: string }[] };
+  };
+  for (const { name } of result.collections) {
+    if (
+      name !== QDRANT_COLLECTION &&
+      !name.startsWith(`${QDRANT_COLLECTION}__`)
+    ) {
+      continue;
+    }
+    const dropped = await qdrant('DELETE', `/collections/${name}`);
+    // 404 is success: a parallel reset dropped it first.
+    if (!dropped.ok && dropped.status !== 404) {
+      throw new Error(
+        `Could not drop the Qdrant collection ${name}: ${dropped.status} ${await dropped.text()}`,
+      );
+    }
+  }
 
-  // 404 is success: there was nothing to drop.
-  if (!response.ok && response.status !== 404) {
+  const alias = collectionAlias(EMBEDDING_MODEL);
+  const collection = `${alias}_1`;
+  await expectOk(
+    qdrant('PUT', `/collections/${collection}`, {
+      vectors: { size: EMBEDDING_DIMENSION, distance: 'Cosine' },
+      metadata: { [QDRANT_MODEL_METADATA_KEY]: EMBEDDING_MODEL },
+    }),
+  );
+  await expectOk(
+    qdrant('POST', '/collections/aliases', {
+      actions: [
+        { create_alias: { collection_name: collection, alias_name: alias } },
+      ],
+    }),
+  );
+}
+
+function qdrant(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<Response> {
+  return fetch(`${QDRANT_URL}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+async function expectOk(pending: Promise<Response>): Promise<void> {
+  const response = await pending;
+  if (!response.ok) {
     throw new Error(
-      `Could not drop the Qdrant collection: ${response.status} ${await response.text()}`,
+      `Qdrant answered ${response.status}: ${await response.text()}`,
     );
   }
 }

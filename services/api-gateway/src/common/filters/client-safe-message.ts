@@ -95,7 +95,13 @@ export type ClientSafeOptions = {
 export function clientSafeError(
   error: unknown,
   { isProduction, logger, context = 'a request' }: ClientSafeOptions,
-): { statusCode: HttpStatus; message: string; details?: ErrorDetails } {
+): {
+  statusCode: HttpStatus;
+  message: string;
+  details?: ErrorDetails;
+  /** From a marker that carried one: sent as `Retry-After`. */
+  retryAfterSeconds?: number;
+} {
   if (error instanceof HttpException) {
     return {
       statusCode: error.getStatus(),
@@ -130,6 +136,9 @@ export function clientSafeError(
         statusCode: hint.httpStatus ?? mapped,
         message: formatErrorMsg(message),
         ...(details && { details }),
+        ...(hint.retryAfterSeconds !== undefined && {
+          retryAfterSeconds: hint.retryAfterSeconds,
+        }),
       };
     }
 

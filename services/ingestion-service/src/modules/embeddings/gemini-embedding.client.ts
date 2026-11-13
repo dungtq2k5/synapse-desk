@@ -6,6 +6,7 @@ import {
   DEFAULT_RATE_LIMIT_WAIT_MS,
   EmbeddingClient,
   EmbeddingResult,
+  isTimeout,
   RateLimited,
 } from './embedding.contract';
 
@@ -40,6 +41,13 @@ export class GeminiEmbeddingClient implements EmbeddingClient {
   constructor(private readonly configService: ConfigService) {
     this.client = new GoogleGenAI({
       apiKey: this.configService.getOrThrow<string>('GEMINI_API_KEY'),
+      // A deadline on every request: without one, a request Gemini accepts
+      // and never answers holds the job (or `ai:reembed`) open indefinitely.
+      httpOptions: {
+        timeout: Number(
+          this.configService.get('GEMINI_EMBED_TIMEOUT_MS') ?? 30_000,
+        ),
+      },
     });
   }
 
@@ -66,6 +74,10 @@ export class GeminiEmbeddingClient implements EmbeddingClient {
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 429) {
           throw new RateLimited(retryDelayMs(error.message), error);
+        }
+        // Past the deadline: retried like a rate limit, within its cap.
+        if (isTimeout(error)) {
+          throw new RateLimited(DEFAULT_RATE_LIMIT_WAIT_MS, error);
         }
         throw error;
       });

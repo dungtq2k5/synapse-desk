@@ -66,3 +66,18 @@ export interface EmbeddingClient {
    */
   embedBatch(texts: string[], model: string): Promise<EmbeddingResult>;
 }
+
+/**
+ * Whether a failure is a request that passed its deadline: an `AbortSignal`
+ * timeout from `fetch`, or the Gemini SDK's own, which arrives as an abort.
+ */
+export function isTimeout(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null)?.name;
+  const raw = (error as { message?: unknown } | null)?.message;
+  const message = typeof raw === 'string' ? raw : '';
+  return (
+    name === 'TimeoutError' ||
+    name === 'AbortError' ||
+    /timed? ?out|aborted/i.test(message)
+  );
+}

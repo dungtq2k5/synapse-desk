@@ -18,13 +18,18 @@ metadata:
   labels:
     app.kubernetes.io/name: ingestion-service
 data:
+  AI_EMBEDDING_PROVIDER: 'gemini'
   AUTH_SERVICE_URL: 'auth-service:5001'
   DOWNLOAD_URL_TTL_SECONDS: '840'
+  GEMINI_EMBED_TIMEOUT_MS: '30000'
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '5004'
   NATS_MONITOR_URL: 'http://nats:8222'
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
+  OLLAMA_BASE_URL: 'http://localhost:11434'
+  OLLAMA_EMBED_TIMEOUT_MS: '120000'
+  OLLAMA_NUM_CTX: '8192'
   QDRANT_URL: 'http://qdrant:6333'
   RAG_SERVICE_URL: 'rag-service:50255'
   REDIS_DB: '0'

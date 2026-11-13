@@ -14,15 +14,21 @@ from pathlib import Path
 
 import pytest
 
+from rag_service.pricing import MODEL_PRICING
 from rag_service.settings import (
     AI_MODEL_TIERS,
+    AI_PROVIDERS,
     ALL_CONFIGURED_MODELS,
     CHEAP_MODEL,
     CLAMPS,
     DEFAULT_AI_MODEL_TIER,
+    DEFAULT_AI_PROVIDERS,
     EMBEDDING_MODEL,
     GENERATION_MODEL_BY_TIER,
+    MODELS_BY_PROVIDER,
+    OLLAMA_MODEL_DIGESTS,
     RETRIEVAL_DEFAULTS,
+    AiProviders,
     AiSettingsResolver,
     as_ai_model_tier,
     clamp_setting,
@@ -208,10 +214,43 @@ class TestCrossLanguageContract:
     """The half of the drift guard that runs in Python."""
 
     def test_the_model_tables_match_the_contract(self, contract):
-        assert CHEAP_MODEL == contract["cheapModel"]
-        assert EMBEDDING_MODEL == contract["embeddingModel"]
-        assert GENERATION_MODEL_BY_TIER == contract["generationModelByTier"]
+        expected = {
+            provider: {
+                "generation_model_by_tier": models["generationModelByTier"],
+                "cheap_model": models["cheapModel"],
+                "embedding_model": models["embeddingModel"],
+            }
+            for provider, models in contract["modelsByProvider"].items()
+        }
+
+        assert MODELS_BY_PROVIDER == expected
+        assert OLLAMA_MODEL_DIGESTS == contract["ollamaModelDigests"]
+        assert {
+            "generation": DEFAULT_AI_PROVIDERS.generation,
+            "embedding": DEFAULT_AI_PROVIDERS.embedding,
+        } == contract["defaultProviders"]
         assert DEFAULT_AI_MODEL_TIER == contract["defaultTier"]
+
+    def test_the_collection_aliases_match_the_contract(self, contract):
+        from rag_service.qdrant.collection import (
+            COLLECTION_PREFIX,
+            MODEL_METADATA_KEY,
+            collection_alias,
+        )
+
+        assert COLLECTION_PREFIX == contract["qdrant"]["collection"]
+        assert MODEL_METADATA_KEY == contract["qdrant"]["modelMetadataKey"]
+        for model, alias in contract["qdrant"]["aliases"].items():
+            assert collection_alias(model) == alias
+
+    def test_the_prices_match_the_contract(self, contract):
+        assert {
+            model: {
+                "promptMicrosPerMillion": price.prompt_micros_per_million,
+                "completionMicrosPerMillion": price.completion_micros_per_million,
+            }
+            for model, price in MODEL_PRICING.items()
+        } == contract["modelPricing"]
 
     def test_the_retrieval_defaults_match_the_contract(self, contract):
         expected = contract["retrievalDefaults"]
@@ -233,26 +272,40 @@ class TestCrossLanguageContract:
         # Stronger than comparing tables field by field: it compares the
         # resolver's OUTPUT, so a divergence in how one side assembles those
         # tables is caught even when every table matches.
-        for tier in AI_MODEL_TIERS:
-            settings = resolve_ai_settings(tier)
+        models = contract["modelsByProvider"]
+        for generation in AI_PROVIDERS:
+            for embedding in AI_PROVIDERS:
+                for tier in AI_MODEL_TIERS:
+                    settings = resolve_ai_settings(
+                        tier, AiProviders(generation=generation, embedding=embedding)
+                    )
 
-            assert settings.generation_model == contract["generationModelByTier"][tier]
-            assert settings.cheap_model == contract["cheapModel"]
-            assert settings.embedding_model == contract["embeddingModel"]
+                    assert (
+                        settings.generation_model
+                        == models[generation]["generationModelByTier"][tier]
+                    )
+                    assert settings.cheap_model == models[generation]["cheapModel"]
+                    assert (
+                        settings.embedding_model == models[embedding]["embeddingModel"]
+                    )
 
-            for python_name, ts_name in SETTING_NAMES.items():
-                assert getattr(settings, python_name) == pytest.approx(
-                    contract["retrievalDefaults"][ts_name]
-                )
+                    for python_name, ts_name in SETTING_NAMES.items():
+                        assert getattr(settings, python_name) == pytest.approx(
+                            contract["retrievalDefaults"][ts_name]
+                        )
 
     def test_every_configured_model_appears_in_the_contract(self, contract):
         # Catches a model added to this side's mapping and nowhere else — the
         # direction the field-by-field assertions above would miss, because a
         # new tier's model has no counterpart to be compared against.
         known = {
-            contract["cheapModel"],
-            contract["embeddingModel"],
-            *contract["generationModelByTier"].values(),
+            model
+            for models in contract["modelsByProvider"].values()
+            for model in (
+                models["cheapModel"],
+                models["embeddingModel"],
+                *models["generationModelByTier"].values(),
+            )
         }
 
         assert set(ALL_CONFIGURED_MODELS) == known

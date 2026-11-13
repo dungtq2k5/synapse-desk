@@ -267,6 +267,47 @@ services:
       timeout: 3s
       retries: 5
 
+  # ---------------------------------------------------------------- Local models
+  #
+  # Ollama, for `AI_GENERATION_PROVIDER` / `AI_EMBEDDING_PROVIDER` = `ollama`.
+  # Opt-in like `prometheus`: `docker compose up -d ollama` starts it, and
+  # `docker compose --profile local-ai down` stops it. `npm run ai:check-local`
+  # says whether the configured models fit this machine.
+  ollama:
+    # Pinned, at least two weeks old. This tag carries the Vulkan runner
+    # (`/usr/lib/ollama/vulkan`), the path that drives a Radeon without ROCm.
+    image: ollama/ollama:0.40.13
+    container_name: synapsedesk-ollama
+    profiles: [local-ai]
+    # The host's own user, so a pull into the bind-mounted store below leaves
+    # files that user still owns. The host's `video` and `render` group ids
+    # open `/dev/dri`; by number, because the image has no `render` group.
+    user: '${OLLAMA_UID}:${OLLAMA_GID}'
+    group_add: ['${OLLAMA_VIDEO_GID}', '${OLLAMA_RENDER_GID}']
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      OLLAMA_VULKAN: '1'
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      # The image's HOME is /root, which the user above can't write.
+      HOME: /tmp
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL}
+      OLLAMA_MAX_QUEUE: ${OLLAMA_MAX_QUEUE}
+    ports:
+      - '${OLLAMA_PORT}:11434'
+    # The store a host `ollama pull` already filled, rather than a volume that
+    # would download the same gigabytes again.
+    volumes:
+      - ${OLLAMA_MODELS_DIR}:/models
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata_auth:
   pgdata_ticket:

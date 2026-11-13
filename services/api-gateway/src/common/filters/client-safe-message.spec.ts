@@ -73,6 +73,27 @@ describe('clientSafeError', () => {
     });
   });
 
+  it('a marked wait comes back beside the status, for `Retry-After`', () => {
+    expect(
+      clientSafeError(
+        grpc(
+          status.UNAVAILABLE,
+          withHttpStatus(
+            503,
+            'The knowledge base is being rebuilt for the embedder. Try again in a minute.',
+            60,
+          ),
+        ),
+        { isProduction: true },
+      ),
+    ).toEqual({
+      statusCode: 503,
+      message:
+        'The knowledge base is being rebuilt for the embedder. Try again in a minute!',
+      retryAfterSeconds: 60,
+    });
+  });
+
   it('the withheld details are logged, where a developer reads them', () => {
     clientSafeMessage(grpc(status.UNAVAILABLE, ADDRESS_DETAILS), {
       isProduction: true,

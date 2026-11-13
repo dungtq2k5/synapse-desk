@@ -4,12 +4,19 @@ import {
   AI_MODEL_TIERS,
   AI_RETRIEVAL_DEFAULTS,
   AI_SETTINGS_CLAMPS,
+  AI_PROVIDERS,
   ALL_CONFIGURED_MODELS,
   CHEAP_MODEL,
+  DEFAULT_AI_PROVIDERS,
   DEFAULT_AI_MODEL_TIER,
   EMBEDDING_MODEL,
   GENERATION_MODEL_BY_TIER,
+  MODELS_BY_PROVIDER,
+  OLLAMA_MODEL_DIGESTS,
+  QDRANT_COLLECTION,
+  QDRANT_MODEL_METADATA_KEY,
   asAiModelTier,
+  collectionAlias,
   clampAiSetting,
   resolveAiSettings,
 } from '@synapsedesk/contracts';
@@ -32,9 +39,22 @@ describe('B AI settings (unit)', () => {
       'utf8',
     ),
   ) as {
-    cheapModel: string;
-    embeddingModel: string;
-    generationModelByTier: Record<string, string>;
+    modelsByProvider: Record<
+      string,
+      {
+        cheapModel: string;
+        embeddingModel: string;
+        generationModelByTier: Record<string, string>;
+      }
+    >;
+    defaultProviders: Record<string, string>;
+    ollamaModelDigests: Record<string, string>;
+    modelPricing: Record<string, unknown>;
+    qdrant: {
+      collection: string;
+      modelMetadataKey: string;
+      aliases: Record<string, string>;
+    };
     defaultTier: string;
     retrievalDefaults: Record<string, number>;
     clamps: Record<string, { min: number; max: number }>;
@@ -172,9 +192,15 @@ describe('B AI settings (unit)', () => {
     // `services/rag-service/tests/test_settings.py`; between them, a value changed
     // on one side and not the other fails that side's own suite.
     it('11. Matches the SHARED contract fixture the Python resolver also reads', () => {
-      expect(CHEAP_MODEL).toBe(contract.cheapModel);
-      expect(EMBEDDING_MODEL).toBe(contract.embeddingModel);
-      expect(GENERATION_MODEL_BY_TIER).toEqual(contract.generationModelByTier);
+      expect(MODELS_BY_PROVIDER).toEqual(contract.modelsByProvider);
+      expect(DEFAULT_AI_PROVIDERS).toEqual(contract.defaultProviders);
+      expect(OLLAMA_MODEL_DIGESTS).toEqual(contract.ollamaModelDigests);
+      expect(MODEL_PRICING).toEqual(contract.modelPricing);
+      expect(QDRANT_COLLECTION).toBe(contract.qdrant.collection);
+      expect(QDRANT_MODEL_METADATA_KEY).toBe(contract.qdrant.modelMetadataKey);
+      for (const [model, alias] of Object.entries(contract.qdrant.aliases)) {
+        expect(collectionAlias(model)).toBe(alias);
+      }
       expect(DEFAULT_AI_MODEL_TIER).toBe(contract.defaultTier);
       expect(AI_RETRIEVAL_DEFAULTS).toEqual(contract.retrievalDefaults);
       expect(AI_SETTINGS_CLAMPS).toEqual(contract.clamps);
@@ -184,13 +210,19 @@ describe('B AI settings (unit)', () => {
       // Stronger than comparing the tables field by field: it compares the
       // resolver's OUTPUT, so a divergence in how one side assembles those
       // tables is caught even when every table matches.
-      for (const tier of AI_MODEL_TIERS) {
-        expect(resolveAiSettings(tier)).toEqual({
-          generationModel: contract.generationModelByTier[tier],
-          cheapModel: contract.cheapModel,
-          embeddingModel: contract.embeddingModel,
-          ...contract.retrievalDefaults,
-        });
+      for (const generation of AI_PROVIDERS) {
+        for (const embedding of AI_PROVIDERS) {
+          for (const tier of AI_MODEL_TIERS) {
+            const models = contract.modelsByProvider[generation];
+            expect(resolveAiSettings(tier, { generation, embedding })).toEqual({
+              generationModel: models.generationModelByTier[tier],
+              cheapModel: models.cheapModel,
+              embeddingModel:
+                contract.modelsByProvider[embedding].embeddingModel,
+              ...contract.retrievalDefaults,
+            });
+          }
+        }
       }
     });
   });

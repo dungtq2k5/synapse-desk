@@ -33,7 +33,10 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
   constructor(private readonly isProduction: boolean) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const { statusCode, message, details } = this.resolve(exception, host);
+    const { statusCode, message, details, retryAfterSeconds } = this.resolve(
+      exception,
+      host,
+    );
 
     if (host.getType<GqlContextType>() === 'graphql') {
       // Apollo formats the error envelope; normalize the message and re-throw.
@@ -44,6 +47,12 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+
+    // Only when the downstream service named a wait (the knowledge base being
+    // rebuilt): an unmarked 503 is a peer that is down, with no honest wait.
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(retryAfterSeconds));
+    }
 
     response.status(statusCode).json({
       success: false,

@@ -12,8 +12,29 @@
  * `ai-settings.contract.json` like every other cross-language constant.
  */
 
-/** ONE collection, payload-partitioned. Not one per tenant. */
+/**
+ * The prefix of every collection and alias, and the name of the one collection
+ * that existed before aliases: Gemini's, adopted under its alias at boot.
+ *
+ * One collection per embedding model, payload-partitioned by tenant (not one
+ * per tenant), reached through {@link collectionAlias}.
+ */
 export const QDRANT_COLLECTION = 'document_chunks';
+
+/** Where a collection records the model its vectors came from; aliases carry no metadata. */
+export const QDRANT_MODEL_METADATA_KEY = 'embedding_model';
+
+/**
+ * The alias both services address for one embedding model. It exists only
+ * once the model's collection is complete; `npm run ai:reembed` creates it.
+ * Sanitized to `[a-z0-9_-]`, because a pinned tag carries a colon and a dot.
+ *
+ * @example
+ * collectionAlias('nomic-embed-text:v1.5') // 'document_chunks__nomic-embed-text_v1_5'
+ */
+export function collectionAlias(model: string): string {
+  return `${QDRANT_COLLECTION}__${model.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+}
 
 /**
  * The vector size, fixed at collection creation.

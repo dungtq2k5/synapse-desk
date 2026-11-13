@@ -1,4 +1,4 @@
-import { ApiError } from '@google/genai';
+import { ApiError, GoogleGenAI } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
 import { EMBEDDING_DIMENSION, EMBEDDING_MODEL } from '@synapsedesk/contracts';
 import { DEFAULT_RATE_LIMIT_WAIT_MS, RateLimited } from './embedding.contract';
@@ -6,7 +6,10 @@ import { GeminiEmbeddingClient, retryDelayMs } from './gemini-embedding.client';
 
 /** The client with the SDK's `embedContent` replaced, answering one vector per content. */
 function clientWith(embedContent: jest.Mock): GeminiEmbeddingClient {
-  const config = { getOrThrow: () => 'test-key' } as unknown as ConfigService;
+  const config = {
+    getOrThrow: () => 'test-key',
+    get: () => undefined,
+  } as unknown as ConfigService;
   const client = new GeminiEmbeddingClient(config);
   (client as unknown as { client: unknown }).client = {
     models: { embedContent },
@@ -90,5 +93,37 @@ describe('GeminiEmbeddingClient', () => {
     ['no delay at all', DEFAULT_RATE_LIMIT_WAIT_MS],
   ])('reads the wait from %s', (message, waitMs) => {
     expect(retryDelayMs(message)).toBe(waitMs);
+  });
+});
+
+describe('GeminiEmbeddingClient against a provider that never answers', () => {
+  // A real request can't be made here: jest's sandbox has no undici
+  // dispatcher for the SDK. Outside jest the SDK aborts at the deadline with
+  // an `AbortError` (measured: 324 ms for a 300 ms timeout); these rows hold
+  // the two halves this client owns.
+  it('hands GEMINI_EMBED_TIMEOUT_MS to the SDK as its request deadline', () => {
+    const client = new GeminiEmbeddingClient({
+      getOrThrow: () => 'test-key',
+      get: (key: string) =>
+        key === 'GEMINI_EMBED_TIMEOUT_MS' ? 300 : undefined,
+    } as unknown as ConfigService);
+
+    const sdk = (client as unknown as { client: GoogleGenAI }).client;
+    const options = (sdk as unknown as { httpOptions?: { timeout?: number } })
+      .httpOptions;
+    expect(options?.timeout).toBe(300);
+  });
+
+  it("turns the SDK's abort at the deadline into a rate limit to retry", async () => {
+    const aborted = Object.assign(new Error('This operation was aborted'), {
+      name: 'AbortError',
+    });
+
+    await expect(
+      clientWith(jest.fn().mockRejectedValue(aborted)).embedBatch(
+        ['a'],
+        EMBEDDING_MODEL,
+      ),
+    ).rejects.toBeInstanceOf(RateLimited);
   });
 });
