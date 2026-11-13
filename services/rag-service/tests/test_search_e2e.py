@@ -390,9 +390,9 @@ class TestUnderReturn:
         ef_values: list[int] = []
         original = retrieval_service.semantic_arm
 
-        async def recording_arm(client, scope, vector, limit, hnsw_ef=128):
+        async def recording_arm(client, scope, vector, limit, hnsw_ef=128, **rest):
             ef_values.append(hnsw_ef)
-            return await original(client, scope, vector, limit, hnsw_ef=hnsw_ef)
+            return await original(client, scope, vector, limit, hnsw_ef=hnsw_ef, **rest)
 
         monkeypatch.setattr(retrieval_service, "semantic_arm", recording_arm)
 
@@ -425,9 +425,9 @@ class TestUnderReturn:
         ef_values: list[int] = []
         original = retrieval_service.semantic_arm
 
-        async def recording_arm(client, scope, vector, limit, hnsw_ef=128):
+        async def recording_arm(client, scope, vector, limit, hnsw_ef=128, **rest):
             ef_values.append(hnsw_ef)
-            return await original(client, scope, vector, limit, hnsw_ef=hnsw_ef)
+            return await original(client, scope, vector, limit, hnsw_ef=hnsw_ef, **rest)
 
         monkeypatch.setattr(retrieval_service, "semantic_arm", recording_arm)
 

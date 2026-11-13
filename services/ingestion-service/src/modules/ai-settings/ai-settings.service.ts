@@ -1,6 +1,9 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   AiModelTier,
+  AiProvider,
+  AiProviders,
   AiSettings,
   ALL_CONFIGURED_MODELS,
   asAiModelTier,
@@ -32,7 +35,21 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 export class AiSettingsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AiSettingsService.name);
 
-  constructor(private readonly authReference: AuthReferenceService) {}
+  /**
+   * This service only embeds, so only the embedding switch decides anything;
+   * the generation side is resolved at its default and never called.
+   */
+  private readonly providers: AiProviders;
+
+  constructor(
+    private readonly authReference: AuthReferenceService,
+    config: ConfigService,
+  ) {
+    this.providers = {
+      generation: 'gemini',
+      embedding: config.get<AiProvider>('AI_EMBEDDING_PROVIDER') ?? 'gemini',
+    };
+  }
 
   private readonly cache = new Map<
     string,
@@ -68,7 +85,10 @@ export class AiSettingsService implements OnApplicationBootstrap {
       return cached.settings;
     }
 
-    const settings = resolveAiSettings(await this.resolveTier(organizationId));
+    const settings = resolveAiSettings(
+      await this.resolveTier(organizationId),
+      this.providers,
+    );
 
     this.cache.set(organizationId, {
       settings,

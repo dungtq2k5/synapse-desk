@@ -30,52 +30,91 @@ AI_MODEL_TIERS: tuple[AiModelTier, ...] = ("FAST", "QUALITY")
 
 DEFAULT_AI_MODEL_TIER: AiModelTier = "FAST"
 
-#: **A model name lives in FIVE files and they must move together.**
+AiProvider = Literal["gemini", "ollama"]
+
+AI_PROVIDERS: tuple[AiProvider, ...] = ("gemini", "ollama")
+
+#: **A model name lives in SIX files and they must move together.**
 #:
-#: `settings.py` (here), `packages/contracts/src/configs/ai-settings.config.ts`,
-#: `ai-settings.contract.json`, `pricing.py` and
-#: `packages/contracts/src/configs/ai-pricing.config.ts`. The contract fixture and
-#: `assert_pricing_table_covers` catch four of the five at boot or in CI; the
-#: TypeScript pricing table is the one with no equivalent guard on this path,
-#: so a model added everywhere except there meters as free on the Node side.
+#: `settings.py` (here), `pricing.py`, and in `packages/contracts/src/configs/`
+#: `ai-models.config.ts` (the catalogue), `ai-settings.config.ts`,
+#: `ai-pricing.config.ts` and `ai-settings.contract.json`. Both languages'
+#: suites assert their tables against that fixture, so a model changed on one
+#: side alone fails that side's tests.
 #:
-#: Tier -> generation model. **This mapping is the entire tier feature**
-#:: once the Stripe webhook writes `organizations.ai_model_tier`,
-#: shipping tiers is this table being read with a real value instead of the
-#: default, and nothing else moves.
-GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
-    "FAST": "gemini-3.5-flash-lite",
-    "QUALITY": "gemini-2.5-pro",
+#: Provider -> the models it serves, per role:
+#:
+#: - `generation_model_by_tier`: **this mapping is the entire tier feature.**
+#:   Once the Stripe webhook writes `organizations.ai_model_tier`, shipping
+#:   tiers is this table being read with a real value instead of the default.
+#: - `cheap_model`: greeting classification and reformulation. Deliberately
+#:   NOT tier-varying: volume calls whose quality barely moves with the tier,
+#:   so scaling them multiplies a premium tenant's bill for no perceptible
+#:   gain. FAST and the cheap model are the same model on both providers, a
+#:   pricing decision rather than a merge.
+#: - `embedding_model`: never tenant- or tier-varying. Each embedding model
+#:   has its own Qdrant collection, reached by its alias.
+MODELS_BY_PROVIDER: dict[AiProvider, dict] = {
+    "gemini": {
+        "generation_model_by_tier": {
+            "FAST": "gemini-3.5-flash-lite",
+            "QUALITY": "gemini-2.5-pro",
+        },
+        "cheap_model": "gemini-3.5-flash-lite",
+        "embedding_model": "gemini-embedding-2",
+    },
+    "ollama": {
+        "generation_model_by_tier": {
+            "FAST": "qwen2.5:3b-instruct-q4_K_M",
+            "QUALITY": "qwen2.5:7b-instruct-q4_K_M",
+        },
+        "cheap_model": "qwen2.5:3b-instruct-q4_K_M",
+        "embedding_model": "nomic-embed-text:v1.5",
+    },
 }
 
-#: **FAST and `CHEAP_MODEL` are the same model today, and that is deliberate.**
-#:
-#: They are separate CONSTANTS because they answer different questions — one is
-#: a tier the tenant buys, the other is an internal volume call — and the tier
-#: The cheap call must not scale with the tier. Pointing
-#: both at one model is a pricing decision, not a merge: the moment a cheaper
-#: generation model exists, only this line moves.
-#:
-#: The alternative was a flash model priced ABOVE the QUALITY tier's input rate,
-#: which would have made a FAST tenant exhaust a money-denominated cap faster
-#: than a premium one — the invariant `ai-pricing` asserts, inverted.
-#:
-#: Greeting classification and reformulation. Deliberately NOT tier-varying
-#:: these are volume calls whose quality barely moves with model
-#: tier, so scaling them multiplies a premium tenant's bill for no perceptible
-#: gain.
-CHEAP_MODEL = "gemini-3.5-flash-lite"
+#: The digest each Ollama tag must resolve to in `/api/tags`: the weights a
+#: baseline was measured on. A re-pull that moved a tag fails the boot check.
+OLLAMA_MODEL_DIGESTS: dict[str, str] = {
+    "qwen2.5:7b-instruct-q4_K_M": (
+        "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e"
+    ),
+    "qwen2.5:3b-instruct-q4_K_M": (
+        "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b"
+    ),
+    "nomic-embed-text:v1.5": (
+        "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+    ),
+}
 
-#: Never tenant-varying and never tier-varying. A Qdrant collection fixes vector
-#: dimension at creation, so a per-tenant embedding model forces per-tenant
-#: collections and makes every tier change a full re-embed migration
-#:
-EMBEDDING_MODEL = "gemini-embedding-2"
 
+@dataclass(frozen=True)
+class AiProviders:
+    """Which provider serves each role, read once from the environment."""
+
+    generation: AiProvider = "gemini"
+    embedding: AiProvider = "gemini"
+
+
+DEFAULT_AI_PROVIDERS = AiProviders()
+
+#: Gemini's, the default provider's: what most tests and fixtures name.
+GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = MODELS_BY_PROVIDER["gemini"][
+    "generation_model_by_tier"
+]
+CHEAP_MODEL: str = MODELS_BY_PROVIDER["gemini"]["cheap_model"]
+EMBEDDING_MODEL: str = MODELS_BY_PROVIDER["gemini"]["embedding_model"]
+
+#: Every model either provider can be configured to use, for the boot-time
+#: price check.
 ALL_CONFIGURED_MODELS: list[str] = [
-    *GENERATION_MODEL_BY_TIER.values(),
-    CHEAP_MODEL,
-    EMBEDDING_MODEL,
+    model
+    for models in MODELS_BY_PROVIDER.values()
+    for model in (
+        *models["generation_model_by_tier"].values(),
+        models["cheap_model"],
+        models["embedding_model"],
+    )
 ]
 
 #: The retrieval defaults, from `docs/rag/`. Guesses in the honest sense —
@@ -163,8 +202,14 @@ def as_ai_model_tier(value: str | None) -> AiModelTier:
     return value if value in AI_MODEL_TIERS else DEFAULT_AI_MODEL_TIER  # type: ignore[return-value]
 
 
-def resolve_ai_settings(tier: AiModelTier) -> AiSettings:
+def resolve_ai_settings(
+    tier: AiModelTier, providers: AiProviders = DEFAULT_AI_PROVIDERS
+) -> AiSettings:
     """Resolution steps 1 and 2 — and in v1 there are only two.
+
+    `providers` picks whose models fill the roles: generation and cheap from
+    one, embedding from the other, e.g.
+    `resolve_ai_settings("FAST", AiProviders(generation="ollama"))`.
 
     Pure and I/O-free, matching `resolveAiSettings` in TypeScript exactly. The
     caching, the tier lookup and the invalidation belong to the resolver
@@ -172,10 +217,11 @@ def resolve_ai_settings(tier: AiModelTier) -> AiSettings:
     which is what makes the contract fixture a meaningful comparison rather
     than a comparison of two constant tables.
     """
+    generation = MODELS_BY_PROVIDER[providers.generation]
     return AiSettings(
-        generation_model=GENERATION_MODEL_BY_TIER[tier],
-        cheap_model=CHEAP_MODEL,
-        embedding_model=EMBEDDING_MODEL,
+        generation_model=generation["generation_model_by_tier"][tier],
+        cheap_model=generation["cheap_model"],
+        embedding_model=MODELS_BY_PROVIDER[providers.embedding]["embedding_model"],
         semantic_weight=clamp_setting(
             "semantic_weight", RETRIEVAL_DEFAULTS["semantic_weight"]
         ),
@@ -205,8 +251,13 @@ class AiSettingsResolver:
     touches settings order-dependent on every other one.
     """
 
-    def __init__(self, ttl_seconds: float = CACHE_TTL_SECONDS) -> None:
+    def __init__(
+        self,
+        ttl_seconds: float = CACHE_TTL_SECONDS,
+        providers: AiProviders = DEFAULT_AI_PROVIDERS,
+    ) -> None:
         self._ttl = ttl_seconds
+        self._providers = providers
         self._cache: dict[str, tuple[AiSettings, float]] = {}
 
     async def settings_for(self, organization_id: str) -> AiSettings:
@@ -222,7 +273,9 @@ class AiSettingsResolver:
         if cached is not None and cached[1] > time.monotonic():
             return cached[0]
 
-        settings = resolve_ai_settings(await self._resolve_tier(organization_id))
+        settings = resolve_ai_settings(
+            await self._resolve_tier(organization_id), self._providers
+        )
         self._cache[organization_id] = (settings, time.monotonic() + self._ttl)
 
         return settings

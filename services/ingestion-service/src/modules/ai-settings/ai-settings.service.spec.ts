@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import {
   CHEAP_MODEL,
@@ -32,6 +33,7 @@ describe('B AiSettingsService (unit)', () => {
       providers: [
         AiSettingsService,
         { provide: AuthReferenceService, useValue: authReference },
+        { provide: ConfigService, useValue: new ConfigService({}) },
       ],
     }).compile();
 

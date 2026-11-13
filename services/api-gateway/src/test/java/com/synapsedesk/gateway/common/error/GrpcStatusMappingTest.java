@@ -107,6 +107,25 @@ class GrpcStatusMappingTest {
   }
 
   @Test
+  void aMarkerCanNameAWaitAndOnlyThenCarriesOne() {
+    GrpcStatusMapping.ClientSafe rebuilding = GrpcStatusMapping.resolve(
+      Status.Code.UNAVAILABLE,
+      "[http:503;retry-after=60] The knowledge base is being rebuilt."
+    );
+    GrpcStatusMapping.ClientSafe plain = GrpcStatusMapping.resolve(
+      Status.Code.UNAVAILABLE,
+      "[http:503] The mailbox is being moved"
+    );
+
+    assertThat(rebuilding.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    assertThat(rebuilding.message()).isEqualTo(
+      "The knowledge base is being rebuilt!"
+    );
+    assertThat(rebuilding.retryAfterSeconds()).isEqualTo(60);
+    assertThat(plain.retryAfterSeconds()).isNull();
+  }
+
+  @Test
   void aMarkerBeatsTheFixedTransportMessage() {
     // A service that deliberately wrote text for the user, while its own peer
     // happened to be down. The marker is the only channel for that, so it has

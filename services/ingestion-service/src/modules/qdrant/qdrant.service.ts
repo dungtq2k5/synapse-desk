@@ -1,14 +1,20 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { DelayedError, Job } from 'bullmq';
 import {
+  AiProvider,
+  MODELS_BY_PROVIDER,
   QDRANT_COLLECTION,
+  QDRANT_MODEL_METADATA_KEY,
   QDRANT_PAYLOAD_FIELDS,
   QdrantChunkPayload,
   QdrantScopePayload,
   EMBEDDING_DIMENSION,
   EMBEDDING_MODEL,
+  collectionAlias,
 } from '@synapsedesk/contracts';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** What one chunk looks like as a Qdrant point. */
 export type ChunkPoint = {
@@ -42,17 +48,40 @@ export type ChunkPoint = {
 export const READ_ATTEMPTS = 20;
 export const READ_DELAY_MS = 500;
 
+/** How often a held service asks again whether its model's alias exists. */
+export const RECHECK_MS = 10_000;
+
+/** How long a held job waits before it is tried again. */
+export const HOLD_MS = 30_000;
+
 @Injectable()
 export class QdrantService implements OnApplicationBootstrap {
   private readonly logger = new Logger(QdrantService.name);
 
   private readonly client: QdrantClient;
 
-  constructor(private readonly configService: ConfigService) {
+  /** The configured embedding model, from `AI_EMBEDDING_PROVIDER`. */
+  readonly model: string;
+
+  /** That model's alias: every point operation below addresses it. */
+  readonly collection: string;
+
+  private ready = false;
+
+  private checkedAt = Number.NEGATIVE_INFINITY;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.client = new QdrantClient({
       url: this.configService.getOrThrow<string>('QDRANT_URL'),
       checkCompatibility: false,
     });
+    const provider =
+      this.configService.get<AiProvider>('AI_EMBEDDING_PROVIDER') ?? 'gemini';
+    this.model = MODELS_BY_PROVIDER[provider].embeddingModel;
+    this.collection = collectionAlias(this.model);
   }
 
   /**
@@ -64,7 +93,43 @@ export class QdrantService implements OnApplicationBootstrap {
    * the collection (see {@link createCollection}).
    */
   async onApplicationBootstrap(): Promise<void> {
-    await this.ensureCollection();
+    if (!(await this.isReady())) {
+      this.logger.warn(
+        `No complete collection for ${this.model} yet: jobs that touch the ` +
+          'vector store are held until `npm run ai:reembed` builds it.',
+      );
+    }
+  }
+
+  /**
+   * Whether the configured model's alias exists, re-asked at most every
+   * {@link RECHECK_MS}, so the alias `ai:reembed` creates is picked up without
+   * a restart.
+   */
+  async isReady(): Promise<boolean> {
+    if (this.ready) return true;
+    if (Date.now() - this.checkedAt >= RECHECK_MS) {
+      this.checkedAt = Date.now();
+      this.ready = await this.ensureCollection();
+    }
+    return this.ready;
+  }
+
+  /**
+   * Puts a job back for {@link HOLD_MS} while the model has no complete
+   * collection. Throws BullMQ's `DelayedError`, which neither fails the job
+   * nor uses an attempt: the job simply runs again later.
+   *
+   * @example
+   * async process(job: Job, token?: string) {
+   *   await this.qdrant.holdUnlessReady(job, token);
+   *   ...
+   * }
+   */
+  async holdUnlessReady(job: Job, token?: string): Promise<void> {
+    if (await this.isReady()) return;
+    await job.moveToDelayed(Date.now() + HOLD_MS, token);
+    throw new DelayedError();
   }
 
   /**
@@ -84,29 +149,78 @@ export class QdrantService implements OnApplicationBootstrap {
     return true;
   }
 
-  async ensureCollection(): Promise<void> {
-    const exists = await this.client.collectionExists(QDRANT_COLLECTION);
-
-    if (!exists.exists && (await this.createCollection())) {
-      this.logger.log(
-        `Created Qdrant collection ${QDRANT_COLLECTION} (${EMBEDDING_MODEL}, ${EMBEDDING_DIMENSION}-dim)`,
-      );
-    } else {
-      await this.assertDimensionMatches();
+  /**
+   * Makes the configured model's alias usable if it can; answers whether it is.
+   * The same order as rag-service's `ensure_collection`:
+   *
+   * 1. the alias exists: its collection's model and dimension are checked;
+   * 2. Gemini, and the pre-alias `document_chunks` collection exists: it is
+   *    Gemini's, so it is adopted under Gemini's alias;
+   * 3. no chunk has a vector yet (a fresh system): created empty, with its alias;
+   * 4. otherwise `false`: only `ai:reembed` may build this model's collection.
+   */
+  async ensureCollection(): Promise<boolean> {
+    const target = await this.aliasTarget(this.collection);
+    if (target !== undefined) {
+      await this.assertModelMatches(target);
+      await this.ensurePayloadIndexes(target);
+      return true;
     }
 
-    await this.ensurePayloadIndexes();
+    if (
+      this.model === EMBEDDING_MODEL &&
+      (await this.client.collectionExists(QDRANT_COLLECTION)).exists
+    ) {
+      await this.assertModelMatches(QDRANT_COLLECTION);
+      await this.client.updateCollection(QDRANT_COLLECTION, {
+        metadata: { [QDRANT_MODEL_METADATA_KEY]: this.model },
+      });
+      await this.ensurePayloadIndexes(QDRANT_COLLECTION);
+      await this.createAlias(QDRANT_COLLECTION, this.collection);
+      return true;
+    }
+
+    const embedded = await this.prisma.documentChunk.findFirst({
+      where: { vectorPointId: { not: null } },
+      select: { id: true },
+    });
+    if (embedded) return false;
+
+    const name = `${this.collection}_1`;
+    if (await this.createCollection(name)) {
+      this.logger.log(
+        `Created Qdrant collection ${name} (${this.model}, ${EMBEDDING_DIMENSION}-dim)`,
+      );
+    }
+    await this.createAlias(name, this.collection);
+    return true;
+  }
+
+  private async aliasTarget(alias: string): Promise<string | undefined> {
+    const { aliases } = await this.client.getAliases();
+    return aliases.find((entry) => entry.alias_name === alias)?.collection_name;
+  }
+
+  /** Points `alias` at `collection`, unless a racing replica already did. */
+  private async createAlias(collection: string, alias: string): Promise<void> {
+    if ((await this.aliasTarget(alias)) === collection) return;
+    await this.client.updateCollectionAliases({
+      actions: [
+        { create_alias: { collection_name: collection, alias_name: alias } },
+      ],
+    });
   }
 
   /**
-   * Creates the collection, or answers false when it already exists: rag-service
-   * boots alongside and runs the same check-then-create, so the one that loses
-   * the race gets Qdrant's 409 and must go on as if it had found it. Any other
-   * failure still fails the boot.
+   * Creates one model's collection with its indexes, or answers false when it
+   * already exists: rag-service boots alongside and runs the same
+   * check-then-create, so the one that loses the race gets Qdrant's 409 and
+   * must go on as if it had found it. Any other failure still fails the boot.
    */
-  private async createCollection(): Promise<boolean> {
+  private async createCollection(name: string): Promise<boolean> {
     try {
-      await this.client.createCollection(QDRANT_COLLECTION, {
+      await this.client.createCollection(name, {
+        metadata: { [QDRANT_MODEL_METADATA_KEY]: this.model },
         // Cosine, and it must MATCH `rag-service`'s
         // `qm.Distance.COSINE` — the writer creating a collection with one
         // metric and the reader querying it with another is not an error
@@ -120,11 +234,14 @@ export class QdrantService implements OnApplicationBootstrap {
         // Dot would silently depend on that.
         vectors: { size: EMBEDDING_DIMENSION, distance: 'Cosine' },
       });
-      return true;
     } catch (error) {
-      if ((error as { status?: unknown } | null)?.status === 409) return false;
-      throw error;
+      if ((error as { status?: unknown } | null)?.status !== 409) throw error;
+      await this.assertModelMatches(name);
+      await this.ensurePayloadIndexes(name);
+      return false;
     }
+    await this.ensurePayloadIndexes(name);
+    return true;
   }
 
   /**
@@ -138,7 +255,7 @@ export class QdrantService implements OnApplicationBootstrap {
   async upsertChunks(points: ChunkPoint[]): Promise<void> {
     if (points.length === 0) return;
 
-    await this.client.upsert(QDRANT_COLLECTION, {
+    await this.client.upsert(this.collection, {
       wait: true,
       points: points.map((point) => {
         // Annotated, so a wrong value type or a missing key is a compile error
@@ -219,7 +336,17 @@ export class QdrantService implements OnApplicationBootstrap {
     }
     if (Object.keys(payload).length === 0) return;
 
-    await this.client.setPayload(QDRANT_COLLECTION, {
+    // With no complete collection for this model, retrieval refuses
+    // everything, and `ai:reembed` rewrites every point's scope from the
+    // chunk rows the caller already updated. So nothing is lost by skipping.
+    if (!(await this.isReady())) {
+      this.logger.debug(
+        `Scope of ${documentId} left to ai:reembed: no collection for ${this.model} yet`,
+      );
+      return;
+    }
+
+    await this.client.setPayload(this.collection, {
       wait: true,
       payload,
       filter: this.documentFilter(documentId, organizationId),
@@ -231,7 +358,7 @@ export class QdrantService implements OnApplicationBootstrap {
     documentId: string,
     organizationId: string,
   ): Promise<number> {
-    const result = await this.client.count(QDRANT_COLLECTION, {
+    const result = await this.client.count(this.collection, {
       exact: true,
       filter: this.documentFilter(documentId, organizationId),
     });
@@ -243,7 +370,7 @@ export class QdrantService implements OnApplicationBootstrap {
   async retrieve(vectorPointIds: string[]) {
     if (vectorPointIds.length === 0) return [];
 
-    return this.client.retrieve(QDRANT_COLLECTION, {
+    return this.client.retrieve(this.collection, {
       ids: vectorPointIds,
       with_payload: true,
     });
@@ -260,7 +387,7 @@ export class QdrantService implements OnApplicationBootstrap {
     documentId: string,
     organizationId: string,
   ): Promise<void> {
-    await this.client.delete(QDRANT_COLLECTION, {
+    await this.client.delete(this.collection, {
       wait: true,
       filter: this.documentFilter(documentId, organizationId),
     });
@@ -282,14 +409,14 @@ export class QdrantService implements OnApplicationBootstrap {
   ): Promise<void> {
     const { must } = this.documentFilter(documentId, organizationId);
     if (keep.length === 0) {
-      await this.client.delete(QDRANT_COLLECTION, {
+      await this.client.delete(this.collection, {
         wait: true,
         filter: { must: [...must, this.staged] },
       });
       return;
     }
 
-    await this.client.batchUpdate(QDRANT_COLLECTION, {
+    await this.client.batchUpdate(this.collection, {
       wait: true,
       operations: [
         {
@@ -332,7 +459,7 @@ export class QdrantService implements OnApplicationBootstrap {
     },
   ): Promise<void> {
     const { must } = this.documentFilter(documentId, organizationId);
-    await this.client.batchUpdate(QDRANT_COLLECTION, {
+    await this.client.batchUpdate(this.collection, {
       wait: true,
       operations: [
         // Live: not staged, which includes a point written before the field.
@@ -367,7 +494,7 @@ export class QdrantService implements OnApplicationBootstrap {
     limit: number,
     minScore: number,
   ): Promise<{ chunkId: string; documentId: string; score: number }[]> {
-    const result = await this.client.query(QDRANT_COLLECTION, {
+    const result = await this.client.query(this.collection, {
       query: vectorPointId,
       limit,
       score_threshold: minScore,
@@ -406,7 +533,7 @@ export class QdrantService implements OnApplicationBootstrap {
     match: { value: true },
   };
 
-  private async ensurePayloadIndexes(): Promise<void> {
+  private async ensurePayloadIndexes(collection: string): Promise<void> {
     const specs: Array<[string, 'keyword' | 'bool']> = [
       [QDRANT_PAYLOAD_FIELDS.organizationId, 'keyword'],
       [QDRANT_PAYLOAD_FIELDS.isDeleted, 'bool'],
@@ -418,7 +545,7 @@ export class QdrantService implements OnApplicationBootstrap {
 
     for (const [field, schema] of specs) {
       try {
-        await this.client.createPayloadIndex(QDRANT_COLLECTION, {
+        await this.client.createPayloadIndex(collection, {
           field_name: field,
           field_schema: schema,
           wait: true,
@@ -443,10 +570,12 @@ export class QdrantService implements OnApplicationBootstrap {
    * to {@link READ_ATTEMPTS} × {@link READ_DELAY_MS} rather than failing the
    * boot.
    */
-  private async readCollection(): ReturnType<QdrantClient['getCollection']> {
+  private async readCollection(
+    collection: string,
+  ): ReturnType<QdrantClient['getCollection']> {
     for (let attempt = 1; ; attempt++) {
       try {
-        return await this.client.getCollection(QDRANT_COLLECTION);
+        return await this.client.getCollection(collection);
       } catch (error) {
         const code = (error as { status?: unknown } | null)?.status;
         if (
@@ -462,15 +591,17 @@ export class QdrantService implements OnApplicationBootstrap {
   }
 
   /**
-   * Refuses to serve a collection built for a different vector size.
+   * Refuses a collection built by another model, or for another vector size.
    *
-   * The dimension is the only part Qdrant itself enforces, and it does so at
-   * insert time with an error that says nothing about why. This turns it into a
-   * boot failure naming the actual problem — a full re-embed migration, not a
-   * config change.
+   * The dimension is the only part Qdrant enforces, at insert time, with an
+   * error that says nothing about why. The model is the part it can't: a
+   * same-dimension DIFFERENT model produces no error at all, just meaningless
+   * neighbors. So the model a collection records is compared, and a mismatch
+   * fails the boot naming both. A collection that records none is the
+   * pre-alias one, which only Gemini's model ever wrote.
    */
-  private async assertDimensionMatches(): Promise<void> {
-    const info = await this.readCollection();
+  private async assertModelMatches(collection: string): Promise<void> {
+    const info = await this.readCollection(collection);
     const vectors = info.config?.params?.vectors;
     const size =
       typeof vectors === 'object' && vectors !== null && 'size' in vectors
@@ -479,9 +610,21 @@ export class QdrantService implements OnApplicationBootstrap {
 
     if (size !== undefined && size !== EMBEDDING_DIMENSION) {
       throw new Error(
-        `Collection '${QDRANT_COLLECTION}' has ${size}-dimensional vectors but ` +
-          `${EMBEDDING_MODEL} produces ${EMBEDDING_DIMENSION}. Changing the embedding ` +
+        `Collection '${collection}' has ${size}-dimensional vectors but ` +
+          `${this.model} produces ${EMBEDDING_DIMENSION}. Changing the embedding ` +
           'model is a full re-embed migration, not a config change.',
+      );
+    }
+
+    const metadata = (info.config as { metadata?: Record<string, unknown> })
+      .metadata;
+    const raw = metadata?.[QDRANT_MODEL_METADATA_KEY];
+    const recorded = typeof raw === 'string' ? raw : EMBEDDING_MODEL;
+    if (recorded !== this.model) {
+      throw new Error(
+        `Collection '${collection}' holds ${recorded} vectors but is ` +
+          `reached as ${this.model}'s. Its alias points at the wrong ` +
+          'collection; run `npm run ai:reembed -- --model <provider>` to rebuild it.',
       );
     }
   }

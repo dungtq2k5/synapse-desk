@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { QdrantService } from '../qdrant/qdrant.service';
 import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/contracts';
 import { IngestionJobData, IngestionProcessor } from './ingestion.processor';
 import { INGESTION_OUTCOMES } from '../../common/configs/ingestion.config';
@@ -23,15 +24,21 @@ import { INGESTION_OUTCOMES } from '../../common/configs/ingestion.config';
 export class IngestionWorker extends WorkerHost {
   private readonly logger = new Logger(IngestionWorker.name);
 
-  constructor(private readonly processor: IngestionProcessor) {
+  constructor(
+    private readonly processor: IngestionProcessor,
+    private readonly qdrant: QdrantService,
+  ) {
     super();
   }
 
-  async process(job: Job<IngestionJobData>): Promise<void> {
+  async process(job: Job<IngestionJobData>, token?: string): Promise<void> {
     if (job.name !== INGESTION_JOB_NAME) {
       this.logger.warn(`Ignoring unknown job '${job.name}' on this queue`);
       return;
     }
+
+    // Held, not failed, while the configured model has no complete collection.
+    await this.qdrant.holdUnlessReady(job, token);
 
     // `attemptsMade` counts the attempts that already failed, so this one is
     // the last when no further attempt is left after it.

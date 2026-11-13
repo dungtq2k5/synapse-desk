@@ -55,7 +55,57 @@ export const MODEL_PRICING: Record<AiModel, ModelPricing> = {
     promptMicrosPerMillion: 300_000,
     completionMicrosPerMillion: 2_500_000,
   },
+
+  // Local models, priced by the electricity they burn:
+  //
+  //   micros per 1M tokens = watts / 1000 × (1,000,000 / tokens per second)
+  //                          / 3600 × LOCAL_ENERGY_PRICE_MICROS_PER_KWH
+  //
+  // Measured 2026-11-12 with Ollama 0.40.13 at num_ctx 8192; tokens per
+  // second from Ollama's own `prompt_eval_*` / `eval_*`. Each row is the
+  // HIGHEST of its runs, so a model never prices below what it can cost:
+  //
+  //   GPU (RX 6600, Vulkan), watts measured from `power1_average`:
+  //     7B     prompt 579.7 tok/s at 96.8 W    completion 43.9 tok/s at 98.2 W
+  //     3B     prompt 840.6 tok/s at 73.7 W    completion 86.8 tok/s at 94.8 W
+  //     nomic         6,897 tok/s at 52.4 W
+  //   CPU (i5-12400F), at its RATED 65 W base power, not a measurement
+  //   (package power isn't readable without root):
+  //     7B     prompt  60.4 tok/s              completion  7.5 tok/s
+  //     3B     prompt 129.0 tok/s              completion 16.9 tok/s
+  //     nomic         1,549.7 tok/s
+  //
+  // So every row is the CPU's. That also keeps the 7B (QUALITY) above the 3B
+  // (FAST), the order `ai-tier.spec.ts` holds every provider to.
+  'qwen2.5:7b-instruct-q4_K_M': {
+    promptMicrosPerMillion: 47_962,
+    completionMicrosPerMillion: 385_581,
+  },
+  'qwen2.5:3b-instruct-q4_K_M': {
+    promptMicrosPerMillion: 22_472,
+    completionMicrosPerMillion: 171_200,
+  },
+  'nomic-embed-text:v1.5': {
+    promptMicrosPerMillion: 1_870,
+    completionMicrosPerMillion: 0,
+  },
 };
+
+/**
+ * The household tariff a local model's power is billed at, in VND per kWh:
+ * EVN's top tier from 2026-11-01 (3,844, Quyết định 2892/QĐ-BCT) plus 8% VAT,
+ * rounded up. The top tier because a model's draw lands on top of the
+ * household's other use.
+ */
+export const LOCAL_ENERGY_PRICE_VND_PER_KWH = 4_152;
+
+/** Vietcombank's USD selling rate, 2026-11-12 21:40, which the prices above were derived at. */
+export const VND_PER_USD = 25_870;
+
+/** 4,152 / 25,870 USD, in micros, rounded up: the rate in the local rows above. */
+export const LOCAL_ENERGY_PRICE_MICROS_PER_KWH = Math.ceil(
+  (LOCAL_ENERGY_PRICE_VND_PER_KWH / VND_PER_USD) * 1_000_000,
+);
 
 /** The pricing entry, or a thrown error naming the model. Never a silent zero. */
 export function pricingFor(modelName: string): ModelPricing {

@@ -205,7 +205,19 @@ public class GatewayExceptionHandler {
       exception.getStatus().getDescription()
     );
 
-    return envelope(safe.status(), request, safe.message(), safe.details());
+    ResponseEntity<ErrorEnvelope> response = envelope(
+      safe.status(),
+      request,
+      safe.message(),
+      safe.details()
+    );
+    // Only when the service named a wait (the knowledge base being rebuilt):
+    // an unmarked 503 is a peer that is down, with no honest wait to give.
+    return safe.retryAfterSeconds() == null
+      ? response
+      : ResponseEntity.status(response.getStatusCode())
+          .header("Retry-After", String.valueOf(safe.retryAfterSeconds()))
+          .body(response.getBody());
   }
 
   /** Anything raised with a status already chosen. */

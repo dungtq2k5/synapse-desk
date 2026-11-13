@@ -30,6 +30,8 @@ python-dotenv==1.2.4
 # and `build_dependencies` runs at boot, so a missing package is an ImportError
 # on startup rather than a surprise later.
 google-genai==1.75.0
+# The Ollama provider's client. Already locked as google-genai's dependency.
+httpx==0.28.1
 
 # The reranker.
 #

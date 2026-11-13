@@ -72,6 +72,10 @@ const MODEL_PATTERNS = [
   /\bclaude-[\w.]+/i,
   /\bo[134]-(?:mini|preview)\b/i,
   /\bmodels\/[\w.-]*(?:gemini|embedding)[\w.-]*/i,
+  // Ollama tags: a family, then a size or a version after the colon.
+  /\bqwen[\d.]*:[\w.-]+/i,
+  /\bllama[\d.]*:[\w.-]+/i,
+  /\bnomic-embed[\w.:-]*/i,
 ];
 
 function* walk(directory) {

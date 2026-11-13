@@ -55,4 +55,17 @@ describe('the HTTP status hint (unit)', () => {
       message: '',
     });
   });
+
+  it('carries a wait in seconds, and only when the marker names one', () => {
+    expect(
+      readHttpStatusHint(withHttpStatus(503, 'Being rebuilt.', 60)),
+    ).toEqual({
+      httpStatus: 503,
+      message: 'Being rebuilt.',
+      retryAfterSeconds: 60,
+    });
+    expect(
+      readHttpStatusHint(withHttpStatus(503, 'Not configured.')),
+    ).not.toHaveProperty('retryAfterSeconds');
+  });
 });

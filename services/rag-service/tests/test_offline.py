@@ -124,8 +124,42 @@ class TestSelectProviders:
             )
 
     def test_the_real_provider_still_needs_its_key(self, config):
+        gemini = dataclasses.replace(
+            config,
+            gemini_api_key="",
+            generation_provider="gemini",
+            embedding_provider="gemini",
+        )
         with pytest.raises(RuntimeError, match="GEMINI_API_KEY is empty"):
-            select_providers(config)
+            select_providers(gemini)
+
+    def test_a_local_provider_needs_no_gemini_key_but_its_url(self, config):
+        local = dataclasses.replace(
+            config,
+            gemini_api_key="",
+            generation_provider="ollama",
+            embedding_provider="ollama",
+            ollama_base_url="http://localhost:11434",
+        )
+        embeddings, generator = select_providers(local)
+
+        assert type(embeddings).__name__ == "OllamaEmbeddingClient"
+        assert type(generator).__name__ == "OllamaGenerator"
+        with pytest.raises(RuntimeError, match="OLLAMA_BASE_URL is empty"):
+            select_providers(dataclasses.replace(local, ollama_base_url=""))
+
+    def test_the_two_roles_switch_separately(self, config):
+        mixed = dataclasses.replace(
+            config,
+            gemini_api_key="key",
+            generation_provider="gemini",
+            embedding_provider="ollama",
+            ollama_base_url="http://localhost:11434",
+        )
+        embeddings, generator = select_providers(mixed)
+
+        assert type(embeddings).__name__ == "OllamaEmbeddingClient"
+        assert type(generator).__name__ == "GeminiGenerator"
 
     def test_the_switch_reads_the_environment(self, monkeypatch, config):
         monkeypatch.setenv("RAG_OFFLINE_MODEL", "true")

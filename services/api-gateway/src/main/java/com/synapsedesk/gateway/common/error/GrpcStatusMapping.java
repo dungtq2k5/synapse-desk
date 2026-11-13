@@ -42,9 +42,13 @@ public final class GrpcStatusMapping {
   /** What a client is told for a fault: a code outside the table, unmarked. */
   private static final String INTERNAL_ERROR = "Internal server error";
 
-  /** The marker `withHttpStatus` writes, and `readHttpStatusHint`'s 100–599 guard. */
+  /**
+   * The marker `withHttpStatus` writes, and `readHttpStatusHint`'s 100–599
+   * guard: `[http:503]`, or `[http:503;retry-after=60]` when the service names
+   * how long to wait (sent as `Retry-After`).
+   */
   private static final Pattern MARKER = Pattern.compile(
-    "^\\[http:(\\d{3})]\\s*"
+    "^\\[http:(\\d{3})(?:;retry-after=(\\d{1,5}))?]\\s*"
   );
 
   private static final Map<Status.Code, HttpStatus> TO_HTTP = new EnumMap<>(
@@ -99,10 +103,19 @@ public final class GrpcStatusMapping {
   public record ClientSafe(
     HttpStatus status,
     String message,
-    @Nullable Map<String, Object> details
+    @Nullable Map<String, Object> details,
+    @Nullable Integer retryAfterSeconds
   ) {
     ClientSafe(HttpStatus status, String message) {
-      this(status, message, null);
+      this(status, message, null, null);
+    }
+
+    ClientSafe(
+      HttpStatus status,
+      String message,
+      @Nullable Map<String, Object> details
+    ) {
+      this(status, message, details, null);
     }
   }
 
@@ -127,7 +140,8 @@ public final class GrpcStatusMapping {
       return new ClientSafe(
         HttpStatus.valueOf(marked.get()),
         ErrorMessages.format(lifted.message()),
-        lifted.details()
+        lifted.details(),
+        retryAfter(text)
       );
     }
 
@@ -168,6 +182,15 @@ public final class GrpcStatusMapping {
     return status < 100 || status > 599
       ? Optional.empty()
       : Optional.of(status);
+  }
+
+  /** The seconds a marker's `;retry-after=` names, or null. */
+  private static @Nullable Integer retryAfter(String message) {
+    Matcher matcher = MARKER.matcher(message);
+
+    return matcher.find() && matcher.group(2) != null
+      ? Integer.valueOf(matcher.group(2))
+      : null;
   }
 
   private static String stripMarker(String message) {

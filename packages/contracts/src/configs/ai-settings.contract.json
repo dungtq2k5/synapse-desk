@@ -22,6 +22,11 @@
   "qdrant": {
     "collection": "document_chunks",
     "embeddingDimension": 768,
+    "modelMetadataKey": "embedding_model",
+    "aliases": {
+      "gemini-embedding-2": "document_chunks__gemini-embedding-2",
+      "nomic-embed-text:v1.5": "document_chunks__nomic-embed-text_v1_5"
+    },
     "payloadFields": {
       "organizationId": "organization_id",
       "isDeleted": "is_deleted",
@@ -31,11 +36,55 @@
       "chunkId": "chunk_id"
     }
   },
-  "cheapModel": "gemini-3.5-flash-lite",
-  "embeddingModel": "gemini-embedding-2",
-  "generationModelByTier": {
-    "FAST": "gemini-3.5-flash-lite",
-    "QUALITY": "gemini-2.5-pro"
+  "modelsByProvider": {
+    "gemini": {
+      "generationModelByTier": {
+        "FAST": "gemini-3.5-flash-lite",
+        "QUALITY": "gemini-2.5-pro"
+      },
+      "cheapModel": "gemini-3.5-flash-lite",
+      "embeddingModel": "gemini-embedding-2"
+    },
+    "ollama": {
+      "generationModelByTier": {
+        "FAST": "qwen2.5:3b-instruct-q4_K_M",
+        "QUALITY": "qwen2.5:7b-instruct-q4_K_M"
+      },
+      "cheapModel": "qwen2.5:3b-instruct-q4_K_M",
+      "embeddingModel": "nomic-embed-text:v1.5"
+    }
+  },
+  "defaultProviders": { "generation": "gemini", "embedding": "gemini" },
+  "ollamaModelDigests": {
+    "qwen2.5:7b-instruct-q4_K_M": "845dbda0ea48ed749caafd9e6037047aa19acfcfd82e704d7ca97d631a0b697e",
+    "qwen2.5:3b-instruct-q4_K_M": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "nomic-embed-text:v1.5": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
+  },
+  "modelPricing": {
+    "gemini-2.5-pro": {
+      "promptMicrosPerMillion": 1250000,
+      "completionMicrosPerMillion": 10000000
+    },
+    "gemini-embedding-2": {
+      "promptMicrosPerMillion": 200000,
+      "completionMicrosPerMillion": 0
+    },
+    "gemini-3.5-flash-lite": {
+      "promptMicrosPerMillion": 300000,
+      "completionMicrosPerMillion": 2500000
+    },
+    "qwen2.5:7b-instruct-q4_K_M": {
+      "promptMicrosPerMillion": 47962,
+      "completionMicrosPerMillion": 385581
+    },
+    "qwen2.5:3b-instruct-q4_K_M": {
+      "promptMicrosPerMillion": 22472,
+      "completionMicrosPerMillion": 171200
+    },
+    "nomic-embed-text:v1.5": {
+      "promptMicrosPerMillion": 1870,
+      "completionMicrosPerMillion": 0
+    }
   },
   "defaultTier": "FAST",
   "retrievalDefaults": {

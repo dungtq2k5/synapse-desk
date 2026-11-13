@@ -42,8 +42,12 @@ async def semantic_arm(
     query_vector: list[float],
     limit: int,
     hnsw_ef: int = 128,
+    collection: str = COLLECTION_NAME,
 ) -> list[RetrievedChunk]:
     """ANN search with the tenant filter applied INSIDE the query.
+
+    `collection` is the configured embedding model's alias; the default is
+    Gemini's.
 
     Not post-filtering, which under-returns (you ask for k, the filter removes
     most of them, and you are left with three), and not naive pre-filtering,
@@ -57,7 +61,7 @@ async def semantic_arm(
     narrow-department user's every question into a false escalation.
     """
     response = await client.query_points(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection,
         query=query_vector,
         query_filter=scope.qdrant,
         limit=limit,

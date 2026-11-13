@@ -20,11 +20,26 @@
  * of cases where the table is genuinely wrong.
  */
 
-const MARKER = /^\[http:(\d{3})]\s*/;
+const MARKER = /^\[http:(\d{3})(?:;retry-after=(\d{1,5}))?]\s*/;
 
-/** Prefixes a message with a status the gateway should use instead of the table. */
-export function withHttpStatus(httpStatus: number, message: string): string {
-  return `[http:${httpStatus}] ${message}`;
+/**
+ * Prefixes a message with a status the gateway should use instead of the table,
+ * and optionally how many seconds a client should wait before trying again
+ * (the gateway sends it as `Retry-After`).
+ *
+ * @example
+ * withHttpStatus(402, 'This workspace has used its AI allowance')
+ * withHttpStatus(503, 'The knowledge base is being rebuilt…', 60)
+ * // '[http:503;retry-after=60] The knowledge base is being rebuilt…'
+ */
+export function withHttpStatus(
+  httpStatus: number,
+  message: string,
+  retryAfterSeconds?: number,
+): string {
+  const wait =
+    retryAfterSeconds === undefined ? '' : `;retry-after=${retryAfterSeconds}`;
+  return `[http:${httpStatus}${wait}] ${message}`;
 }
 
 /**
@@ -36,6 +51,8 @@ export function withHttpStatus(httpStatus: number, message: string): string {
 export function readHttpStatusHint(message: string): {
   httpStatus: number | null;
   message: string;
+  /** Present only when the marker carried one. */
+  retryAfterSeconds?: number;
 } {
   const match = MARKER.exec(message);
   if (!match) return { httpStatus: null, message };
@@ -49,5 +66,8 @@ export function readHttpStatusHint(message: string): {
     return { httpStatus: null, message };
   }
 
-  return { httpStatus, message: message.slice(match[0].length) };
+  const rest = message.slice(match[0].length);
+  return match[2] === undefined
+    ? { httpStatus, message: rest }
+    : { httpStatus, message: rest, retryAfterSeconds: Number(match[2]) };
 }

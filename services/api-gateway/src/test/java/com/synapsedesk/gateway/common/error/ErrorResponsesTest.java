@@ -98,6 +98,16 @@ class ErrorResponsesTest {
     }
 
     @RouteSecurity(RouteSecurity.Scheme.NONE)
+    @PostMapping("/probe/rebuilding")
+    String rebuilding() {
+      throw new StatusRuntimeException(
+        Status.UNAVAILABLE.withDescription(
+          "[http:503;retry-after=60] The knowledge base is being rebuilt."
+        )
+      );
+    }
+
+    @RouteSecurity(RouteSecurity.Scheme.NONE)
     @PostMapping("/probe/marked")
     String marked() {
       throw new StatusRuntimeException(
@@ -176,6 +186,40 @@ class ErrorResponsesTest {
     assertThat(response.json().get("error")).isEqualTo(
       "Your plan does not include this!"
     );
+  }
+
+  @Test
+  void aMarkedWaitIsSentAsRetryAfterAndAnUnmarked503SendsNone()
+    throws Exception {
+    java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+    java.util.function.Function<
+      String,
+      java.net.http.HttpResponse<String>
+    > post = path -> {
+      try {
+        return client.send(
+          java.net.http.HttpRequest.newBuilder(
+            java.net.URI.create("http://localhost:" + port + path)
+          )
+            .header("Content-Type", "application/json")
+            .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{}"))
+            .build(),
+          java.net.http.HttpResponse.BodyHandlers.ofString()
+        );
+      } catch (Exception e) {
+        throw new IllegalStateException(e);
+      }
+    };
+
+    java.net.http.HttpResponse<String> rebuilding = post.apply(
+      "/probe/rebuilding"
+    );
+    java.net.http.HttpResponse<String> down = post.apply("/probe/peer-down");
+
+    assertThat(rebuilding.statusCode()).isEqualTo(503);
+    assertThat(rebuilding.headers().firstValue("Retry-After")).contains("60");
+    assertThat(down.statusCode()).isEqualTo(503);
+    assertThat(down.headers().firstValue("Retry-After")).isEmpty();
   }
 
   @Test

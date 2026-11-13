@@ -2,8 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import {
-  GENERATION_MODEL_BY_TIER,
+  AI_PROVIDERS,
   AI_MODEL_TIERS,
+  MODELS_BY_PROVIDER,
   MODEL_PRICING,
   estimateCostMicros,
 } from '@synapsedesk/contracts';
@@ -12,38 +13,38 @@ const REPO_ROOT = join(__dirname, '../../..');
 
 describe('The AI tier (unit)', () => {
   describe('what makes it safe to sell', () => {
-    it('1. Prices QUALITY above FAST, so the CAP keeps meaning what it meant', () => {
-      // Under TOKEN budgeting, a premium tenant consumes the same token count
-      // for several times the money and the budget stops protecting margin.
-      // Cost metering (RDM §1.14) is what closed that door before it cost
-      // anything, and it is the only reason the tier is sellable at all.
-      const fast = MODEL_PRICING[GENERATION_MODEL_BY_TIER.FAST];
-      const quality = MODEL_PRICING[GENERATION_MODEL_BY_TIER.QUALITY];
+    it.each(AI_PROVIDERS)(
+      '1. Prices QUALITY above FAST on %s, so the CAP keeps meaning what it meant',
+      (provider) => {
+        // Under TOKEN budgeting, a premium tenant consumes the same token count
+        // for several times the money and the budget stops protecting margin.
+        // Cost metering (RDM §1.14) is what closed that door before it cost
+        // anything, and it is the only reason the tier is sellable at all.
+        const byTier = MODELS_BY_PROVIDER[provider].generationModelByTier;
+        const fast = MODEL_PRICING[byTier.FAST];
+        const quality = MODEL_PRICING[byTier.QUALITY];
 
-      expect(quality.promptMicrosPerMillion).toBeGreaterThan(
-        fast.promptMicrosPerMillion,
-      );
-      expect(quality.completionMicrosPerMillion).toBeGreaterThan(
-        fast.completionMicrosPerMillion,
-      );
-    });
+        expect(quality.promptMicrosPerMillion).toBeGreaterThan(
+          fast.promptMicrosPerMillion,
+        );
+        expect(quality.completionMicrosPerMillion).toBeGreaterThan(
+          fast.completionMicrosPerMillion,
+        );
+      },
+    );
 
-    it('2. Charges MORE for identical token counts on the premium tier', () => {
-      // The commercial consequence in one line: same usage, more money, so a
-      // QUALITY tenant reaches the cap sooner.
-      const fast = estimateCostMicros(
-        GENERATION_MODEL_BY_TIER.FAST,
-        1_000,
-        200,
-      );
-      const quality = estimateCostMicros(
-        GENERATION_MODEL_BY_TIER.QUALITY,
-        1_000,
-        200,
-      );
+    it.each(AI_PROVIDERS)(
+      '2. Charges MORE for identical token counts on the premium tier (%s)',
+      (provider) => {
+        // The commercial consequence in one line: same usage, more money, so a
+        // QUALITY tenant reaches the cap sooner.
+        const byTier = MODELS_BY_PROVIDER[provider].generationModelByTier;
+        const fast = estimateCostMicros(byTier.FAST, 1_000, 200);
+        const quality = estimateCostMicros(byTier.QUALITY, 1_000, 200);
 
-      expect(quality).toBeGreaterThan(fast);
-    });
+        expect(quality).toBeGreaterThan(fast);
+      },
+    );
   });
 
   describe('the tier vocabulary', () => {
@@ -53,8 +54,12 @@ describe('The AI tier (unit)', () => {
     // create, not for the three that happened to be hardcoded.
     it('3. Maps every tier to a generation model', () => {
       // A tier with no model is a plan somebody can buy and nothing can serve.
-      for (const tier of AI_MODEL_TIERS) {
-        expect(GENERATION_MODEL_BY_TIER[tier]).toBeTruthy();
+      for (const provider of AI_PROVIDERS) {
+        for (const tier of AI_MODEL_TIERS) {
+          expect(
+            MODELS_BY_PROVIDER[provider].generationModelByTier[tier],
+          ).toBeTruthy();
+        }
       }
     });
 
@@ -65,8 +70,12 @@ describe('The AI tier (unit)', () => {
       // Against the vocabulary rather than against rows, so a Super Admin
       // creating a fourth plan tomorrow cannot reach an unpriced model — the
       // only tiers a row may hold are the ones checked here.
-      for (const tier of AI_MODEL_TIERS) {
-        expect(MODEL_PRICING[GENERATION_MODEL_BY_TIER[tier]]).toBeDefined();
+      for (const provider of AI_PROVIDERS) {
+        for (const tier of AI_MODEL_TIERS) {
+          const model =
+            MODELS_BY_PROVIDER[provider].generationModelByTier[tier];
+          expect(MODEL_PRICING[model]).toBeDefined();
+        }
       }
     });
 

@@ -8,13 +8,13 @@
  * See `docs/decisions/0007-settings-layer-owns-model-names.md`.
  */
 
-import type { AiModel } from './ai-models.config';
+import type { AiModel, AiProvider } from './ai-models.config';
 
 /**
  * The tier a tenant's generation model is resolved from.
  *
  * Written to `organizations.ai_model_tier` by the Stripe webhook. Resolve
- * through {@link GENERATION_MODEL_BY_TIER}, never around it.
+ * through {@link MODELS_BY_PROVIDER}, never around it.
  */
 export const AI_MODEL_TIERS = ['FAST', 'QUALITY'] as const;
 export type AiModelTier = (typeof AI_MODEL_TIERS)[number];
@@ -48,39 +48,76 @@ export type AiSettings = {
   coRagMaxRetries: number;
 };
 
-/**
- * Tier -> generation model. This mapping is the entire tier feature.
- *
- * Typed `AiModel`, so a model named here without a price in `MODEL_PRICING`
- * is a compile error rather than a `pricingFor()` throw in production.
- */
-export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, AiModel> = {
-  FAST: 'gemini-3.5-flash-lite',
-  QUALITY: 'gemini-2.5-pro',
+/** The models one provider serves, per role. */
+export type ProviderModels = {
+  /** Tier -> generation model. This mapping is the entire tier feature. */
+  generationModelByTier: Record<AiModelTier, AiModel>;
+  /**
+   * Greeting classification and reformulation. It doesn't scale with the
+   * tier on purpose: these are volume calls whose quality barely moves with
+   * model tier, so scaling them multiplies a premium tenant's bill for no
+   * perceptible gain.
+   */
+  cheapModel: AiModel;
+  /**
+   * Tenant-independent: a Qdrant collection fixes dimension at creation, and
+   * each embedding model has its own collection (`collectionAliasFor`).
+   */
+  embeddingModel: AiModel;
 };
 
 /**
- * The tier-independent models.
+ * Provider -> the models it serves. Typed `AiModel`, so a model named here
+ * without a price in `MODEL_PRICING` is a compile error rather than a
+ * `pricingFor()` throw in production.
  *
- * `cheapModel` does not scale with the tier on purpose: greeting
- * classification and reformulation are volume calls whose quality barely moves
- * with model tier, so scaling them multiplies a premium tenant's bill for no
- * perceptible gain.
- *
- * `embeddingModel` is not merely tier-independent but tenant-independent.
- * Per-tenant embedding models force per-tenant collections and make every tier
- * change a full re-embed migration. It is stated here as a
- * constant rather than a setting anyone could vary.
+ * @example
+ * MODELS_BY_PROVIDER.ollama.generationModelByTier.FAST // the 3B
  */
-export const CHEAP_MODEL: AiModel = 'gemini-3.5-flash-lite';
-export const EMBEDDING_MODEL: AiModel = 'gemini-embedding-2';
+export const MODELS_BY_PROVIDER: Record<AiProvider, ProviderModels> = {
+  gemini: {
+    generationModelByTier: {
+      FAST: 'gemini-3.5-flash-lite',
+      QUALITY: 'gemini-2.5-pro',
+    },
+    cheapModel: 'gemini-3.5-flash-lite',
+    embeddingModel: 'gemini-embedding-2',
+  },
+  ollama: {
+    generationModelByTier: {
+      FAST: 'qwen2.5:3b-instruct-q4_K_M',
+      QUALITY: 'qwen2.5:7b-instruct-q4_K_M',
+    },
+    cheapModel: 'qwen2.5:3b-instruct-q4_K_M',
+    embeddingModel: 'nomic-embed-text:v1.5',
+  },
+};
 
-/** Every model the system can be configured to use — for the boot-time price check. */
-export const ALL_CONFIGURED_MODELS: readonly AiModel[] = [
-  ...Object.values(GENERATION_MODEL_BY_TIER),
-  CHEAP_MODEL,
-  EMBEDDING_MODEL,
-];
+/** Which provider serves each role. Both are deployment-wide settings. */
+export type AiProviders = { generation: AiProvider; embedding: AiProvider };
+
+export const DEFAULT_AI_PROVIDERS: AiProviders = {
+  generation: 'gemini',
+  embedding: 'gemini',
+};
+
+/** Gemini's tier map, the default provider's: what most tests and the demo seed name. */
+export const GENERATION_MODEL_BY_TIER =
+  MODELS_BY_PROVIDER.gemini.generationModelByTier;
+
+/** Gemini's cheap and embedding models, the default provider's. */
+export const CHEAP_MODEL: AiModel = MODELS_BY_PROVIDER.gemini.cheapModel;
+export const EMBEDDING_MODEL: AiModel =
+  MODELS_BY_PROVIDER.gemini.embeddingModel;
+
+/** Every model either provider can be configured to use — for the boot-time price check. */
+export const ALL_CONFIGURED_MODELS: readonly AiModel[] = Object.values(
+  MODELS_BY_PROVIDER,
+).flatMap((models) => [
+  ...Object.values(models.generationModelByTier),
+  models.cheapModel,
+  models.embeddingModel,
+]);
 
 /**
  * The retrieval defaults, from `docs/rag/`.
@@ -156,12 +193,23 @@ export function clampAiSetting(
  * the invalidation all belong to the service wrapping this in each language;
  * what is shared across the two languages is exactly this function, which is
  * what makes the contract fixture a meaningful comparison.
+ *
+ * `providers` picks whose models fill the three roles: generation and cheap
+ * from one, embedding from the other. Each service reads them once from its
+ * environment.
+ *
+ * @example
+ * resolveAiSettings('FAST', { generation: 'ollama', embedding: 'gemini' })
  */
-export function resolveAiSettings(tier: AiModelTier): AiSettings {
+export function resolveAiSettings(
+  tier: AiModelTier,
+  providers: AiProviders = DEFAULT_AI_PROVIDERS,
+): AiSettings {
+  const generation = MODELS_BY_PROVIDER[providers.generation];
   return {
-    generationModel: GENERATION_MODEL_BY_TIER[tier],
-    cheapModel: CHEAP_MODEL,
-    embeddingModel: EMBEDDING_MODEL,
+    generationModel: generation.generationModelByTier[tier],
+    cheapModel: generation.cheapModel,
+    embeddingModel: MODELS_BY_PROVIDER[providers.embedding].embeddingModel,
     semanticWeight: clampAiSetting(
       'semanticWeight',
       AI_RETRIEVAL_DEFAULTS.semanticWeight,

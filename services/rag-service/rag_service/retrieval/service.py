@@ -34,6 +34,7 @@ from rag_service.embeddings import EmbeddingClient
 from rag_service.enums import AiGenerationPurpose
 from rag_service.ledger.client import GenerationEntry, LedgerClient
 from rag_service.ledger.quota import QuotaCounter
+from rag_service.qdrant.collection import COLLECTION_NAME, KnowledgeBase
 from rag_service.retrieval.arms import RetrievedChunk, lexical_arm, semantic_arm
 from rag_service.retrieval.fusion import FusedChunk, reciprocal_rank_fusion
 from rag_service.retrieval.rerank import Reranker, apply_rerank
@@ -89,7 +90,10 @@ class RetrievalService:
         reranker: Reranker,
         quota: QuotaCounter,
         ledger: LedgerClient,
+        knowledge: KnowledgeBase | None = None,
     ) -> None:
+        self._knowledge = knowledge
+        self._collection = knowledge.alias if knowledge else COLLECTION_NAME
         self._qdrant = qdrant
         self._pool = pool
         self._embeddings = embeddings
@@ -114,6 +118,11 @@ class RetrievalService:
         classification, long before retrieval, and re-reading it would be a
         second Redis round trip answering a question already answered.
         """
+        # Before anything is charged: with no complete collection for the
+        # configured embedding model, there is nothing that may be searched.
+        if self._knowledge is not None:
+            await self._knowledge.require()
+
         scope = tenant_scope(ctx)
         final_k = limit or settings.final_context_k
 
@@ -237,7 +246,12 @@ class RetrievalService:
         )
 
         results = await semantic_arm(
-            self._qdrant, scope, embedding.vector, limit=top_n, hnsw_ef=HNSW_EF_DEFAULT
+            self._qdrant,
+            scope,
+            embedding.vector,
+            limit=top_n,
+            hnsw_ef=HNSW_EF_DEFAULT,
+            collection=self._collection,
         )
 
         if len(results) < top_n:
@@ -254,6 +268,7 @@ class RetrievalService:
                 embedding.vector,
                 limit=top_n,
                 hnsw_ef=HNSW_EF_RELAXED,
+                collection=self._collection,
             )
             if len(relaxed) > len(results):
                 return relaxed

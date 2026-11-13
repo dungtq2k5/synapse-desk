@@ -1,0 +1,38 @@
+{
+  "retrieval_hit_rate": {
+    "rate": 0.7083,
+    "n": 24
+  },
+  "citation_rate": {
+    "rate": 0.6667,
+    "n": 30
+  },
+  "refusal_accuracy": {
+    "rate": 0.8889,
+    "n": 45
+  },
+  "legitimate_not_refused": {
+    "rate": 1.0,
+    "n": 35
+  },
+  "language_match": {
+    "rate": 0.7714,
+    "n": 35
+  },
+  "contains_expected": {
+    "rate": 0.9286,
+    "n": 14
+  },
+  "renders_as_markdown": {
+    "rate": 1.0,
+    "n": 35
+  },
+  "markdown_structured": {
+    "rate": 0.4,
+    "n": 5
+  },
+  "structured_outputs": {
+    "rate": 1.0,
+    "n": 10
+  }
+}

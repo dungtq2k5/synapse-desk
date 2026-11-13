@@ -42,12 +42,20 @@ class EmbeddingClient(Protocol):
 
 
 class GeminiEmbeddingClient:
-    """The real provider."""
+    """The real provider.
 
-    def __init__(self, api_key: str) -> None:
+    `timeout_s` is each request's deadline: without one, a request Gemini
+    accepts and never answers holds the question open indefinitely.
+    """
+
+    def __init__(self, api_key: str, timeout_s: float = 30.0) -> None:
         import google.genai as genai
+        from google.genai import types
 
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=int(timeout_s * 1000)),
+        )
 
     async def embed_query(self, text: str, model: str) -> EmbeddingResult:
         from google.genai import types

@@ -329,6 +329,40 @@ services:
     depends_on:
       web: { condition: service_healthy }
 
+  # ------------------------------------------------------- local models
+  # Ollama, for when rag-service and ingestion-service are switched to
+  # `AI_*_PROVIDER=ollama` (env/*.env). Opt-in: `--profile local-ai up -d
+  # ollama`. The demo stays on Gemini until it is switched; on this network
+  # the services reach it as http://ollama:11434, and no host port is
+  # published. Models come from the PC's own `ollama pull` store.
+  ollama:
+    image: ollama/ollama:0.40.13
+    profiles: [local-ai]
+    restart: unless-stopped
+    logging: *logging
+    # The PC's own user, so a pull leaves files it owns; the PC's `video` and
+    # `render` group ids, by number, open the GPU (Vulkan).
+    user: '${OLLAMA_UID:-1000}:${OLLAMA_GID:-1000}'
+    group_add: ['${OLLAMA_VIDEO_GID:-44}', '${OLLAMA_RENDER_GID:-992}']
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      OLLAMA_VULKAN: '1'
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      HOME: /tmp
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_MAX_LOADED_MODELS: '2'
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_QUEUE: '64'
+    volumes:
+      - ${OLLAMA_MODELS_DIR:-${HOME}/.ollama/models}:/models
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # ------------------------------------------------------- on demand only
   # Seeds and one-off scripts, run by hand on this network (README.md):
   #   docker compose --profile tools run --rm tools npm run plans:seed:apply

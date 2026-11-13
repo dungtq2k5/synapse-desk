@@ -60,6 +60,7 @@ from rag_service.ledger.client import LedgerClient
 from rag_service.ledger.metered import MeteredGenerator
 from rag_service.ledger.quota import QuotaCounter
 from rag_service.offline import OfflineEmbeddingClient, OfflineGenerator
+from rag_service.ollama import OllamaEmbeddingClient, OllamaGenerator, check_ollama
 from rag_service.preprocess.greeting import Intent, refusal_reply
 from rag_service.preprocess.injection import InjectionGuard, LlmInjectionClassifier
 from rag_service.preprocess.pipeline import (
@@ -68,12 +69,15 @@ from rag_service.preprocess.pipeline import (
     Turn,
 )
 from rag_service.pricing import assert_pricing_table_covers
-from rag_service.qdrant.collection import ensure_collection
+from rag_service.qdrant.collection import KnowledgeBase, KnowledgeBaseRebuilding
 from rag_service.retrieval.rerank import FlashRankReranker, Reranker
 from rag_service.retrieval.service import BudgetState, RetrievalService
 from rag_service.settings import (
     ALL_CONFIGURED_MODELS,
+    OLLAMA_MODEL_DIGESTS,
+    AiProviders,
     AiSettingsResolver,
+    resolve_ai_settings,
     with_co_rag_retries,
 )
 
@@ -110,8 +114,11 @@ MAX_SEARCH_LIMIT = 50
 ESCALATION_GRACE_RATIO = 0.1
 
 
-def with_http_status(status_code: int, message: str) -> str:
-    """The `[http:NNN]` marker the gateway's filter reads.
+def with_http_status(
+    status_code: int, message: str, retry_after_seconds: int | None = None
+) -> str:
+    """The `[http:NNN]` marker the gateway's filter reads, optionally with
+    `;retry-after=S`, which the gateway sends as `Retry-After`.
 
     402 has no faithful gRPC code — `RESOURCE_EXHAUSTED` maps to 429 and
     legitimately so, since OTP throttling uses it to say "slow down", which is
@@ -121,7 +128,8 @@ def with_http_status(status_code: int, message: str) -> str:
     Mirrors `withHttpStatus` in `@synapsedesk/core`; the format is duplicated
     here for the same reason the quota key is.
     """
-    return f"[http:{status_code}] {message}"
+    wait = "" if retry_after_seconds is None else f";retry-after={retry_after_seconds}"
+    return f"[http:{status_code}{wait}] {message}"
 
 
 #: The injection refusal `Draft` aborts with.
@@ -187,6 +195,10 @@ class Dependencies:
     #: check; that approach was measured and rejected.
     injection: InjectionGuard = field(default_factory=InjectionGuard)
 
+    #: The configured embedding model's collection, by its alias. `None` in
+    #: tests, which address Gemini's alias directly.
+    knowledge: KnowledgeBase | None = None
+
     def retrieval(self) -> RetrievalService:
         return RetrievalService(
             qdrant=self.qdrant,
@@ -195,6 +207,7 @@ class Dependencies:
             reranker=self.reranker,
             quota=QuotaCounter(self.redis),
             ledger=self.ledger,
+            knowledge=self.knowledge,
         )
 
 
@@ -856,14 +869,17 @@ def build_injection_guard(config: Config, metered) -> InjectionGuard:
 
 
 def select_providers(config: Config) -> tuple[EmbeddingClient, ProviderClient]:
-    """The embedding client and the generator: the real provider, or with
-    `RAG_OFFLINE_MODEL` the model-free one (`rag_service.offline`).
+    """The embedding client and the generator, each from its own switch.
+
+    `AI_EMBEDDING_PROVIDER` and `AI_GENERATION_PROVIDER` pick `gemini` or
+    `ollama` per role. With `RAG_OFFLINE_MODEL` the model-free provider
+    (`rag_service.offline`) wins over both, for the end-to-end stack.
 
     The offline model is refused under `APP_ENV=production`, at boot: real
-    questions answered by fixed text would look like a working assistant.
-    The real provider needs `GEMINI_API_KEY`, checked here for the same
-    reason: the first failure should name the variable, not a frame inside
-    `google.genai`.
+    questions answered by fixed text would look like a working assistant. A
+    local model is allowed there: the demo is a real use. `GEMINI_API_KEY` is
+    required only when a switch says `gemini`, checked here so the first
+    failure names the variable, not a frame inside `google.genai`.
     """
     if config.offline_model:
         if config.app_env == "production":
@@ -877,19 +893,117 @@ def select_providers(config: Config) -> tuple[EmbeddingClient, ProviderClient]:
         )
         return OfflineEmbeddingClient(), OfflineGenerator()
 
-    if not config.gemini_api_key:
+    providers = {config.generation_provider, config.embedding_provider}
+    if "gemini" in providers and not config.gemini_api_key:
         # Checked before constructing anything. Without it the first failure is
         # `ValueError: Missing key inputs argument!` raised inside
         # `google.genai`, eight frames deep, naming neither this service nor the
         # variable that is actually missing.
         raise RuntimeError(
-            "GEMINI_API_KEY is empty. The server needs it for embeddings and "
-            "generation; set it in services/rag-service/.env. (The test suite does "
-            "not — it substitutes the embedding client.)"
+            "GEMINI_API_KEY is empty. The server needs it while "
+            "AI_GENERATION_PROVIDER or AI_EMBEDDING_PROVIDER is gemini; set it in "
+            "services/rag-service/.env. (The test suite does not — it "
+            "substitutes the embedding client.)"
         )
-    return GeminiEmbeddingClient(config.gemini_api_key), GeminiGenerator(
-        config.gemini_api_key
+    if "ollama" in providers and not config.ollama_base_url:
+        raise RuntimeError(
+            "OLLAMA_BASE_URL is empty, and a provider is set to ollama. Set it "
+            "in services/rag-service/.env."
+        )
+
+    embeddings: EmbeddingClient = (
+        OllamaEmbeddingClient(
+            config.ollama_base_url, config.ollama_num_ctx, config.ollama_embed_timeout_s
+        )
+        if config.embedding_provider == "ollama"
+        else GeminiEmbeddingClient(config.gemini_api_key, config.gemini_embed_timeout_s)
     )
+    generator: ProviderClient = (
+        OllamaGenerator(
+            config.ollama_base_url, config.ollama_num_ctx, config.ollama_idle_timeout_s
+        )
+        if config.generation_provider == "ollama"
+        else GeminiGenerator(config.gemini_api_key, config.gemini_idle_timeout_s)
+    )
+    return embeddings, generator
+
+
+def configured_providers(config: Config) -> AiProviders:
+    """The two switches, as the settings layer reads them."""
+    return AiProviders(
+        generation=config.generation_provider,  # type: ignore[arg-type]
+        embedding=config.embedding_provider,  # type: ignore[arg-type]
+    )
+
+
+def ollama_models(providers: AiProviders) -> list[str]:
+    """The models this service will ask Ollama for, for the boot check."""
+    resolved = [resolve_ai_settings(tier, providers) for tier in ("FAST", "QUALITY")]
+    models: set[str] = set()
+    if providers.generation == "ollama":
+        models |= {s.generation_model for s in resolved} | {resolved[0].cheap_model}
+    if providers.embedding == "ollama":
+        models.add(resolved[0].embedding_model)
+    return sorted(models)
+
+
+#: What a retrieval call answers while the configured embedding model has no
+#: complete collection. UNAVAILABLE, marked so the gateway forwards the text
+#: and adds `Retry-After`.
+def rebuilding_refusal(error: KnowledgeBaseRebuilding) -> str:
+    return with_http_status(503, str(error), REBUILDING_RETRY_AFTER_SECONDS)
+
+
+#: How long a caller is told to wait while the knowledge base is rebuilt.
+REBUILDING_RETRY_AFTER_SECONDS = 60
+
+
+class KnowledgeBaseInterceptor(grpc.aio.ServerInterceptor):
+    """Turns `KnowledgeBaseRebuilding`, from any handler, into a marked UNAVAILABLE.
+
+    One place rather than one `try` per handler: `retrieve()` raises it, and
+    whichever RPC was retrieving (Search, Chat, Ask, Draft) answers the same
+    way. A handler that already catches retrieval failures (Suggest's
+    articles) keeps doing so.
+    """
+
+    async def intercept_service(self, continuation, handler_call_details):
+        handler = await continuation(handler_call_details)
+        if handler is None:
+            return handler
+
+        if handler.unary_unary is not None:
+            inner_unary = handler.unary_unary
+
+            async def unary(request, context):
+                try:
+                    return await inner_unary(request, context)
+                except KnowledgeBaseRebuilding as error:
+                    await context.abort(
+                        grpc.StatusCode.UNAVAILABLE, rebuilding_refusal(error)
+                    )
+
+            return grpc.unary_unary_rpc_method_handler(
+                unary, handler.request_deserializer, handler.response_serializer
+            )
+
+        if handler.unary_stream is not None:
+            inner_stream = handler.unary_stream
+
+            async def stream(request, context):
+                try:
+                    async for item in inner_stream(request, context):
+                        yield item
+                except KnowledgeBaseRebuilding as error:
+                    await context.abort(
+                        grpc.StatusCode.UNAVAILABLE, rebuilding_refusal(error)
+                    )
+
+            return grpc.unary_stream_rpc_method_handler(
+                stream, handler.request_deserializer, handler.response_serializer
+            )
+
+        return handler
 
 
 # Real clients only; the tests build their own collaborators.
@@ -903,13 +1017,36 @@ async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cove
     question, not after it.
     """
     embeddings, generator = select_providers(config)
+    providers = configured_providers(config)
 
-    qdrant = AsyncQdrantClient(url=config.qdrant_url)
-    await ensure_collection(qdrant)
+    if not config.offline_model and (models := ollama_models(providers)):
+        await check_ollama(config.ollama_base_url, models, OLLAMA_MODEL_DIGESTS)
 
     pool = await asyncpg.create_pool(
         config.ingestion_database_url, min_size=2, max_size=10
     )
+
+    async def nothing_embedded() -> bool:
+        # A fresh system: no chunk has a vector yet, so creating the
+        # collection empty loses nothing. Otherwise the vectors exist for some
+        # model, and only `ai:reembed` may build this one's collection.
+        return not await pool.fetchval(
+            "SELECT EXISTS (SELECT 1 FROM document_chunks "
+            "WHERE vector_point_id IS NOT NULL)"
+        )
+
+    qdrant = AsyncQdrantClient(url=config.qdrant_url)
+    knowledge = KnowledgeBase(
+        qdrant,
+        resolve_ai_settings("FAST", providers).embedding_model,
+        nothing_embedded,
+    )
+    try:
+        await knowledge.require()
+    except KnowledgeBaseRebuilding as error:
+        # Serving anyway: generation that doesn't retrieve still works, and
+        # retrieval answers this until `ai:reembed` creates the alias.
+        logger.warning("%s Retrieval answers UNAVAILABLE until then.", error)
 
     client = redis.from_url(config.redis_url, db=config.redis_db, decode_responses=True)
 
@@ -931,7 +1068,8 @@ async def build_dependencies(config: Config) -> Dependencies:  # pragma: no cove
         ),
         generator=generator,
         ledger=ledger,
-        settings=AiSettingsResolver(),
+        settings=AiSettingsResolver(providers=providers),
+        knowledge=knowledge,
     )
 
 
@@ -1057,7 +1195,9 @@ async def serve() -> None:  # pragma: no cover
     # at gRPC's 4 MB while every TypeScript client and server is at 10 MB, and
     # the mismatch only shows up as RESOURCE_EXHAUSTED on a request the caller
     # had no reason to think was too large.
-    server = grpc.aio.server(options=GRPC_SERVER_OPTIONS)
+    server = grpc.aio.server(
+        options=GRPC_SERVER_OPTIONS, interceptors=[KnowledgeBaseInterceptor()]
+    )
     rag_pb2_grpc.add_RagServiceServicer_to_server(RagServicer(deps), server)
 
     # The ops surface, on the SAME port No HTTP listener and no

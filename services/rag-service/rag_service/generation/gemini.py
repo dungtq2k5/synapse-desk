@@ -6,6 +6,7 @@ from `settings_for(organization_id)`
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 
@@ -16,10 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiGenerator:
-    def __init__(self, api_key: str) -> None:
+    """Streamed generation, with an IDLE deadline rather than a total one.
+
+    A long answer legitimately takes minutes; a stream that has sent nothing
+    for `idle_timeout_s` (before its first frame, or between two) is the fault,
+    and raises `TimeoutError` the way an unavailable provider fails.
+    """
+
+    def __init__(self, api_key: str, idle_timeout_s: float = 60.0) -> None:
         import google.genai as genai
 
         self._client = genai.Client(api_key=api_key)
+        self._idle = idle_timeout_s
 
     async def stream(
         self, prompt: Prompt, model: str, max_output_tokens: int
@@ -36,13 +45,22 @@ class GeminiGenerator:
         completion_tokens = 0
         finish_reason: str | None = None
 
-        stream = await self._client.aio.models.generate_content_stream(
-            model=model,
-            contents=_to_contents(prompt),
-            config=types.GenerateContentConfig(max_output_tokens=max_output_tokens),
+        stream = await self._within_idle(
+            self._client.aio.models.generate_content_stream(
+                model=model,
+                contents=_to_contents(prompt),
+                config=types.GenerateContentConfig(max_output_tokens=max_output_tokens),
+            ),
+            model,
         )
 
-        async for response in stream:
+        frames = aiter(stream)
+        while True:
+            try:
+                response = await self._within_idle(anext(frames), model)
+            except StopAsyncIteration:
+                break
+
             if response.text:
                 yield GenerationDelta(text=response.text)
 
@@ -85,6 +103,14 @@ class GeminiGenerator:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+
+    async def _within_idle(self, awaitable, model: str):
+        try:
+            return await asyncio.wait_for(awaitable, self._idle)
+        except TimeoutError as error:
+            raise TimeoutError(
+                f"Gemini sent nothing for {self._idle:g} s on {model}"
+            ) from error
 
     async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):
         """The unary form, for the preprocessing steps.

@@ -1,5 +1,5 @@
 import * as Joi from 'joi';
-import { NODE_ENV_OPTIONS } from '@synapsedesk/contracts';
+import { AI_PROVIDERS, NODE_ENV_OPTIONS } from '@synapsedesk/contracts';
 
 /**
  * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,
@@ -83,6 +83,7 @@ export const envValidationSchema = Joi.object({
   // need no API key, no network and no per-run spend.
   //
   // Not needed either with INGESTION_OFFLINE_MODEL, which calls no provider.
+  // Nor while embeddings come from Ollama (AI_EMBEDDING_PROVIDER=ollama).
   GEMINI_API_KEY: Joi.string().when('NODE_ENV', {
     is: 'test',
     then: Joi.optional(),
@@ -91,9 +92,40 @@ export const envValidationSchema = Joi.object({
       // `required()` so an absent switch doesn't match.
       is: Joi.valid(true, 'true').required(),
       then: Joi.optional(),
-      otherwise: Joi.required(),
+      otherwise: Joi.when('AI_EMBEDDING_PROVIDER', {
+        is: 'ollama',
+        then: Joi.optional(),
+        otherwise: Joi.required(),
+      }),
     }),
   }),
+
+  // Which provider embeds chunks: `gemini` or `ollama`. rag-service embeds
+  // queries by its own copy of this switch, and the two must agree; a
+  // mismatch finds no collection for its model and holds rather than mixing
+  // two models' vectors.
+  AI_EMBEDDING_PROVIDER: Joi.string()
+    .valid(...AI_PROVIDERS)
+    .default('gemini'),
+
+  // The Ollama server, required while a role says `ollama`.
+  OLLAMA_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .when('AI_EMBEDDING_PROVIDER', {
+      is: 'ollama',
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
+
+  // The context every Ollama call asks for; its own default truncates silently.
+  OLLAMA_NUM_CTX: Joi.number().integer().min(512).default(8192),
+
+  // Each embedding request's deadline, per provider. A request past it is
+  // retried like a rate limit, within the pipeline's cap. Gemini answers a
+  // 32-chunk batch in about 2 s; Ollama on the CPU takes about 6 s, plus a
+  // cold model load.
+  GEMINI_EMBED_TIMEOUT_MS: Joi.number().integer().min(1000).default(30_000),
+  OLLAMA_EMBED_TIMEOUT_MS: Joi.number().integer().min(1000).default(120_000),
 
   // -------------------------------------------------------------- 8 POLICY
 
