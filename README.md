@@ -58,7 +58,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 | If you want to | Read |
 | :--- | :--- |
 | Write code in this repo | [`docs/development-conventions.md`](docs/development-conventions.md) |
-| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 47 ADRs, append-only |
+| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 52 ADRs, append-only |
 | Follow an end-to-end path | [`docs/reference/flows/`](docs/reference/flows/) |
 | Build a client | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
 | Know what is currently broken | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md) |
@@ -71,7 +71,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 | Tool | Version | Why |
 | :--- | :--- | :--- |
 | Node | **24.22.1** — see `.nvmrc` | `nvm use` picks it up |
-| npm | **11.9.0** — pinned by `packageManager` | Workspaces |
+| npm | **11.19.1** — pinned by `packageManager` | Workspaces |
 | Docker + Compose | any current | The eight backing services |
 | Python | **3.12** | `rag-service`; matches the image base |
 | JDK | **21** | `api-gateway`; Maven itself comes from the module's `./mvnw` |
@@ -118,6 +118,24 @@ Then `http://localhost:9090` — `/targets`, `/rules` (18 today, 9 jobs x 2) and
 **Teardown needs the flag even though startup does not.** `docker compose down` does **not** stop a profiled service — it removes the other eight, leaves this one running holding `synapsedesk-network`, prints `Resource is still in use`, and exits `0`. Only `--profile observability down` reaches it.
 
 On a fresh database every `ScheduledJobMissing` fires after thirty minutes, which is correct: no job has run. Note that it also fires when the target is `DOWN`, so it is not by itself evidence that anything was scraped — `/targets` is.
+
+#### Optional: local models (Ollama)
+
+rag-service and ingestion-service call **Gemini** by default. They can call local models through **Ollama** instead, chosen per role: `AI_GENERATION_PROVIDER` (rag-service) and `AI_EMBEDDING_PROVIDER` (rag-service **and** ingestion-service, always the same value), each `gemini` or `ollama`.
+
+```sh
+docker compose up -d ollama                         # naming it activates the local-ai profile
+docker compose --profile local-ai exec ollama ollama pull qwen2.5:3b-instruct-q4_K_M
+docker compose --profile local-ai exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+docker compose --profile local-ai exec ollama ollama pull nomic-embed-text:v1.5
+npm run ai:check-local                              # do the configured models fit this machine?
+```
+
+- **The root `.env`'s `OLLAMA_*` lines** set the port, the model store (by default your own `~/.ollama/models`, so nothing downloads twice), your user and group ids, and the host's `video` and `render` group ids, which open the GPU. The image runs on a Radeon through Vulkan. **Stop a host Ollama service first** (`sudo systemctl disable --now ollama`): two servers would split the GPU.
+- **Switching generation** is the env line and a restart of rag-service.
+- **Switching embedding is a rebuild,** because vectors from different models can't be compared. Each model has its own Qdrant collection, built from the chunk text in Postgres by `npm run ai:reembed -- --model <gemini|ollama>`. The four steps, with the services stopped for the catch-up, are in the `.env.example` of both services and in `services/ingestion-service/src/ai-reembed.ts`. Until a model's collection is complete, retrieval answers 503.
+- **What fits:** the 3B answers at about 87 tokens a second on an 8 GB Radeon, and about 17 on the CPU. The 7B fits the GPU but not beside the 3B, so `OLLAMA_MAX_LOADED_MODELS = 2` loads it on demand.
+- **Teardown:** `docker compose --profile local-ai down`, for the same reason as Prometheus's.
 
 ### 4. Generate credentials
 
@@ -166,7 +184,7 @@ cp apps/web/.env.example apps/web/.env
 Also worth setting now, though nothing refuses to boot without them:
 
 - `TWO_FACTOR_MASTER_KEY` (auth-service) — 32 chars minimum.
-- `GEMINI_API_KEY` (ingestion-service **and** rag-service) — no embeddings and no generated answers without it.
+- `GEMINI_API_KEY` (ingestion-service **and** rag-service) — no embeddings and no generated answers without it, unless both roles run on Ollama (see [Optional: local models](#optional-local-models-ollama)).
 - `RESEND_API_KEY` (notification-service) — a sending-only Resend key, with `EMAIL_SENDER` on a domain verified in Resend. Without a verified domain, `onboarding@resend.dev` sends only to the Resend account's own address.
 - `RESEND_GATEWAY_API_KEY` and `RESEND_WEBHOOK_SECRET` (api-gateway) — inbound mail; see [Inbound email](#inbound-email).
 - Stripe keys (auth-service) are **optional**. Without them the billing endpoints return `UNAVAILABLE` and everything else, login included, is unaffected.
@@ -282,7 +300,7 @@ The suite reuses `test:system`'s setup, so it is destructive in the same way. CI
 
 The suite starts rag-service in its model-free mode (`RAG_OFFLINE_MODEL=true`, refused under `APP_ENV=production`), on every machine and in CI, so it needs no `GEMINI_API_KEY` and the AI journeys assert fixed text: embeddings are a fixed function of the words, and an answer reads "This answer comes from the offline model, citing [1]." for each source it found. ingestion-service has the same mode (`INGESTION_OFFLINE_MODEL=true`, refused under `NODE_ENV=production`), whose vectors are rag-service's, so an uploaded document is found by an offline question. The real model stays covered by rag-service's live tests in the Python job. **The Google sign-in rows need the internet:** Firebase's popup sign-in loads `apis.google.com/js/api.js` before it opens, even against the Auth emulator.
 
-`npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collection and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares. **Don't run another suite against the dev stack while it runs:** rag-service's pytest uses the same Qdrant (`QDRANT_URL` in its `.env.test`) and errors when the collection is dropped under it.
+`npm run test:system` is **destructive** and says so: it flushes the entire dev Redis, drops the Qdrant collections (each alias and the collection behind it) and resets the JetStream streams, in setup _and_ teardown. Postgres is the only store it spares. **Don't run another suite against the dev stack while it runs:** rag-service's pytest uses the same Qdrant (`QDRANT_URL` in its `.env.test`) and errors when the collection is dropped under it.
 
 **A test run never reaches Resend, Stripe or Firebase for real, whatever your `.env` holds.** Every stack starts through `startStack` (`test/system/stack.ts`), whose providers step points the services at a fake Resend and a fake Stripe (`test/system/fake-resend.ts`, `fake-stripe.ts`) and at the Firebase Auth and Storage emulators, then refuses to start if any of the three would still reach the real service. The fake Resend records every mail (`GET /__sent`) and prints a count when the stack stops. **Gemini is the exception, on purpose:** `test:system`'s AI steps and rag-service's `test_multimodal_e2e.py` call the real models with the `GEMINI_API_KEY` in `.env`, and are billed for it; `test:e2e:web` uses the offline models, since its screens need the same answer every run.
 

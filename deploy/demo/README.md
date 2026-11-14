@@ -120,9 +120,62 @@ Logs rotate at 5 × 20 MB per service.
 Rebuild and start as above. `up -d` replaces what changed, and the migrate
 services run before their services start again.
 
+## Local models (Ollama)
+
+The demo runs on Gemini. Each role can move to local models instead:
+`AI_GENERATION_PROVIDER` in `env/rag-service.env`, and `AI_EMBEDDING_PROVIDER`
+in `env/rag-service.env` **and** `env/ingestion-service.env` (always the same
+value), each `gemini` or `ollama`.
+
+```sh
+docker compose up -d ollama          # naming it activates the local-ai profile
+docker compose --profile local-ai exec ollama ollama pull qwen2.5:3b-instruct-q4_K_M
+docker compose --profile local-ai exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+docker compose --profile local-ai exec ollama ollama pull nomic-embed-text:v1.5
+```
+
+The models land in the PC's own `~/.ollama/models`, the store development's
+`ollama` uses too, so nothing downloads twice. **Run one Ollama at a time:**
+development's container (or a host service) beside the demo's splits the GPU.
+
+**Generation:** set `AI_GENERATION_PROVIDER = ollama`, then
+`docker compose up -d --force-recreate rag-service`.
+
+**Embedding** is a rebuild: each model has its own Qdrant collection, built
+from the chunk text in Postgres. Run the script as a one-off ingestion
+container, with ingestion's own env, so its guard reads the real switch.
+From Gemini to Ollama:
+
+```sh
+# 1. Pre-fill, everything running (the long part):
+docker compose run --rm --no-deps ingestion-service node dist/src/ai-reembed.js --model ollama
+# 2. Stop both, letting a job in flight finish:
+docker compose stop -t 120 rag-service ingestion-service
+docker compose ps -a rag-service ingestion-service   # both must show "Exited"
+# 3. Catch up (seconds):
+docker compose run --rm --no-deps ingestion-service node dist/src/ai-reembed.js --model ollama
+# 4. Set AI_EMBEDDING_PROVIDER = ollama in both env files, then:
+docker compose up -d rag-service ingestion-service
+```
+
+- **Why stop both:** with ingestion stopped, nothing changes in Postgres, so
+  the new collection is complete when they start. rag-service writes its AI
+  usage records through ingestion, so it stops too. Meanwhile the site
+  answers 503 for AI and document pages; tickets and sign-in keep working.
+- **Never run it against the active model while the services run.** The
+  script refuses `--model` for the provider its env names as active
+  (`--services-stopped` overrides that, for a repair with both stopped). That
+  refusal is also a safe check that the command works:
+  `... ai-reembed.js --model gemini` on a Gemini demo should refuse and touch
+  nothing.
+- **Switching back** is the same four steps with `--model gemini`.
+  `--drop <gemini|ollama>` deletes a model's collection once it's unused.
+- **Until a model's collection is complete,** retrieval answers 503 with
+  `Retry-After: 60` rather than search a wrong one.
+
 ## Back up
 
-The four Postgres volumes and Qdrant's. Redis and NATS rebuild themselves.
+The four Postgres volumes and Qdrant's (one collection per embedding model; any of them can be rebuilt from Postgres with `ai-reembed.js`). Redis and NATS rebuild themselves.
 
 ```sh
 docker compose exec postgres-auth pg_dump -U postgres synapsedesk_auth > auth-$(date +%F).sql
