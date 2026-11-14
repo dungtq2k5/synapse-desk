@@ -579,12 +579,18 @@ export class IngestionProcessor {
    * is not bookkeeping, it is the security precondition.
    *
    * **An earlier run's staged rows are reused where they still fit.** A staged
-   * row whose index and text match the new chunk and whose
-   * `vector_point_id` is set already has its point, and the embedding model
-   * is one for every tenant, so the same text embeds the same. A deferral
-   * resumed at the cycle roll, or a retry after a provider failure, then pays
-   * only for the batches not yet embedded. Every other staged row and point is
-   * a leftover (a different file, a crashed run) and is purged.
+   * row whose index and text match the new chunk, and whose point is in the
+   * collection this run writes to, already has its vector: the same text
+   * embeds the same under one model. A deferral resumed at the cycle roll, or
+   * a retry after a provider failure, then pays only for the batches not yet
+   * embedded. Every other staged row and point is a leftover (a different
+   * file, a crashed run) and is purged.
+   *
+   * **"In the collection this run writes to" is checked, not assumed.** A run
+   * embedded under one provider and resumed after `AI_EMBEDDING_PROVIDER`
+   * switched has its points in the OTHER model's collection; reused, those
+   * rows would go live with no point here. So they are leftovers too: deleted
+   * and created again, which puts them back in the embed loop.
    *
    * Rows first, then points: a row whose point is gone must never survive, or
    * the next run would keep it and the swap would make a vector-less chunk
@@ -608,10 +614,22 @@ export class IngestionProcessor {
         vectorPointId: true,
       },
     });
-    const kept = staged.filter(
+    const fitting = staged.filter(
       (row) =>
         row.vectorPointId !== null &&
         texts.get(row.chunkIndex) === row.contentText,
+    );
+    // One read of the candidates in this run's collection: a point that is
+    // elsewhere (embedded before a provider switch) doesn't count.
+    const present = new Set(
+      (
+        await this.qdrant.retrieve(
+          fitting.map((row) => row.vectorPointId as string),
+        )
+      ).map((point) => String(point.id)),
+    );
+    const kept = fitting.filter((row) =>
+      present.has(row.vectorPointId as string),
     );
     const keptIndexes = new Set(kept.map((row) => row.chunkIndex));
 
