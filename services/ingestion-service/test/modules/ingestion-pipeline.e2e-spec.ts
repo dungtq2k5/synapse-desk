@@ -17,6 +17,7 @@ import {
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/contracts';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { Queue } from 'bullmq';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -41,6 +42,7 @@ import { DocumentEventPublisher } from '../../src/modules/events/document-event.
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { OcrService } from '../../src/modules/ingestion/ocr.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
+import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
@@ -1946,6 +1948,74 @@ describe('The ingestion pipeline (e2e)', () => {
       const now = await expectOneVersion(old.data);
       expect(now.every((text) => embedded.has(text))).toBe(true);
       expect(embedded.size).toBe(now.length);
+    });
+
+    it('**a run deferred under one provider and resumed under another embeds the kept rows again, into the new collection**', async () => {
+      // The other provider's collection, as a second service on its alias.
+      // Its own boot check sees no chunk with a vector, so it creates the
+      // collection if this Qdrant has none for that model yet.
+      const config = fx.moduleRef.get(ConfigService);
+      const local = new QdrantService(
+        {
+          getOrThrow: (key: string) => config.getOrThrow<string>(key),
+          get: (key: string) =>
+            key === 'AI_EMBEDDING_PROVIDER' ? 'ollama' : config.get(key),
+        } as unknown as ConfigService,
+        {
+          documentChunk: { findFirst: () => Promise.resolve(null) },
+        } as unknown as PrismaService,
+      );
+      await expect(local.ensureCollection()).resolves.toBe(true);
+
+      const old = await indexed();
+      try {
+        downloadObject.mockResolvedValue(variant(40, 'Switched'));
+        const cap = capAfter(1);
+        const rerun = await requeue(old.data);
+        await expect(processor.process(rerun)).resolves.toBe(
+          INGESTION_OUTCOMES.DEFERRED,
+        );
+        const { staged } = await rowsOf(old.data.documentId);
+        const embeddedBefore = staged.filter(
+          (row) => row.vectorPointId !== null,
+        );
+        expect(embeddedBefore).toHaveLength(EMBEDDING_BATCH_SIZE);
+
+        // AI_EMBEDDING_PROVIDER switched: every write now reaches the other
+        // collection.
+        for (const method of [
+          'retrieve',
+          'upsertChunks',
+          'purgeStagedPoints',
+          'swapDocumentPoints',
+          'countPoints',
+          'setDocumentScope',
+          'deleteDocumentPoints',
+        ] as const) {
+          faults.replace(qdrant, method, ((...args: unknown[]) =>
+            (local[method] as (...a: unknown[]) => unknown)(...args)) as never);
+        }
+        cap.allowed = Number.POSITIVE_INFINITY;
+        fx.embeddings.reset();
+        await expect(processor.process(rerun)).resolves.toBe('INDEXED');
+
+        // Every chunk was embedded again: none was reused from the old collection.
+        const resumed = fx.embeddings.calls.flatMap((batch) => batch.texts);
+        expect(resumed).toHaveLength(staged.length);
+        // And every live row's point is in the new collection.
+        const { live } = await rowsOf(old.data.documentId);
+        const points = await local.retrieve(
+          live.map((row) => row.vectorPointId as string),
+        );
+        expect(points).toHaveLength(live.length);
+      } finally {
+        // The other collection lives in the Qdrant every suite shares: a
+        // failing run must not leave points no test row will ever name.
+        await local.deleteDocumentPoints(
+          old.data.documentId,
+          old.data.organizationId,
+        );
+      }
     });
 
     it('**a crash between the two halves of the swap, then the retry: one version, no orphaned point**', async () => {

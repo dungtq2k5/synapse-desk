@@ -6,17 +6,33 @@
  *
  * Idempotent: after a run, the target holds exactly the live chunks (rows with
  * a point id and `is_staged = false`), each under the point id its row already
- * carries, with the scope its row holds now. So it is the whole embedding
- * switch, run with the TARGET provider reachable while the services keep
- * serving the old one:
+ * carries, with the scope its row holds now. The switch from model A to B:
  *
- *   1. `ai:reembed -- --model ollama`;
- *   2. flip `AI_EMBEDDING_PROVIDER` in rag-service and ingestion-service and
- *      restart both;
- *   3. `ai:reembed -- --model ollama` again, for what was ingested between.
+ *   1. **Pre-fill, everything running:** `ai:reembed -- --model B`. The
+ *      services keep serving from A; the long part (or a quota stop) happens
+ *      here, never during downtime.
+ *   2. **Stop rag-service and ingestion-service**, with time for a job in
+ *      flight to finish: `docker compose stop -t 120 rag-service
+ *      ingestion-service` (Ctrl-C and wait, in development). A job still
+ *      running at 120 s is killed and retried after the start.
+ *   3. **Once both have EXITED** (no process left, their gRPC ports free: a
+ *      surviving rag-service keeps answering beside a new one through
+ *      `SO_REUSEPORT`, and a surviving ingestion-service keeps writing),
+ *      catch up: `ai:reembed -- --model B` again, seconds.
+ *   4. **Flip `AI_EMBEDDING_PROVIDER` to B** in both services and start them.
+ *
+ * Both stop, not just ingestion: rag-service records its ledger rows through
+ * ingestion-service, so kept up alone it would charge the quota counter and
+ * lose the row, and reconciliation would correct the counter down.
+ *
+ * **Never against the active collection while the services run:** a chunk
+ * ingested during the run would have its point deleted. {@link refuseActive}
+ * refuses `--model` equal to this environment's `AI_EMBEDDING_PROVIDER`;
+ * `--services-stopped` overrides it for a deliberate repair.
  *
  * A staged row is a run in progress: its point is neither embedded nor
- * deleted here, and that run's swap makes it live.
+ * deleted here. If the switch interrupted it, its points are in A's
+ * collection; the resumed run sees that and embeds it again into B.
  *
  * **Not charged to tenants.** Re-embedding is the operator's choice, not a
  * tenant's use, so no ledger row is written: chunks are logged per tenant and
@@ -33,7 +49,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import {
-  AI_PROVIDERS,
   AiProvider,
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_DIMENSION,
@@ -48,6 +63,7 @@ import {
   collectionAlias,
 } from '@synapsedesk/contracts';
 import { envValidationSchema } from './common/configs/env.validation';
+import { parseArgs, refuseActive } from './ai-reembed.args';
 import {
   EmbeddingClient,
   RateLimited,
@@ -78,30 +94,6 @@ export const LONGEST_WAIT_MS = 5 * 60_000;
   ],
 })
 class ReembedModule {}
-
-type Args = { model?: AiProvider; drop?: AiProvider };
-
-/** `--model ollama` / `--drop gemini`, nothing else. */
-export function parseArgs(argv: string[]): Args {
-  const args: Args = {};
-  for (let i = 0; i < argv.length; i++) {
-    const flag = argv[i];
-    if (flag !== '--model' && flag !== '--drop') continue;
-    const value = argv[++i] as AiProvider;
-    if (!AI_PROVIDERS.includes(value)) {
-      throw new Error(
-        `${flag} takes ${AI_PROVIDERS.join(' or ')}, not '${value}'.`,
-      );
-    }
-    args[flag === '--model' ? 'model' : 'drop'] = value;
-  }
-  if (Boolean(args.model) === Boolean(args.drop)) {
-    throw new Error(
-      'Usage: npm run ai:reembed -- --model <gemini|ollama>  (or --drop <gemini|ollama>)',
-    );
-  }
-  return args;
-}
 
 type LiveChunk = {
   id: string;
@@ -409,6 +401,7 @@ async function main(): Promise<void> {
     }
 
     const provider = args.model as AiProvider;
+    refuseActive(provider, configured, Boolean(args.servicesStopped));
     const model = MODELS_BY_PROVIDER[provider].embeddingModel;
     let embedder: EmbeddingClient;
     if (provider === 'ollama') {
