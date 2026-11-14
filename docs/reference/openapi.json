@@ -66660,6 +66660,7 @@
               "ledger-daily",
               "ledger-hourly",
               "scope-reconcile",
+              "ticket-hourly",
               "webhook-retention"
             ]
           },

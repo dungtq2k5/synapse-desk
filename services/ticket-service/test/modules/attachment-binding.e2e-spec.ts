@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc } from '@synapsedesk/testing/rpc';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import {
   INGEST_DEADLINE_MS,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -20,6 +20,10 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { AttachmentExtractorClient } from '../../src/modules/ai-client/attachment-extractor.client';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
+import {
+  EXTRACTION_RETRY_HOURS,
+  OutageRetries,
+} from '../../src/modules/scheduler/outage-retries';
 
 /**
  * Binding attachments AT CREATE.
@@ -291,6 +295,83 @@ describe('Attachments bound at message create (e2e)', () => {
         DOCX,
         expect.anything(),
       );
+    });
+
+    describe('an extraction lost to an ingestion-service outage', () => {
+      /** The client's own gRPC stub: below `attempt`, so its code mapping runs. */
+      const stub = () =>
+        (
+          extractor as unknown as {
+            documents: { extractAttachmentText: () => unknown };
+          }
+        ).documents;
+
+      const sendDocx = async () => {
+        asDocx();
+        const ticket = await createTicket(fx.prisma, tenant);
+        const { message } = await messages.createMessage(
+          {
+            ticketId: ticket.id,
+            content: 'see attached',
+            isInternalNote: false,
+            invokeAi: false,
+            attachments: [uploaded('quote.docx')],
+          },
+          caller(),
+        );
+        const [row] = await fx.prisma.messageAttachment.findMany({
+          where: { messageId: message?.id },
+        });
+        return row;
+      };
+
+      beforeEach(() => extract.mockRestore());
+
+      it('**8. is extracted again by the hourly retry, once ingestion answers**', async () => {
+        const call = jest
+          .spyOn(stub(), 'extractAttachmentText')
+          .mockReturnValueOnce(
+            throwError(() => ({ code: status.UNAVAILABLE, details: 'down' })),
+          )
+          .mockReturnValue(of({ markdown: '## Quote\n\nTotal: 42' }));
+
+        const row = await sendDocx();
+        expect(row.extractedText).toBeNull();
+
+        await expect(
+          fx.moduleRef.get(OutageRetries).retryExtractions(),
+        ).resolves.toBe(1);
+
+        await expect(
+          fx.prisma.messageAttachment.findUnique({ where: { id: row.id } }),
+        ).resolves.toMatchObject({ extractedText: '## Quote\n\nTotal: 42' });
+        expect(call).toHaveBeenCalledTimes(2);
+      });
+
+      it('9. is left alone once it is older than the retry window', async () => {
+        jest
+          .spyOn(stub(), 'extractAttachmentText')
+          .mockReturnValueOnce(
+            throwError(() => ({ code: status.UNAVAILABLE, details: 'down' })),
+          );
+        const row = await sendDocx();
+        await fx.prisma.messageAttachment.update({
+          where: { id: row.id },
+          data: {
+            createdAt: new Date(
+              Date.now() - (EXTRACTION_RETRY_HOURS + 1) * 3_600_000,
+            ),
+          },
+        });
+        // The same spy as above: only calls from here on count.
+        const call = jest.spyOn(stub(), 'extractAttachmentText');
+        call.mockClear();
+
+        await expect(
+          fx.moduleRef.get(OutageRetries).retryExtractions(),
+        ).resolves.toBe(0);
+        expect(call).not.toHaveBeenCalled();
+      });
     });
 
     it('**7. a failed extraction stores NULL and the confirm still succeeds**', async () => {

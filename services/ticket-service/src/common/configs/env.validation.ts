@@ -86,6 +86,17 @@ export const envValidationSchema = Joi.object({
     otherwise: Joi.required(),
   }),
 
+  // ingestion-service: the AI ledger (draft outcomes) and attachment text
+  // extraction. Required outside test for the same reason as RAG_SERVICE_URL:
+  // read but never validated, a missing value fell back to an address that
+  // refuses every call, and both calls swallow their failure by design, so
+  // nothing reported that neither had ever worked.
+  INGESTION_SERVICE_URL: Joi.string().when('NODE_ENV', {
+    is: 'test',
+    then: Joi.optional(),
+    otherwise: Joi.required(),
+  }),
+
   // -------------------------------------------------------------- 8 POLICY
 
   // How long a sender may edit their own message. Named and configured rather

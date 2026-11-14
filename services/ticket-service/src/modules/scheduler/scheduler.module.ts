@@ -4,6 +4,8 @@ import { SCHEDULER_QUEUE } from '@synapsedesk/contracts';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';
+import { AiClientModule } from '../ai-client/ai-client.module';
+import { OutageRetries } from './outage-retries';
 import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
 
@@ -24,7 +26,9 @@ import { SchedulerRegistrar } from './scheduler.registrar';
     AnalyticsModule,
     PrismaModule,
     JobRunsModule,
+    // The two clients the hourly retries call ingestion-service through.
+    AiClientModule,
   ],
-  providers: [SchedulerProcessor, SchedulerRegistrar],
+  providers: [SchedulerProcessor, SchedulerRegistrar, OutageRetries],
 })
 export class SchedulerModule {}

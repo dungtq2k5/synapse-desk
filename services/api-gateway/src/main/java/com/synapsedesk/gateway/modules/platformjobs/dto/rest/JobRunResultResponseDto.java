@@ -80,6 +80,8 @@ public class JobRunResultResponseDto {
 
     SCOPE_RECONCILE("scope-reconcile"),
 
+    TICKET_HOURLY("ticket-hourly"),
+
     WEBHOOK_RETENTION("webhook-retention");
 
     private final String value;

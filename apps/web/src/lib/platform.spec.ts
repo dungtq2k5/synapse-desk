@@ -84,7 +84,10 @@ describe('jobs', () => {
 
   it('lists a silent service’s jobs from the schedule', () => {
     expect(jobsOf('notification-service')).toEqual(['webhook-retention']);
-    expect(jobsOf('ticket-service')).toEqual(['analytics-daily']);
+    expect(jobsOf('ticket-service')).toEqual([
+      'analytics-daily',
+      'ticket-hourly',
+    ]);
   });
 
   it('finds a step’s job, and none for a job named after its only step', () => {

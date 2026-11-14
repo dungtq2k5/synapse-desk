@@ -48,10 +48,9 @@ import { AttachmentExtractorClient } from './attachment-extractor.client';
           options: {
             package: INGESTION_PACKAGE_NAME,
             protoPath: INGESTION_PROTO_PATHS,
-            // Optional in the same sense `RAG_SERVICE_URL` is: ticket-service
-            // predates Domain C and must still boot without it. An unset URL
-            // makes the outcome write fail and be logged, which costs a
-            // metric — not a reply.
+            // Required outside test, like `RAG_SERVICE_URL` (env.validation).
+            // In test it may be absent, and both calls then fail and are
+            // logged, which costs a metric or a file's text — not a reply.
             url:
               configService.get<string>('INGESTION_SERVICE_URL') ??
               'localhost:0',

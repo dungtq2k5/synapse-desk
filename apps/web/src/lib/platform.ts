@@ -106,6 +106,7 @@ export function mrrReason(reason: string | null | undefined): string {
 /** Each job and step in words, as the Jobs table names them. */
 export const JOB_WORDS: Record<string, string> = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'Analytics rollup, daily',
+  [SCHEDULED_JOBS.TICKET_HOURLY]: 'Ticket retries, hourly',
   [SCHEDULED_JOBS.LEDGER_DAILY]: 'Usage ledger, daily',
   [SCHEDULED_JOBS.LEDGER_HOURLY]: 'Usage ledger, hourly',
   [SCHEDULED_JOBS.AUTH_HOURLY]: 'Accounts, hourly',
@@ -115,6 +116,8 @@ export const JOB_WORDS: Record<string, string> = {
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: 'Sharing check',
   [SCHEDULED_JOBS.WEBHOOK_RETENTION]: 'Webhook history cleanup',
   'ticket-rollup': 'Ticket rollup',
+  'attachment-extraction': 'Attachment text retry',
+  'draft-outcomes': 'Draft outcomes retry',
   'chunk-usage-projection': 'Passage usage counts',
   'ai-generation-rollup': 'AI usage rollup',
   'document-flags': 'Document quality flags',

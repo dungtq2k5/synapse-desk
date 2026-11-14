@@ -20,6 +20,7 @@ data:
   AUTH_SERVICE_URL: 'auth-service:5001'
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '5002'
+  INGESTION_SERVICE_URL: 'ingestion-service:5004'
   MESSAGE_EDIT_WINDOW_MINUTES: '15'
   NATS_MONITOR_URL: 'http://nats:8222'
   NATS_URL: 'nats://nats:4222'

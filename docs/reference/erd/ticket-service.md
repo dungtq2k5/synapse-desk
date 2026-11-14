@@ -210,6 +210,14 @@ erDiagram
     DateTime updated_at
     }
 
+
+  "pending_draft_outcomes" {
+    String generation_id "🗝️"
+    String message_id
+    String sent_text
+    DateTime created_at
+    }
+
     "inbound_emails" }o--|o tickets : "ticket"
     "ticket_status_changes" }o--|| tickets : "ticket"
     "ticket_read_states" }o--|| tickets : "ticket"
