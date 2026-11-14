@@ -8,6 +8,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg, JobRunRecorder } from '@synapsedesk/nest-common';
 import { TicketRollupJob } from '../analytics/ticket-rollup.job';
+import { OutageRetries } from './outage-retries';
 
 /**
  * The caller `TicketRollupJob` never had
@@ -29,36 +30,74 @@ export class SchedulerProcessor extends WorkerHost {
   constructor(
     private readonly rollup: TicketRollupJob,
     private readonly runs: JobRunRecorder,
+    private readonly retries: OutageRetries,
   ) {
     super();
   }
 
   async process(job: Job): Promise<void> {
-    if (job.name !== SCHEDULED_JOBS.ANALYTICS_DAILY) {
-      // **A defect, not routine cross-talk** — and the difference is what makes
-      // throwing correct now.
-      //
-      // This branch used to `return`, which reported SUCCESS to BullMQ for work
-      // nobody did. It is where the shared-queue bug was OBSERVED: all three
-      // services ran a worker on one queue, so `ledger-hourly` and `auth-hourly`
-      // arrived here, were logged as ignored, and were recorded as complete —
-      // and their schedules advanced as though they had run.
-      //
-      // With one queue per service a job can only arrive at its owner, so a name
-      // this build does not know is what the old comment always claimed it was:
-      // a repeat entry left by an older deploy. It belongs in `failed`, where it
-      // is visible and stops pretending the schedule ran.
-      //
-      // Retrying cannot bury the real jobs: the repeat entry carries
-      // `attempts: 3` with exponential backoff, so this exhausts and stops.
-      throw new Error(`Unknown scheduled job '${job.name}'`);
+    switch (job.name) {
+      case SCHEDULED_JOBS.ANALYTICS_DAILY:
+        return this.analyticsDaily(job.name);
+      case SCHEDULED_JOBS.TICKET_HOURLY:
+        return this.runs.track(job.name, () => this.hourly());
+      default:
+        // **A defect, not routine cross-talk** — and the difference is what makes
+        // throwing correct now.
+        //
+        // This branch used to `return`, which reported SUCCESS to BullMQ for work
+        // nobody did. It is where the shared-queue bug was OBSERVED: all three
+        // services ran a worker on one queue, so `ledger-hourly` and `auth-hourly`
+        // arrived here, were logged as ignored, and were recorded as complete —
+        // and their schedules advanced as though they had run.
+        //
+        // With one queue per service a job can only arrive at its owner, so a name
+        // this build does not know is what the old comment always claimed it was:
+        // a repeat entry left by an older deploy. It belongs in `failed`, where it
+        // is visible and stops pretending the schedule ran.
+        //
+        // Retrying cannot bury the real jobs: the repeat entry carries
+        // `attempts: 3` with exponential backoff, so this exhausts and stops.
+        throw new Error(`Unknown scheduled job '${job.name}'`);
     }
+  }
 
+  /**
+   * Hourly: the two calls to ingestion-service an outage of it would lose,
+   * tried again (`OutageRetries`). Unordered relative to each other, and run
+   * in sequence so one slow step can't overlap the other.
+   */
+  private async hourly(): Promise<void> {
+    await this.step('attachment-extraction', async () => {
+      const extracted = await this.retries.retryExtractions();
+      return `${extracted} attachment(s) extracted`;
+    });
+    await this.step('draft-outcomes', async () => {
+      const recorded = await this.retries.retryOutcomes();
+      return `${recorded} outcome(s) recorded`;
+    });
+  }
+
+  /** One step: its result logged, a failure logged and rethrown. */
+  private async step(name: string, run: () => Promise<string>): Promise<void> {
+    const startedAt = Date.now();
+    try {
+      const summary = await run();
+      this.logger.log(`${name}: ${summary} (${Date.now() - startedAt}ms)`);
+    } catch (error) {
+      this.logger.error(
+        `${name} FAILED after ${Date.now() - startedAt}ms: ${formatErrorMsg(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  private async analyticsDaily(name: string): Promise<void> {
     const startedAt = Date.now();
 
     // Wrapped so a run that never happens is visible as an ageing
     // `last_succeeded_at` rather than as silence.
-    return this.runs.track(job.name, async () => {
+    return this.runs.track(name, async () => {
       try {
         // **A TRAILING window, not yesterday.** This is what makes one 02:00 UTC
         // schedule correct for tenants in every timezone: a tenant whose local

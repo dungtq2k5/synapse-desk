@@ -60,6 +60,25 @@ export class AttachmentExtractorClient implements OnModuleInit {
     mimeType: string,
     context: CallerContext,
   ): Promise<string | null> {
+    const result = await this.attempt(objectPath, mimeType, context);
+    return result.ok ? result.markdown : null;
+  }
+
+  /**
+   * One extraction, saying how it failed: the gRPC code ingestion-service
+   * answered, or `null` when none came back (a local timeout). The hourly
+   * retry needs that to tell a corrupt file or an ineligible type from an
+   * ingestion-service that was down. Never throws.
+   *
+   * @example
+   * const result = await extractor.attempt(path, mime, ctx);
+   * if (!result.ok && result.code === status.INVALID_ARGUMENT) giveUp();
+   */
+  async attempt(
+    objectPath: string,
+    mimeType: string,
+    context: CallerContext,
+  ): Promise<ExtractionAttempt> {
     try {
       const response = await firstValueFrom(
         this.documents
@@ -70,7 +89,7 @@ export class AttachmentExtractorClient implements OnModuleInit {
           .pipe(timeout(EXTRACT_DEADLINE_MS)),
       );
 
-      return response.markdown;
+      return { ok: true, markdown: response.markdown };
     } catch (error) {
       // `warn`, not `error`: the upload succeeded, the file is downloadable,
       // and the user loses only the model's view of it — which they are told
@@ -78,8 +97,13 @@ export class AttachmentExtractorClient implements OnModuleInit {
       this.logger.warn(
         `Could not extract text from '${objectPath}' (${mimeType}): ${formatErrorMsg(error)}`,
       );
+      const code = (error as { code?: unknown } | null)?.code;
 
-      return null;
+      return { ok: false, code: typeof code === 'number' ? code : null };
     }
   }
 }
+
+/** One extraction's result: the markdown, or the gRPC code it failed with. */
+export type ExtractionAttempt =
+  { ok: true; markdown: string } | { ok: false; code: number | null };

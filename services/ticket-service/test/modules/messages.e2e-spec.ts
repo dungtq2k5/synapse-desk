@@ -35,6 +35,9 @@ import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publ
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { LedgerClientService } from '../../src/modules/ai-client/ledger-client.service';
+import { OutageRetries } from '../../src/modules/scheduler/outage-retries';
+import { of, throwError } from 'rxjs';
+import { AiGenerationOutcome } from '@synapsedesk/grpc-proto';
 
 describe('Ticket messages & attachments (e2e)', () => {
   let fx: E2eFixture;
@@ -1513,6 +1516,107 @@ describe('Ticket messages & attachments (e2e)', () => {
       await expect(
         fx.prisma.ticketMessage.findUnique({ where: { id: message.id } }),
       ).resolves.not.toBeNull();
+    });
+
+    describe('an outcome lost to an ingestion-service outage', () => {
+      /** The client's own gRPC stub: below `recordOutcome`, so its mapping runs. */
+      const stub = () => {
+        const client: unknown = fx.moduleRef.get(LedgerClientService);
+        return (
+          client as { ledger: { recordGenerationOutcome: () => unknown } }
+        ).ledger;
+      };
+
+      const down = () =>
+        throwError(() => ({ code: status.UNAVAILABLE, details: 'down' }));
+
+      const sendDraft = async (generationId: string, content: string) => {
+        const { ticket } = await createAssignedTicket(fx.prisma, tenant);
+        return createTestMessage(
+          messages,
+          {
+            ticketId: ticket.id,
+            content,
+            isInternalNote: false,
+            invokeAi: false,
+            generatedFromId: generationId,
+          },
+          agent(),
+        );
+      };
+
+      beforeEach(() => recordOutcome.mockRestore());
+
+      it('4. **is kept with the text AS SENT, and the hourly retry records it**', async () => {
+        const call = jest
+          .spyOn(stub(), 'recordGenerationOutcome')
+          .mockReturnValueOnce(down())
+          .mockReturnValue(
+            of({ outcome: AiGenerationOutcome.AI_GENERATION_OUTCOME_ACCEPTED }),
+          );
+        const generationId = faker.string.uuid();
+        const message = await sendDraft(generationId, 'Restart the router.');
+
+        await expect(
+          fx.prisma.pendingDraftOutcome.findUnique({ where: { generationId } }),
+        ).resolves.toMatchObject({
+          messageId: message.id,
+          sentText: 'Restart the router.',
+        });
+
+        // Edited after sending: the outcome still compares the text as sent.
+        await fx.prisma.ticketMessage.update({
+          where: { id: message.id },
+          data: { content: 'Restart the router, then call us.' },
+        });
+
+        await expect(
+          fx.moduleRef.get(OutageRetries).retryOutcomes(),
+        ).resolves.toBe(1);
+        expect(call).toHaveBeenLastCalledWith(
+          {
+            generationId,
+            resultingMessageId: message.id,
+            sentText: 'Restart the router.',
+          },
+          expect.anything(),
+        );
+        await expect(
+          fx.prisma.pendingDraftOutcome.count({ where: { generationId } }),
+        ).resolves.toBe(0);
+      });
+
+      it('5. is dropped when ingestion-service refuses it for good', async () => {
+        jest
+          .spyOn(stub(), 'recordGenerationOutcome')
+          .mockReturnValueOnce(down())
+          .mockReturnValue(
+            throwError(() => ({ code: status.NOT_FOUND, details: 'gone' })),
+          );
+        const generationId = faker.string.uuid();
+        await sendDraft(generationId, 'Sent.');
+
+        await expect(
+          fx.moduleRef.get(OutageRetries).retryOutcomes(),
+        ).resolves.toBe(0);
+        await expect(
+          fx.prisma.pendingDraftOutcome.count({ where: { generationId } }),
+        ).resolves.toBe(0);
+      });
+
+      it('6. keeps nothing when the first write succeeds', async () => {
+        jest
+          .spyOn(stub(), 'recordGenerationOutcome')
+          .mockReturnValue(
+            of({ outcome: AiGenerationOutcome.AI_GENERATION_OUTCOME_ACCEPTED }),
+          );
+        const generationId = faker.string.uuid();
+        await sendDraft(generationId, 'Sent.');
+
+        await expect(
+          fx.prisma.pendingDraftOutcome.count({ where: { generationId } }),
+        ).resolves.toBe(0);
+      });
     });
   });
   describe('answerOpening', () => {

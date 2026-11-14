@@ -28,6 +28,7 @@ import {
 } from '../utils';
 import { buildTenant, TenantFixture } from '../factories';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
+import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
 import {
   QUOTA_REDIS,
   QuotaCounterService,
@@ -857,5 +858,33 @@ describe('The acceptance loop (e2e)', () => {
         'anything',
       ),
     ).rejects.toBeInstanceOf(RpcException);
+  });
+
+  it('**an outcome that arrives after the sweep still overwrites DISCARDED**', async () => {
+    // ticket-service retries an outcome ingestion-service missed during an
+    // outage (`pending_draft_outcomes`), hourly. An outage longer than the
+    // sweep's 24 hours lets the sweep mark the draft DISCARDED first; the
+    // late outcome must still win, or the retry fixes nothing.
+    const row = await draft('Restart the router.');
+    await fx.prisma.aiGeneration.update({
+      where: { id: row.id },
+      data: { createdAt: new Date(Date.now() - 25 * 3_600_000) },
+    });
+    await expect(
+      fx.moduleRef.get(DiscardedDraftSweep).sweep(),
+    ).resolves.toBeGreaterThanOrEqual(1);
+    await expect(
+      fx.prisma.aiGeneration.findUniqueOrThrow({ where: { id: row.id } }),
+    ).resolves.toMatchObject({ outcome: AiGenerationOutcome.DISCARDED });
+
+    await expect(
+      ledger.recordOutcome(row.id, MESSAGE_ID, 'Restart the router.'),
+    ).resolves.toBe(AiGenerationOutcome.ACCEPTED);
+    await expect(
+      fx.prisma.aiGeneration.findUniqueOrThrow({ where: { id: row.id } }),
+    ).resolves.toMatchObject({
+      outcome: AiGenerationOutcome.ACCEPTED,
+      resultingMessageId: MESSAGE_ID,
+    });
   });
 });

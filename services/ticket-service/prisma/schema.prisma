@@ -890,3 +890,37 @@ model JobRun {
 
   @@map("job_runs")
 }
+
+/// A sent reply's draft outcome that ingestion-service couldn't record.
+///
+/// **Only written when that call fails.** A reply sent from an AI draft tells
+/// ingestion's ledger the outcome (ACCEPTED or EDITED) right after the message
+/// commits. When ingestion is down that call fails, and without this row the
+/// reply would keep no record of the draft it came from: ingestion's 24-hour
+/// sweep would then mark the draft DISCARDED, and co-pilot acceptance would
+/// under-count.
+///
+/// `TICKET_HOURLY`'s `draft-outcomes` step retries each row and deletes it on
+/// success, or on a refusal no retry can change (`NOT_FOUND`,
+/// `INVALID_ARGUMENT`). A late outcome overwrites DISCARDED, so a retry after
+/// the sweep still corrects the ledger row. The daily AI rollup, though,
+/// recomputes only `ROLLUP_TRAILING_DAYS` (3) of history: an outcome landing
+/// later than that fixes the row but not the stat. That takes an outage of
+/// days.
+model PendingDraftOutcome {
+  /// The draft's `ai_generations.id`, in ingestion-service. No FK: another
+  /// service's database.
+  generationId String @id @map("generation_id") @db.Uuid
+
+  /// The reply it became.
+  messageId String @map("message_id") @db.Uuid
+
+  /// The reply's text **as sent**. The outcome compares the draft with this,
+  /// and the message itself may be edited after sending.
+  sentText String @map("sent_text") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([createdAt])
+  @@map("pending_draft_outcomes")
+}

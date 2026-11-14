@@ -50,6 +50,18 @@ export const SCHEDULED_JOBS = {
   ANALYTICS_DAILY: 'analytics-daily',
 
   /**
+   * ticket-service, hourly. Retries the two calls to ingestion-service that an
+   * outage of it would otherwise lose: a confirmed attachment's text
+   * extraction, and a sent draft's outcome.
+   *
+   * **Its own job rather than a step on `ANALYTICS_DAILY`**, for the reason
+   * `BILLING_SNAPSHOT` gives: the heartbeat is per job, so a retry failing
+   * there would show the rollup as failing. Hourly so an outcome lands before
+   * ingestion's 24-hour discarded-draft sweep.
+   */
+  TICKET_HOURLY: 'ticket-hourly',
+
+  /**
    * auth-service, hourly. Transitions expired invitations to EXPIRED.
    *
    * `seatsInUse()` counts PENDING invitations as reserved seats, so this is
@@ -134,6 +146,7 @@ export const SCHEDULE_CRON = {
   [SCHEDULED_JOBS.LEDGER_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.LEDGER_DAILY]: '0 2 * * *',
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: '0 2 * * *',
+  [SCHEDULED_JOBS.TICKET_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.AUTH_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.AUTH_DAILY]: '0 3 * * *',
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: '0 * * * *',
@@ -162,6 +175,7 @@ export const JOB_SEQUENCES = {
   ],
   [SCHEDULED_JOBS.LEDGER_HOURLY]: ['discarded-draft-sweep', 'quota-reconcile'],
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: ['ticket-rollup'],
+  [SCHEDULED_JOBS.TICKET_HOURLY]: ['attachment-extraction', 'draft-outcomes'],
   [SCHEDULED_JOBS.AUTH_HOURLY]: ['invitations-expiry'],
   [SCHEDULED_JOBS.AUTH_DAILY]: ['expired-records'],
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: ['billing-snapshot'],
@@ -252,6 +266,7 @@ export const JOB_SERVICE = {
   [SCHEDULED_JOBS.LEDGER_HOURLY]: 'ingestion',
   [SCHEDULED_JOBS.LEDGER_DAILY]: 'ingestion',
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'ticket',
+  [SCHEDULED_JOBS.TICKET_HOURLY]: 'ticket',
   [SCHEDULED_JOBS.AUTH_HOURLY]: 'auth',
   [SCHEDULED_JOBS.AUTH_DAILY]: 'auth',
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: 'auth',

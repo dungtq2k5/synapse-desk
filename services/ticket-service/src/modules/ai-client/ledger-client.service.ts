@@ -11,6 +11,8 @@ import {
   fromProtoAiGenerationOutcome,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { status } from '@grpc/grpc-js';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * The acceptance loop's other end.
@@ -33,6 +35,7 @@ export class LedgerClientService implements OnModuleInit {
 
   constructor(
     @Inject(INGESTION_GRPC_CLIENT) private readonly client: ClientGrpc,
+    private readonly prisma: PrismaService,
   ) {}
 
   onModuleInit(): void {
@@ -49,6 +52,13 @@ export class LedgerClientService implements OnModuleInit {
    * to protect a number — exactly the wrong trade, and the same reasoning that
    * makes the ledger's own `record()` non-throwing.
    *
+   * **Kept for a retry when ingestion-service didn't answer.** An outage
+   * (`UNAVAILABLE`, a deadline) would otherwise lose the outcome for good: the
+   * reply keeps no record of its draft, and ingestion's 24-hour sweep would
+   * mark it DISCARDED. So the outcome is written to `pending_draft_outcomes`
+   * with the text as sent, and `TICKET_HOURLY` sends it again. A refusal no
+   * retry can change (`NOT_FOUND` for a generation that's gone) is only logged.
+   *
    * Returns null when it could not be recorded, so a caller that wants to
    * surface the outcome can tell "not recorded" from "recorded as ACCEPTED".
    */
@@ -58,6 +68,45 @@ export class LedgerClientService implements OnModuleInit {
     sentText: string,
     context: CallerContext,
   ): Promise<string | null> {
+    const result = await this.send(
+      generationId,
+      resultingMessageId,
+      sentText,
+      context,
+    );
+    if (result.ok) return result.outcome;
+
+    if (isTransient(result.code)) {
+      try {
+        await this.prisma.pendingDraftOutcome.upsert({
+          where: { generationId },
+          create: { generationId, messageId: resultingMessageId, sentText },
+          update: { messageId: resultingMessageId, sentText },
+        });
+      } catch (error) {
+        this.logger.error(
+          `Could not keep the outcome of generation ${generationId} for a retry: ${formatErrorMsg(error)}`,
+        );
+      }
+    }
+    return null;
+  }
+
+  /**
+   * One attempt at recording an outcome, saying how it failed: the gRPC code
+   * ingestion-service answered, or `null` when none came back (a local
+   * timeout). Never throws; used by `recordOutcome` and by the hourly retry.
+   *
+   * @example
+   * const result = await ledger.send(generationId, messageId, text, ctx);
+   * if (!result.ok && isTransient(result.code)) keepForLater();
+   */
+  async send(
+    generationId: string,
+    resultingMessageId: string,
+    sentText: string,
+    context: CallerContext,
+  ): Promise<OutcomeAttempt> {
     try {
       const response = await firstValueFrom(
         this.ledger
@@ -68,17 +117,39 @@ export class LedgerClientService implements OnModuleInit {
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return fromProtoAiGenerationOutcome(response.outcome);
+      return {
+        ok: true,
+        outcome: fromProtoAiGenerationOutcome(response.outcome),
+      };
     } catch (error) {
       this.logger.error(
         `Could not record the outcome for generation ${generationId}: ${formatErrorMsg(error)}`,
       );
+      const code = (error as { code?: unknown } | null)?.code;
 
-      // The sweep will eventually mark it DISCARDED, which is WRONG for a
-      // draft that was actually sent — and that is the honest cost of not
-      // failing the user's request. Logged loudly because nothing else
-      // surfaces it.
-      return null;
+      return { ok: false, code: typeof code === 'number' ? code : null };
     }
   }
 }
+
+/** One outcome write's result: the outcome, or the gRPC code it failed with. */
+export type OutcomeAttempt =
+  { ok: true; outcome: string | null } | { ok: false; code: number | null };
+
+/**
+ * Whether a failed call is worth trying again: ingestion-service didn't
+ * answer (`UNAVAILABLE`, `DEADLINE_EXCEEDED`) or no answer came back in time
+ * (`null`, a local timeout). Anything else is the service saying no.
+ *
+ * @example
+ * isTransient(status.UNAVAILABLE) // true
+ * isTransient(status.NOT_FOUND)   // false
+ */
+export function isTransient(code: number | null): boolean {
+  return code === null || TRANSIENT_CODES.has(code);
+}
+
+const TRANSIENT_CODES = new Set<number>([
+  status.UNAVAILABLE,
+  status.DEADLINE_EXCEEDED,
+]);
