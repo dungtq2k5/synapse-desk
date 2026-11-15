@@ -18,7 +18,7 @@ import pytest
 from rag_service.embeddings import GeminiEmbeddingClient
 from rag_service.generation.gemini import GeminiGenerator
 from rag_service.ollama import OllamaEmbeddingClient, OllamaGenerator
-from rag_service.settings import MODELS_BY_PROVIDER
+from rag_service.settings import MODELS_BY_PROVIDER, THINKING_MODELS
 
 GEMINI = MODELS_BY_PROVIDER["gemini"]
 OLLAMA = MODELS_BY_PROVIDER["ollama"]
@@ -97,3 +97,54 @@ async def test_ollama_generation_gives_up_when_the_stream_goes_quiet(silent):
     generator = OllamaGenerator(silent, 8192, idle_timeout_s=0.3)
 
     await _fails_within(generator.generate("q", OLLAMA["cheap_model"], 16), 5)
+
+
+class TestThinkingModelsWaitLonger:
+    """A thinking model gets its own, longer idle deadline.
+
+    QUALITY's thinking model once sent nothing for 78 s before its first frame, past
+    the 60 s every other Gemini model keeps. The fake stream here stays quiet
+    longer than the short deadline and shorter than the long one.
+    """
+
+    QUIET_S = 0.4
+
+    def _generator(self):
+        generator = GeminiGenerator.__new__(GeminiGenerator)
+        generator._idle = 0.1
+        generator._thinking_idle = 2.0
+        quiet = self.QUIET_S
+
+        class Frame:
+            text = "ok"
+            candidates = ()
+            usage_metadata = None
+
+        class FakeModels:
+            async def generate_content_stream(self, **kwargs):
+                async def iterate():
+                    await asyncio.sleep(quiet)
+                    yield Frame()
+
+                return iterate()
+
+        class FakeAio:
+            models = FakeModels()
+
+        class FakeClient:
+            aio = FakeAio()
+
+        generator._client = FakeClient()  # type: ignore[bad-assignment]
+
+        return generator
+
+    async def test_a_thinking_model_outlasts_the_quiet_first_frame(self):
+        (thinking,) = sorted(THINKING_MODELS)
+
+        output = await self._generator().generate("q", thinking, 16)
+
+        assert output.text == "ok"
+
+    async def test_any_other_model_fails_at_its_own_deadline(self):
+        with pytest.raises(TimeoutError, match="sent nothing for 0.1 s"):
+            await self._generator().generate("q", GEMINI["cheap_model"], 16)

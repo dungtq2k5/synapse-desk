@@ -923,7 +923,11 @@ def select_providers(config: Config) -> tuple[EmbeddingClient, ProviderClient]:
             config.ollama_base_url, config.ollama_num_ctx, config.ollama_idle_timeout_s
         )
         if config.generation_provider == "ollama"
-        else GeminiGenerator(config.gemini_api_key, config.gemini_idle_timeout_s)
+        else GeminiGenerator(
+            config.gemini_api_key,
+            config.gemini_idle_timeout_s,
+            config.gemini_thinking_idle_timeout_s,
+        )
     )
     return embeddings, generator
 
@@ -1179,9 +1183,24 @@ async def _refresh_readiness(
         await asyncio.sleep(READINESS_REFRESH_SECONDS)
 
 
+def log_level(name: str) -> int:
+    """`LOG_LEVEL` as a logging level, in either case.
+
+    Python's logging takes only upper-case names, and the Node services write
+    `info`. An unknown name fails startup, naming it.
+
+    @example log_level("info") == logging.INFO
+    """
+    levels = logging.getLevelNamesMapping()
+    if name.upper() not in levels:
+        raise ValueError(f"LOG_LEVEL {name!r} is not a logging level")
+
+    return levels[name.upper()]
+
+
 # The process's boot: runs only when the service starts.
 async def serve() -> None:  # pragma: no cover
-    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
+    logging.basicConfig(level=log_level(os.environ.get("LOG_LEVEL", "INFO")))
 
     config = load_config()
 

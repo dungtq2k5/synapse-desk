@@ -570,6 +570,7 @@ class TestTruncationIsDiagnosable:
 
         generator = GeminiGenerator.__new__(GeminiGenerator)
         generator._idle = 60.0
+        generator._thinking_idle = 60.0
 
         class FakeModels:
             async def generate_content_stream(self, **kwargs):
@@ -675,6 +676,7 @@ class TestThinkingIsBilledAsOutput:
 
         generator = GeminiGenerator.__new__(GeminiGenerator)
         generator._idle = 60.0
+        generator._thinking_idle = 60.0
         sent: list[dict] = []
 
         class FakeModels:
