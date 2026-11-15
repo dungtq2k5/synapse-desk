@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.build.json",
+  // The browser's build, beside the CommonJS one in dist/: ES modules a
+  // bundler can trim to the exports a page uses. Node never loads it; the
+  // package's `module` export condition is a bundler's alone.
+  "compilerOptions": {
+    "module": "es2022",
+    "moduleResolution": "bundler",
+    "outDir": "./dist/esm",
+    "declaration": false,
+    "declarationMap": false
+  }
+}
