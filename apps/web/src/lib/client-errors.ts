@@ -1,13 +1,10 @@
 import { clientErrorsControllerReportV1 } from '@synapsedesk/api-client';
-// The one module, not the package: `@synapsedesk/contracts` is a CommonJS
-// barrel the bundler can't tree-shake, and this file loads on every route
-// (the root providers install it), so the barrel would ship to all of them.
 import {
   CLIENT_ERROR_MESSAGE_MAX,
   CLIENT_ERROR_PATH_MAX,
   CLIENT_ERROR_STACK_KEPT,
   type ClientErrorKind,
-} from '@synapsedesk/contracts/dist/configs/client-errors.config';
+} from '@synapsedesk/contracts';
 
 /** The most a page load reports; a loop of errors sends no more than this. */
 export const MAX_REPORTS = 5;

@@ -5,6 +5,7 @@
   "license": "AGPL-3.0-only",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "scripts": {
     "generate": "orval --config orval.config.ts && node scripts/generate-session-routes.mjs",
     "build": "tsc -p tsconfig.build.json",
