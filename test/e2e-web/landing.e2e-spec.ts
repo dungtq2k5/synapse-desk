@@ -141,9 +141,13 @@ test.describe('the page', () => {
     );
     await expect(sentence).toHaveCSS('opacity', '0');
 
-    await second.focus();
+    const button = second.getByRole('button');
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+
+    await button.focus();
 
     await expect(second).toHaveAttribute('data-active', 'true');
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
     await expect(sentence).toHaveCSS('opacity', '1');
   });
 
@@ -308,7 +312,10 @@ test.describe('the scene', () => {
     // The canvas drew its first frame (the still) under the image, then the
     // image's wrapper faded out.
     await expect(page.locator('#hero canvas')).toHaveCount(1);
-    await expect(page.locator('#hero canvas + div')).toHaveCSS('opacity', '0');
+    await expect(page.locator('#hero div:has(> canvas) + div')).toHaveCSS(
+      'opacity',
+      '0',
+    );
   });
 
   test('with WebGL off: the still stays and the console is clean', async ({

@@ -305,48 +305,50 @@ export function FlowGraph() {
           return (
             <li
               key={step.label}
-              // Focusable at both widths: at 1440 focus shows the sentence, at 390 it rings the node.
-              tabIndex={0}
               onPointerEnter={() => setActive(index)}
               onPointerLeave={() =>
                 setActive((was) => (was === index ? null : was))
               }
-              onFocus={() => setActive(index)}
-              onBlur={() => setActive((was) => (was === index ? null : was))}
               data-active={lit || undefined}
-              className={cn(
-                'group flex min-h-26 gap-4 last:min-h-22.5 rounded-md outline-none xl:absolute xl:top-28.5 xl:w-60 xl:flex-col xl:items-center xl:gap-0 xl:text-center',
-                '',
-              )}
+              className="flex min-h-26 last:min-h-22.5 xl:absolute xl:top-28.5 xl:w-60"
               // The row's slots: each step centered on its node, 300 px apart.
               style={{ left: `${(30 + 300 * index) / 12}%` }}
               data-step={index + 1}
             >
-              <span
-                className={cn(
-                  'relative flex size-12 shrink-0 items-center justify-center rounded-full border bg-card xl:size-18',
-                  'transition-[background-color,box-shadow,border-color] duration-(--motion-duration-fast) ease-standard motion-reduce:transition-none',
-                  'group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
-                  lit &&
-                    'border-transparent bg-accent shadow-[0_0_0_2px_var(--scene-glow),0_0_16px_var(--scene-glow-soft)]',
-                )}
+              {/* Focusable at both widths: at 1440 focus shows the sentence, at 390 it rings the node. */}
+              <button
+                type="button"
+                aria-expanded={lit}
+                onFocus={() => setActive(index)}
+                onBlur={() => setActive((was) => (was === index ? null : was))}
+                className="group flex flex-1 gap-4 rounded-md text-left outline-none xl:flex-col xl:items-center xl:gap-0 xl:text-center"
               >
-                <Icon aria-hidden className="size-5 xl:size-6" />
-              </span>
-              <span className="flex flex-col gap-1 pt-3 xl:mt-4 xl:pt-0">
-                <span className="text-sm font-medium">{step.label}</span>
                 <span
                   className={cn(
-                    'type-small text-muted-foreground xl:px-2 xl:text-sm',
-                    'xl:opacity-0 xl:translate-y-1 xl:transition-[opacity,translate] xl:duration-(--motion-duration-fast) xl:ease-exit',
-                    'motion-reduce:xl:translate-y-0',
+                    'relative flex size-12 shrink-0 items-center justify-center rounded-full border bg-card xl:size-18',
+                    'transition-[background-color,box-shadow,border-color] duration-(--motion-duration-fast) ease-standard motion-reduce:transition-none',
+                    'group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background',
                     lit &&
-                      'xl:translate-y-0 xl:opacity-100 xl:duration-(--motion-duration-base) xl:ease-enter',
+                      'border-transparent bg-accent shadow-[0_0_0_2px_var(--scene-glow),0_0_16px_var(--scene-glow-soft)]',
                   )}
                 >
-                  {step.sentence}
+                  <Icon aria-hidden className="size-5 xl:size-6" />
                 </span>
-              </span>
+                <span className="flex flex-col gap-1 pt-3 xl:mt-4 xl:pt-0">
+                  <span className="text-sm font-medium">{step.label}</span>
+                  <span
+                    className={cn(
+                      'type-small text-muted-foreground xl:px-2 xl:text-sm',
+                      'xl:opacity-0 xl:translate-y-1 xl:transition-[opacity,translate] xl:duration-(--motion-duration-fast) xl:ease-exit',
+                      'motion-reduce:xl:translate-y-0',
+                      lit &&
+                        'xl:translate-y-0 xl:opacity-100 xl:duration-(--motion-duration-base) xl:ease-enter',
+                    )}
+                  >
+                    {step.sentence}
+                  </span>
+                </span>
+              </button>
             </li>
           );
         })}

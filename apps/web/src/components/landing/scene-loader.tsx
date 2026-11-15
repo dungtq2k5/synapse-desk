@@ -94,11 +94,10 @@ export function SceneLoader({
   return (
     <div className="relative size-full">
       {mounted && (
-        <canvas
-          ref={canvas}
-          aria-hidden="true"
-          className="absolute inset-0 size-full"
-        />
+        // Hidden on a wrapper: `aria-hidden` doesn't belong on the canvas itself.
+        <div aria-hidden="true" className="absolute inset-0 size-full">
+          <canvas ref={canvas} className="size-full" />
+        </div>
       )}
       <div
         className={cn(

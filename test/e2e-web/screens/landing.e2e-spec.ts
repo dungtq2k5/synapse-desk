@@ -73,7 +73,7 @@ test('a step highlighted', async ({ page }) => {
     .filter({ hasText: '1. Someone asks' })
     .getByRole('listitem')
     .nth(1);
-  await step.focus();
+  await step.getByRole('button').focus();
   await expect(step).toHaveAttribute('data-active', 'true');
   await look(page, 'landing-step', { target: page.locator('#how-it-works') });
 });
