@@ -27,6 +27,11 @@ answer worth having.
 (both roles) against `eval/baseline.local.json`; the two baselines side by side
 say whether the local models are good enough.
 
+`--tier QUALITY` answers with the tier's dearer model (the cheap-model calls
+stay as they are on every tier), against `eval/baseline.quality.json`. Every
+run prints its generation cost and the first-token latency of the tier's
+model.
+
 Beside the four metrics, `structured_outputs` is how often the three calls whose
 answer is PARSED (the greeting check, Classify and JudgeConflict) return
 something their parser accepts. A column, not a gate.
@@ -44,7 +49,9 @@ import asyncio
 import json
 import os
 import re
+import statistics
 import sys
+import time
 import uuid
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -64,12 +71,18 @@ load_dotenv(SERVICE_ROOT / ".env")
 
 from rag_service.config import load_config  # noqa: E402
 from rag_service.generated.synapsedesk.rag import rag_pb2  # noqa: E402
+from rag_service.pricing import estimate_cost_micros  # noqa: E402
 from rag_service.qdrant.collection import (  # noqa: E402
     EMBEDDING_DIMENSION,
     KnowledgeBase,
     collection_alias,
 )
-from rag_service.settings import AiProviders, resolve_ai_settings  # noqa: E402
+from rag_service.settings import (  # noqa: E402
+    AiModelTier,
+    AiProviders,
+    AiSettingsResolver,
+    resolve_ai_settings,
+)
 
 #: Small enough that a paragraph is one chunk, which keeps `must_cite`
 #: meaningful: a chunk spanning three sections would make every question look
@@ -628,9 +641,17 @@ async def main() -> int:  # NOSONAR
         default="gemini",
         help="Whose models answer AND embed. ollama reads OLLAMA_BASE_URL.",
     )
+    parser.add_argument(
+        "--tier",
+        choices=("FAST", "QUALITY"),
+        default="FAST",
+        help="The AI tier every question resolves to. QUALITY is the dearer model.",
+    )
     args = parser.parse_args()
-    if args.provider == "ollama" and args.baseline == EVAL_DIR / "baseline.json":
-        args.baseline = EVAL_DIR / "baseline.local.json"
+    if args.baseline == EVAL_DIR / "baseline.json":
+        local = ".local" if args.provider == "ollama" else ""
+        quality = ".quality" if args.tier == "QUALITY" else ""
+        args.baseline = EVAL_DIR / f"baseline{local}{quality}.json"
 
     if args.provider == "gemini" and not os.getenv("GEMINI_API_KEY"):
         print("GEMINI_API_KEY is not set — this harness calls the real model.")
@@ -667,7 +688,8 @@ async def main() -> int:  # NOSONAR
         offline_model=False,
     )
     providers = AiProviders(generation=args.provider, embedding=args.provider)
-    model = resolve_ai_settings("FAST", providers).embedding_model
+    tier_settings = resolve_ai_settings(args.tier, providers)
+    model = tier_settings.embedding_model
     organization_id = str(uuid.uuid4())
 
     pool = await asyncpg.create_pool(config.ingestion_database_url, min_size=1)
@@ -679,7 +701,6 @@ async def main() -> int:  # NOSONAR
 
     from rag_service.retrieval.rerank import FlashRankReranker
     from rag_service.server import Dependencies, RagServicer, select_providers
-    from rag_service.settings import AiSettingsResolver
 
     embeddings, provider_generator = select_providers(config)
     redis_client = redis.from_url(
@@ -688,6 +709,7 @@ async def main() -> int:  # NOSONAR
 
     # Recorded, so `structured_outputs` can read what the model actually said.
     generator = _Recording(provider_generator)
+    ledger = _NullLedger()
 
     # **The guard is built from `Config`, exactly as `build_dependencies` does.**
     #
@@ -699,7 +721,7 @@ async def main() -> int:  # NOSONAR
     from rag_service.server import build_injection_guard
 
     injection = build_injection_guard(
-        config, MeteredGenerator(generator, _NullLedger(), _NullQuota())
+        config, MeteredGenerator(generator, ledger, _NullQuota())
     )
 
     servicer = RagServicer(
@@ -714,8 +736,8 @@ async def main() -> int:  # NOSONAR
             # A structural stand-in rather than a `LedgerClient`. The eval is
             # not a metering test, and thirty rows written to a tenant that is
             # about to be deleted would be noise the flag jobs reason about.
-            ledger=_NullLedger(),  # type: ignore[bad-argument-type]
-            settings=AiSettingsResolver(providers=providers),
+            ledger=ledger,  # type: ignore[bad-argument-type]
+            settings=_FixedTier(args.tier, providers),
             knowledge=knowledge,
         )
     )
@@ -741,13 +763,25 @@ async def main() -> int:  # NOSONAR
         outcomes = await ask_all(servicer, questions, organization_id)
         metrics = report(outcomes)
         metrics["structured_outputs"] = await structured_outputs(
-            servicer, generator, resolve_ai_settings("FAST", providers), organization_id
+            servicer, generator, tier_settings, organization_id
         )
         print(
             f"  {'structured_outputs':24} {metrics['structured_outputs']['rate']:.1%}"
             f"  (n={metrics['structured_outputs']['n']})"
         )
         print(f"\nLargest prompt: {generator.largest_prompt} tokens")
+        print(
+            f"Generation cost: ${ledger.cost_micros / 1e6:.4f}, "
+            f"${ledger.cost_micros / 1e6 / len(questions):.4f} per question "
+            "(embedding excluded)"
+        )
+        first = generator.first_token_s.get(tier_settings.generation_model, [])
+        if first:
+            print(
+                f"First token on {tier_settings.generation_model}: median "
+                f"{statistics.median(first):.2f} s, max {max(first):.2f} s "
+                f"(n={len(first)})"
+            )
     finally:
         await teardown(pool, qdrant, model, organization_id)
         await redis_client.aclose()
@@ -793,15 +827,34 @@ class _NullQuota:
         return None
 
 
+class _FixedTier(AiSettingsResolver):
+    """Every tenant on the tier `--tier` names: the eval's tenant has no plan."""
+
+    def __init__(self, tier: AiModelTier, providers: AiProviders) -> None:
+        super().__init__(providers=providers)
+        self._tier = tier
+
+    async def _resolve_tier(self, organization_id: str) -> AiModelTier:  # NOSONAR
+        return self._tier
+
+
 class _NullLedger:
-    """Records nothing.
+    """Writes nothing, and adds up what each generation cost.
 
     The eval is not a metering test, and writing thirty rows to a tenant that is
     about to be deleted would put noise in `ai_generations` that the flag jobs
-    would then reason about.
+    would then reason about. The sum is the run's spend, priced as the ledger
+    prices it.
     """
 
-    def record(self, _entry):
+    def __init__(self) -> None:
+        self.cost_micros = 0
+
+    def record(self, entry):
+        self.cost_micros += estimate_cost_micros(
+            entry.model_name, entry.prompt_tokens, entry.completion_tokens
+        )
+
         # `async` is what makes this a COROUTINE, which is the only thing
         # `ensure_future` below accepts — a plain function returning a str
         # raises "a coroutine or an awaitable is required". Callers do
@@ -829,11 +882,18 @@ class _Recording:
         #: The largest prompt the run sent, in the provider's own tokens: what
         #: `OLLAMA_NUM_CTX` has to cover.
         self.largest_prompt = 0
+        #: Model -> seconds from each streamed call to its first text.
+        self.first_token_s: dict[str, list[float]] = {}
 
     async def stream(self, prompt, model: str, max_output_tokens: int):
         parts: list[str] = []
+        started = time.monotonic()
         async for delta in self._inner.stream(prompt, model, max_output_tokens):
             if delta.text:
+                if not parts:
+                    self.first_token_s.setdefault(model, []).append(
+                        time.monotonic() - started
+                    )
                 parts.append(delta.text)
             if delta.done:
                 self.texts.append("".join(parts))

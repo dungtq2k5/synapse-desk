@@ -10,10 +10,10 @@
  * used to run at boot, moved to the compiler.
  *
  * @example
- * const model: AiModel = 'gemini-2.5-pro';
+ * const model: AiModel = 'gemini-4-argon';
  */
 export const AI_MODELS = [
-  'gemini-2.5-pro',
+  'gemini-4-argon',
   'gemini-3.5-flash-lite',
   'gemini-embedding-2',
   'qwen2.5:7b-instruct-q4_K_M',

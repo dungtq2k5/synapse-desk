@@ -58,7 +58,7 @@ MODELS_BY_PROVIDER: dict[AiProvider, dict] = {
     "gemini": {
         "generation_model_by_tier": {
             "FAST": "gemini-3.5-flash-lite",
-            "QUALITY": "gemini-2.5-pro",
+            "QUALITY": "gemini-4-argon",
         },
         "cheap_model": "gemini-3.5-flash-lite",
         "embedding_model": "gemini-embedding-2",
@@ -86,6 +86,13 @@ OLLAMA_MODEL_DIGESTS: dict[str, str] = {
         "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f"
     ),
 }
+
+#: The generation models that think before answering. Their thinking tokens
+#: count against `max_output_tokens`, so the Gemini adapter adds
+#: `THINKING_ALLOWANCE` to each call's ceiling for them. Every other Gemini
+#: model is sent with thinking at its lowest level: a thinking pass on a
+#: small ceiling (Classify, the greeting check) would come back as empty text.
+THINKING_MODELS: frozenset[str] = frozenset({"gemini-4-argon"})
 
 
 @dataclass(frozen=True)

@@ -648,6 +648,112 @@ class TestTruncationIsDiagnosable:
         assert deltas[-1].done is True
 
 
+class TestThinkingIsBilledAsOutput:
+    """A thinking model's thoughts are output, billed at the output rate.
+
+    `usage_metadata.thoughts_token_count` is separate from
+    `candidates_token_count`, and Google's price is "output price (including
+    thinking tokens)". Reading only the candidates would under-count every
+    call to a thinking model by its whole thinking pass.
+    """
+
+    class Usage:
+        def __init__(self, prompt=None, answer=None, thoughts=None):
+            self.prompt_token_count = prompt
+            self.candidates_token_count = answer
+            self.thoughts_token_count = thoughts
+
+    class Frame:
+        def __init__(self, text, usage):
+            self.text = text
+            self.candidates = []
+            self.usage_metadata = usage
+
+    def _generator(self, frames):
+        """A `GeminiGenerator` whose provider call is replaced, keeping its kwargs."""
+        from rag_service.generation.gemini import GeminiGenerator
+
+        generator = GeminiGenerator.__new__(GeminiGenerator)
+        generator._idle = 60.0
+        sent: list[dict] = []
+
+        class FakeModels:
+            async def generate_content_stream(self, **kwargs):
+                sent.append(kwargs)
+
+                async def iterate():
+                    for frame in frames:
+                        yield frame
+
+                return iterate()
+
+        class FakeAio:
+            models = FakeModels()
+
+        class FakeClient:
+            aio = FakeAio()
+
+        generator._client = FakeClient()  # type: ignore[bad-assignment]
+
+        return generator, sent
+
+    async def test_500_thinking_tokens_are_charged_to_the_ledger_AND_the_quota(
+        self, ledger, quota, settings, budget
+    ):
+        from rag_service.pricing import estimate_cost_micros
+
+        gemini, _ = self._generator(
+            [self.Frame("The limit is 500 [1].", self.Usage(1_000, 100, 500))]
+        )
+
+        await run(CoRagGenerator(gemini, ledger, quota), [chunk(1)], settings, budget)
+
+        assert ledger.entries[0].completion_tokens == 600
+        assert quota.charges == [
+            estimate_cost_micros(settings.generation_model, 1_000, 600)
+        ]
+
+    async def test_each_count_keeps_its_own_last_value_across_frames(self):
+        # A zero is omitted from a frame, not sent: a later frame without
+        # `thoughts_token_count` must not drop the thinking already reported.
+        gemini, _ = self._generator(
+            [
+                self.Frame("The limit", self.Usage(1_000, None, 500)),
+                self.Frame(" is 500.", self.Usage(1_000, 100, None)),
+            ]
+        )
+
+        quality = resolve_ai_settings("QUALITY").generation_model
+        deltas = [d async for d in gemini.stream("prompt", quality, 32)]
+
+        assert deltas[-1].prompt_tokens == 1_000
+        assert deltas[-1].completion_tokens == 600
+
+    async def test_a_thinking_model_gets_the_allowance_on_top_of_the_ceiling(self):
+        from rag_service.generation.gemini import THINKING_ALLOWANCE
+
+        gemini, sent = self._generator([self.Frame("ok", self.Usage(10, 1))])
+
+        quality = resolve_ai_settings("QUALITY").generation_model
+        _ = [d async for d in gemini.stream("prompt", quality, 512)]
+
+        config = sent[0]["config"]
+        assert config.max_output_tokens == 512 + THINKING_ALLOWANCE
+        assert config.thinking_config is None
+
+    async def test_any_other_model_thinks_at_the_lowest_level_on_its_own_ceiling(self):
+        from google.genai import types
+
+        gemini, sent = self._generator([self.Frame("ok", self.Usage(10, 1))])
+
+        cheap = resolve_ai_settings("QUALITY").cheap_model
+        _ = [d async for d in gemini.stream("prompt", cheap, 128)]
+
+        config = sent[0]["config"]
+        assert config.max_output_tokens == 128
+        assert config.thinking_config.thinking_level == types.ThinkingLevel.MINIMAL
+
+
 class TestJsonExtraction:
     r"""The greedy regex, and what it silently cost.
 
