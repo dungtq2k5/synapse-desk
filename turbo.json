@@ -112,6 +112,13 @@
       // importing `src/generated/prisma`, which nothing has created.
       "dependsOn": ["^build", "db:generate"],
       "cache": false,
+      "persistent": true,
+      // A package with an ES module build (contracts, core) watches it beside
+      // the CommonJS one: the web's bundler reads dist/esm.
+      "with": ["dev:esm"]
+    },
+    "dev:esm": {
+      "cache": false,
       "persistent": true
     },
     "clean": {

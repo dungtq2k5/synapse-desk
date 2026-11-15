@@ -5,9 +5,19 @@
   "license": "AGPL-3.0-only",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "module": "./dist/esm/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.esm.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "dev:esm": "tsc -p tsconfig.esm.json --watch --preserveWatchOutput",
     "clean": "rimraf dist *.tsbuildinfo",
     "lint": "eslint \"src/**/*.ts\""
   },
