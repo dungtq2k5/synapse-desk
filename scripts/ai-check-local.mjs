@@ -29,13 +29,22 @@ const { MODELS_BY_PROVIDER, OLLAMA_MODEL_DIGESTS } = await import(
   join(ROOT, 'packages/contracts/dist/index.js')
 );
 
-/** `KEY = value` lines, as the services' `.env` files write them. */
+/**
+ * `KEY = value` lines, as the services' `.env` files write them: split on the
+ * first `=`, both halves trimmed. A line whose key isn't an env name (a
+ * comment, a blank) is skipped.
+ */
 function readEnv(path) {
   if (!existsSync(path)) return {};
   const env = {};
   for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const match = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
-    if (match) env[match[1]] = match[2].replace(/^['"]|['"]$/g, '');
+    const at = line.indexOf('=');
+    const key = line.slice(0, Math.max(at, 0)).trim();
+    if (at < 0 || !/^[A-Z][A-Z0-9_]*$/.test(key)) continue;
+    env[key] = line
+      .slice(at + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
   }
   return env;
 }
@@ -55,7 +64,14 @@ const baseUrl = rag.OLLAMA_BASE_URL || ingestion.OLLAMA_BASE_URL || '';
 const numCtx = Number(rag.OLLAMA_NUM_CTX || 8192);
 
 const lines = [];
-const say = (text) => lines.push(text);
+/**
+ * A printed line with its control characters (CR, LF, ESC, …) stripped:
+ * values read from the env files and the environment reach the output, and
+ * must not forge a line or color it. Everything this script prints goes
+ * through here.
+ */
+const clean = (text) => text.replace(/[\u0000-\u001f\u007f]/g, '');
+const say = (text) => lines.push(clean(text));
 let verdict = 'OK';
 const raise = (level) => {
   const order = ['OK', 'WARN', 'NO'];
@@ -112,8 +128,10 @@ try {
   tags = (await get('/api/tags')).models;
 } catch (error) {
   console.log(
-    `NO   OLLAMA_BASE_URL ${baseUrl || '(unset)'} doesn't answer (${error.message}). ` +
-      'Start it with `docker compose up -d ollama`.',
+    clean(
+      `NO   OLLAMA_BASE_URL ${baseUrl || '(unset)'} doesn't answer (${error.message}). ` +
+        'Start it with `docker compose up -d ollama`.',
+    ),
   );
   process.exit(2);
 }
