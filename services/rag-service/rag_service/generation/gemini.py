@@ -31,15 +31,23 @@ class GeminiGenerator:
     """Streamed generation, with an IDLE deadline rather than a total one.
 
     A long answer legitimately takes minutes; a stream that has sent nothing
-    for `idle_timeout_s` (before its first frame, or between two) is the fault,
-    and raises `TimeoutError` the way an unavailable provider fails.
+    for its idle deadline (before its first frame, or between two) is the
+    fault, and raises `TimeoutError` the way an unavailable provider fails.
+    The deadline is `thinking_idle_timeout_s` for a model in
+    `THINKING_MODELS` and `idle_timeout_s` for every other.
     """
 
-    def __init__(self, api_key: str, idle_timeout_s: float = 60.0) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        idle_timeout_s: float = 60.0,
+        thinking_idle_timeout_s: float = 120.0,
+    ) -> None:
         import google.genai as genai
 
         self._client = genai.Client(api_key=api_key)
         self._idle = idle_timeout_s
+        self._thinking_idle = thinking_idle_timeout_s
 
     async def stream(
         self, prompt: Prompt, model: str, max_output_tokens: int
@@ -134,11 +142,12 @@ class GeminiGenerator:
         )
 
     async def _within_idle(self, awaitable, model: str):
+        idle = self._thinking_idle if model in THINKING_MODELS else self._idle
         try:
-            return await asyncio.wait_for(awaitable, self._idle)
+            return await asyncio.wait_for(awaitable, idle)
         except TimeoutError as error:
             raise TimeoutError(
-                f"Gemini sent nothing for {self._idle:g} s on {model}"
+                f"Gemini sent nothing for {idle:g} s on {model}"
             ) from error
 
     async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):

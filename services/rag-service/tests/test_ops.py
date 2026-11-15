@@ -26,6 +26,7 @@ from rag_service.server import (
     OpsServicer,
     _readiness_status,
     _refresh_readiness,
+    log_level,
 )
 
 SERVING = health_pb2.HealthCheckResponse.SERVING
@@ -182,3 +183,16 @@ def test_readiness_checks_no_peer_service():
 
     for peer in ("ledger", "LedgerClient", "auth_", "grpc.aio.insecure"):
         assert peer not in body, f"readiness must not reference {peer}"
+
+
+@pytest.mark.parametrize("name", ["info", "INFO", "Warning"])
+def test_log_level_takes_either_case(name):
+    # The Node services write `info`; Python's logging takes only `INFO`.
+    import logging
+
+    assert log_level(name) == logging.getLevelNamesMapping()[name.upper()]
+
+
+def test_an_unknown_log_level_fails_naming_the_value():
+    with pytest.raises(ValueError, match="LOG_LEVEL 'loud'"):
+        log_level("loud")

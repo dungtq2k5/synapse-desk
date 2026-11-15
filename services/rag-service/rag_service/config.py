@@ -73,6 +73,9 @@ class Config:
     #: takes minutes and a stream that stops sending is the fault.
     gemini_embed_timeout_s: float = 30.0
     gemini_idle_timeout_s: float = 60.0
+    #: The idle deadline for a model in `THINKING_MODELS`, which can be slow
+    #: to send its first frame.
+    gemini_thinking_idle_timeout_s: float = 120.0
     ollama_embed_timeout_s: float = 120.0
     ollama_idle_timeout_s: float = 300.0
 
@@ -119,6 +122,10 @@ def load_config() -> Config:
         gemini_embed_timeout_s=int(os.environ.get("GEMINI_EMBED_TIMEOUT_MS", "30000"))
         / 1000,
         gemini_idle_timeout_s=int(os.environ.get("GEMINI_IDLE_TIMEOUT_MS", "60000"))
+        / 1000,
+        gemini_thinking_idle_timeout_s=int(
+            os.environ.get("GEMINI_THINKING_IDLE_TIMEOUT_MS", "120000")
+        )
         / 1000,
         ollama_embed_timeout_s=int(os.environ.get("OLLAMA_EMBED_TIMEOUT_MS", "120000"))
         / 1000,
