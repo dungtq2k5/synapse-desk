@@ -102,4 +102,7 @@ export const envValidationSchema = Joi.object({
   // How long a sender may edit their own message. Named and configured rather
   // than a hardcoded number, the same treatment OTP_EXPIRY_MINUTES gets.
   MESSAGE_EDIT_WINDOW_MINUTES: Joi.number().required(),
+
+  // Mirrors every audit event AuditPublisher sends to the log as well.
+  AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
 });

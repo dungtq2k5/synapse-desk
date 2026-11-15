@@ -35,7 +35,9 @@ class ModelPricing:
 #: Published paid-tier rates, read off ai.google.dev/gemini-api/docs/pricing.
 #: Micros per million equals USD per million exactly — $1.25/M is 1_250_000.
 MODEL_PRICING: dict[str, ModelPricing] = {
-    "gemini-2.5-pro": ModelPricing(1_250_000, 10_000_000),
+    #: Priced at the rate from 2026-12-01 ($4 / $20), not the launch rate
+    #: ($2 / $10), so it never under-counts. Output includes thinking tokens.
+    "gemini-4-argon": ModelPricing(4_000_000, 20_000_000),
     #: Text input only. The other modalities this model prices (image, audio,
     #: video) are unreachable here — this service embeds question and chunk
     #: TEXT and nothing else.

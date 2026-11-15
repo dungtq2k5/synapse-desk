@@ -17,6 +17,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ticket-service
 data:
+  AUDIT_LOG_TO_CONSOLE: 'true'
   AUTH_SERVICE_URL: 'auth-service:5001'
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '5002'

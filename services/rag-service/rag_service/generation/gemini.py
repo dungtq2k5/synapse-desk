@@ -12,8 +12,19 @@ from collections.abc import AsyncIterator
 
 from rag_service.generation.corag import GenerationDelta
 from rag_service.generation.parts import Prompt
+from rag_service.settings import THINKING_MODELS
 
 logger = logging.getLogger(__name__)
+
+#: Tokens added to `max_output_tokens` for a model in `THINKING_MODELS`, whose
+#: thinking counts against that ceiling. Call sites keep ceilings sized for
+#: the answer; unused tokens bill nothing.
+#:
+#: Measured on `gemini-4-argon` (2026-11-15): 0 thinking tokens on all 35
+#: answers of the eval and on Summarize over 6- to 40-turn threads; 118 on a
+#: multi-step arithmetic prompt. 2,048 is far above that and caps a runaway
+#: thinking pass at about $0.04 a call at $20 per million.
+THINKING_ALLOWANCE = 2_048
 
 
 class GeminiGenerator:
@@ -42,14 +53,29 @@ class GeminiGenerator:
         from google.genai import types
 
         prompt_tokens = 0
-        completion_tokens = 0
+        answer_tokens = 0
+        thinking_tokens = 0
         finish_reason: str | None = None
+
+        if model in THINKING_MODELS:
+            ceiling = max_output_tokens + THINKING_ALLOWANCE
+            config = types.GenerateContentConfig(max_output_tokens=ceiling)
+        else:
+            # The lowest level the API takes: it refuses `thinking_budget=0`
+            # for `gemini-3.5-flash-lite` (400 INVALID_ARGUMENT).
+            ceiling = max_output_tokens
+            config = types.GenerateContentConfig(
+                max_output_tokens=ceiling,
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=types.ThinkingLevel.MINIMAL
+                ),
+            )
 
         stream = await self._within_idle(
             self._client.aio.models.generate_content_stream(
                 model=model,
                 contents=_to_contents(prompt),
-                config=types.GenerateContentConfig(max_output_tokens=max_output_tokens),
+                config=config,
             ),
             model,
         )
@@ -81,9 +107,11 @@ class GeminiGenerator:
             if usage is not None:
                 # Overwritten rather than accumulated: the provider reports
                 # RUNNING totals, so summing them would multiply the bill by
-                # the number of frames.
+                # the number of frames. Each field keeps its own last value,
+                # since a frame can omit one (a zero is omitted, not sent).
                 prompt_tokens = usage.prompt_token_count or prompt_tokens
-                completion_tokens = usage.candidates_token_count or completion_tokens
+                answer_tokens = usage.candidates_token_count or answer_tokens
+                thinking_tokens = usage.thoughts_token_count or thinking_tokens
 
         if finish_reason == "MAX_TOKENS":
             # WARN rather than error: the request succeeded and the caller
@@ -95,13 +123,14 @@ class GeminiGenerator:
                 "Generation with %s hit max_output_tokens=%d and was truncated; "
                 "any structured output is likely unparseable",
                 model,
-                max_output_tokens,
+                ceiling,
             )
 
+        # Thinking is output: Google bills it at the output rate.
         yield GenerationDelta(
             done=True,
             prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            completion_tokens=answer_tokens + thinking_tokens,
         )
 
     async def _within_idle(self, awaitable, model: str):

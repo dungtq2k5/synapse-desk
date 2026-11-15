@@ -35,10 +35,12 @@ export type ModelPricing = {
 };
 
 export const MODEL_PRICING: Record<AiModel, ModelPricing> = {
-  // Generation — the QUALITY tier, sellable once billing lands.
-  'gemini-2.5-pro': {
-    promptMicrosPerMillion: 1_250_000,
-    completionMicrosPerMillion: 10_000_000,
+  // Generation — the QUALITY tier. Priced at the rate from 2026-12-01
+  // ($4 / $20), not the launch rate ($2 / $10), so it never under-counts.
+  // Output includes thinking tokens, which Google bills as output.
+  'gemini-4-argon': {
+    promptMicrosPerMillion: 4_000_000,
+    completionMicrosPerMillion: 20_000_000,
   },
   // Embedding. No completion side at all, which is why the column is 0 rather
   // than absent: `completionTokens` is always 0 for EMBEDDING, so any non-zero

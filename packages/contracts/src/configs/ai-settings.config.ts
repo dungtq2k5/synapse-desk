@@ -78,7 +78,7 @@ export const MODELS_BY_PROVIDER: Record<AiProvider, ProviderModels> = {
   gemini: {
     generationModelByTier: {
       FAST: 'gemini-3.5-flash-lite',
-      QUALITY: 'gemini-2.5-pro',
+      QUALITY: 'gemini-4-argon',
     },
     cheapModel: 'gemini-3.5-flash-lite',
     embeddingModel: 'gemini-embedding-2',

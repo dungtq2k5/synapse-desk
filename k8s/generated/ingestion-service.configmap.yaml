@@ -19,6 +19,7 @@ metadata:
     app.kubernetes.io/name: ingestion-service
 data:
   AI_EMBEDDING_PROVIDER: 'gemini'
+  AUDIT_LOG_TO_CONSOLE: 'true'
   AUTH_SERVICE_URL: 'auth-service:5001'
   DOWNLOAD_URL_TTL_SECONDS: '840'
   GEMINI_EMBED_TIMEOUT_MS: '30000'

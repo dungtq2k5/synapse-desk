@@ -114,6 +114,9 @@ export const envValidationSchema = Joi.object({
   APP_WEB_URL: Joi.string().uri().required(),
   SUPPORT_EMAIL: Joi.string().email().required(),
 
+  // Mirrors every audit event AuditPublisher sends to the log as well.
+  AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
+
   // --------------------------------------------------------- 9 DEVELOPMENT
 
   // The SSRF escape hatch, for a developer's localhost receiver. Honoured ONLY

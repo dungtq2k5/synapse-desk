@@ -28,6 +28,7 @@ from rag_service.settings import (
     MODELS_BY_PROVIDER,
     OLLAMA_MODEL_DIGESTS,
     RETRIEVAL_DEFAULTS,
+    THINKING_MODELS,
     AiProviders,
     AiSettingsResolver,
     as_ai_model_tier,
@@ -309,3 +310,14 @@ class TestCrossLanguageContract:
         }
 
         assert set(ALL_CONFIGURED_MODELS) == known
+
+    def test_every_thinking_model_is_a_configured_generation_model(self):
+        # A misspelled entry would silently send that model with thinking at
+        # its lowest level and no allowance.
+        generation = {
+            model
+            for models in MODELS_BY_PROVIDER.values()
+            for model in models["generation_model_by_tier"].values()
+        }
+
+        assert THINKING_MODELS <= generation
