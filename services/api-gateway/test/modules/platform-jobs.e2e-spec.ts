@@ -119,21 +119,38 @@ describe('Platform job health (e2e)', () => {
       };
     });
 
-  const stubHealthy = () => {
-    fx.stubs.analytics.getJobHealth.mockReturnValue(
-      of({ items: [healthyTicketRow()] }),
-    );
-    fx.stubs.ledger.getAiJobHealth.mockReturnValue(
-      of({ items: healthyIngestionRows() }),
-    );
-    fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-      of({ items: healthyRowsFor('auth') }),
-    );
+  /**
+   * Every leg's healthy rows. ticket-service's beyond `ANALYTICS_DAILY`
+   * (`TICKET_HOURLY`, …) are derived like auth's, so a new ticket job needs no
+   * fixture edit either.
+   */
+  const healthyRows = () => ({
+    ticket: [
+      healthyTicketRow(),
+      ...healthyRowsFor('ticket').filter(
+        ({ jobName }) => jobName !== SCHEDULED_JOBS.ANALYTICS_DAILY,
+      ),
+    ],
+    ingestion: healthyIngestionRows(),
+    auth: healthyRowsFor('auth'),
     // The fourth leg — outbound webhooks made notification-service a
     // scheduled-jobs service. Derived from `jobsOwnedBy`, like auth, so a
     // second notification job needs no fixture edit here.
+    notification: healthyRowsFor('notification'),
+  });
+
+  const stubHealthy = () => {
+    const rows = healthyRows();
+
+    fx.stubs.analytics.getJobHealth.mockReturnValue(of({ items: rows.ticket }));
+    fx.stubs.ledger.getAiJobHealth.mockReturnValue(
+      of({ items: rows.ingestion }),
+    );
+    fx.stubs.platform.getAuthJobHealth.mockReturnValue(
+      of({ items: rows.auth }),
+    );
     fx.stubs.notification.getNotificationJobHealth.mockReturnValue(
-      of({ items: healthyRowsFor('notification') }),
+      of({ items: rows.notification }),
     );
   };
 
@@ -168,6 +185,19 @@ describe('Platform job health (e2e)', () => {
 
   describe('health', () => {
     it('2. reports every expected job as healthy when all have run', async () => {
+      // The fixture first: a job added to `SCHEDULED_JOBS` without a healthy
+      // row here would report never-ran below, as a bare `false`.
+      const stubbed = new Set(
+        Object.values(healthyRows())
+          .flat()
+          .map(({ jobName }) => jobName),
+      );
+      expect(
+        Object.values(SCHEDULED_JOBS)
+          .filter((name) => !stubbed.has(name))
+          .map((name) => `no heartbeat row for ${name}`),
+      ).toEqual([]);
+
       stubHealthy();
 
       const response = await superAdmin()
