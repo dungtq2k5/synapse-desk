@@ -145,6 +145,9 @@ export const envValidationSchema = Joi.object({
   // clock-skew one. The default leaves a 60-second margin.
   DOWNLOAD_URL_TTL_SECONDS: Joi.number().default(840),
 
+  // Mirrors every audit event AuditPublisher sends to the log as well.
+  AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
+
   // --------------------------------------------------------- 9 DEVELOPMENT
 
   // The model-free embedding client, for the end-to-end stack only: rag-service's

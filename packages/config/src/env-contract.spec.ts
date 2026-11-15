@@ -517,4 +517,195 @@ describe('the environment contract', () => {
       expect(() => lifetimeMs('7d', 'days')).toThrow(/unrecognized/i);
     });
   });
+
+  /**
+   * The code's reads against the registry: every env key a service's `src/`
+   * reads appears in its `.env.example`, commented or not.
+   *
+   * The schema checks above hold the example and the schema to each other, but
+   * a key read by the code and declared in neither passed them all: ticket-service
+   * read `INGESTION_SERVICE_URL` for its whole life, fell back to `localhost:0`,
+   * and two features never worked on any deployment. So this scan starts from the
+   * code, where a new read appears.
+   *
+   * A read is a `configService`/`config` `.get`/`.getOrThrow` call or a
+   * `process.env` access whose key is a literal string. A key that isn't one
+   * (a variable, a template) fails, so nothing escapes by being dynamic; that
+   * rests on every `ConfigService` going by one of those two names, which is
+   * checked too.
+   */
+  describe('**the code reads only declared env keys**', () => {
+    /**
+     * Read by the code, deliberately absent from the example, each with its
+     * reason. An entry whose key nothing reads fails as stale.
+     */
+    const UNDOCUMENTED: Readonly<Record<string, Record<string, string>>> = {
+      'auth-service': {
+        REDIS_DB:
+          'optional; defaults to 0, the database every other service uses',
+      },
+    };
+
+    /**
+     * Distinct keys each service reads today, rounded down a little: a service
+     * whose reads moved to a shape this scan doesn't know fails here instead
+     * of passing with nothing scanned.
+     */
+    const FLOOR: Readonly<Record<string, number>> = {
+      'api-gateway': 32,
+      'auth-service': 24,
+      'ingestion-service': 18,
+      'notification-service': 14,
+      'storage-service': 6,
+      'ticket-service': 10,
+    };
+
+    /**
+     * Keys read inside `packages/`, each with the exported symbols that carry
+     * the read into a service. A service whose `src/` names one of them must
+     * declare the key. Every key a package reads must be listed, and every
+     * listed key must still be read.
+     */
+    const PACKAGE_READS: Readonly<Record<string, readonly string[]>> = {
+      APP_VERSION: ['readBuildInfo'],
+      AUDIT_LOG_TO_CONSOLE: ['AuditPublisher'],
+      BUILD_SHA: ['readBuildInfo'],
+      BUILD_TIME: ['readBuildInfo'],
+      DATABASE_URL: ['runDatabaseCheck'],
+      NATS_URL: ['createNatsTransport', 'JetStreamModule'],
+    };
+
+    const CONFIG_CALL =
+      /\b(?:configService|config)\.(?:get|getOrThrow)(?:<[^>()]*>)?\(\s*([^,)]*)/g;
+    const ENV_DOT = /\bprocess\.env\.(\w+)/g;
+    const ENV_INDEX = /\bprocess\.env\[\s*([^\]]*)\]/g;
+    const ENV_KEY = /^['"]([A-Z][A-Z0-9_]*)['"]$/;
+
+    type Scan = { reads: Map<string, string>; unscannable: string[] };
+
+    /** Keys read (key → first file) and calls whose key isn't a literal. */
+    const scan = (pathspec: string): Scan => {
+      const reads = new Map<string, string>();
+      const unscannable: string[] = [];
+      const sources = readRepoFiles(pathspec).filter(
+        ({ path }) => path.endsWith('.ts') && !/\.(e2e-)?spec\.ts$/.test(path),
+      );
+
+      for (const { path, text } of sources) {
+        const code = stripComments(text);
+
+        for (const match of code.matchAll(ENV_DOT)) {
+          if (!reads.has(match[1])) reads.set(match[1], path);
+        }
+        for (const match of [
+          ...code.matchAll(CONFIG_CALL),
+          ...code.matchAll(ENV_INDEX),
+        ]) {
+          const key = ENV_KEY.exec(match[1].trim())?.[1];
+
+          if (key === undefined)
+            unscannable.push(`${path}: ${match[0].trim()}`);
+          else if (!reads.has(key)) reads.set(key, path);
+        }
+      }
+
+      return { reads, unscannable };
+    };
+
+    // The services the schema checks skip: their own toolchain guards them.
+    const scanned = services().filter(
+      (service) => !(service in GUARDED_ELSEWHERE),
+    );
+    const byService = new Map(
+      scanned.map((service) => [service, scan(`services/${service}/src`)]),
+    );
+    const packages = scan('packages').reads;
+
+    // `packages/testing` is test plumbing, never loaded by a running service.
+    for (const [key, path] of packages) {
+      if (path.startsWith('packages/testing/')) packages.delete(key);
+    }
+
+    it.each(scanned)('%s: every key read is in its .env.example', (service) => {
+      const documented = exampleKeys(service);
+      const allowed = UNDOCUMENTED[service] ?? {};
+      const missing = [...byService.get(service)!.reads]
+        .filter(([key]) => !documented.has(key) && !(key in allowed))
+        .map(([key, path]) => `${key} (read in ${path})`);
+
+      expect(missing).toEqual([]);
+    });
+
+    it.each(scanned)('%s: the scan finds its reads (the floor)', (service) => {
+      expect([service, FLOOR[service]]).not.toEqual([service, undefined]);
+      expect(byService.get(service)!.reads.size).toBeGreaterThanOrEqual(
+        FLOOR[service],
+      );
+    });
+
+    it('no read has a key the scan cannot see', () => {
+      expect(
+        [...byService.values()].flatMap(({ unscannable }) => unscannable),
+      ).toEqual([]);
+      expect(scan('packages').unscannable).toEqual([]);
+    });
+
+    it('every allowlisted key is still read (no stale entry)', () => {
+      const stale = Object.entries(UNDOCUMENTED).flatMap(([service, keys]) =>
+        Object.keys(keys)
+          .filter((key) => !byService.get(service)?.reads.has(key))
+          .map((key) => `${service}: ${key}`),
+      );
+
+      expect(stale).toEqual([]);
+    });
+
+    it('every ConfigService goes by configService or config', () => {
+      // The dynamic-read check above matches those two receivers; a third name
+      // would read past it unseen.
+      const NAMED = [
+        /(\w+)\s*:\s*ConfigService\b/g,
+        /(?:const|let)\s+(\w+)\s*=\s*[\w.]+\.get(?:<ConfigService>)?\(\s*ConfigService\s*\)/g,
+      ];
+      const others = readRepoFiles('services', 'packages')
+        .filter(({ path }) => /\/src\/.*\.ts$/.test(path))
+        .filter(({ path }) => !/\.(e2e-)?spec\.ts$/.test(path))
+        .flatMap(({ path, text }) => {
+          const code = stripComments(text);
+
+          return NAMED.flatMap((pattern) => [...code.matchAll(pattern)])
+            .map((match) => match[1])
+            .filter((name) => name !== 'configService' && name !== 'config')
+            .map((name) => `${path}: ${name}`);
+        });
+
+      expect(others).toEqual([]);
+    });
+
+    it('every key a package reads is in PACKAGE_READS, and every entry is read', () => {
+      expect([...packages.keys()].sort()).toEqual(
+        Object.keys(PACKAGE_READS).sort(),
+      );
+    });
+
+    it.each(scanned)(
+      '%s: declares every key its package imports read',
+      (service) => {
+        const source = readRepoFiles(`services/${service}/src`)
+          .filter(({ path }) => !/\.(e2e-)?spec\.ts$/.test(path))
+          .map(({ text }) => stripComments(text))
+          .join('\n');
+        const documented = exampleKeys(service);
+        const missing = Object.entries(PACKAGE_READS)
+          .filter(([key]) => !documented.has(key))
+          .flatMap(([key, symbols]) =>
+            symbols
+              .filter((symbol) => new RegExp(`\\b${symbol}\\b`).test(source))
+              .map((symbol) => `${key} (through ${symbol})`),
+          );
+
+        expect(missing).toEqual([]);
+      },
+    );
+  });
 });

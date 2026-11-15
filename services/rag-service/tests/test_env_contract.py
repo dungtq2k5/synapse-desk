@@ -1,5 +1,5 @@
-"""The environment contract, Python side: config.py is the code,
-`.env.example` is the registry, and the scan runs from the code toward the
+"""The environment contract, Python side: every module under `rag_service/`
+is the code, `.env.example` is the registry, and the scan runs from the code toward the
 registry — the same rule the TypeScript services' guard enforces, in this
 toolchain because this is this toolchain's file.
 
@@ -19,26 +19,32 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CONFIG_SOURCE = REPO_ROOT / "services/rag-service/rag_service/config.py"
+#: Every module, not just `config.py`: `server.py` reads the build-info keys
+#: itself, and a read in any file is a read.
+SOURCE_ROOT = REPO_ROOT / "services/rag-service/rag_service"
 ENV_EXAMPLE = REPO_ROOT / "services/rag-service/.env.example"
 
-#: Every way config.py names an environment variable. A fourth accessor shape
+#: Every way the service names an environment variable. A fourth accessor shape
 #: added later is caught by the FLOOR below, not by these — the patterns catch
 #: what exists, the floor catches what the patterns stopped catching.
 READ_PATTERNS = (
     re.compile(r'os\.environ\[\s*"([A-Z][A-Z0-9_]*)"\s*\]'),
     re.compile(r'os\.environ\.get\(\s*"([A-Z][A-Z0-9_]*)"'),
+    re.compile(r'os\.getenv\(\s*"([A-Z][A-Z0-9_]*)"'),
     re.compile(r'_flag\(\s*"([A-Z][A-Z0-9_]*)"'),
 )
 
 #: The measured census the floor pins. Grows with the config; never shrinks.
-FLOOR = 12
+FLOOR = 24
 
 
 def declared_variables() -> set[str]:
-    source = CONFIG_SOURCE.read_text()
-
-    return {name for pattern in READ_PATTERNS for name in pattern.findall(source)}
+    return {
+        name
+        for path in sorted(SOURCE_ROOT.rglob("*.py"))
+        for pattern in READ_PATTERNS
+        for name in pattern.findall(path.read_text())
+    }
 
 
 def documented_variables() -> set[str]:
@@ -74,7 +80,7 @@ def test_every_flag_read_is_seen() -> None:
 def test_every_declared_variable_is_documented() -> None:
     missing = sorted(declared_variables() - documented_variables())
 
-    assert missing == [], f"read by config.py, absent from .env.example: {missing}"
+    assert missing == [], f"read by rag_service/, absent from .env.example: {missing}"
 
 
 def test_everything_documented_is_declared() -> None:

@@ -66,16 +66,20 @@ export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {
    * incident caused by one of the four it never looked at.
    */
   onModuleInit(): void {
+    // Literal keys, one read each: the env-reads guard can only see a read
+    // whose key is written out.
     const peers = {
-      auth: 'AUTH_SERVICE_URL',
-      ticket: 'TICKET_SERVICE_URL',
-      ingestion: 'INGESTION_SERVICE_URL',
-      notification: 'NOTIFICATION_SERVICE_URL',
-      rag: 'RAG_SERVICE_URL',
-    } as const;
+      auth: this.configService.getOrThrow<string>('AUTH_SERVICE_URL'),
+      ticket: this.configService.getOrThrow<string>('TICKET_SERVICE_URL'),
+      ingestion: this.configService.getOrThrow<string>('INGESTION_SERVICE_URL'),
+      notification: this.configService.getOrThrow<string>(
+        'NOTIFICATION_SERVICE_URL',
+      ),
+      rag: this.configService.getOrThrow<string>('RAG_SERVICE_URL'),
+    };
 
-    for (const [name, variable] of Object.entries(peers)) {
-      this.register(name, this.configService.getOrThrow<string>(variable));
+    for (const [name, url] of Object.entries(peers)) {
+      this.register(name, url);
     }
   }
 
