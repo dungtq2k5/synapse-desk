@@ -10,6 +10,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { DocumentParserService } from './document-parser.service';
+import { OfficeFileTooLarge } from './office-zip';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
 /** What `parse()`'s pages are joined with — one blank line, as markdown wants. */
@@ -57,7 +58,8 @@ export class AttachmentExtractorService {
    * @param objectPath the confirmed path — never a `pending/` one.
    * @param mimeType read back from the object at confirm, never client-declared.
    * @param organizationId the tenant, for storage-service's own path check.
-   * @throws RpcException `INVALID_ARGUMENT` when the type has no parser.
+   * @throws RpcException `INVALID_ARGUMENT` when the type has no parser, or
+   *   an Office file inflates past the ceiling (permanent: never retried).
    * @throws RpcException `INTERNAL` when the parse itself failed.
    */
   async extract(
@@ -85,6 +87,12 @@ export class AttachmentExtractorService {
       const parsed = await this.parser.parse(bytes, extensionFor(mimeType));
       pages = parsed.pages.map((page) => page.markdown);
     } catch (error) {
+      if (error instanceof OfficeFileTooLarge) {
+        throw new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: error.message,
+        });
+      }
       // Named for the operator and rethrown for the caller. ticket-service
       // turns this into a stored `null`; this service's job is to be honest
       // that it could not do the work.

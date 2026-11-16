@@ -71161,6 +71161,7 @@
               "OCR_UNAVAILABLE",
               "OTHER",
               "PROVIDER_FAILURE",
+              "TOO_LARGE_WHEN_OPENED",
               "TOO_LONG"
             ]
           }
@@ -71517,12 +71518,13 @@
           },
           "errorCode": {
             "nullable": true,
-            "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, no\nreadable text, OCR unavailable, the AI provider failed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed.",
+            "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, too\nlarge when opened, no readable text, OCR unavailable, the AI provider\nfailed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed.",
             "enum": [
               "NO_READABLE_TEXT",
               "OCR_UNAVAILABLE",
               "OTHER",
               "PROVIDER_FAILURE",
+              "TOO_LARGE_WHEN_OPENED",
               "TOO_LONG"
             ],
             "type": "string"

@@ -13,6 +13,7 @@ import {
   IngestionStage,
   IngestionWaitingReason,
   MAX_CHUNKS_PER_DOCUMENT,
+  MAX_OFFICE_DECOMPRESSED_BYTES,
   UNKNOWN_EXTENSION,
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/contracts';
@@ -28,6 +29,8 @@ import {
   E2eFixture,
   bootstrapE2eTest,
   buildPdf,
+  deflateRepeated,
+  zipOf,
 } from '../utils';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { memberContext } from '../utils/context';
@@ -366,6 +369,33 @@ describe('The ingestion pipeline (e2e)', () => {
       });
       expect(document.status).toBe(DocumentStatus.FAILED);
     });
+
+    it('6b. **a .docx that inflates past the ceiling is REFUSED, naming why**', async () => {
+      // Known gap 17. A few hundred KB of zipped XML that would inflate past
+      // 256 MiB: refused before mammoth opens it, once, as a deterministic
+      // verdict on the bytes.
+      const chunk = Buffer.from('<w:p/>'.repeat(200_000));
+      const bomb = await deflateRepeated(
+        chunk,
+        Math.ceil(MAX_OFFICE_DECOMPRESSED_BYTES / chunk.length) + 16,
+      );
+      downloadObject.mockResolvedValue(
+        zipOf([{ name: 'word/document.xml', entry: bomb }]),
+      );
+      const data = await queueDocument({ fileType: 'docx' });
+
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.status).toBe(IngestionJobStatus.FAILED);
+      expect(job.errorCode).toBe(IngestionErrorCode.TOO_LARGE_WHEN_OPENED);
+      expect(job.failedStage).toBe(IngestionStage.PARSING);
+      expect(job.errorLog).toMatch(/expands to more than 256 MB when opened/);
+    }, 60_000);
 
     it('6a. **a PDF OCR could not read names LANGUAGE as the cause**', async () => {
       // And the message changed because the system did. It used to

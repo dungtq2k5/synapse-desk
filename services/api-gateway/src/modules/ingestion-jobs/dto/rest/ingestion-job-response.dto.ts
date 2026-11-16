@@ -15,8 +15,9 @@ export class IngestionJobResponseDto {
   status!: IngestionJobStatus | null;
   errorLog!: string | null;
   /**
-   * Why a `FAILED` attempt failed, as a reader can act on it: too long, no
-   * readable text, OCR unavailable, the AI provider failed, or other.
+   * Why a `FAILED` attempt failed, as a reader can act on it: too long, too
+   * large when opened, no readable text, OCR unavailable, the AI provider
+   * failed, or other.
    * `errorLog` stays the detail. `null` on an attempt that hasn't failed.
    */
   errorCode!: IngestionErrorCode | null;

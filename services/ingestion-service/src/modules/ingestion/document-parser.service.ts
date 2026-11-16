@@ -6,6 +6,7 @@ import {
   type OcrLanguage,
 } from '@synapsedesk/contracts';
 import { MAX_OCR_PAGES, OcrService, type OcrFailure } from './ocr.service';
+import { assertOfficeZipFits } from './office-zip';
 
 /** One page of extracted text. PDFs have many; everything else has one. */
 export type ParsedPage = {
@@ -177,6 +178,9 @@ export class DocumentParserService {
         // `docx` alone. `doc` used to fall through to here and could never have
         // worked — mammoth reads OOXML, and a Word 97-2003 file is OLE2. It is
         // no longer an accepted document type, so this switch cannot see one.
+        // Both Office types are zips, checked before a parser inflates one
+        // whole: `OfficeFileTooLarge` past the ceiling.
+        await assertOfficeZipFits(bytes);
         return this.parseDocx(bytes);
       case 'xlsx':
         // ATTACHMENTS only today — `.xlsx` is not in
@@ -186,6 +190,7 @@ export class DocumentParserService {
         // "bytes → markdown", and because promoting spreadsheets to knowledge
         // base content later should be a list edit rather than moving code
         // between services.
+        await assertOfficeZipFits(bytes);
         return this.parseXlsx(bytes);
       case 'md':
       case 'txt':

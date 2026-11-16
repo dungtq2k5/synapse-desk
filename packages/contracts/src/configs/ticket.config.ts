@@ -345,6 +345,29 @@ export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 
 /**
+ * The most an Office file (`.docx`, `.xlsx`) may inflate to when unzipped,
+ * summed over its entries and counted as the bytes actually come out (a
+ * zip's declared sizes are written by whoever made the file).
+ *
+ * {@link MAX_ATTACHMENT_BYTES} bounds the upload, not what the parser holds
+ * once the zip is open: a 10 MB zip of repetitive XML can inflate to
+ * gigabytes. Measured 2026-11-16 on generated workbooks (the repository holds
+ * no real `.xlsx`, and its one `.docx` inflates ×1.2):
+ *
+ * | Workbook | Zipped | Inflated | Ratio |
+ * | :--- | ---: | ---: | ---: |
+ * | 120,000 rows: dates, names, SKUs, amounts, notes | 5.07 MB | 39.57 MB | ×7.8 |
+ * | 200,000 rows of mostly zeros | 4.47 MB | 54.50 MB | ×12.2 |
+ *
+ * So a real workbook at the upload cap inflates to about 120 MB; 256 MiB is
+ * ×25 the upload cap, with room above that.
+ */
+export const MAX_OFFICE_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
+
+/** The most files one Office zip may hold. A real document holds tens. */
+export const MAX_OFFICE_ENTRIES = 10_000;
+
+/**
  * The socket timeout on storage-service's fetch of an attachment from a URL —
  * the INNERMOST of three nested deadlines.
  *
