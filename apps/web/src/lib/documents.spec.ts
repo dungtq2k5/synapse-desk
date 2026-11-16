@@ -49,6 +49,12 @@ describe('document wording', () => {
       retry: false,
       replace: true,
     });
+    expect(failure('TOO_LARGE_WHEN_OPENED', 'docx')).toEqual({
+      sentence:
+        'This file expands to more than 256 MB when opened. Upload a smaller one.',
+      retry: false,
+      replace: true,
+    });
     expect(failure('NO_READABLE_TEXT', 'pdf').sentence).toMatch(
       /even with OCR/,
     );

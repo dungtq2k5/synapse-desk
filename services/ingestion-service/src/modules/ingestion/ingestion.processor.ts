@@ -48,6 +48,7 @@ import {
 } from './document-parser.service';
 import { MAX_OCR_PAGES } from './ocr.service';
 import { Chunk, DocumentChunkerService } from './document-chunker.service';
+import { OfficeFileTooLarge } from './office-zip';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 
 /**
@@ -182,6 +183,9 @@ class ProviderFailure extends Error {
 /** The code a reader acts on, for an error the processor caught. */
 function errorCodeOf(error: unknown): IngestionErrorCode {
   if (error instanceof DocumentTooComplex) return IngestionErrorCode.TOO_LONG;
+  if (error instanceof OfficeFileTooLarge) {
+    return IngestionErrorCode.TOO_LARGE_WHEN_OPENED;
+  }
   if (error instanceof NoExtractableText) {
     return IngestionErrorCode.NO_READABLE_TEXT;
   }
@@ -379,6 +383,7 @@ export class IngestionProcessor {
 
       if (
         error instanceof DocumentTooComplex ||
+        error instanceof OfficeFileTooLarge ||
         error instanceof NoExtractableText ||
         error instanceof OcrUnavailable
       ) {

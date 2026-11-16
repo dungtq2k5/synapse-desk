@@ -1,6 +1,7 @@
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   MAX_DOCUMENT_BYTES,
+  MAX_OFFICE_DECOMPRESSED_BYTES,
   NON_LATIN_OCR_LANGUAGES,
   type AllowedDocumentMimeType,
   type OcrLanguage,
@@ -160,6 +161,12 @@ export function failure(
       return {
         sentence:
           'This document is too long to process as one. Split it into smaller documents and upload those; retrying won’t help.',
+        retry: false,
+        replace: true,
+      };
+    case 'TOO_LARGE_WHEN_OPENED':
+      return {
+        sentence: `This file expands to more than ${MAX_OFFICE_DECOMPRESSED_BYTES / 1024 / 1024} MB when opened. Upload a smaller one.`,
         retry: false,
         replace: true,
       };

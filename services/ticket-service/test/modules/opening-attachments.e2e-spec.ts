@@ -14,7 +14,10 @@ import { memberContext } from '../utils/context';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { MessagesService } from '../../src/modules/messages/messages.service';
 import { AiService } from '../../src/modules/ai/ai.service';
-import { AiAttachmentService } from '../../src/modules/ai-attachments/ai-attachment.service';
+import {
+  AiAttachmentService,
+  OPENING_WITHHELD,
+} from '../../src/modules/ai-attachments/ai-attachment.service';
 import { AttachmentExtractorClient } from '../../src/modules/ai-client/attachment-extractor.client';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
@@ -475,6 +478,88 @@ describe('Files on the opening (e2e)', () => {
       );
 
       expect(partsSent(1)).toEqual([]);
+    });
+  });
+
+  describe('a refused opening’s description (known gap 70)', () => {
+    const DESCRIPTION = 'It crashes on this screen, see the screenshot.';
+
+    /** The ticket, with its opening refused as `markRefused` records it. */
+    const refusedOpening = async () => {
+      const { ticket } = await open([]);
+      await fx.prisma.ticket.update({
+        where: { id: ticket!.id },
+        data: { openingExcludedFromAiContext: true },
+      });
+      return ticket!;
+    };
+
+    /** The transcript the n-th draft request carried (the second argument). */
+    const transcriptSent = (call = 0) =>
+      generateReplyDraft.mock.calls[call][1] as Array<{ content: string }>;
+
+    it('**the next answer leads with the neutral line, never the description**', async () => {
+      const ticket = await refusedOpening();
+
+      await messages.answerOpening({ ticketId: ticket.id }, requester());
+      await draftRequested();
+
+      expect(transcriptSent()[0].content).toBe(OPENING_WITHHELD);
+      expect(JSON.stringify(transcriptSent())).not.toContain(DESCRIPTION);
+    });
+
+    it('an unrefused ticket still leads with its description', async () => {
+      const { ticket } = await open([]);
+
+      await messages.answerOpening({ ticketId: ticket!.id }, requester());
+      await draftRequested();
+
+      expect(transcriptSent()[0].content).toBe(DESCRIPTION);
+    });
+
+    it('**Classify reads the title and the neutral line**', async () => {
+      const ticket = await refusedOpening();
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'listDepartments')
+        .mockResolvedValue([]);
+      const classify = jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
+        priority: 'HIGH',
+        departmentId: '',
+        confidence: 0.9,
+        reasoning: '',
+      } as never);
+
+      await ai.classifyTicket({ ticketId: ticket.id }, agent());
+
+      expect(classify.mock.calls[0].slice(1, 3)).toEqual([
+        'The app crashes',
+        OPENING_WITHHELD,
+      ]);
+    });
+
+    it('drafts and summaries never carry the description, refused or not', async () => {
+      const summarize = jest.spyOn(rag, 'generateSummary').mockResolvedValue({
+        summaryText: 'A crash.',
+        suggestedAction: '',
+        confidenceScore: 0.5,
+        modelName: 'model',
+        generationId: 'gen-summary',
+      });
+      const refused = await refusedOpening();
+      const { ticket: plain } = await open([]);
+
+      for (const ticketId of [refused.id, plain!.id]) {
+        await ai.generateDraft({ ticketId, instruction: undefined }, agent());
+        await ai.generateSummary({ ticketId }, agent());
+      }
+
+      for (const call of [
+        ...generateReplyDraft.mock.calls,
+        ...summarize.mock.calls,
+      ]) {
+        expect(JSON.stringify(call[1])).not.toContain(DESCRIPTION);
+        expect(JSON.stringify(call[1])).not.toContain(OPENING_WITHHELD);
+      }
     });
   });
 });

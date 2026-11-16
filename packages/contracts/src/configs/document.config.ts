@@ -53,6 +53,9 @@ export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
  * on it. `error_log` keeps the detail.
  *
  * - `TOO_LONG`: more passages than one document may produce; split it.
+ * - `TOO_LARGE_WHEN_OPENED`: an Office file that inflates past
+ *   `MAX_OFFICE_DECOMPRESSED_BYTES` (or holds more than `MAX_OFFICE_ENTRIES`
+ *   files) when unzipped; upload a smaller one.
  * - `NO_READABLE_TEXT`: the file parsed to no text, even with OCR.
  * - `OCR_UNAVAILABLE`: scanned pages and no OCR on this deployment.
  * - `PROVIDER_FAILURE`: the embedding provider refused or didn't answer.
@@ -60,6 +63,7 @@ export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
  */
 export enum IngestionErrorCode {
   TOO_LONG = 'TOO_LONG',
+  TOO_LARGE_WHEN_OPENED = 'TOO_LARGE_WHEN_OPENED',
   NO_READABLE_TEXT = 'NO_READABLE_TEXT',
   OCR_UNAVAILABLE = 'OCR_UNAVAILABLE',
   PROVIDER_FAILURE = 'PROVIDER_FAILURE',

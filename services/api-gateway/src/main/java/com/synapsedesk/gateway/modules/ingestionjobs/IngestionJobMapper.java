@@ -93,6 +93,7 @@ public final class IngestionJobMapper {
   private static IngestionErrorCodeGql toErrorCodeGql(IngestionErrorCode code) {
     return switch (code) {
       case INGESTION_ERROR_CODE_TOO_LONG -> IngestionErrorCodeGql.TOO_LONG;
+      case INGESTION_ERROR_CODE_TOO_LARGE_WHEN_OPENED -> IngestionErrorCodeGql.TOO_LARGE_WHEN_OPENED;
       case INGESTION_ERROR_CODE_NO_READABLE_TEXT -> IngestionErrorCodeGql.NO_READABLE_TEXT;
       case INGESTION_ERROR_CODE_OCR_UNAVAILABLE -> IngestionErrorCodeGql.OCR_UNAVAILABLE;
       case INGESTION_ERROR_CODE_PROVIDER_FAILURE -> IngestionErrorCodeGql.PROVIDER_FAILURE;

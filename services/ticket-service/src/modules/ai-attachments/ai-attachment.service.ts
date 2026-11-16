@@ -12,6 +12,16 @@ import type { MessageAttachment } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
+/**
+ * What a model reads in place of a ticket's description once its opening was
+ * refused (`openingExcludedFromAiContext`): the text that made the model refuse
+ * never leads a later prompt, and the line keeps the model from guessing what
+ * the ticket is about. Agents still see the description; only the model's
+ * input changes.
+ */
+export const OPENING_WITHHELD =
+  "(The ticket's opening message was withheld from the assistant.)";
+
 /** What was sent, and what was not. */
 export type AiAttachments = {
   parts: AttachmentPart[];

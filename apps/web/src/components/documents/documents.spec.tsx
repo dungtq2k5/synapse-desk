@@ -436,6 +436,7 @@ describe('one document', () => {
 
   for (const code of [
     'TOO_LONG',
+    'TOO_LARGE_WHEN_OPENED',
     'NO_READABLE_TEXT',
     'OCR_UNAVAILABLE',
   ] as const) {

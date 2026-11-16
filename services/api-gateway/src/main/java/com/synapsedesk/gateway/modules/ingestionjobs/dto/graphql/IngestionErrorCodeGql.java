@@ -6,5 +6,6 @@ public enum IngestionErrorCodeGql {
   OCR_UNAVAILABLE,
   OTHER,
   PROVIDER_FAILURE,
+  TOO_LARGE_WHEN_OPENED,
   TOO_LONG,
 }

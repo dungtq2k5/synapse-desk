@@ -509,6 +509,8 @@ const ingestionErrorCode = enumBridge<
   {
     [IngestionErrorCode.TOO_LONG]:
       ProtoIngestionErrorCode.INGESTION_ERROR_CODE_TOO_LONG,
+    [IngestionErrorCode.TOO_LARGE_WHEN_OPENED]:
+      ProtoIngestionErrorCode.INGESTION_ERROR_CODE_TOO_LARGE_WHEN_OPENED,
     [IngestionErrorCode.NO_READABLE_TEXT]:
       ProtoIngestionErrorCode.INGESTION_ERROR_CODE_NO_READABLE_TEXT,
     [IngestionErrorCode.OCR_UNAVAILABLE]:

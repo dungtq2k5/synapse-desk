@@ -71,7 +71,7 @@ public class IngestionJobResponseDto {
   private String errorLog = null;
 
   /**
-   * Why a `FAILED` attempt failed, as a reader can act on it: too long, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
+   * Why a `FAILED` attempt failed, as a reader can act on it: too long, too large when opened, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
    */
   public enum ErrorCodeEnum {
     NO_READABLE_TEXT("NO_READABLE_TEXT"),
@@ -81,6 +81,8 @@ public class IngestionJobResponseDto {
     OTHER("OTHER"),
 
     PROVIDER_FAILURE("PROVIDER_FAILURE"),
+
+    TOO_LARGE_WHEN_OPENED("TOO_LARGE_WHEN_OPENED"),
 
     TOO_LONG("TOO_LONG");
 
@@ -332,7 +334,7 @@ public class IngestionJobResponseDto {
   }
 
   /**
-   * Why a `FAILED` attempt failed, as a reader can act on it: too long, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
+   * Why a `FAILED` attempt failed, as a reader can act on it: too long, too large when opened, no readable text, OCR unavailable, the AI provider failed, or other. `errorLog` stays the detail. `null` on an attempt that hasn't failed.
    * @return errorCode
    */
 

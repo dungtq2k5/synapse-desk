@@ -108,6 +108,8 @@ public class LatestIngestionJobResponseDto {
 
     PROVIDER_FAILURE("PROVIDER_FAILURE"),
 
+    TOO_LARGE_WHEN_OPENED("TOO_LARGE_WHEN_OPENED"),
+
     TOO_LONG("TOO_LONG");
 
     private final String value;

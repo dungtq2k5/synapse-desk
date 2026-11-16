@@ -38,6 +38,7 @@ class IngestionErrorCode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     INGESTION_ERROR_CODE_OCR_UNAVAILABLE: _ClassVar[IngestionErrorCode]
     INGESTION_ERROR_CODE_PROVIDER_FAILURE: _ClassVar[IngestionErrorCode]
     INGESTION_ERROR_CODE_OTHER: _ClassVar[IngestionErrorCode]
+    INGESTION_ERROR_CODE_TOO_LARGE_WHEN_OPENED: _ClassVar[IngestionErrorCode]
 
 class IngestionStage(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -104,6 +105,7 @@ INGESTION_ERROR_CODE_NO_READABLE_TEXT: IngestionErrorCode
 INGESTION_ERROR_CODE_OCR_UNAVAILABLE: IngestionErrorCode
 INGESTION_ERROR_CODE_PROVIDER_FAILURE: IngestionErrorCode
 INGESTION_ERROR_CODE_OTHER: IngestionErrorCode
+INGESTION_ERROR_CODE_TOO_LARGE_WHEN_OPENED: IngestionErrorCode
 INGESTION_STAGE_UNSPECIFIED: IngestionStage
 INGESTION_STAGE_PARSING: IngestionStage
 INGESTION_STAGE_CHUNKING: IngestionStage

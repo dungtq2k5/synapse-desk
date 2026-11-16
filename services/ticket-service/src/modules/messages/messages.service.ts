@@ -48,7 +48,10 @@ import { isUniqueConstraintViolation, exceedsLimit } from '@synapsedesk/core';
 import { formatErrorMsg, requireActor } from '@synapsedesk/nest-common';
 import { editWindowEnd } from '../../common/utils/edit-window';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
+import {
+  AiAttachmentService,
+  OPENING_WITHHELD,
+} from '../ai-attachments/ai-attachment.service';
 import { isAtCap, isDraftRefusal } from '../ai-client/refusal';
 import {
   recordInboundEmail,
@@ -1039,11 +1042,18 @@ export class MessagesService {
       if (history.length < AI_REPLY_TRANSCRIPT_TURNS) {
         const opening = await this.prisma.ticket.findUnique({
           where: { id: ticketId },
-          select: { description: true, authorId: true },
+          select: {
+            description: true,
+            authorId: true,
+            openingExcludedFromAiContext: true,
+          },
         });
         if (opening?.description) {
           history.unshift({
-            content: opening.description,
+            // A refused opening's text never leads a later transcript.
+            content: opening.openingExcludedFromAiContext
+              ? OPENING_WITHHELD
+              : opening.description,
             senderId: opening.authorId,
             isAiGenerated: false,
           });
