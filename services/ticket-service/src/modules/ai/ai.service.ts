@@ -18,7 +18,10 @@ import {
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { isDraftRefusal } from '../ai-client/refusal';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
+import {
+  AiAttachmentService,
+  OPENING_WITHHELD,
+} from '../ai-attachments/ai-attachment.service';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -294,7 +297,11 @@ export class AiService {
     const classification = await this.rag.classifyTicket(
       ticket.id,
       ticket.title,
-      ticket.description ?? '',
+      // A refused opening's text never reaches a model: the title alone, and
+      // the neutral line in its place.
+      ticket.openingExcludedFromAiContext
+        ? OPENING_WITHHELD
+        : (ticket.description ?? ''),
       // The candidate departments travel WITH the request: rag-service cannot
       // see postgres_auth, and a suggestion naming a department that does not
       // exist is worse than no suggestion.
