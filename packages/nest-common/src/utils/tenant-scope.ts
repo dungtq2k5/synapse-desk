@@ -29,6 +29,9 @@ export type TenantScope = {
  *     confirms the row exists, turning id enumeration into a membership oracle.
  */
 export function tenantScope(context: CallerContext): TenantScope {
+  // A person only: row visibility can turn on who is asking (a ticket's
+  // author, a document's departments), and a background job is nobody. A job
+  // that needs its tenant reads it through `requireTenant`.
   if (!hasIdentity(context)) {
     // Reached when an RPC that needs an identity was called without one — i.e.
     // the gateway route is missing JwtAuthGuard. Failing here is the last line
@@ -65,7 +68,7 @@ export function tenantScope(context: CallerContext): TenantScope {
  * shared helper returning `string | undefined` would let them do by accident.
  */
 export function requireTenant(context: CallerContext): string {
-  if (!hasIdentity(context)) {
+  if (!hasCaller(context)) {
     throw new RpcException({
       code: status.UNAUTHENTICATED,
       message: 'This operation requires an authenticated caller',
@@ -82,6 +85,15 @@ export function requireTenant(context: CallerContext): string {
   return context.organizationId;
 }
 
+/**
+ * Someone `requireTenant` can name a tenant for: a signed-in user, or a
+ * background job acting for its tenant (`systemContext()`). `tenantScope` and
+ * `requireActor` take only a user.
+ */
+function hasCaller(context: CallerContext): boolean {
+  return hasIdentity(context) || context.isSystem === true;
+}
+
 /** The actor id for `created_by` / `deleted_by` / audit stamping. */
 export function requireActor(context: CallerContext): string {
   if (!hasIdentity(context)) {
@@ -92,4 +104,17 @@ export function requireActor(context: CallerContext): string {
   }
 
   return context.sub;
+}
+
+/**
+ * The actor id, or `null` for a background job (`systemContext()`, carried as
+ * `is_system`). For the few checks a job legitimately reaches, such as
+ * storage's export upload; everywhere else `requireActor` refuses a job.
+ *
+ * @example requireActorOrSystem(systemContext(orgId)) // null
+ */
+export function requireActorOrSystem(context: CallerContext): string | null {
+  if (context.isSystem) return null;
+
+  return requireActor(context);
 }
