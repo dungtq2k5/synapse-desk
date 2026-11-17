@@ -196,7 +196,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
     // Hash before opening the transaction: bcrypt is deliberately slow and
     // CPU-bound, and holding a pooled connection open across it is wasteful.
-    const superAdminPasswordHash = await this.hashSuperAdminPassword();
+    // And only when the account is about to be created: once it exists,
+    // `SUPER_ADMIN_PASSWORD` isn't read at all and may be removed.
+    const superAdminPasswordHash = (await this.superAdminExists())
+      ? null
+      : await this.hashSuperAdminPassword();
 
     const summary = await this.prisma.$transaction(
       async (tx) => {
@@ -302,14 +306,29 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * Returns the hash for a *potential* Super Admin creation. Computed
-   * unconditionally because the existence check happens inside the transaction;
-   * it is simply discarded when the account is already there.
+   * Whether the bootstrap Super Admin exists: the same lookup
+   * `findOrCreateSuperAdmin` makes inside the transaction, made first so the
+   * password is read only when it will be used.
    */
+  private async superAdminExists(): Promise<boolean> {
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        email: normalizeEmail(
+          this.configService.getOrThrow<string>('SUPER_ADMIN_EMAIL'),
+        ),
+        organizationId: null,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    return existing !== null;
+  }
+
+  /** The hash for the Super Admin about to be created. */
   private async hashSuperAdminPassword(): Promise<string> {
-    const password = this.configService.getOrThrow<string>(
-      'SUPER_ADMIN_PASSWORD',
-    );
+    const password = this.configService.get<string>('SUPER_ADMIN_PASSWORD');
+    if (!password) throw missingSuperAdminPassword();
 
     return bcrypt.hash(
       password,
@@ -685,7 +704,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    */
   private async seedSuperAdmin(
     tx: Prisma.TransactionClient,
-    passwordHash: string,
+    passwordHash: string | null,
   ): Promise<{ id: string; created: boolean; enrolled: boolean }> {
     const { id, created } = await this.findOrCreateSuperAdmin(tx, passwordHash);
     const secret = this.configService.get<string>('SUPER_ADMIN_TOTP_SECRET');
@@ -707,7 +726,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
   private async findOrCreateSuperAdmin(
     tx: Prisma.TransactionClient,
-    passwordHash: string,
+    passwordHash: string | null,
   ): Promise<{ id: string; created: boolean }> {
     const email = normalizeEmail(
       this.configService.getOrThrow<string>('SUPER_ADMIN_EMAIL'),
@@ -721,6 +740,9 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       select: { id: true },
     });
     if (existing) return { id: existing.id, created: false };
+    // Found before the transaction and gone now (deleted between the two
+    // reads): there's no hash to create it with.
+    if (passwordHash === null) throw missingSuperAdminPassword();
 
     const superAdmin = await tx.user.create({
       data: {
@@ -795,4 +817,16 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
     return created;
   }
+}
+
+/**
+ * The first boot needs `SUPER_ADMIN_PASSWORD` to create the Super Admin; every
+ * boot after that runs without it.
+ */
+function missingSuperAdminPassword(): Error {
+  return new Error(
+    'SUPER_ADMIN_PASSWORD is required to create the Super Admin ' +
+      '(SUPER_ADMIN_EMAIL has no account yet). Set it for this boot; it can be ' +
+      'removed once the account exists.',
+  );
 }

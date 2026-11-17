@@ -88,6 +88,17 @@ const documented = (content) => {
  */
 const BUILD_INJECTED = new Set(['APP_VERSION', 'BUILD_SHA', 'BUILD_TIME']);
 
+/**
+ * Secrets needed only on the first boot, each with why: the skeleton marks
+ * them, so an operator knows the value can go afterwards.
+ */
+const FIRST_BOOT_ONLY = new Map([
+  [
+    'SUPER_ADMIN_PASSWORD',
+    'creates the bootstrap Super Admin; delete it once that account exists',
+  ],
+]);
+
 /** Carries a credential. Goes to a Secret, with the value blanked. */
 const SECRET = new Set([
   'DATABASE_URL',
@@ -322,7 +333,14 @@ const render = ({ root, name: service }) => {
     `apiVersion: v1\nkind: Secret\nmetadata:\n  name: ${service}-secret\n` +
     `  labels:\n    app.kubernetes.io/name: ${service}\ntype: Opaque\nstringData:\n` +
     (secrets.length
-      ? secrets.map((key) => `  ${key}: ''\n`).join('')
+      ? secrets
+          .map(
+            (key) =>
+              (FIRST_BOOT_ONLY.has(key)
+                ? `  # First boot only: ${FIRST_BOOT_ONLY.get(key)}.\n`
+                : '') + `  ${key}: ''\n`,
+          )
+          .join('')
       : '  {}\n');
 
   return { configMap, secret };
