@@ -522,7 +522,7 @@
       "summary": "Mark a quality flag replaced"
     },
     "POST /api/v1/documents/presign": {
-      "summary": "{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }"
+      "summary": "{ contentType, sizeBytes, fileName, replaceDocumentId? } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }"
     },
     "POST /api/v1/documents/{id}/reindex": {
       "summary": "Reindex"
@@ -1313,6 +1313,9 @@
     },
     "PresignDocumentDto.contentType": {
       "description": "The document's MIME type. Must be one the parser accepts."
+    },
+    "PresignDocumentDto.replaceDocumentId": {
+      "description": "The document this upload will replace, for a replace's presign. It isn't\ncharged against the document limit, and its pending file (which the\nreplace supersedes) leaves the storage total. Requires\n`document.update`; an id the caller can't update answers 404, like a\nmissing document."
     },
     "PreviewInvitationsResponseDto.seatOverrun": {
       "description": "Non-zero means the batch would be partially rejected at commit time."

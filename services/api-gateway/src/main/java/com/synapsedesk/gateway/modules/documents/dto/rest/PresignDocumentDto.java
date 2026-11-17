@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -61,6 +62,8 @@ public class PresignDocumentDto {
   private BigDecimal sizeBytes;
 
   private String fileName;
+
+  private @Nullable UUID replaceDocumentId;
 
   public PresignDocumentDto() {
     super();
@@ -145,6 +148,31 @@ public class PresignDocumentDto {
     this.fileName = fileName;
   }
 
+  public PresignDocumentDto replaceDocumentId(
+    @Nullable UUID replaceDocumentId
+  ) {
+    this.replaceDocumentId = replaceDocumentId;
+    return this;
+  }
+
+  /**
+   * The document this upload will replace, for a replace's presign: not
+   * charged against the document limit, and its pending file leaves the
+   * storage total. Requires `document.update`; an id the caller can't update
+   * answers 404, like a missing document.
+   * @return replaceDocumentId
+   */
+  @Valid
+  @JsonProperty("replaceDocumentId")
+  public @Nullable UUID getReplaceDocumentId() {
+    return replaceDocumentId;
+  }
+
+  @JsonProperty("replaceDocumentId")
+  public void setReplaceDocumentId(@Nullable UUID replaceDocumentId) {
+    this.replaceDocumentId = replaceDocumentId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -157,13 +185,17 @@ public class PresignDocumentDto {
     return (
       Objects.equals(this.contentType, presignDocumentDto.contentType) &&
       Objects.equals(this.sizeBytes, presignDocumentDto.sizeBytes) &&
-      Objects.equals(this.fileName, presignDocumentDto.fileName)
+      Objects.equals(this.fileName, presignDocumentDto.fileName) &&
+      Objects.equals(
+        this.replaceDocumentId,
+        presignDocumentDto.replaceDocumentId
+      )
     );
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(contentType, sizeBytes, fileName);
+    return Objects.hash(contentType, sizeBytes, fileName, replaceDocumentId);
   }
 
   @Override
@@ -177,6 +209,9 @@ public class PresignDocumentDto {
       .append(toIndentedString(sizeBytes))
       .append("\n");
     sb.append("    fileName: ").append(toIndentedString(fileName)).append("\n");
+    sb.append("    replaceDocumentId: ")
+      .append(toIndentedString(replaceDocumentId))
+      .append("\n");
     sb.append("}");
     return sb.toString();
   }

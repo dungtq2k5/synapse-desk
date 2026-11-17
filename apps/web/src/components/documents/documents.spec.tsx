@@ -540,6 +540,44 @@ describe('one document', () => {
     ).toBeInTheDocument();
   });
 
+  it('a replace presigns as that document’s replace', async () => {
+    // The id is what lets a replace through at the document limit and keeps a
+    // failed update's pending file out of the total.
+    const { user, calls } = show(<DocumentView documentId="d1" />, MANAGER, {
+      'GET /api/v1/documents/d1': ok(doc({ status: 'FAILED', chunkCount: 0 })),
+      'GET /api/v1/documents/d1/ingestion-jobs': page([
+        job({
+          status: 'FAILED',
+          errorCode: 'NO_READABLE_TEXT',
+          failedStage: 'PARSING',
+        }),
+      ]),
+      'POST /api/v1/documents/presign': fail(
+        402,
+        'Your document storage is full. New uploads will be refused until space is freed or your plan is changed.',
+      ),
+    });
+
+    const alert = await screen.findByRole('alert');
+    await user.click(
+      within(alert).getByRole('button', { name: 'Replace file' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.upload(
+      dialog.querySelector('input[type="file"]') as HTMLInputElement,
+      new File(['%PDF'], 'Policy v2.pdf', { type: 'application/pdf' }),
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Replace file' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        calls.find((call) => call.url.endsWith('/documents/presign'))?.body,
+      ).toMatchObject({ fileName: 'Policy v2.pdf', replaceDocumentId: 'd1' }),
+    );
+  });
+
   it('a failure stops the stepper at its stage and says it plainly, with only the actions that help', async () => {
     show(<DocumentView documentId="d1" />, MANAGER, {
       'GET /api/v1/documents/d1': ok(doc({ status: 'FAILED', chunkCount: 0 })),

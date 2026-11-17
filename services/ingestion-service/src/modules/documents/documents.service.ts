@@ -1,3 +1,4 @@
+import { STORED_BYTES_SUM, storedBytes } from './stored-bytes';
 import { ConfigService } from '@nestjs/config';
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
@@ -161,7 +162,16 @@ export class DocumentsService {
     // refused for the cost of a comparison.
     this.assertUploadable(request.contentType, request.sizeBytes);
 
-    const [limitBytes, usedBytes, sizeLimitBytes, countLimit, documentCount] =
+    // A replace's presign names the document it will replace. That document
+    // isn't charged against the count limit (a replace adds none), and its
+    // pending file leaves the storage total: the replace's confirm
+    // supersedes it. Its live file stays counted until the swap.
+    const replacing =
+      request.replaceDocumentId === undefined
+        ? null
+        : await this.replaceTarget(request.replaceDocumentId, context);
+
+    const [limitBytes, storedNow, sizeLimitBytes, countLimit, documentCount] =
       await Promise.all([
         this.authReference.getStorageLimitBytes(context),
         this.usedBytes(organizationId),
@@ -169,6 +179,7 @@ export class DocumentsService {
         this.authReference.getDocumentCountLimit(context),
         this.documentCount(organizationId),
       ]);
+    const usedBytes = storedNow - Number(replacing?.pendingFileSizeBytes ?? 0n);
 
     // The TENANT ceiling, which needed a read. Separate from the storage quota
     // beside it and separate from the platform check above: this one is "your
@@ -202,7 +213,7 @@ export class DocumentsService {
     // `+ 1` because the question is whether THIS upload fits, not whether the
     // tenant is already at the limit — at exactly the limit the next one is the
     // one to refuse.
-    if (exceedsLimit(documentCount + 1, countLimit)) {
+    if (!replacing && exceedsLimit(documentCount + 1, countLimit)) {
       // 402, for the storage refusal's reasons above.
       throw new RpcException({
         code: status.RESOURCE_EXHAUSTED,
@@ -236,12 +247,14 @@ export class DocumentsService {
       usedBytes + request.sizeBytes,
       limitBytes,
     );
-    void this.limitAlerts.evaluate(
-      organizationId,
-      'documents',
-      documentCount + 1,
-      countLimit,
-    );
+    if (!replacing) {
+      void this.limitAlerts.evaluate(
+        organizationId,
+        'documents',
+        documentCount + 1,
+        countLimit,
+      );
+    }
 
     // A per-upload NONCE, and not the id the row will have — `confirmDocument`
     // lets Postgres generate that, so the two never match. Tempting to read it
@@ -308,6 +321,12 @@ export class DocumentsService {
       context,
     );
     this.assertUploadable(confirmed.contentType, confirmed.sizeBytes);
+    await this.assertFitsAtConfirm(
+      organizationId,
+      context,
+      request.objectPath,
+      confirmed.sizeBytes,
+    );
 
     // Hashed from the PATH, not the bytes.
     //
@@ -1258,6 +1277,63 @@ export class DocumentsService {
   }
 
   /**
+   * The presign's count and storage checks, run again at a new document's
+   * confirm with the size storage confirmed.
+   *
+   * A presign that named a document to replace skipped the count, so an upload
+   * presigned "as a replace" and confirmed as a new document would add one
+   * past the limit; this is where that's refused. It also closes the window
+   * between two presigns that each fit alone. A refused upload is superseded:
+   * no row will ever reference it.
+   */
+  private async assertFitsAtConfirm(
+    organizationId: string,
+    context: CallerContext,
+    objectPath: string,
+    sizeBytes: number,
+  ): Promise<void> {
+    const [limitBytes, usedBytes, countLimit, documentCount] =
+      await Promise.all([
+        this.authReference.getStorageLimitBytes(context),
+        this.usedBytes(organizationId),
+        this.authReference.getDocumentCountLimit(context),
+        this.documentCount(organizationId),
+      ]);
+    const refusal = exceedsLimit(usedBytes + sizeBytes, limitBytes)
+      ? STORAGE_FULL_MESSAGE
+      : exceedsLimit(documentCount + 1, countLimit)
+        ? DOCUMENT_LIMIT_MESSAGE
+        : null;
+    if (refusal === null) return;
+
+    this.storage.emitSuperseded(objectPath, SupersededReason.RECORD_DELETED);
+    throw new RpcException({
+      code: status.RESOURCE_EXHAUSTED,
+      message: withHttpStatus(402, refusal),
+    });
+  }
+
+  /**
+   * The document a replace's presign names, checked as a read: this tenant,
+   * visible to the caller, and a caller who may update documents. Every
+   * failure answers exactly as a missing document does, so the id can't
+   * probe.
+   */
+  private async replaceTarget(documentId: string, context: CallerContext) {
+    if (
+      !context.isSuperAdmin &&
+      !context.permissionCodes.includes('document.update')
+    ) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No document with that id',
+      });
+    }
+
+    return this.load(documentId, context);
+  }
+
+  /**
    * Live documents for one tenant.
    *
    * `deletedAt: null`, so a soft-deleted document frees a slot — the count
@@ -1270,14 +1346,19 @@ export class DocumentsService {
     });
   }
 
-  /** `SUM(file_size_bytes)` over the tenant's LIVE documents. */
+  /**
+   * What the tenant's live (not soft-deleted) documents hold: each one's
+   * file, plus the file a replace left pending. A pending file is stored and
+   * billed until its version goes live or a later replace supersedes it, and
+   * a failed update keeps it (so Retry can run it), so it counts.
+   */
   private async usedBytes(organizationId: string): Promise<number> {
     const result = await this.prisma.document.aggregate({
       where: { organizationId, deletedAt: null },
-      _sum: { fileSizeBytes: true },
+      _sum: STORED_BYTES_SUM,
     });
 
-    return Number(result._sum.fileSizeBytes ?? 0n);
+    return storedBytes(result._sum);
   }
 
   private assertUploadable(contentType: string, sizeBytes: number): void {

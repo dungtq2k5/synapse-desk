@@ -50,6 +50,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
 import { faultInjector } from '@synapsedesk/testing/fault';
+import { PlatformUsageService } from '../../src/modules/platform/platform.service';
 
 /**
  * A plan-limit refusal: `RESOURCE_EXHAUSTED` carrying the `[http:402]` marker
@@ -1308,6 +1309,144 @@ describe('Documents (e2e)', () => {
         documents.reindexDocument({ id: scoped.id }, outsider()),
         status.NOT_FOUND,
       );
+    });
+  });
+
+  describe('a pending file and the storage quota', () => {
+    /** An indexed 1,000-byte document whose 4,000-byte replacement failed. */
+    const failedUpdate = async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        fileSizeBytes: BigInt(1000),
+      });
+      return fx.prisma.document.update({
+        where: { id: document.id },
+        data: {
+          pendingFileUrl: `organizations/${tenant.organizationId}/documents/${document.id}/new.pdf`,
+          pendingFileType: 'pdf',
+          pendingFileSizeBytes: BigInt(4000),
+          pendingFileHash: 'd'.repeat(64),
+        },
+      });
+    };
+
+    it('**a failed update’s pending file counts**, and refuses an upload that fits without it', async () => {
+      await failedUpdate();
+      getStorageLimitBytes.mockResolvedValue(6000);
+
+      const usage = await documents.getStorageUsage(manager());
+      expect(usage.usedBytes).toBe(5000);
+
+      // 1,000 + 1,500 fits; 5,000 + 1,500 doesn't.
+      await expectRpc(
+        documents.presignDocument(
+          presignRequest({ sizeBytes: 1500 }),
+          manager(),
+        ),
+        status.RESOURCE_EXHAUSTED,
+      );
+    });
+
+    it('the platform console’s usage matches getStorageUsage', async () => {
+      await failedUpdate();
+
+      const usage = await documents.getStorageUsage(manager());
+      const platform = await fx.moduleRef
+        .get(PlatformUsageService)
+        .getPlatformUsage({ organizationIds: [tenant.organizationId] });
+
+      expect(platform.usage[0].usedBytes).toBe(usage.usedBytes);
+    });
+
+    it('**a replace presign after a failed update needs room for the new file only**', async () => {
+      const document = await failedUpdate();
+      getStorageLimitBytes.mockResolvedValue(6000);
+
+      // Without the id: 5,000 + 4,500 > 6,000.
+      await expectRpc(
+        documents.presignDocument(
+          presignRequest({ sizeBytes: 4500 }),
+          manager(),
+        ),
+        status.RESOURCE_EXHAUSTED,
+      );
+      // As that document's replace: its pending 4,000 is superseded at the
+      // confirm, so 1,000 + 4,500 fits. The live file still counts.
+      await expect(
+        documents.presignDocument(
+          presignRequest({ sizeBytes: 4500, replaceDocumentId: document.id }),
+          manager(),
+        ),
+      ).resolves.toMatchObject({ uploadUrl: expect.any(String) });
+    });
+
+    it('**at the document limit, a replace presigns and a new upload does not**', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      getDocumentCountLimit.mockResolvedValue(1);
+
+      await expectRpc(
+        documents.presignDocument(presignRequest(), manager()),
+        status.RESOURCE_EXHAUSTED,
+      );
+      await expect(
+        documents.presignDocument(
+          presignRequest({ replaceDocumentId: document.id }),
+          manager(),
+        ),
+      ).resolves.toMatchObject({ uploadUrl: expect.any(String) });
+    });
+
+    it('**presigned as a replace, confirmed as a new document: refused**, and the object superseded', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      getDocumentCountLimit.mockResolvedValue(1);
+      const presigned = await documents.presignDocument(
+        presignRequest({ replaceDocumentId: document.id }),
+        manager(),
+      );
+
+      await expectRpc(
+        documents.confirmDocument(
+          confirmRequest({ objectPath: presigned.objectPath }),
+          manager(),
+        ),
+        status.RESOURCE_EXHAUSTED,
+      );
+      expect(await fx.prisma.document.count()).toBe(1);
+      expect(emitSuperseded).toHaveBeenCalledWith(
+        presigned.objectPath,
+        SupersededReason.RECORD_DELETED,
+      );
+    });
+
+    it('**another tenant’s id, or a caller who can’t update, answers like a missing document**', async () => {
+      const other = await createDocument(fx.prisma, buildTenant(), {
+        status: DocumentStatus.INDEXED,
+      });
+      const mine = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      const refusal = (replaceDocumentId: string, context = manager()) =>
+        documents
+          .presignDocument(presignRequest({ replaceDocumentId }), context)
+          .then(
+            () => null,
+            (error: RpcException) => error.getError(),
+          );
+      const uploader = memberContext(
+        { id: tenant.userId, organizationId: tenant.organizationId },
+        ['document.create'],
+        { departmentIds: [tenant.departmentId] },
+      );
+
+      const missing = await refusal(randomUUID());
+      expect(missing).toMatchObject({ code: status.NOT_FOUND });
+      expect(await refusal(other.id)).toEqual(missing);
+      expect(await refusal(mine.id, uploader)).toEqual(missing);
+      expect(presignDocument).not.toHaveBeenCalled();
     });
   });
 

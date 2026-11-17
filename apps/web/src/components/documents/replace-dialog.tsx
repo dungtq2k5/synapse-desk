@@ -108,6 +108,9 @@ function ReplaceForm({
           contentType: checked.contentType,
           sizeBytes: file.size,
           fileName: file.name,
+          // A replace: not charged to the document limit, and this
+          // document's pending file (if an update failed) leaves the total.
+          replaceDocumentId: document.id,
         })
       ).data;
       await sendFile(signed.uploadUrl, signed.uploadMethod, file, setPercent);

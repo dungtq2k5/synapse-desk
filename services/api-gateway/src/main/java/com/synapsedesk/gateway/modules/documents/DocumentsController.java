@@ -540,15 +540,24 @@ public class DocumentsController {
     consumes = { "application/json" }
   )
   @ApiErrors(
-    value = { "400", "401", "402", "403" },
-    descriptions = @ApiErrors.Description(
-      status = "402",
-      value = "A plan limit: the organization's document storage is full, or it " +
-        "holds its plan's document count. `error` is the sentence to show " +
-        "(\"Your document storage is full. …\" or \"You have reached the " +
-        "document limit on your plan. …\"). A file over the organization's " +
-        "size limit is a 400; the rate limit stays a 429."
-    )
+    value = { "400", "401", "402", "403", "404" },
+    descriptions = {
+      @ApiErrors.Description(
+        status = "402",
+        value = "A plan limit: the organization's document storage is full, or it " +
+          "holds its plan's document count. `error` is the sentence to show " +
+          "(\"Your document storage is full. …\" or \"You have reached the " +
+          "document limit on your plan. …\"). A file over the organization's " +
+          "size limit is a 400; the rate limit stays a 429. A replace " +
+          "(`replaceDocumentId`) is never refused for the document count."
+      ),
+      @ApiErrors.Description(
+        status = "404",
+        value = "`replaceDocumentId` names no document this caller can update, " +
+          "including another organization's: indistinguishable from a " +
+          "missing one."
+      ),
+    }
   )
   @RequirePermission(PermissionCodesEnum.DOCUMENT_CREATE)
   public ResponseEntity<
@@ -558,12 +567,16 @@ public class DocumentsController {
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
+    PresignDocumentRequest.Builder presign = PresignDocumentRequest.newBuilder()
+      .setContentType(presignDocumentDto.getContentType().getValue())
+      .setSizeBytes(presignDocumentDto.getSizeBytes().longValue())
+      .setFileName(presignDocumentDto.getFileName());
+    UUID replaceDocumentId = presignDocumentDto.getReplaceDocumentId();
+    if (replaceDocumentId != null) {
+      presign.setReplaceDocumentId(replaceDocumentId.toString());
+    }
     PresignDocumentResponse response = withMetadata(context).presignDocument(
-      PresignDocumentRequest.newBuilder()
-        .setContentType(presignDocumentDto.getContentType().getValue())
-        .setSizeBytes(presignDocumentDto.getSizeBytes().longValue())
-        .setFileName(presignDocumentDto.getFileName())
-        .build()
+      presign.build()
     );
 
     return ResponseEntity.ok(

@@ -186,6 +186,11 @@ message PresignDocumentRequest {
   string content_type = 1;
   int64 size_bytes = 2;
   string file_name = 3;
+  // The document this upload will replace, when it's a replace: the count
+  // limit then isn't charged, and that document's pending file (which the
+  // replace supersedes) leaves the storage total. Checked as a read; an id
+  // that fails answers NOT_FOUND, like a missing one.
+  optional string replace_document_id = 4;
 }
 
 message PresignDocumentResponse {
