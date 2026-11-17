@@ -6,6 +6,7 @@ import {
   AiGenerationStatus,
   AiSurface,
   DOCUMENT_PATTERNS,
+  DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
@@ -17,6 +18,7 @@ import {
   MAX_CHUNKS_PER_DOCUMENT,
   QDRANT_UPSERT_BATCH,
   RESUMABLE_INGESTION_STATUSES,
+  SupersededReason,
   TERMINAL_INGESTION_STATUSES,
   estimateCostMicros,
   parseOcrLanguages,
@@ -352,7 +354,7 @@ export class IngestionProcessor {
       // Once more before the swap: a cancellation that landed while the
       // batches were embedding stops here, and the live version stays.
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
-      await this.swap(documentId, organizationId);
+      await this.swap(documentId, organizationId, data.objectPath);
 
       // **After chunking, because that is where the SECOND drop happens** —
       // `document-chunker.service.ts` discards any chunk under
@@ -683,23 +685,75 @@ export class IngestionProcessor {
    * Each half works by filter on the document, deleting only live data and
    * flipping only staged data, so a re-run converges from a crash between
    * them: the purge skips live data, and the next swap repeats both halves.
+   *
+   * **And the file follows the version.** When this run built a replace's
+   * pending file (`objectPath`), the same transaction makes that file the
+   * live one and resolves the old version's open flags as
+   * `DOCUMENT_REPLACED`; the old file is superseded after the commit. A run
+   * over the live file (a reindex) moves nothing.
    */
-  private async swap(documentId: string, organizationId: string) {
+  private async swap(
+    documentId: string,
+    organizationId: string,
+    objectPath: string,
+  ) {
     // Read again rather than reused from `stageChunks`: a scope change while
     // the batches were embedding reached the rows, not the points of a batch
     // upserted after it. Both halves stamp it.
     const scope = await this.readScope(documentId);
     await this.qdrant.swapDocumentPoints(documentId, organizationId, scope);
 
-    await this.prisma.$transaction([
-      this.prisma.documentChunk.deleteMany({
+    const replaced = await this.prisma.$transaction(async (tx) => {
+      await tx.documentChunk.deleteMany({
         where: { documentId, isStaged: false },
-      }),
-      this.prisma.documentChunk.updateMany({
+      });
+      await tx.documentChunk.updateMany({
         where: { documentId, isStaged: true },
         data: { isStaged: false, ...scope },
-      }),
-    ]);
+      });
+
+      const document = await tx.document.findUniqueOrThrow({
+        where: { id: documentId },
+      });
+      if (document.pendingFileUrl !== objectPath) return null;
+
+      await tx.document.update({
+        where: { id: documentId },
+        data: {
+          fileUrl: document.pendingFileUrl,
+          fileType: document.pendingFileType!,
+          fileSizeBytes: document.pendingFileSizeBytes!,
+          fileHash: document.pendingFileHash!,
+          // The file's own date, which `OUTDATED` counts from.
+          fileUpdatedAt: new Date(),
+          pendingFileUrl: null,
+          pendingFileType: null,
+          pendingFileSizeBytes: null,
+          pendingFileHash: null,
+        },
+      });
+      // `resolvedAt: null` guards it: a flag a human already closed keeps
+      // their resolution and comment. Before the new version's own flags,
+      // which `reportMissingPages` raises after this.
+      await tx.documentFlag.updateMany({
+        where: { documentId, resolvedAt: null },
+        data: {
+          resolvedAt: new Date(),
+          resolution: DocumentFlagResolution.DOCUMENT_REPLACED,
+          // NULL: nobody decided these individually; the resolution says
+          // what closed them.
+          resolvedById: null,
+        },
+      });
+
+      return document.fileUrl;
+    });
+
+    // After the commit: an event a rollback erases is one no consumer can
+    // un-handle, and here it would delete the file still answering.
+    if (replaced) {
+      this.storage.emitSuperseded(replaced, SupersededReason.REPLACED);
+    }
   }
 
   /** The scope columns a chunk copies from its document, beside its tenant. */

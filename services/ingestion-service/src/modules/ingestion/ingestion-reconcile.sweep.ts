@@ -61,7 +61,13 @@ type StuckJob = {
   organizationId: string;
   documentId: string;
   bullmqJobId: string;
-  document: { fileUrl: string; fileType: string; ocrLanguages: string[] };
+  document: {
+    fileUrl: string;
+    fileType: string;
+    pendingFileUrl: string | null;
+    pendingFileType: string | null;
+    ocrLanguages: string[];
+  };
 };
 
 /**
@@ -137,7 +143,13 @@ export class IngestionReconcileSweep {
       take: MAX_RECONCILED_PER_RUN,
       include: {
         document: {
-          select: { fileUrl: true, fileType: true, ocrLanguages: true },
+          select: {
+            fileUrl: true,
+            fileType: true,
+            pendingFileUrl: true,
+            pendingFileType: true,
+            ocrLanguages: true,
+          },
         },
       },
     });
@@ -337,8 +349,10 @@ function toJobData(job: StuckJob): IngestionJobData {
     organizationId: job.organizationId,
     documentId: job.documentId,
     ingestionJobId: job.id,
-    objectPath: job.document.fileUrl,
-    fileType: job.document.fileType,
+    // A replace's pending file when there is one: a stuck update re-runs the
+    // new file, never the live one it is meant to replace.
+    objectPath: job.document.pendingFileUrl ?? job.document.fileUrl,
+    fileType: job.document.pendingFileType ?? job.document.fileType,
     // Narrowed here for the same reason the processor narrows it: a code that
     // is not a language must fail the job rather than drop out of `-l` and OCR
     // the document in English.

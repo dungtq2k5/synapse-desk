@@ -1315,7 +1315,10 @@ describe('Documents (e2e)', () => {
     const replacement = (documentId: string) =>
       `organizations/${tenant.organizationId}/documents/${documentId}/${faker.string.uuid()}.pdf`;
 
-    it('1. swaps the file and re-queues, leaving identity alone', async () => {
+    it('1. **holds the new file as PENDING and re-queues; the live file stays**', async () => {
+      // Known gap 72: the file follows the version that answers. Until the
+      // new version is swapped in, Download, citations and the flags keep
+      // describing the live one.
       const document = await createDocument(fx.prisma, tenant, {
         status: DocumentStatus.INDEXED,
         isOrganizationWide: true,
@@ -1336,39 +1339,59 @@ describe('Documents (e2e)', () => {
       const reloaded = await fx.prisma.document.findUniqueOrThrow({
         where: { id: document.id },
       });
-      expect(reloaded.fileUrl).toBe(objectPath);
-      expect(reloaded.fileType).toBe('md');
-      expect(reloaded.fileSizeBytes).toBe(BigInt(4096));
+      expect(reloaded.fileUrl).toBe(document.fileUrl);
+      expect(reloaded.fileType).toBe(document.fileType);
+      expect(reloaded.fileSizeBytes).toBe(document.fileSizeBytes);
+      expect(reloaded.fileHash).toBe(document.fileHash);
+      expect(reloaded.fileUpdatedAt).toEqual(new Date('2025-01-01T00:00:00Z'));
+      expect(reloaded.pendingFileUrl).toBe(objectPath);
+      expect(reloaded.pendingFileType).toBe('md');
+      expect(reloaded.pendingFileSizeBytes).toBe(BigInt(4096));
+      expect(reloaded.pendingFileHash).toMatch(/^[0-9a-f]{64}$/);
       expect(reloaded.ocrLanguages).toEqual(['vi']);
       expect(reloaded.status).toBe(DocumentStatus.PENDING);
       expect(await fx.prisma.ingestionJob.count()).toBe(1);
-      // The new file's date, which OUTDATED's year counts from.
-      expect(Date.now() - reloaded.fileUpdatedAt.getTime()).toBeLessThan(
-        60_000,
-      );
     });
 
-    it('2. **supersedes the OLD path, never the new one**', async () => {
-      // The single-character mistake this guards deletes the file the user
-      // just uploaded, and it deletes it asynchronously, from another service.
+    it('2. **supersedes nothing that answers: only an earlier replace’s file that never went live**', async () => {
       const document = await createDocument(fx.prisma, tenant, {
         status: DocumentStatus.INDEXED,
       });
-      const objectPath = replacement(document.id);
+      const first = replacement(document.id);
+      const second = replacement(document.id);
 
       await documents.replaceDocument(
-        { id: document.id, objectPath, ocrLanguages: [] },
+        { id: document.id, objectPath: first, ocrLanguages: [] },
+        manager(),
+      );
+      expect(emitSuperseded).not.toHaveBeenCalled();
+
+      // A replace while the update runs is refused (one live job per
+      // document), so the second arrives after the first failed, its file
+      // still pending.
+      await fx.prisma.ingestionJob.updateMany({
+        where: { documentId: document.id },
+        data: { status: IngestionJobStatus.FAILED },
+      });
+      await documents.replaceDocument(
+        { id: document.id, objectPath: second, ocrLanguages: [] },
         manager(),
       );
 
+      // Two pending files never exist; the live one is untouched.
       expect(emitSuperseded).toHaveBeenCalledTimes(1);
       expect(emitSuperseded).toHaveBeenCalledWith(
-        document.fileUrl,
+        first,
         SupersededReason.REPLACED,
       );
+      const reloaded = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
+      expect(reloaded.pendingFileUrl).toBe(second);
+      expect(reloaded.fileUrl).toBe(document.fileUrl);
     });
 
-    it('3. **resolves open flags as DOCUMENT_REPLACED**', async () => {
+    it('3. **leaves open flags open: they still describe the live version**', async () => {
       const document = await createDocument(fx.prisma, tenant, {
         status: DocumentStatus.INDEXED,
       });
@@ -1386,12 +1409,29 @@ describe('Documents (e2e)', () => {
       const reloaded = await fx.prisma.documentFlag.findUniqueOrThrow({
         where: { id: flag.id },
       });
-      expect(reloaded.resolution).toBe(
-        DocumentFlagResolution.DOCUMENT_REPLACED,
+      expect(reloaded.resolvedAt).toBeNull();
+      expect(reloaded.resolution).toBeNull();
+    });
+
+    it('3b. **Download opens the live file while an update is pending**', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+
+      await documents.replaceDocument(
+        {
+          id: document.id,
+          objectPath: replacement(document.id),
+          ocrLanguages: [],
+        },
+        manager(),
       );
-      expect(reloaded.resolvedAt).not.toBeNull();
-      // Nobody decided this one individually, so no human is named for it.
-      expect(reloaded.resolvedById).toBeNull();
+      await documents.downloadDocument({ id: document.id }, manager());
+
+      expect(resolveReadUrls).toHaveBeenLastCalledWith(
+        [document.fileUrl],
+        expect.anything(),
+      );
     });
 
     it('4. does NOT overwrite a flag a human already closed', async () => {

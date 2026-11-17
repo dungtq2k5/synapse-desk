@@ -11,6 +11,10 @@ erDiagram
     BigInt file_size_bytes
     String file_hash
     DateTime file_updated_at
+    String pending_file_url "❓"
+    String pending_file_type "❓"
+    BigInt pending_file_size_bytes "❓"
+    String pending_file_hash "❓"
     DateTime conflicts_checked_at "❓"
     Boolean is_organization_wide
     String status
