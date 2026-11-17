@@ -5,6 +5,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { AiClientModule } from '../ai-client/ai-client.module';
+import { StorageClientModule } from '../storage-client/storage-client.module';
 import { OutageRetries } from './outage-retries';
 import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
@@ -28,6 +29,7 @@ import { SchedulerRegistrar } from './scheduler.registrar';
     JobRunsModule,
     // The two clients the hourly retries call ingestion-service through.
     AiClientModule,
+    StorageClientModule,
   ],
   providers: [SchedulerProcessor, SchedulerRegistrar, OutageRetries],
 })

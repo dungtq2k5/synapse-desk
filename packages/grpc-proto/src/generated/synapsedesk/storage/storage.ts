@@ -64,6 +64,18 @@ export interface PresignUploadResponse {
   uploadMethod: string;
 }
 
+export interface SweepPendingUploadsRequest {
+  /**
+   * Objects created longer ago than this are swept. At least the confirm
+   * window (`UPLOAD_URL_TTL_SECONDS`), or INVALID_ARGUMENT.
+   */
+  olderThanSeconds: number;
+}
+
+export interface SweepPendingUploadsResponse {
+  deleted: number;
+}
+
 export interface ConfirmUploadRequest {
   objectPath: string;
   /**
@@ -172,6 +184,17 @@ export interface StorageServiceClient {
   getSignedReadUrls(request: GetSignedReadUrlsRequest, metadata?: Metadata): Observable<GetSignedReadUrlsResponse>;
 
   downloadObject(request: DownloadObjectRequest, metadata?: Metadata): Observable<DownloadObjectChunk>;
+
+  /**
+   * Deletes abandoned uploads under `pending/` older than the given age. Takes
+   * an age, never a path: the pending shapes are fixed inside storage-service,
+   * and an age inside the confirm window is refused.
+   */
+
+  sweepPendingUploads(
+    request: SweepPendingUploadsRequest,
+    metadata?: Metadata,
+  ): Observable<SweepPendingUploadsResponse>;
 }
 
 export interface StorageServiceController {
@@ -196,6 +219,17 @@ export interface StorageServiceController {
   ): Promise<GetSignedReadUrlsResponse> | Observable<GetSignedReadUrlsResponse> | GetSignedReadUrlsResponse;
 
   downloadObject(request: DownloadObjectRequest, metadata?: Metadata): Observable<DownloadObjectChunk>;
+
+  /**
+   * Deletes abandoned uploads under `pending/` older than the given age. Takes
+   * an age, never a path: the pending shapes are fixed inside storage-service,
+   * and an age inside the confirm window is refused.
+   */
+
+  sweepPendingUploads(
+    request: SweepPendingUploadsRequest,
+    metadata?: Metadata,
+  ): Promise<SweepPendingUploadsResponse> | Observable<SweepPendingUploadsResponse> | SweepPendingUploadsResponse;
 }
 
 export function StorageServiceControllerMethods() {
@@ -206,6 +240,7 @@ export function StorageServiceControllerMethods() {
       "ingestFromUrl",
       "getSignedReadUrls",
       "downloadObject",
+      "sweepPendingUploads",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

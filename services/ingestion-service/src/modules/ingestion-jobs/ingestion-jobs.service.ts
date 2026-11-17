@@ -184,7 +184,13 @@ export class IngestionJobsService {
     // soft-deleted, so this read needs no scope of its own.
     const document = await this.prisma.document.findUniqueOrThrow({
       where: { id: source.documentId },
-      select: { fileUrl: true, fileType: true, ocrLanguages: true },
+      select: {
+        fileUrl: true,
+        fileType: true,
+        pendingFileUrl: true,
+        pendingFileType: true,
+        ocrLanguages: true,
+      },
     });
 
     const retry = await this.prisma
@@ -257,8 +263,10 @@ export class IngestionJobsService {
       organizationId: retry.organizationId,
       documentId: retry.documentId,
       ingestionJobId: retry.id,
-      objectPath: document.fileUrl,
-      fileType: document.fileType,
+      // A failed or cancelled update keeps its file pending, so Retry
+      // processes the new file again rather than the live one.
+      objectPath: document.pendingFileUrl ?? document.fileUrl,
+      fileType: document.pendingFileType ?? document.fileType,
       ocrLanguages: document.ocrLanguages,
     });
 

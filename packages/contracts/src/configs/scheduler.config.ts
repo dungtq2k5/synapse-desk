@@ -52,7 +52,8 @@ export const SCHEDULED_JOBS = {
   /**
    * ticket-service, hourly. Retries the two calls to ingestion-service that an
    * outage of it would otherwise lose: a confirmed attachment's text
-   * extraction, and a sent draft's outcome.
+   * extraction, and a sent draft's outcome. Then has storage-service delete
+   * abandoned uploads under `pending/`, which this service's uploads produce.
    *
    * **Its own job rather than a step on `ANALYTICS_DAILY`**, for the reason
    * `BILLING_SNAPSHOT` gives: the heartbeat is per job, so a retry failing
@@ -175,7 +176,11 @@ export const JOB_SEQUENCES = {
   ],
   [SCHEDULED_JOBS.LEDGER_HOURLY]: ['discarded-draft-sweep', 'quota-reconcile'],
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: ['ticket-rollup'],
-  [SCHEDULED_JOBS.TICKET_HOURLY]: ['attachment-extraction', 'draft-outcomes'],
+  [SCHEDULED_JOBS.TICKET_HOURLY]: [
+    'attachment-extraction',
+    'draft-outcomes',
+    'pending-sweep',
+  ],
   [SCHEDULED_JOBS.AUTH_HOURLY]: ['invitations-expiry'],
   [SCHEDULED_JOBS.AUTH_DAILY]: ['expired-records'],
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: ['billing-snapshot'],

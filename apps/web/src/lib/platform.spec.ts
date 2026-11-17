@@ -79,6 +79,7 @@ describe('jobs', () => {
   it('names jobs and steps, and reads an unknown one as its code', () => {
     expect(jobWords('analytics-daily')).toBe('Analytics rollup, daily');
     expect(jobWords('ai-generation-rollup')).toBe('AI usage rollup');
+    expect(jobWords('pending-sweep')).toBe('Abandoned uploads sweep');
     expect(jobWords('something-new')).toBe('something-new');
   });
 
@@ -92,6 +93,7 @@ describe('jobs', () => {
 
   it('finds a step’s job, and none for a job named after its only step', () => {
     expect(parentOf('ai-generation-rollup')).toBe('ledger-daily');
+    expect(parentOf('pending-sweep')).toBe('ticket-hourly');
     expect(parentOf('billing-snapshot')).toBeNull();
   });
 

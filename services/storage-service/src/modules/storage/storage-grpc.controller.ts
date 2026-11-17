@@ -12,6 +12,8 @@ import {
   IngestFromUrlResponse,
   PresignUploadRequest,
   PresignUploadResponse,
+  SweepPendingUploadsRequest,
+  SweepPendingUploadsResponse,
   StorageServiceController,
   StorageServiceControllerMethods,
   unpackCallerContext,
@@ -19,9 +21,10 @@ import {
 import { StorageService } from './storage.service';
 
 /**
- * Four methods. There is no delete — that is NATS-only, and the absence
- * is expressed in the proto so a contributor cannot add one here without first
- * noticing the contract has none to extend.
+ * No delete by path — that is NATS-only, and the absence is expressed in the
+ * proto so a contributor cannot add one here without first noticing the
+ * contract has none to extend. The one deleting method, `sweepPendingUploads`,
+ * takes an age and removes only abandoned `pending/` uploads.
  */
 @Controller()
 @StorageServiceControllerMethods()
@@ -57,6 +60,13 @@ export class StorageGrpcController implements StorageServiceController {
       request,
       unpackCallerContext(metadata),
     );
+  }
+
+  /** No caller context: it reads no tenant data and answers a count. */
+  sweepPendingUploads(
+    request: SweepPendingUploadsRequest,
+  ): Promise<SweepPendingUploadsResponse> {
+    return this.storage.sweepPendingUploads(request);
   }
 
   /**

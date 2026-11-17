@@ -241,7 +241,7 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
     it('9. builds the ATTACHMENT path from both owner ids, under `pending/`', async () => {
       // **`pending/` is new**. A presigned object is
       // unreferenced until confirm moves it out, and keeping the two apart is
-      // what makes a lifecycle rule over the prefix safe: before this, an
+      // what makes the pending sweep over the prefix safe: before this, an
       // abandoned upload and a live attachment had identical path shapes.
       //
       // The owner ids are still both there and still in the same order — the
@@ -764,8 +764,8 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
  *
  * **The prefix is the point, not the move.** `confirmUpload` never relocated
  * anything, so a live attachment on a real ticket had the same path shape as
- * one somebody uploaded and abandoned — and "add a bucket lifecycle rule",
- * which is the obvious answer to orphaned objects, would have deleted both.
+ * one somebody uploaded and abandoned — and a sweep of orphaned objects,
+ * the obvious answer to them, would have deleted both.
  *
  * The rule itself is bucket configuration the emulator does not run, so it
  * cannot be tested here. **What can be tested is the invariant that makes it
@@ -858,8 +858,8 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
   });
 
   it('1. **after confirm, nothing remains under `pending/`**', async () => {
-    // The invariant the lifecycle rule depends on, and the reason the lifecycle rule is a
-    // code change rather than a console change.
+    // The invariant the pending sweep depends on: only an unconfirmed upload
+    // is ever under `pending/`.
     const presigned = await presign();
     await fx.firebase.bucket
       .file(presigned.objectPath)
@@ -955,8 +955,8 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
     //
     // Refusing there would report the opposite of what happened: "no object was
     // uploaded" for an upload that landed and was committed. And the residue
-    // sits OUTSIDE `pending/`, where the lifecycle rule can never reach it —
-    // precisely the unsweepable orphan the lifecycle rule exists to prevent, arriving
+    // sits OUTSIDE `pending/`, where the pending sweep can never reach it —
+    // precisely the unsweepable orphan the sweep exists to prevent, arriving
     // through a narrower door.
     const presigned = await presign();
     await fx.firebase.bucket
@@ -1455,6 +1455,66 @@ describe('Ingesting an object from a URL (e2e)', () => {
         ),
         status.NOT_FOUND,
       );
+    });
+  });
+
+  describe('the pending sweep (known gap 35)', () => {
+    const exists = async (objectPath: string) =>
+      (await fx.firebase.bucket.file(objectPath).exists())[0];
+    const put = (objectPath: string) =>
+      fx.firebase.bucket
+        .file(objectPath)
+        .save(Buffer.from('x'), { contentType: 'image/png', resumable: false });
+    const sleep = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms));
+
+    it('**deletes only old pending/ uploads**: never a committed object, never a fresh one', async () => {
+      const org = `organizations/${faker.string.uuid()}`;
+      const oldAttachment = `${org}/tickets/t1/attachments/pending/m1/a.png`;
+      const oldOpening = `${org}/ticket-openings/u1/pending/b.png`;
+      const committedAttachment = `${org}/tickets/t1/attachments/m1/c.png`;
+      const committedOpening = `${org}/ticket-openings/u1/d.png`;
+      const freshPending = `${org}/tickets/t1/attachments/pending/e.png`;
+      for (const path of [
+        oldAttachment,
+        oldOpening,
+        committedAttachment,
+        committedOpening,
+      ]) {
+        await put(path);
+      }
+      // An object can't be backdated, so the sweep's clock moves instead:
+      // everything created before `mid` is an hour old at `mid + 1 h`.
+      await sleep(50);
+      const mid = Date.now();
+      await sleep(50);
+      await put(freshPending);
+
+      const result = await storage.sweepPendingUploads(
+        { olderThanSeconds: 3600 },
+        mid + 3600 * 1000,
+      );
+
+      expect(result.deleted).toBe(2);
+      expect(await exists(oldAttachment)).toBe(false);
+      expect(await exists(oldOpening)).toBe(false);
+      expect(await exists(committedAttachment)).toBe(true);
+      expect(await exists(committedOpening)).toBe(true);
+      expect(await exists(freshPending)).toBe(true);
+    });
+
+    it('**refuses an age inside the confirm window**, so a confirmable upload is never swept', async () => {
+      const ttl = fx.moduleRef
+        .get(ConfigService)
+        .getOrThrow<number>('UPLOAD_URL_TTL_SECONDS');
+
+      await expectRpc(
+        storage.sweepPendingUploads({ olderThanSeconds: ttl - 1 }),
+        status.INVALID_ARGUMENT,
+      );
+      await expect(
+        storage.sweepPendingUploads({ olderThanSeconds: ttl }),
+      ).resolves.toEqual({ deleted: 0 });
     });
   });
 });

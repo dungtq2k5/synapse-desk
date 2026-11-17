@@ -118,6 +118,7 @@ export const JOB_WORDS: Record<string, string> = {
   'ticket-rollup': 'Ticket rollup',
   'attachment-extraction': 'Attachment text retry',
   'draft-outcomes': 'Draft outcomes retry',
+  'pending-sweep': 'Abandoned uploads sweep',
   'chunk-usage-projection': 'Passage usage counts',
   'ai-generation-rollup': 'AI usage rollup',
   'document-flags': 'Document quality flags',

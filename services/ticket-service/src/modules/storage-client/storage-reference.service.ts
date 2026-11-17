@@ -268,6 +268,24 @@ export class StorageReferenceService implements OnModuleInit {
     return resolved[objectPath] ?? null;
   }
 
+  /**
+   * Deletes abandoned uploads under `pending/` older than `olderThanSeconds`,
+   * across tenants (storage-service refuses an age inside the confirm
+   * window). Run by `TICKET_HOURLY`: this service owns both producers,
+   * message attachments and opening files.
+   *
+   * @returns how many were deleted.
+   */
+  async sweepPendingUploads(olderThanSeconds: number): Promise<number> {
+    const response = await firstValueFrom(
+      this.storageService
+        .sweepPendingUploads({ olderThanSeconds })
+        .pipe(timeout(GRPC_DEADLINE_MS)),
+    );
+
+    return response.deleted;
+  }
+
   async confirmUpload(
     objectPath: string,
     context: CallerContext,
@@ -293,7 +311,7 @@ export class StorageReferenceService implements OnModuleInit {
       // **The path storage-service RETURNED, not the one we sent**
       // A confirmed attachment moves out of `pending/`, so the presign
       // path is where the object no longer is — and a row built from it would
-      // point at exactly what the lifecycle rule is about to delete.
+      // point at exactly what the hourly pending sweep is about to delete.
       objectPath: response.objectPath,
       sizeBytes: response.sizeBytes,
       contentType: response.contentType,

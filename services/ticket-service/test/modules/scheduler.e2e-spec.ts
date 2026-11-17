@@ -10,6 +10,8 @@ import {
 import { JobHealthService, JobRunRecorder } from '@synapsedesk/nest-common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
+import { OutageRetries } from '../../src/modules/scheduler/outage-retries';
+import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.registrar';
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
 
@@ -157,6 +159,24 @@ describe('The scheduler (e2e)', () => {
       expect(row.consecutiveFailures).toBe(0);
       expect(row.lastError).toBeNull();
       expect(row.lastDurationMs).not.toBeNull();
+    });
+
+    it('7b. **the hourly run sweeps abandoned uploads with the grace setting**, and records its run (known gap 35)', async () => {
+      const retries = fx.moduleRef.get(OutageRetries);
+      jest.spyOn(retries, 'retryExtractions').mockResolvedValue(0);
+      jest.spyOn(retries, 'retryOutcomes').mockResolvedValue(0);
+      const sweep = jest
+        .spyOn(fx.moduleRef.get(StorageReferenceService), 'sweepPendingUploads')
+        .mockResolvedValue(2);
+
+      await runJob(SCHEDULED_JOBS.TICKET_HOURLY);
+
+      expect(sweep).toHaveBeenCalledWith(3600);
+      const row = await fx.prisma.jobRun.findUniqueOrThrow({
+        where: { jobName: SCHEDULED_JOBS.TICKET_HOURLY },
+      });
+      expect(row.lastSucceededAt).not.toBeNull();
+      expect(row.consecutiveFailures).toBe(0);
     });
 
     it('8. **a failure records the error and KEEPS the previous success**', async () => {

@@ -1653,6 +1653,28 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       expect(await queuedIds()).toEqual([job.id]);
     });
 
+    it('1b. **a stuck update re-queues the PENDING file, not the live one** (known gap 72)', async () => {
+      const job = await stuck();
+      const pending = `organizations/${tenant.organizationId}/documents/${job.documentId}/new.md`;
+      await fx.prisma.document.update({
+        where: { id: job.documentId },
+        data: {
+          pendingFileUrl: pending,
+          pendingFileType: 'md',
+          pendingFileSizeBytes: BigInt(1),
+          pendingFileHash: 'c'.repeat(64),
+        },
+      });
+
+      await sweep.sweep();
+
+      const [queued] = await ingestionQueue.getJobs(['waiting', 'delayed']);
+      expect(queued.data).toMatchObject({
+        objectPath: pending,
+        fileType: 'md',
+      });
+    });
+
     it('2. **leaves a job the queue still holds alone**', async () => {
       // The sweep must not fight a job about to run — `isRunnable` is what
       // tells a stranded QUEUED row from one waiting its turn.

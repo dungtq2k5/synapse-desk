@@ -16,6 +16,7 @@ import {
   MAX_OFFICE_DECOMPRESSED_BYTES,
   UNKNOWN_EXTENSION,
   QDRANT_PAYLOAD_FIELDS,
+  SupersededReason,
 } from '@synapsedesk/contracts';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -32,7 +33,13 @@ import {
   deflateRepeated,
   zipOf,
 } from '../utils';
-import { buildTenant, createDocument, TenantFixture } from '../factories';
+import {
+  buildTenant,
+  createChunks,
+  createDocument,
+  createFlag,
+  TenantFixture,
+} from '../factories';
 import { memberContext } from '../utils/context';
 import { INGESTION_OUTCOMES } from '../../src/common/configs/ingestion.config';
 import { DocumentChunkerService } from '../../src/modules/ingestion/document-chunker.service';
@@ -52,6 +59,8 @@ import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
 import { faultInjector } from '@synapsedesk/testing/fault';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
 import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
+import { IngestionJobsService } from '../../src/modules/ingestion-jobs/ingestion-jobs.service';
+import { IngestionQueueService } from '../../src/modules/ingestion/ingestion-queue.service';
 
 describe('The ingestion pipeline (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
@@ -958,6 +967,144 @@ describe('The ingestion pipeline (e2e)', () => {
       await expect(processor.process(data)).resolves.toBe(
         INGESTION_OUTCOMES.REFUSED,
       );
+    });
+  });
+
+  describe('a replace: the file follows the version that answers (known gap 72)', () => {
+    let emitSuperseded: jest.SpyInstance;
+
+    beforeEach(() => {
+      emitSuperseded = jest
+        .spyOn(fx.moduleRef.get(StorageReferenceService), 'emitSuperseded')
+        .mockReturnValue(undefined);
+    });
+
+    /**
+     * An INDEXED document with three live chunks and an open flag, and a
+     * replace's new file pending: what `replaceDocument` leaves behind.
+     */
+    const replacing = async () => {
+      const data = await queueDocument({ status: DocumentStatus.INDEXED });
+      const document = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: data.documentId },
+      });
+      await createChunks(fx.prisma, document, 3);
+      const flag = await createFlag(fx.prisma, document);
+      const pending = `organizations/${tenant.organizationId}/documents/${document.id}/new.md`;
+      await fx.prisma.document.update({
+        where: { id: document.id },
+        data: {
+          pendingFileUrl: pending,
+          pendingFileType: 'md',
+          pendingFileSizeBytes: BigInt(2048),
+          pendingFileHash: 'b'.repeat(64),
+        },
+      });
+
+      return {
+        data: { ...data, objectPath: pending },
+        document,
+        flag,
+        pending,
+      };
+    };
+
+    const documentOf = (id: string) =>
+      fx.prisma.document.findUniqueOrThrow({ where: { id } });
+
+    it('**at the swap, the pending file goes live, the old one is superseded, the old flags close**', async () => {
+      const { data, document, flag, pending } = await replacing();
+
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.INDEXED,
+      );
+
+      const after = await documentOf(document.id);
+      expect(after.fileUrl).toBe(pending);
+      expect(after.fileType).toBe('md');
+      expect(after.fileSizeBytes).toBe(BigInt(2048));
+      expect(after.fileHash).toBe('b'.repeat(64));
+      expect(after.pendingFileUrl).toBeNull();
+      expect(after.pendingFileType).toBeNull();
+      expect(after.pendingFileSizeBytes).toBeNull();
+      expect(after.pendingFileHash).toBeNull();
+      expect(emitSuperseded).toHaveBeenCalledWith(
+        document.fileUrl,
+        SupersededReason.REPLACED,
+      );
+      const closed = await fx.prisma.documentFlag.findUniqueOrThrow({
+        where: { id: flag.id },
+      });
+      expect(closed.resolution).toBe(DocumentFlagResolution.DOCUMENT_REPLACED);
+      expect(closed.resolvedById).toBeNull();
+    });
+
+    it('**a failed update keeps both files and the old version; Retry runs the new file, and its swap removes the old**', async () => {
+      const { data, document, flag, pending } = await replacing();
+      downloadObject.mockResolvedValueOnce(Buffer.from('tiny', 'utf8'));
+
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
+
+      // The old version, whole: file, chunks and flags. The new file stays
+      // pending, so the page's "Retry to process the new file again" can.
+      const failed = await documentOf(document.id);
+      expect(failed.fileUrl).toBe(document.fileUrl);
+      expect(failed.pendingFileUrl).toBe(pending);
+      expect(
+        await fx.prisma.documentChunk.count({
+          where: { documentId: document.id, isStaged: false },
+        }),
+      ).toBe(3);
+      expect(
+        (
+          await fx.prisma.documentFlag.findUniqueOrThrow({
+            where: { id: flag.id },
+          })
+        ).resolvedAt,
+      ).toBeNull();
+      expect(emitSuperseded).not.toHaveBeenCalled();
+
+      const queue = fx.moduleRef.get(IngestionQueueService);
+      jest.spyOn(queue, 'discard').mockResolvedValue(undefined);
+      const enqueue = jest.spyOn(queue, 'enqueue').mockResolvedValue(undefined);
+      await fx.moduleRef
+        .get(IngestionJobsService)
+        .retryIngestionJob(
+          { id: data.ingestionJobId },
+          memberContext(
+            { id: tenant.userId, organizationId: tenant.organizationId },
+            ['document.read', 'document.reindex'],
+            { departmentIds: [tenant.departmentId] },
+          ),
+        );
+
+      const retried = enqueue.mock.calls[0][0];
+      expect(retried.objectPath).toBe(pending);
+      expect(retried.fileType).toBe('md');
+
+      await expect(processor.process(retried)).resolves.toBe(
+        INGESTION_OUTCOMES.INDEXED,
+      );
+      expect((await documentOf(document.id)).fileUrl).toBe(pending);
+      expect(emitSuperseded).toHaveBeenCalledWith(
+        document.fileUrl,
+        SupersededReason.REPLACED,
+      );
+    });
+
+    it('a reindex of the live file moves nothing, even with a replace pending', async () => {
+      const { data, document, pending } = await replacing();
+
+      await expect(
+        processor.process({ ...data, objectPath: document.fileUrl }),
+      ).resolves.toBe(INGESTION_OUTCOMES.INDEXED);
+
+      const after = await documentOf(document.id);
+      expect(after.fileUrl).toBe(document.fileUrl);
+      expect(after.pendingFileUrl).toBe(pending);
+      expect(emitSuperseded).not.toHaveBeenCalled();
     });
   });
 

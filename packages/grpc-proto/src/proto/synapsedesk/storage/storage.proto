@@ -49,6 +49,16 @@ message PresignUploadResponse {
   string upload_method = 4;
 }
 
+message SweepPendingUploadsRequest {
+  // Objects created longer ago than this are swept. At least the confirm
+  // window (`UPLOAD_URL_TTL_SECONDS`), or INVALID_ARGUMENT.
+  int64 older_than_seconds = 1;
+}
+
+message SweepPendingUploadsResponse {
+  int32 deleted = 1;
+}
+
 message ConfirmUploadRequest {
   string object_path = 1;
   // The purposes the caller binds this object as. Empty accepts any; a
@@ -120,6 +130,10 @@ service StorageService {
   rpc IngestFromUrl(IngestFromUrlRequest) returns (IngestFromUrlResponse);
   rpc GetSignedReadUrls(GetSignedReadUrlsRequest) returns (GetSignedReadUrlsResponse);
   rpc DownloadObject(DownloadObjectRequest) returns (stream DownloadObjectChunk);
+  // Deletes abandoned uploads under `pending/` older than the given age. Takes
+  // an age, never a path: the pending shapes are fixed inside storage-service,
+  // and an age inside the confirm window is refused.
+  rpc SweepPendingUploads(SweepPendingUploadsRequest) returns (SweepPendingUploadsResponse);
 
   // No DeleteObject RPC, deliberately. Deletion is NATS-only — the same
   // "no write path exists in the contract" discipline audit_logs uses, so a

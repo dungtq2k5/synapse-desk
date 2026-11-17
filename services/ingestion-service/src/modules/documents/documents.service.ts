@@ -48,7 +48,6 @@ import {
   DocumentStatus,
   extensionFor,
   IngestionJobStatus,
-  DocumentFlagResolution,
   SupersededReason,
   parseOcrLanguages,
   OcrLanguage,
@@ -1064,10 +1063,12 @@ export class DocumentsService {
     requireActor(context);
     const document = await this.load(request.id, context);
 
-    // BEFORE the update, and this is the ordering trap the plan names: the
-    // column is about to hold the NEW path, and the supersede event must carry
-    // the OLD one. Emitting the new path deletes the file just uploaded.
-    const supersededPath = document.fileUrl;
+    // **The file follows the version that answers.** The new file waits in
+    // the `pending_file_*` columns until its version is swapped in, and the
+    // live file stays until then (the swap supersedes it). What this confirm
+    // supersedes is only an earlier replace's file that never went live: two
+    // pending files never exist.
+    const supersededPath = document.pendingFileUrl;
 
     // No "does this path belong to THIS document" check, and none is possible
     // or needed. `confirmUpload` consumes the `PendingUpload`, and its absence
@@ -1113,20 +1114,6 @@ export class DocumentsService {
           });
         }
 
-        // `resolvedAt: null` guards it: a flag a human already closed keeps
-        // their resolution and their comment, which is the one record of why.
-        await tx.documentFlag.updateMany({
-          where: { documentId: document.id, resolvedAt: null },
-          data: {
-            resolvedAt: new Date(),
-            resolution: DocumentFlagResolution.DOCUMENT_REPLACED,
-            // NULL, not the actor: `resolved_by_id` means "a human decided
-            // this", and nobody decided these individually. The resolution
-            // value already says what closed them.
-            resolvedById: null,
-          },
-        });
-
         // Before the update, so the row it returns carries the status. A
         // document with a live version keeps answering from it until the new
         // file's run swaps in, and stays INDEXED.
@@ -1134,13 +1121,14 @@ export class DocumentsService {
 
         const updated = await tx.document.update({
           where: { id: document.id },
+          // Pending, not live: Download, citations and the flags keep
+          // describing the version that answers until the swap. The OCR
+          // languages describe the file being processed, which is this one.
           data: {
-            fileUrl: request.objectPath,
-            fileType: extensionFor(confirmed.contentType),
-            fileSizeBytes: BigInt(confirmed.sizeBytes),
-            fileHash,
-            // The file's own date, which `OUTDATED` counts from.
-            fileUpdatedAt: new Date(),
+            pendingFileUrl: request.objectPath,
+            pendingFileType: extensionFor(confirmed.contentType),
+            pendingFileSizeBytes: BigInt(confirmed.sizeBytes),
+            pendingFileHash: fileHash,
             ocrLanguages: assertOcrLanguages(request.ocrLanguages),
           },
           include: DOCUMENT_INCLUDE,
@@ -1152,14 +1140,16 @@ export class DocumentsService {
       // AFTER the commit, both of them. An event announcing a change a
       // rollback erases is one no consumer can un-handle — and here it would
       // delete the file the document still points at.
-      this.storage.emitSuperseded(supersededPath, SupersededReason.REPLACED);
+      if (supersededPath) {
+        this.storage.emitSuperseded(supersededPath, SupersededReason.REPLACED);
+      }
 
       await this.ingestionQueue.enqueue({
         organizationId: document.organizationId,
         documentId: document.id,
         ingestionJobId: replaced.job.id,
         objectPath: request.objectPath,
-        fileType: replaced.updated.fileType,
+        fileType: extensionFor(confirmed.contentType),
         ocrLanguages: replaced.updated.ocrLanguages,
       });
 
