@@ -142,6 +142,12 @@ export type CallerContext = RequestOrigin & {
   departmentIds: string[];
   permissionCodes: PermissionCode[];
   isEmailVerified: boolean;
+  /**
+   * A background job acting for the tenant, with no user. Set only by
+   * `systemContext()`, and carried across a hop as its own header
+   * (`is_system`), so a peer never has to infer "system" from a missing id.
+   */
+  isSystem?: true;
 };
 
 /**
@@ -162,6 +168,7 @@ export type CallerContext = RequestOrigin & {
  */
 export function systemContext(organizationId: string): CallerContext {
   return {
+    isSystem: true,
     sub: null,
     organizationId,
     isSuperAdmin: false,
@@ -197,6 +204,7 @@ export const GRPC_CONTEXT_METADATA = {
   departmentIds: 'department_ids',
   permissionCodes: 'permission_codes',
   isEmailVerified: 'is_email_verified',
+  isSystem: 'is_system',
   ip: 'ip_address',
   userAgent: 'user_agent',
 } as const;

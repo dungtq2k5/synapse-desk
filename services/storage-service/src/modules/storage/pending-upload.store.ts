@@ -33,9 +33,10 @@ export type PendingUpload = {
   organizationId: string;
   /**
    * The caller who was authorized to write here, and the only one who may
-   * confirm it.
+   * confirm it. `null` for a background job's export upload, which only a
+   * job may confirm.
    */
-  actorId: string;
+  actorId: string | null;
   /** What the object was uploaded for; a confirm may require it. */
   purpose: StoragePurpose;
   contentType: string;

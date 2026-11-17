@@ -24,7 +24,7 @@ import {
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
-  UNKNOWN_ORIGIN,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { withHttpStatus } from '@synapsedesk/core';
 import {
@@ -485,25 +485,4 @@ export class StorageReferenceService implements OnModuleInit {
       message: withHttpStatus(503, 'File storage is currently unavailable'),
     });
   }
-}
-
-/**
- * The tenant, with no user.
- *
- * A background job acts for the TENANT rather than for the person who queued
- * the work — that request finished minutes ago, and carrying their identity
- * through a queue would mean an authorization decision made against a session
- * that may since have been revoked. storage-service scopes by
- * `organizationId`, which is exactly what this carries and all it carries.
- */
-function systemContext(organizationId: string): CallerContext {
-  return {
-    sub: null,
-    organizationId,
-    isSuperAdmin: false,
-    departmentIds: [],
-    permissionCodes: [],
-    isEmailVerified: true,
-    ...UNKNOWN_ORIGIN,
-  };
 }

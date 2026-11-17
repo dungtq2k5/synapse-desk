@@ -51,6 +51,22 @@ describe('SUPER_ADMIN_PASSWORD refuses the passwords this repo publishes', () =>
     return detail ? `FAIL:${detail.type}` : 'PASS';
   };
 
+  it('**is optional**: absent passes in every environment, since only the first boot needs it', () => {
+    for (const nodeEnv of ['production', 'development', 'test', undefined]) {
+      const value: Record<string, unknown> = {};
+      if (nodeEnv !== undefined) value.NODE_ENV = nodeEnv;
+      const { error } = envValidationSchema.validate(value, {
+        allowUnknown: true,
+        abortEarly: false,
+      });
+
+      expect([
+        nodeEnv,
+        error?.details.find((item) => item.path[0] === 'SUPER_ADMIN_PASSWORD'),
+      ]).toEqual([nodeEnv, undefined]);
+    }
+  });
+
   it('the published list is the two values this repo ships', () => {
     // The floor: an empty list would make every FAIL row below pass for the
     // wrong reason — `min(12)` would carry the short-password rows and the

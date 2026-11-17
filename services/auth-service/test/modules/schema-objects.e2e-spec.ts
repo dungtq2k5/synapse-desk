@@ -175,4 +175,39 @@ describe('Schema objects are not seeding (e2e)', () => {
     expect(names).not.toEqual([]);
     await expect(missingObjects(fx.prisma, names)).resolves.toEqual([]);
   });
+
+  describe('SUPER_ADMIN_PASSWORD is read only to create the account (known gap 28)', () => {
+    /** Overrides config keys at their source, as `forceFlag` does. */
+    const withConfig = (values: Record<string, unknown>) => {
+      const config = fx.moduleRef.get(ConfigService);
+      const realGet = config.get.bind(config);
+      const realOrThrow = config.getOrThrow.bind(config);
+      jest
+        .spyOn(config, 'get')
+        .mockImplementation(((key: string, ...rest: unknown[]) =>
+          key in values
+            ? values[key]
+            : realGet(key, ...(rest as []))) as never);
+      jest
+        .spyOn(config, 'getOrThrow')
+        .mockImplementation(((key: string) =>
+          key in values ? values[key] : realOrThrow(key)) as never);
+    };
+
+    it('**the account exists: seeding runs with no password at all**', async () => {
+      await seeder.seedRows();
+      withConfig({ SUPER_ADMIN_PASSWORD: undefined });
+
+      await expect(seeder.seedRows()).resolves.toBeUndefined();
+    });
+
+    it('**no account yet and no password: the boot fails naming the variable**', async () => {
+      withConfig({
+        SUPER_ADMIN_EMAIL: `first-boot-${Date.now()}@example.com`,
+        SUPER_ADMIN_PASSWORD: undefined,
+      });
+
+      await expect(seeder.seedRows()).rejects.toThrow(/SUPER_ADMIN_PASSWORD/);
+    });
+  });
 });

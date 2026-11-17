@@ -16,6 +16,7 @@ public final class GrpcMetadata {
   public static final String GRPC_CONTEXT_METADATA_IP = "ip_address";
   public static final String GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED = "is_email_verified";
   public static final String GRPC_CONTEXT_METADATA_IS_SUPER_ADMIN = "is_super_admin";
+  public static final String GRPC_CONTEXT_METADATA_IS_SYSTEM = "is_system";
   public static final String GRPC_CONTEXT_METADATA_ORGANIZATION_ID = "organization_id";
   public static final String GRPC_CONTEXT_METADATA_PERMISSION_CODES = "permission_codes";
   public static final String GRPC_CONTEXT_METADATA_USER_AGENT = "user_agent";

@@ -177,7 +177,7 @@ cp apps/web/.env.example apps/web/.env
 | Where | Key | Change it to | What happens otherwise |
 | :--- | :--- | :--- | :--- |
 | all four DB services | `DATABASE_URL` | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password` |
-| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own: 12+ characters, with a lowercase letter, an uppercase letter, a digit and a symbol | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
+| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own: 12+ characters, with a lowercase letter, an uppercase letter, a digit and a symbol. **First boot only:** delete it once the Super Admin exists | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
 
 `INBOUND_EMAIL_SECRET` needs one more thing that no single file can state: the **same value** must reach `api-gateway` and `notification-service`. Both examples ship a byte-identical placeholder, and `env-contract.spec.ts` keeps them that way — because a mismatch between the gateway and notification is **silent**: `parseTicketReplyToken` returns `null` and every email reply opens a new ticket instead of threading, with nothing in a log.
 
@@ -224,7 +224,7 @@ npm run dev
 
 `turbo run dev` starts all seven services and the web client. It already depends on `^build` and `db:generate`, so a Prisma client or a stale lib is not something you have to remember — but `nest start --watch` only watches a service's own `src/`, so an edit inside `packages/` during a session needs a rebuild to propagate. The gateway runs under `./mvnw -q spring-boot:run` and does not reload: restart it after an edit.
 
-On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in. **A Super Admin must use two-step.** In development and tests, `SUPER_ADMIN_TOTP_SECRET` (a base32 secret, refused under production) enrolls it at boot, new or existing, so signing in by hand needs an authenticator holding that secret, and scripts compute the code with `otplib`. A code is accepted once per 30-second step. Without the setting, the Super Admin enrolls at their first sign-in.
+On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in. `SUPER_ADMIN_PASSWORD` is read only on the boot that creates it, so remove it from auth-service's environment afterwards; changing `SUPER_ADMIN_EMAIL`, or deleting that account, makes the next boot create one again and need the password again. **A Super Admin must use two-step.** In development and tests, `SUPER_ADMIN_TOTP_SECRET` (a base32 secret, refused under production) enrolls it at boot, new or existing, so signing in by hand needs an authenticator holding that secret, and scripts compute the code with `otplib`. A code is accepted once per 30-second step. Without the setting, the Super Admin enrolls at their first sign-in.
 
 | Reach | At |
 | :--- | :--- |

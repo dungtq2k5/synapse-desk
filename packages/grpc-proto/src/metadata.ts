@@ -37,7 +37,7 @@ export type { CallerContext };
  * adds the next RPC, and forgetting it there is a cross-tenant read.
  */
 export function packRequestContext(
-  origin: RequestOrigin | RequestContext,
+  origin: RequestOrigin | RequestContext | CallerContext,
 ): Metadata {
   const metadata = new Metadata();
   metadata.set(GRPC_CONTEXT_METADATA.ip, origin.ip);
@@ -45,7 +45,13 @@ export function packRequestContext(
 
   if (!isRequestContext(origin)) return metadata;
 
-  metadata.set(GRPC_CONTEXT_METADATA.userId, origin.sub);
+  // A system call names the system and sends no user id. `Metadata.set` would
+  // send `null` as the text "null", which every peer then read as a user id.
+  if ('isSystem' in origin && origin.isSystem) {
+    metadata.set(GRPC_CONTEXT_METADATA.isSystem, 'true');
+  } else if (origin.sub) {
+    metadata.set(GRPC_CONTEXT_METADATA.userId, origin.sub);
+  }
   // Omitted rather than set to '' when null: a Super Admin genuinely has no
   // tenant, and '' would unpack as a tenant whose id is the empty string.
   if (origin.organizationId) {
@@ -86,9 +92,15 @@ export function unpackRequestOrigin(metadata?: Metadata): RequestOrigin {
  * decides whether that is legal for the RPC in question.
  */
 export function unpackCallerContext(metadata?: Metadata): CallerContext {
+  const isSystem = readOne(metadata, GRPC_CONTEXT_METADATA.isSystem) === 'true';
+
   return {
     ...unpackRequestOrigin(metadata),
-    sub: readOne(metadata, GRPC_CONTEXT_METADATA.userId) || null,
+    ...(isSystem ? { isSystem: true as const } : {}),
+    // A system call carries no user id; a missing one is null, never "".
+    sub: isSystem
+      ? null
+      : readOne(metadata, GRPC_CONTEXT_METADATA.userId) || null,
     organizationId:
       readOne(metadata, GRPC_CONTEXT_METADATA.organizationId) || null,
     isSuperAdmin:
@@ -136,7 +148,7 @@ function readJson<T>(
 }
 
 function isRequestContext(
-  value: RequestOrigin | RequestContext,
-): value is RequestContext {
+  value: RequestOrigin | RequestContext | CallerContext,
+): value is RequestContext | CallerContext {
   return 'sub' in value;
 }

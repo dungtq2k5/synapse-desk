@@ -250,7 +250,9 @@ export const envValidationSchema = Joi.object({
         'SUPER_ADMIN_PASSWORD needs a lowercase letter, an uppercase letter, ' +
         'a digit and a symbol.',
     })
-    .required()
+    // Needed only on the boot that creates the Super Admin; the seeder
+    // refuses that boot without it, naming the variable.
+    .optional()
     .when('NODE_ENV', {
       is: 'test',
       otherwise: Joi.string()

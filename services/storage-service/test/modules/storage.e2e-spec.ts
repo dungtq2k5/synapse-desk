@@ -450,16 +450,12 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
       ).resolves.toMatchObject({ objectPath: presigned.objectPath });
     });
 
-    it('4d. **a background job confirms its own upload**: its identity arrives the same both times', async () => {
-      // The analytics export presigns and confirms under `systemContext`,
-      // whose `sub` is null. Node's http2 sends every header value through
-      // `String()`, so the null arrives as the text "null": the same value at
-      // presign and at confirm, which is what lets the uploader check hold for
-      // a job. Emulated here exactly as the wire does it.
-      const overTheWire = () => {
-        const headers = packRequestContext(
-          systemContext(organizationId),
-        ).toHttp2Headers();
+    describe('a background job (known gap 71)', () => {
+      /** A context packed, sent through http2's header strings, and unpacked. */
+      const overTheWire = (
+        context: Parameters<typeof packRequestContext>[0],
+      ) => {
+        const headers = packRequestContext(context).toHttp2Headers();
         const sent = Object.fromEntries(
           // grpc-js gives a single value as itself and several as an array.
           Object.entries(headers).map(([key, values]) => [
@@ -467,30 +463,81 @@ describe('Storage presign, confirm and read URLs (e2e)', () => {
             [values].flat().map(String),
           ]),
         );
-        return unpackCallerContext(Metadata.fromHttp2Headers(sent));
+        return {
+          headers: sent,
+          context: unpackCallerContext(Metadata.fromHttp2Headers(sent)),
+        };
       };
-      const presigned = await storage.presignUpload(
-        {
-          purpose: ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT,
-          ownerId: faker.string.uuid(),
-          secondaryOwnerId: '',
-          contentType: 'text/csv',
-          sizeBytes: 64,
-          originalFileName: 'analytics.csv',
-        },
-        overTheWire(),
-      );
-      await putBytes(presigned.objectPath, 'text/csv', 'day,tickets_created\n');
+      const job = () => overTheWire(systemContext(organizationId)).context;
+      const exportRequest = () => ({
+        purpose: ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT,
+        ownerId: faker.string.uuid(),
+        secondaryOwnerId: '',
+        contentType: 'text/csv',
+        sizeBytes: 64,
+        originalFileName: 'analytics.csv',
+      });
 
-      await expect(
-        storage.confirmUpload(
-          {
-            objectPath: presigned.objectPath,
-            expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT],
-          },
-          overTheWire(),
-        ),
-      ).resolves.toMatchObject({ contentType: 'text/csv' });
+      it('4d. **arrives with no user id and the system marker**', () => {
+        const { headers, context } = overTheWire(systemContext(organizationId));
+
+        expect(headers).not.toHaveProperty('user_id');
+        expect(headers.is_system).toEqual(['true']);
+        expect(context.sub).toBeNull();
+        expect(context.isSystem).toBe(true);
+        // A user's call is unchanged: its id, and no marker.
+        const user = overTheWire(caller()).context;
+        expect(user.sub).toBe(userId);
+        expect(user.isSystem).toBeUndefined();
+      });
+
+      it('4e. **presigns and confirms its own export**', async () => {
+        const presigned = await storage.presignUpload(exportRequest(), job());
+        await putBytes(
+          presigned.objectPath,
+          'text/csv',
+          'day,tickets_created\n',
+        );
+
+        await expect(
+          storage.confirmUpload(
+            {
+              objectPath: presigned.objectPath,
+              expectedPurposes: [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT],
+            },
+            job(),
+          ),
+        ).resolves.toMatchObject({ contentType: 'text/csv' });
+      });
+
+      it('4f. **is refused on any other purpose’s presign**', async () => {
+        await expectRpc(
+          storage.presignUpload(avatarRequest(), job()),
+          status.UNAUTHENTICATED,
+        );
+      });
+
+      it('4g. **can’t confirm an upload a user presigned, nor a user one a job presigned**', async () => {
+        const byUser = await storage.presignUpload(exportRequest(), caller());
+        await putBytes(byUser.objectPath, 'text/csv', 'x\n');
+        const byJob = await storage.presignUpload(exportRequest(), job());
+        await putBytes(byJob.objectPath, 'text/csv', 'x\n');
+
+        await expectRpc(
+          storage.confirmUpload(
+            { objectPath: byUser.objectPath, expectedPurposes: [] },
+            job(),
+          ),
+          status.NOT_FOUND,
+        );
+        await expectRpc(
+          storage.confirmUpload(
+            { objectPath: byJob.objectPath, expectedPurposes: [] },
+            caller(),
+          ),
+          status.NOT_FOUND,
+        );
+      });
     });
 
     it('5. is NOT idempotent — a second confirm fails', async () => {

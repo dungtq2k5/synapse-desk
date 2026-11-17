@@ -33,6 +33,7 @@ import { exceedsLimit } from '@synapsedesk/core';
 import {
   formatErrorMsg,
   requireActor,
+  requireActorOrSystem,
   requireTenant,
 } from '@synapsedesk/nest-common';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
@@ -156,8 +157,13 @@ export class StorageService {
     context: CallerContext,
   ): Promise<PresignUploadResponse> {
     const organizationId = requireTenant(context);
-    const actorId = requireActor(context);
     const purpose = this.requirePurpose(request.purpose);
+    // A background job uploads exports, and only exports: every other
+    // purpose has a person behind it, so a job is refused there.
+    const actorId =
+      purpose === StoragePurpose.EXPORT
+        ? requireActorOrSystem(context)
+        : requireActor(context);
     const policy = PURPOSE_POLICY[purpose];
 
     this.assertUploadable(request, purpose, policy.maxSizeBytes);
@@ -353,7 +359,9 @@ export class StorageService {
     context: CallerContext,
   ): Promise<ConfirmUploadResponse> {
     const organizationId = requireTenant(context);
-    const actorId = requireActor(context);
+    // A job may confirm only what a job presigned: the equality below holds
+    // a null actor only against a record made by one.
+    const actorId = requireActorOrSystem(context);
     const expected = (request.expectedPurposes ?? []).map((purpose) =>
       this.requirePurpose(purpose),
     );
