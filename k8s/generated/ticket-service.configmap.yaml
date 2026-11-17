@@ -26,6 +26,7 @@ data:
   NATS_MONITOR_URL: 'http://nats:8222'
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
+  PENDING_UPLOAD_GRACE_SECONDS: '3600'
   RAG_SERVICE_URL: 'rag-service:50255'
   REDIS_DB: '0'
   STORAGE_SERVICE_URL: 'storage-service:50253'

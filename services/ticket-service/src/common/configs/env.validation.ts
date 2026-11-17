@@ -103,6 +103,10 @@ export const envValidationSchema = Joi.object({
   // than a hardcoded number, the same treatment OTP_EXPIRY_MINUTES gets.
   MESSAGE_EDIT_WINDOW_MINUTES: Joi.number().required(),
 
+  // How old an upload under `pending/` must be before the hourly sweep
+  // deletes it. storage-service refuses less than its confirm window.
+  PENDING_UPLOAD_GRACE_SECONDS: Joi.number().integer().min(1).default(3600),
+
   // Mirrors every audit event AuditPublisher sends to the log as well.
   AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
 });

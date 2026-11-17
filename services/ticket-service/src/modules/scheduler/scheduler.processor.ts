@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import {
   ROLLUP_TRAILING_DAYS,
@@ -9,6 +10,7 @@ import {
 import { formatErrorMsg, JobRunRecorder } from '@synapsedesk/nest-common';
 import { TicketRollupJob } from '../analytics/ticket-rollup.job';
 import { OutageRetries } from './outage-retries';
+import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
 /**
  * The caller `TicketRollupJob` never had
@@ -31,6 +33,8 @@ export class SchedulerProcessor extends WorkerHost {
     private readonly rollup: TicketRollupJob,
     private readonly runs: JobRunRecorder,
     private readonly retries: OutageRetries,
+    private readonly storage: StorageReferenceService,
+    private readonly config: ConfigService,
   ) {
     super();
   }
@@ -75,6 +79,15 @@ export class SchedulerProcessor extends WorkerHost {
     await this.step('draft-outcomes', async () => {
       const recorded = await this.retries.retryOutcomes();
       return `${recorded} outcome(s) recorded`;
+    });
+    // Uploads a confirm never claimed (an abandoned presign, a redelivered
+    // mail's files, a cut-off ingest). Nothing older than the confirm window
+    // can be confirmed; the grace is six times that.
+    await this.step('pending-sweep', async () => {
+      const deleted = await this.storage.sweepPendingUploads(
+        this.config.getOrThrow<number>('PENDING_UPLOAD_GRACE_SECONDS'),
+      );
+      return `${deleted} abandoned upload(s) deleted`;
     });
   }
 

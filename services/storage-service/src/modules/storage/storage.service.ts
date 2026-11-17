@@ -18,6 +18,8 @@ import {
   IngestFromUrlResponse,
   PresignUploadRequest,
   PresignUploadResponse,
+  SweepPendingUploadsRequest,
+  SweepPendingUploadsResponse,
   StoragePurpose as ProtoStoragePurpose,
   toProtoTimestamp,
   fromProtoStoragePurpose,
@@ -34,6 +36,7 @@ import {
   requireTenant,
 } from '@synapsedesk/nest-common';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
+import { isAbandoned, PENDING_SHAPES } from './pending-sweep';
 import { extensionFor, PURPOSE_POLICY } from '../../common/purpose-registry';
 import {
   matchesDeclaredType,
@@ -84,6 +87,60 @@ export class StorageService {
     this.readTtlSeconds = configService.getOrThrow<number>(
       'READ_URL_TTL_SECONDS',
     );
+  }
+
+  /**
+   * Deletes abandoned uploads: objects in a `pending/` shape created longer
+   * than `olderThanSeconds` ago. Run hourly by ticket-service, which owns
+   * both producers.
+   *
+   * **Across tenants, and only there**: it reads no tenant data and answers a
+   * count. An age inside the confirm window (`UPLOAD_URL_TTL_SECONDS`) is
+   * refused, so no caller can sweep an upload that could still be confirmed:
+   * the pending record a confirm needs expires with that window.
+   *
+   * Lists page by page (`matchGlob` narrows it on GCS; the emulator ignores
+   * it, and the exact pattern decides either way).
+   *
+   * @param now injectable for tests, which can't backdate an object.
+   */
+  async sweepPendingUploads(
+    request: SweepPendingUploadsRequest,
+    now: number = Date.now(),
+  ): Promise<SweepPendingUploadsResponse> {
+    if (!(request.olderThanSeconds >= this.uploadTtlSeconds)) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `olderThanSeconds must be at least the confirm window (${this.uploadTtlSeconds} s)`,
+      });
+    }
+
+    const cutoff = now - request.olderThanSeconds * 1000;
+    let deleted = 0;
+    for (const { glob, pattern } of PENDING_SHAPES) {
+      let pageToken: string | undefined;
+      do {
+        const [files, next] = await this.firebase.bucket.getFiles({
+          prefix: 'organizations/',
+          matchGlob: glob,
+          autoPaginate: false,
+          maxResults: 1000,
+          pageToken,
+        });
+        for (const file of files) {
+          if (
+            isAbandoned(file.name, file.metadata.timeCreated, cutoff, pattern)
+          ) {
+            await file.delete({ ignoreNotFound: true });
+            deleted += 1;
+          }
+        }
+        pageToken = (next as { pageToken?: string } | null)?.pageToken;
+      } while (pageToken);
+    }
+
+    if (deleted > 0) this.logger.log(`Swept ${deleted} abandoned upload(s)`);
+    return { deleted };
   }
 
   /**
@@ -330,8 +387,8 @@ export class StorageService {
       // path with the record still keyed to the pending one. Refusing here
       // would then report the opposite of what happened — "no object was
       // uploaded" for an upload that landed AND was committed — and the
-      // residue sits outside `pending/`, where the lifecycle rule exists
-      // for will never touch it.
+      // residue sits outside `pending/`, where the hourly pending sweep
+      // (`sweepPendingUploads`) will never touch it.
       //
       // Nothing can close the window: there is no transaction spanning a bucket
       // and Redis. Making the retry idempotent is strictly better than
@@ -383,7 +440,7 @@ export class StorageService {
 
     // **The move out of `pending/`**, and the whole reason that
     // prefix exists. Everything still under it after this point is unreferenced
-    // by construction, which is what makes a lifecycle rule over it safe.
+    // by construction, which is what makes the pending sweep over it safe.
     //
     // **Before the record is consumed**, so a failure HERE leaves the object
     // exactly where a sweep expects it and the caller free to retry.
@@ -609,10 +666,10 @@ export class StorageService {
       //
       // Nothing else makes the prefix sweepable. `confirmUpload` never moved
       // the object, so a live attachment on a real ticket had the same path
-      // shape as one somebody uploaded and abandoned — and a lifecycle rule
-      // over `**/attachments/**` would have deleted both. Under `pending/`
+      // shape as one somebody uploaded and abandoned — and a sweep over
+      // `**/attachments/**` would have deleted both. Under `pending/`
       // everything is unreferenced BY CONSTRUCTION, which is what makes the
-      // rule safe to enable.
+      // pending sweep (`sweepPendingUploads`) safe.
       //
       // Inserted after `attachments`, not before `organizations`: the tenant
       // check in `organizationIdFromObjectPath` reads segment 2, and this

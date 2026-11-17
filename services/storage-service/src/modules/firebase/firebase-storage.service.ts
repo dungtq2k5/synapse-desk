@@ -86,8 +86,8 @@ export class FirebaseStorageService implements OnModuleInit {
 
     this.bucketHandle = getStorage(this.app).bucket(bucketName);
 
-    // The bucket itself is created ONCE by scripts/setup-firebase-bucket.mjs,
-    // never here. GCS has no folders — a prefix exists the moment the first
+    // The bucket itself is created once, outside the service, never here.
+    // GCS has no folders — a prefix exists the moment the first
     // object under it is written — so there is nothing per-tenant to create;
     // the bucket is the one real, billable, IAM-bearing resource, and
     // provisioning it at boot would be the same mistake as a service migrating
