@@ -58,6 +58,7 @@ export class DocumentsService {
           contentType: dto.contentType,
           sizeBytes: dto.sizeBytes,
           fileName: dto.fileName,
+          replaceDocumentId: dto.replaceDocumentId,
         },
         context,
       ),

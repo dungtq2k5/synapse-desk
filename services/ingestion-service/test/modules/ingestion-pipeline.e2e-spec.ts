@@ -60,6 +60,7 @@ import { faultInjector } from '@synapsedesk/testing/fault';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
 import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
 import { IngestionJobsService } from '../../src/modules/ingestion-jobs/ingestion-jobs.service';
+import { PlatformUsageService } from '../../src/modules/platform/platform.service';
 import { IngestionQueueService } from '../../src/modules/ingestion/ingestion-queue.service';
 
 describe('The ingestion pipeline (e2e)', () => {
@@ -1037,6 +1038,12 @@ describe('The ingestion pipeline (e2e)', () => {
       });
       expect(closed.resolution).toBe(DocumentFlagResolution.DOCUMENT_REPLACED);
       expect(closed.resolvedById).toBeNull();
+
+      // The storage total is the new file alone, not old plus new.
+      const usage = await fx.moduleRef
+        .get(PlatformUsageService)
+        .getPlatformUsage({ organizationIds: [tenant.organizationId] });
+      expect(usage.usage[0].usedBytes).toBe(2048);
     });
 
     it('**a failed update keeps both files and the old version; Retry runs the new file, and its swap removes the old**', async () => {

@@ -1,3 +1,4 @@
+import { STORED_BYTES_SUM, storedBytes } from '../documents/stored-bytes';
 import { Injectable } from '@nestjs/common';
 import type {
   PlatformUsageRequest,
@@ -50,7 +51,7 @@ export class PlatformUsageService {
     const rows = await this.prisma.document.groupBy({
       by: ['organizationId'],
       where: { organizationId: { in: ids }, deletedAt: null },
-      _sum: { fileSizeBytes: true },
+      _sum: STORED_BYTES_SUM,
       _count: true,
     });
 
@@ -58,7 +59,7 @@ export class PlatformUsageService {
       rows.map((row) => [
         row.organizationId,
         {
-          usedBytes: Number(row._sum.fileSizeBytes ?? 0n),
+          usedBytes: storedBytes(row._sum),
           documentCount: row._count,
         },
       ]),

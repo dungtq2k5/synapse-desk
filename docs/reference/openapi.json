@@ -26226,7 +26226,7 @@
             }
           },
           "402": {
-            "description": "A plan limit: the organization's document storage is full, or it holds its plan's document count. `error` is the sentence to show (\"Your document storage is full. …\" or \"You have reached the document limit on your plan. …\"). A file over the organization's size limit is a 400; the rate limit stays a 429.",
+            "description": "A plan limit: the organization's document storage is full, or it holds its plan's document count. `error` is the sentence to show (\"Your document storage is full. …\" or \"You have reached the document limit on your plan. …\"). A file over the organization's size limit is a 400; the rate limit stays a 429. A replace (`replaceDocumentId`) is never refused for the document count.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26289,6 +26289,49 @@
                     "statusCode": {
                       "type": "number",
                       "example": 403
+                    },
+                    "path": {
+                      "type": "string",
+                      "example": "/api/v1/tickets"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true,
+                      "description": "Data for the refusals a client acts on, absent on every other error: `overLimit` (`[{ dimension: SEATS | STORAGE | DOCUMENTS, inUse, allowed }]`) when a plan change or Checkout does not fit, and `organizationStatus` (`SUSPENDED_PAST_DUE` | `FROZEN`) when the organization’s status refuses the request."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`replaceDocumentId` names no document this caller can update, including another organization's: indistinguishable from a missing one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "statusCode",
+                    "path",
+                    "timestamp",
+                    "error"
+                  ],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
                     },
                     "path": {
                       "type": "string",
@@ -26446,7 +26489,7 @@
             "access-cookie": []
           }
         ],
-        "summary": "{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }",
+        "summary": "{ contentType, sizeBytes, fileName, replaceDocumentId? } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }",
         "tags": ["Documents"]
       }
     },
@@ -71406,6 +71449,11 @@
       "PresignDocumentDto": {
         "type": "object",
         "properties": {
+          "replaceDocumentId": {
+            "type": "string",
+            "description": "The document this upload will replace, for a replace's presign. It isn't\ncharged against the document limit, and its pending file (which the\nreplace supersedes) leaves the storage total. Requires\n`document.update`; an id the caller can't update answers 404, like a\nmissing document.",
+            "format": "uuid"
+          },
           "contentType": {
             "type": "string",
             "description": "The document's MIME type. Must be one the parser accepts.",

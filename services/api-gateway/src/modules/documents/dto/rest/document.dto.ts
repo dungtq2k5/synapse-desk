@@ -67,6 +67,18 @@ export class PresignDocumentDto {
   @MaxLength(MAX_UPLOAD_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName!: string;
+
+  /**
+   * The document this upload will replace, for a replace's presign. It isn't
+   * charged against the document limit, and its pending file (which the
+   * replace supersedes) leaves the storage total. Requires
+   * `document.update`; an id the caller can't update answers 404, like a
+   * missing document.
+   */
+  @IsOptional()
+  @IsUUID('4')
+  @ApiPropertyOptional()
+  readonly replaceDocumentId?: string;
 }
 
 export class ConfirmDocumentDto {

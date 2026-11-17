@@ -185,14 +185,16 @@ class LatestIngestionJob(_message.Message):
     def __init__(self, status: _Optional[_Union[IngestionJobStatus, str]] = ..., waiting_reason: _Optional[_Union[IngestionWaitingReason, str]] = ..., error_code: _Optional[_Union[IngestionErrorCode, str]] = ...) -> None: ...
 
 class PresignDocumentRequest(_message.Message):
-    __slots__ = ("content_type", "size_bytes", "file_name")
+    __slots__ = ("content_type", "size_bytes", "file_name", "replace_document_id")
     CONTENT_TYPE_FIELD_NUMBER: _ClassVar[int]
     SIZE_BYTES_FIELD_NUMBER: _ClassVar[int]
     FILE_NAME_FIELD_NUMBER: _ClassVar[int]
+    REPLACE_DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
     content_type: str
     size_bytes: int
     file_name: str
-    def __init__(self, content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., file_name: _Optional[str] = ...) -> None: ...
+    replace_document_id: str
+    def __init__(self, content_type: _Optional[str] = ..., size_bytes: _Optional[int] = ..., file_name: _Optional[str] = ..., replace_document_id: _Optional[str] = ...) -> None: ...
 
 class PresignDocumentResponse(_message.Message):
     __slots__ = ("upload_url", "object_path", "expires_at", "upload_method")

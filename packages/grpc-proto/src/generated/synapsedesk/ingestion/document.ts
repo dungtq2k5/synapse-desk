@@ -213,6 +213,13 @@ export interface PresignDocumentRequest {
   contentType: string;
   sizeBytes: number;
   fileName: string;
+  /**
+   * The document this upload will replace, when it's a replace: the count
+   * limit then isn't charged, and that document's pending file (which the
+   * replace supersedes) leaves the storage total. Checked as a read; an id
+   * that fails answers NOT_FOUND, like a missing one.
+   */
+  replaceDocumentId?: string | undefined;
 }
 
 export interface PresignDocumentResponse {
