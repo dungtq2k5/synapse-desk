@@ -59,6 +59,13 @@ export const UNSCOPED_REASONS = [
    * token), which moves to whichever tenant presents it.
    */
   'globally unique key',
+  /**
+   * The caller's own user row and its credentials (OTPs, 2FA, sessions),
+   * keyed by an id proven theirs (`requireSelf`, a session, a token).
+   */
+  'own account',
+  /** The plan catalog and the permission list: shared by every tenant. */
+  'shared catalog',
 ] as const;
 
 export type UnscopedReason = (typeof UNSCOPED_REASONS)[number];

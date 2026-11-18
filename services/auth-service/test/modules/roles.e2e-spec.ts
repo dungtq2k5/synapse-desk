@@ -778,10 +778,10 @@ describe('Roles & Permissions (e2e)', () => {
   });
 
   describe('grantRoles / releaseUserRoles', () => {
-    it('grantRoles bumps the counter without the checks — invitation acceptance only', async () => {
-      // The one path that cannot supply an actor to check against. It exists so
-      // the counter is still maintained there; every administrative path must use
-      // `setUserRoles` instead.
+    it('grantRoles bumps the counter for a user and role of the named tenant', async () => {
+      // The paths that cannot supply an actor to check against (invitation
+      // acceptance, a new organization's first admin). Every administrative
+      // path uses `setUserRoles` instead.
       const t = await seedTenantWithUser(fx.prisma);
       const joiner = await addMember(fx.prisma, t.org.id);
       const role = await createRole(fx.prisma, {
@@ -790,13 +790,46 @@ describe('Roles & Permissions (e2e)', () => {
       });
 
       await fx.prisma.$transaction((tx) =>
-        roles.grantRoles(tx, joiner.id, [role.id]),
+        roles.grantRoles(tx, joiner.id, [role.id], t.org.id),
       );
 
       const after = await fx.prisma.role.findUniqueOrThrow({
         where: { id: role.id },
       });
       expect(after.userAssigned).toBe(1);
+    });
+
+    it('**grantRoles refuses another tenant’s user, or another tenant’s role**, and grants nothing', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const theirs = await seedForeignTenant(fx.prisma);
+
+      await expectRpc(
+        fx.prisma.$transaction((tx) =>
+          roles.grantRoles(tx, theirs.user.id, [t.role.id], t.org.id),
+        ),
+        status.NOT_FOUND,
+      );
+      await expectRpc(
+        fx.prisma.$transaction((tx) =>
+          roles.grantRoles(tx, t.user.id, [theirs.role.id], t.org.id),
+        ),
+        status.NOT_FOUND,
+      );
+      await expect(
+        fx.prisma.role.findUniqueOrThrow({ where: { id: theirs.role.id } }),
+      ).resolves.toMatchObject({ userAssigned: theirs.role.userAssigned });
+    });
+
+    it('**setUserRoles refuses a user of another tenant**, whatever roles it names', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const theirs = await seedForeignTenant(fx.prisma);
+
+      await expectRpc(
+        fx.prisma.$transaction((tx) =>
+          roles.setUserRoles(tx, theirs.user.id, [t.role.id], superuser(t)),
+        ),
+        status.NOT_FOUND,
+      );
     });
 
     it('releaseUserRoles decrements every role a departing user held', async () => {

@@ -121,7 +121,7 @@ export class EntitlementWriterService {
     const customerId = customerIdOf(subscription);
 
     const organization = customerId
-      ? await this.prisma.organization.findUnique({
+      ? await this.prisma.unscoped('cross-tenant job').organization.findUnique({
           where: { stripeCustomerId: customerId },
           select: { id: true, entitlementsPinned: true },
         })
@@ -253,21 +253,23 @@ export class EntitlementWriterService {
     // Read before the write, so "did anything change" is answerable. One extra
     // query on the webhook path, which runs per subscription event rather than
     // per request — and it is what stops every renewal announcing itself.
-    const before = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: {
-        maxAgentSeats: true,
-        maxStorageBytes: true,
-        monthlyAiTokenBudget: true,
-        aiModelTier: true,
-        maxDocumentBytes: true,
-        maxAttachmentBytes: true,
-        maxDocumentUploads: true,
-        maxAnalyticsRangeDays: true,
-      },
-    });
+    const before = await this.prisma
+      .unscoped('cross-tenant job')
+      .organization.findUnique({
+        where: { id: organizationId },
+        select: {
+          maxAgentSeats: true,
+          maxStorageBytes: true,
+          monthlyAiTokenBudget: true,
+          aiModelTier: true,
+          maxDocumentBytes: true,
+          maxAttachmentBytes: true,
+          maxDocumentUploads: true,
+          maxAnalyticsRangeDays: true,
+        },
+      });
 
-    await this.prisma.organization.update({
+    await this.prisma.unscoped('cross-tenant job').organization.update({
       where: { id: organizationId },
       data: {
         maxAgentSeats: entitlements.maxAgentSeats,
@@ -371,16 +373,18 @@ export class EntitlementWriterService {
     event: Stripe.Event,
     excludeId: string,
   ): Promise<boolean> {
-    const newest = await this.prisma.billingEvent.findFirst({
-      where: {
-        organizationId,
-        status: BillingEventStatus.PROCESSED,
-        source: BillingEventSource.STRIPE,
-        id: { not: excludeId },
-      },
-      orderBy: { stripeCreatedAt: 'desc' },
-      select: { stripeCreatedAt: true },
-    });
+    const newest = await this.prisma
+      .unscoped('cross-tenant job')
+      .billingEvent.findFirst({
+        where: {
+          organizationId,
+          status: BillingEventStatus.PROCESSED,
+          source: BillingEventSource.STRIPE,
+          id: { not: excludeId },
+        },
+        orderBy: { stripeCreatedAt: 'desc' },
+        select: { stripeCreatedAt: true },
+      });
     if (!newest) return false;
 
     // Strictly older. Equal timestamps are NOT stale: Stripe's `created` is
@@ -405,21 +409,23 @@ export class EntitlementWriterService {
    */
   private async claim(event: Stripe.Event): Promise<string | null> {
     try {
-      const row = await this.prisma.billingEvent.create({
-        data: {
-          stripeEventId: event.id,
-          organizationId: null,
-          eventType: event.type,
-          stripeCreatedAt: stripeCreatedAt(event),
-          // Explicit rather than defaulted: this is the producer the default
-          // was chosen FOR, and stating it here is what makes the other
-          // producer's `LOCAL` read as a deliberate pair.
-          source: BillingEventSource.STRIPE,
-          payload: event as unknown as Prisma.InputJsonValue,
-          status: BillingEventStatus.PROCESSED,
-        },
-        select: { id: true },
-      });
+      const row = await this.prisma
+        .unscoped('cross-tenant job')
+        .billingEvent.create({
+          data: {
+            stripeEventId: event.id,
+            organizationId: null,
+            eventType: event.type,
+            stripeCreatedAt: stripeCreatedAt(event),
+            // Explicit rather than defaulted: this is the producer the default
+            // was chosen FOR, and stating it here is what makes the other
+            // producer's `LOCAL` read as a deliberate pair.
+            source: BillingEventSource.STRIPE,
+            payload: event as unknown as Prisma.InputJsonValue,
+            status: BillingEventStatus.PROCESSED,
+          },
+          select: { id: true },
+        });
 
       return row.id;
     } catch (error) {
@@ -442,7 +448,7 @@ export class EntitlementWriterService {
     status: BillingEventStatus,
     errorLog?: string,
   ): Promise<WriteOutcome> {
-    await this.prisma.billingEvent.update({
+    await this.prisma.unscoped('cross-tenant job').billingEvent.update({
       where: { id: billingEventId },
       data: { organizationId, status, errorLog: errorLog ?? null },
     });

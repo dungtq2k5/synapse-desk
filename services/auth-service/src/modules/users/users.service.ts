@@ -50,6 +50,7 @@ import {
   SupersededReason,
   SystemRoleName,
   USER_SORTABLE_FIELDS,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   extractEmailDomain,
@@ -66,7 +67,7 @@ import {
   tenantScope,
   formatErrorMsg,
 } from '@synapsedesk/nest-common';
-import { PrismaService } from '../prisma/prisma.service';
+import { type AnyTransaction, PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -108,7 +109,7 @@ export class UsersService {
    * navigation, in one round trip.
    */
   async getCurrentUser(userId: string): Promise<CurrentUserResponse> {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.unscoped('own account').user.findFirst({
       where: { id: userId, deletedAt: null },
       include: {
         organization: true,
@@ -157,7 +158,7 @@ export class UsersService {
   ): Promise<UserResponse> {
     const userId = requireActor(context);
 
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.scoped(context).user.update({
       where: { id: userId },
       data: this.toProfileData(request),
     });
@@ -201,14 +202,14 @@ export class UsersService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.scoped(context).user.findMany({
         where,
         include: USER_SUMMARY_INCLUDE,
         orderBy,
         skip,
         take,
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.scoped(context).user.count({ where }),
     ]);
 
     // ONE storage call for the whole page, not one per row — the N+1 the
@@ -246,7 +247,7 @@ export class UsersService {
     // Scoped first, so a foreign id 404s rather than leaking a permission set.
     await this.load(request.id, context, { includeDeleted: true });
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.scoped(context).user.findUnique({
       where: { id: request.id },
       select: { roles: { include: { permissions: true } } },
     });
@@ -287,50 +288,52 @@ export class UsersService {
       });
     }
 
-    const users = await this.prisma.user.findMany({
-      where: {
-        organizationId: request.organizationId,
-        deletedAt: null,
-        // A locked account cannot act on the alert, which is the whole point
-        // of addressing it by permission.
-        //
-        // **`isLocked` is the authoritative boolean, and this filter is
-        // deliberately NOT temporal**. A `lockedUntil` column
-        // does now exist, but it is only an EXPIRY: two mechanisms act on it
-        // (a lazy unlock on the login path and the hourly `ExpiredLockSweep`),
-        // and both clear `isLocked` when they fire. Reading the expiry here as
-        // well would be the 22-call-site version of this change, where each
-        // site is a fresh chance to get a boolean wrong in code where wrong
-        // means a locked user logs in or an unlocked one cannot.
-        //
-        // The cost is bounded and known: for up to an hour after expiry a
-        // swept-but-not-yet-swept user is missing from this audience. That is
-        // the gap the sweep exists to close, and closing it here instead would
-        // trade a one-hour delay for a permanent class of bug.
-        isLocked: false,
-        // `user_roles` and `role_permissions` are IMPLICIT many-to-many
-        // relations, so the nesting is user → roles → permissions directly.
-        // A join-model shape (`some: { role: {... } }`) compiles against an
-        // explicit relation and is a type error here — which is the schema
-        // telling the truth about itself.
-        roles: {
-          some: { permissions: { some: { code: request.permissionCode } } },
+    const users = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .user.findMany({
+        where: {
+          organizationId: request.organizationId,
+          deletedAt: null,
+          // A locked account cannot act on the alert, which is the whole point
+          // of addressing it by permission.
+          //
+          // **`isLocked` is the authoritative boolean, and this filter is
+          // deliberately NOT temporal**. A `lockedUntil` column
+          // does now exist, but it is only an EXPIRY: two mechanisms act on it
+          // (a lazy unlock on the login path and the hourly `ExpiredLockSweep`),
+          // and both clear `isLocked` when they fire. Reading the expiry here as
+          // well would be the 22-call-site version of this change, where each
+          // site is a fresh chance to get a boolean wrong in code where wrong
+          // means a locked user logs in or an unlocked one cannot.
+          //
+          // The cost is bounded and known: for up to an hour after expiry a
+          // swept-but-not-yet-swept user is missing from this audience. That is
+          // the gap the sweep exists to close, and closing it here instead would
+          // trade a one-hour delay for a permanent class of bug.
+          isLocked: false,
+          // `user_roles` and `role_permissions` are IMPLICIT many-to-many
+          // relations, so the nesting is user → roles → permissions directly.
+          // A join-model shape (`some: { role: {... } }`) compiles against an
+          // explicit relation and is a type error here — which is the schema
+          // telling the truth about itself.
+          roles: {
+            some: { permissions: { some: { code: request.permissionCode } } },
+          },
+          // Narrowed to one DEPARTMENT when the caller asked for it
+          // Absent means the whole tenant, which is right for a quota
+          // alert (one budget per organization) and wrong for a ticket
+          // escalation: every agent in the company hearing about one
+          // department's queue is the noise that makes people stop reading.
+          ...(request.departmentId
+            ? {
+                userDepartments: {
+                  some: { departmentId: request.departmentId },
+                },
+              }
+            : {}),
         },
-        // Narrowed to one DEPARTMENT when the caller asked for it
-        // Absent means the whole tenant, which is right for a quota
-        // alert (one budget per organization) and wrong for a ticket
-        // escalation: every agent in the company hearing about one
-        // department's queue is the noise that makes people stop reading.
-        ...(request.departmentId
-          ? {
-              userDepartments: {
-                some: { departmentId: request.departmentId },
-              },
-            }
-          : {}),
-      },
-      select: NOTIFICATION_RECIPIENT_SELECT,
-    });
+        select: NOTIFICATION_RECIPIENT_SELECT,
+      });
 
     return { items: users.map(toNotificationRecipient) };
   }
@@ -402,18 +405,22 @@ export class UsersService {
     // result FROM the select, so a ternary there collapses both shapes to their
     // intersection and neither mapper type-checks.
     if (summary) {
-      const users = await this.prisma.user.findMany({
-        where,
-        select: USER_SUMMARY_SELECT,
-      });
+      const users = await this.prisma
+        .scoped(systemContext(request.organizationId))
+        .user.findMany({
+          where,
+          select: USER_SUMMARY_SELECT,
+        });
 
       return { items: [], summaries: users.map(toUserSummary) };
     }
 
-    const users = await this.prisma.user.findMany({
-      where,
-      select: NOTIFICATION_RECIPIENT_SELECT,
-    });
+    const users = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .user.findMany({
+        where,
+        select: NOTIFICATION_RECIPIENT_SELECT,
+      });
 
     return { items: users.map(toNotificationRecipient), summaries: [] };
   }
@@ -439,10 +446,12 @@ export class UsersService {
     const actorId = requireActor(context);
     const email = normalizeEmail(request.email);
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      select: { maxAgentSeats: true },
-    });
+    const organization = await this.prisma
+      .scoped(context)
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        select: { maxAgentSeats: true },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -451,43 +460,45 @@ export class UsersService {
     }
 
     try {
-      const createdId = await this.prisma.$transaction(async (tx) => {
-        // The SAME definition of "seats used" the invitation path applies —
-        // extracted so a create rejected here cannot contradict what the usage
-        // page reports.
-        if (
-          (await this.organizationsService.seatsInUse(tx, organizationId)) >=
-          organization.maxAgentSeats
-        ) {
-          throw noSeats(NO_SEATS_MESSAGE);
-        }
+      const createdId = await this.prisma
+        .scoped(context)
+        .$transaction(async (tx) => {
+          // The SAME definition of "seats used" the invitation path applies —
+          // extracted so a create rejected here cannot contradict what the usage
+          // page reports.
+          if (
+            (await this.organizationsService.seatsInUse(tx, organizationId)) >=
+            organization.maxAgentSeats
+          ) {
+            throw noSeats(NO_SEATS_MESSAGE);
+          }
 
-        const user = await tx.user.create({
-          data: { organizationId, email, fullName: request.fullName },
-          select: { id: true },
+          const user = await tx.user.create({
+            data: { organizationId, email, fullName: request.fullName },
+            select: { id: true },
+          });
+
+          const roleIds =
+            request.roleIds.length > 0
+              ? request.roleIds
+              : [await this.rolesService.getEndUserRoleId(tx)];
+          await this.rolesService.setUserRoles(tx, user.id, roleIds, context);
+
+          if (request.departmentIds.length > 0) {
+            await this.assignDepartments(
+              tx,
+              user.id,
+              request.departmentIds.map((departmentId) => ({
+                departmentId,
+                isPrimary: departmentId === request.primaryDepartmentId,
+              })),
+              context,
+              actorId,
+            );
+          }
+
+          return user.id;
         });
-
-        const roleIds =
-          request.roleIds.length > 0
-            ? request.roleIds
-            : [await this.rolesService.getEndUserRoleId(tx)];
-        await this.rolesService.setUserRoles(tx, user.id, roleIds, context);
-
-        if (request.departmentIds.length > 0) {
-          await this.assignDepartments(
-            tx,
-            user.id,
-            request.departmentIds.map((departmentId) => ({
-              departmentId,
-              isPrimary: departmentId === request.primaryDepartmentId,
-            })),
-            context,
-            actorId,
-          );
-        }
-
-        return user.id;
-      });
 
       // Read AFTER the transaction, deliberately.
       //
@@ -500,7 +511,7 @@ export class UsersService {
       // Outside, they run on the pool where concurrency is the point. It is
       // also simply less work to hold a transaction open for: every statement
       // above is a write, and this is a pure read-back of committed rows.
-      const created = await this.prisma.user.findUniqueOrThrow({
+      const created = await this.prisma.scoped(context).user.findUniqueOrThrow({
         where: { id: createdId },
         include: USER_SUMMARY_INCLUDE,
       });
@@ -564,7 +575,7 @@ export class UsersService {
 
     // Write, then re-read — see restoreUser for why the include cannot ride
     // along on the write.
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.scoped(context).user.update({
       where: { id: existing.id },
       data: {
         ...this.toProfileData(request),
@@ -590,7 +601,7 @@ export class UsersService {
       },
     });
 
-    const updated = await this.prisma.user.findUniqueOrThrow({
+    const updated = await this.prisma.scoped(context).user.findUniqueOrThrow({
       where: { id: user.id },
       include: USER_SUMMARY_INCLUDE,
     });
@@ -617,7 +628,7 @@ export class UsersService {
 
     await this.assertRemovable(target, actorId, context);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.scoped(context).$transaction(async (tx) => {
       // Releases the roles first so `user_assigned` reflects reality: a
       // deactivated user is not occupying the role, and leaving the count
       // inflated would block a legitimate role delete forever.
@@ -649,7 +660,7 @@ export class UsersService {
   ): Promise<UserSummaryResponse> {
     const organizationId = requireTenant(context);
 
-    const existing = await this.prisma.user.findFirst({
+    const existing = await this.prisma.scoped(context).user.findFirst({
       where: {
         id: request.id,
         organizationId,
@@ -670,23 +681,25 @@ export class UsersService {
       // does NOT carry the include: its relation loads would run concurrently
       // on the transaction's single connection, the pg deprecation. The read
       // below is its own statement.
-      const user = await this.prisma.$transaction(async (tx) => {
-        const organization = await tx.organization.findUniqueOrThrow({
-          where: { id: organizationId },
-          select: { maxAgentSeats: true },
+      const user = await this.prisma
+        .scoped(context)
+        .$transaction(async (tx) => {
+          const organization = await tx.organization.findUniqueOrThrow({
+            where: { id: organizationId },
+            select: { maxAgentSeats: true },
+          });
+          if (
+            (await this.organizationsService.seatsInUse(tx, organizationId)) >=
+            organization.maxAgentSeats
+          ) {
+            throw noSeats(NO_SEATS_MESSAGE);
+          }
+          return tx.user.update({
+            where: { id: existing.id },
+            data: restoreData(),
+            select: { id: true, email: true },
+          });
         });
-        if (
-          (await this.organizationsService.seatsInUse(tx, organizationId)) >=
-          organization.maxAgentSeats
-        ) {
-          throw noSeats(NO_SEATS_MESSAGE);
-        }
-        return tx.user.update({
-          where: { id: existing.id },
-          data: restoreData(),
-          select: { id: true, email: true },
-        });
-      });
 
       this.audit.record(context, {
         action: AuditAction.USER_RESTORED,
@@ -695,10 +708,12 @@ export class UsersService {
         metadata: { email: user.email },
       });
 
-      const restored = await this.prisma.user.findUniqueOrThrow({
-        where: { id: user.id },
-        include: USER_SUMMARY_INCLUDE,
-      });
+      const restored = await this.prisma
+        .scoped(context)
+        .user.findUniqueOrThrow({
+          where: { id: user.id },
+          include: USER_SUMMARY_INCLUDE,
+        });
 
       return toUserSummaryResponse(
         restored,
@@ -736,7 +751,7 @@ export class UsersService {
 
     const lockedUntil = this.parseLockExpiry(request.lockedUntil);
 
-    await this.prisma.user.update({
+    await this.prisma.scoped(context).user.update({
       where: { id: target.id },
       // `lockedUntil: null` when absent, not left alone: a re-lock must not
       // inherit an expiry from a previous temporary lock.
@@ -817,7 +832,7 @@ export class UsersService {
   ): Promise<UnlockUserResponse> {
     const target = await this.load(request.id, context);
 
-    await this.prisma.user.update({
+    await this.prisma.scoped(context).user.update({
       where: { id: target.id },
       data: { isLocked: false, lockedUntil: null },
     });
@@ -847,24 +862,28 @@ export class UsersService {
   ): Promise<ResetUserTwoFactorResponse> {
     const target = await this.load(request.id, context);
 
-    const untrustedDeviceCount = await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: target.id },
-        data: { twoFactorSecret: null, isTwoFactorEnabled: false },
-      });
-      await tx.twoFactorBackupCode.deleteMany({ where: { userId: target.id } });
+    const untrustedDeviceCount = await this.prisma
+      .scoped(context)
+      .$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: target.id },
+          data: { twoFactorSecret: null, isTwoFactorEnabled: false },
+        });
+        await tx.twoFactorBackupCode.deleteMany({
+          where: { userId: target.id },
+        });
 
-      const { count } = await tx.deviceSession.updateMany({
-        where: { userId: target.id },
-        data: {
-          deviceTokenHash: null,
-          trustedUntil: null,
-          isTrusted: false,
-        },
-      });
+        const { count } = await tx.deviceSession.updateMany({
+          where: { userId: target.id },
+          data: {
+            deviceTokenHash: null,
+            trustedUntil: null,
+            isTrusted: false,
+          },
+        });
 
-      return count;
-    });
+        return count;
+      });
 
     this.audit.record(context, {
       action: AuditAction.USER_TWO_FACTOR_RESET,
@@ -929,55 +948,61 @@ export class UsersService {
     // (`WHERE deleted_at IS NULL`) — so a former member emailing in is a
     // re-provision rather than a conflict, which is the same re-hire case that
     // index was made partial for.
-    const existing = await this.prisma.user.findFirst({
-      where: { organizationId, email, deletedAt: null },
-      select: { id: true },
-    });
+    const existing = await this.prisma
+      .scoped(systemContext(organizationId))
+      .user.findFirst({
+        where: { organizationId, email, deletedAt: null },
+        select: { id: true },
+      });
 
     if (existing) return { userId: existing.id, created: false };
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      select: { allowedEmailDomains: true },
-    });
+    const organization = await this.prisma
+      .scoped(systemContext(organizationId))
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        select: { allowedEmailDomains: true },
+      });
 
     // Scoped: "does THIS tenant allow this domain?" — never "who claims it?".
     if (!organization?.allowedEmailDomains.includes(domain)) {
       return { created: false };
     }
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      // **End User, always.** The role is not a parameter and cannot be one:
-      // the caller is an unauthenticated webhook, and a request-supplied role
-      // is how a stranger's email becomes tenant control.
-      const endUserRoleId = await this.rolesService.getEndUserRoleId(tx);
+    const created = await this.prisma
+      .scoped(systemContext(organizationId))
+      .$transaction(async (tx) => {
+        // **End User, always.** The role is not a parameter and cannot be one:
+        // the caller is an unauthenticated webhook, and a request-supplied role
+        // is how a stranger's email becomes tenant control.
+        const endUserRoleId = await this.rolesService.getEndUserRoleId(tx);
 
-      return tx.user.create({
-        data: {
-          organizationId,
-          email,
-          // `full_name` is NOT NULL; the local part is the same stand-in the
-          // Google sign-in path uses when the provider withholds a name, and
-          // now through the same helper rather than a second inline `split`.
-          fullName:
-            request.displayName?.trim() ||
-            extractEmailLocalPart(email) ||
+        return tx.user.create({
+          data: {
+            organizationId,
             email,
-          // No password: this account has no way to sign in until its owner
-          // sets one through the ordinary reset flow. An email sender has not
-          // proven they can authenticate, only that they can send mail.
-          passwordHash: null,
-          // Unverified — sending from an address is not proof of controlling
-          // it, and the portal's own verification is what establishes that.
-          isEmailVerified: false,
-          // `gender` is nullable and unstated — an email sender did not answer
-          // that question, and inventing a default would put a fact in the
-          // record that nobody supplied.
-          roles: { connect: { id: endUserRoleId } },
-        },
-        select: { id: true },
+            // `full_name` is NOT NULL; the local part is the same stand-in the
+            // Google sign-in path uses when the provider withholds a name, and
+            // now through the same helper rather than a second inline `split`.
+            fullName:
+              request.displayName?.trim() ||
+              extractEmailLocalPart(email) ||
+              email,
+            // No password: this account has no way to sign in until its owner
+            // sets one through the ordinary reset flow. An email sender has not
+            // proven they can authenticate, only that they can send mail.
+            passwordHash: null,
+            // Unverified — sending from an address is not proof of controlling
+            // it, and the portal's own verification is what establishes that.
+            isEmailVerified: false,
+            // `gender` is nullable and unstated — an email sender did not answer
+            // that question, and inventing a default would put a fact in the
+            // record that nobody supplied.
+            roles: { connect: { id: endUserRoleId } },
+          },
+          select: { id: true },
+        });
       });
-    });
 
     return { userId: created.id, created: true };
   }
@@ -992,7 +1017,7 @@ export class UsersService {
   ): Promise<UserSummaryResponse> {
     const target = await this.load(request.id, context);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.scoped(context).$transaction(async (tx) => {
       // Tenant validation, the no-escalation rule and the `user_assigned`
       // counter all live in RolesService, so every grant path shares them.
       await this.rolesService.setUserRoles(
@@ -1006,7 +1031,7 @@ export class UsersService {
     // Read-back AFTER the transaction — see createUser for why: a multi-relation
     // include issues its relation loads concurrently, which inside a
     // transaction means several queries on one pinned connection.
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.scoped(context).user.findUniqueOrThrow({
       where: { id: target.id },
       include: USER_SUMMARY_INCLUDE,
     });
@@ -1034,7 +1059,7 @@ export class UsersService {
     const target = await this.load(request.id, context);
     const actorId = requireActor(context);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.scoped(context).$transaction(async (tx) => {
       await tx.userDepartment.deleteMany({ where: { userId: target.id } });
 
       if (request.departments.length > 0) {
@@ -1049,7 +1074,7 @@ export class UsersService {
     });
 
     // Read-back AFTER the transaction — see createUser for why.
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.scoped(context).user.findUniqueOrThrow({
       where: { id: target.id },
       include: USER_SUMMARY_INCLUDE,
     });
@@ -1081,12 +1106,13 @@ export class UsersService {
    * ticket routing and no document scope.
    */
   private async assignDepartments(
-    tx: Prisma.TransactionClient,
+    client: AnyTransaction,
     userId: string,
     departments: { departmentId: string; isPrimary: boolean }[],
     context: CallerContext,
     actorId: string,
   ): Promise<void> {
+    const tx = client as Prisma.TransactionClient;
     const primaryCount = departments.filter((d) => d.isPrimary).length;
     if (primaryCount !== 1) {
       throw new RpcException({
@@ -1156,7 +1182,7 @@ export class UsersService {
     );
     if (!isOrgAdmin) return;
 
-    const remaining = await this.prisma.user.count({
+    const remaining = await this.prisma.scoped(context).user.count({
       where: {
         organizationId: target.organizationId,
         deletedAt: null,
@@ -1189,7 +1215,7 @@ export class UsersService {
      */
     { includeDeleted = false }: { includeDeleted?: boolean } = {},
   ): Promise<UserSummaryRow> {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.scoped(context).user.findFirst({
       where: {
         id,
         ...tenantScope(context),
@@ -1265,12 +1291,12 @@ export class UsersService {
       throw StorageReferenceService.asClientError(error);
     }
 
-    const existing = await this.prisma.user.findUniqueOrThrow({
+    const existing = await this.prisma.scoped(context).user.findUniqueOrThrow({
       where: { id: actorId },
       select: { avatarUrl: true },
     });
 
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.scoped(context).user.update({
       where: { id: actorId },
       data: { avatarUrl: request.objectPath },
     });
@@ -1298,12 +1324,12 @@ export class UsersService {
   async deleteAvatar(context: CallerContext): Promise<UserResponse> {
     const actorId = requireActor(context);
 
-    const existing = await this.prisma.user.findUniqueOrThrow({
+    const existing = await this.prisma.scoped(context).user.findUniqueOrThrow({
       where: { id: actorId },
       select: { avatarUrl: true },
     });
 
-    const user = await this.prisma.user.update({
+    const user = await this.prisma.scoped(context).user.update({
       where: { id: actorId },
       data: { avatarUrl: null },
     });

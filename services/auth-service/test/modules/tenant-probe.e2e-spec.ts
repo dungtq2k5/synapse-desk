@@ -177,22 +177,18 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
 
     'OtpService/RequestEmailVerification': {
       build: member,
-      knownFailure: '9: takes userId from the request',
     },
     'OtpService/VerifyEmail': {
       build: (a) => ({ userId: a.member, code: '123456' }),
-      knownFailure: '7: takes userId from the request',
     },
     'OtpService/RequestPhoneVerification': {
       build: (a) => ({ userId: a.member, phoneNumber: '+84901234567' }),
-      knownFailure: '6: takes userId from the request',
     },
     'OtpService/VerifyPhone': {
       build: (a) => ({ userId: a.member, code: '123456' }),
     },
     'OtpService/GetOtpStatus': {
       build: (a) => ({ userId: a.member, purpose: 1 }),
-      knownFailure: '8: takes userId from the request',
     },
 
     'PlatformService/AssignPlan': {
@@ -235,27 +231,22 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
 
     'TwoFactorAuthService/GenerateTwoFactor': {
       build: member,
-      knownFailure: '5: takes userId from the request',
     },
     'TwoFactorAuthService/ActivateTwoFactor': {
       build: (a) => ({ userId: a.member, code: '123456', twoFactorToken: 'x' }),
     },
     'TwoFactorAuthService/DisableTwoFactor': {
       build: (a) => ({ userId: a.member, code: '123456', password: 'x' }),
-      knownFailure: '9: takes userId from the request',
     },
     'TwoFactorAuthService/RegenerateBackupCodes': {
       build: (a) => ({ userId: a.member, password: 'x' }),
-      knownFailure: '9: takes userId from the request',
     },
     'TwoFactorAuthService/GetBackupCodesStatus': {
       build: member,
-      knownFailure: '8: takes userId from the request',
     },
 
     'UserService/GetCurrentUser': {
       build: member,
-      knownFailure: '4: takes userId from the request',
     },
     'UserService/ListUsers': {
       build: (a) => ({
@@ -335,6 +326,12 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     B = await seedTenantWithUser(fx.prisma);
   });
 
+  it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
+    expect(
+      Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
+    ).toEqual([]);
+  });
+
   it('**every id-taking RPC has a row**, and no row names an RPC that is gone', () => {
     expect(Object.keys(PROBE).sort()).toEqual(
       methods.map((m) => m.name).sort(),
@@ -364,33 +361,12 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     });
   };
 
-  /** The rows that call an RPC, known failures or not. */
-  const runnable = (known: boolean) =>
-    methods.filter((method) => {
-      const row = PROBE[method.name];
-
-      return 'build' in row && Boolean(row.knownFailure) === known;
-    });
-
-  it.each(runnable(false).map((method) => [method.name, method] as const))(
+  it.each(
+    methods
+      .filter((method) => 'build' in PROBE[method.name])
+      .map((method) => [method.name, method] as const),
+  )(
     '**%s** as tenant B on A’s ids: answers as for a missing id, names nothing of A’s, changes nothing of A’s',
     probe,
-  );
-
-  // **Known failures**: the cross-tenant reaches the scoped client will
-  // close. Each passes while its finding is still true and FAILS the day it's
-  // fixed, which forces it off this list rather than letting it be forgotten.
-  it.failing.each(
-    runnable(true).map(
-      (method) =>
-        [
-          method.name,
-          (PROBE[method.name] as { knownFailure: string }).knownFailure,
-          method,
-        ] as const,
-    ),
-  )(
-    '**%s** is a known failure until the scoped client lands (finding %s)',
-    (name, _finding, method) => probe(name, method),
   );
 });

@@ -31,11 +31,37 @@ import {
 type Service = 'auth' | 'ticket' | 'ingestion' | 'notification';
 
 /** Services whose code has moved to `scoped(context)`: no direct use left. */
-const MIGRATED = new Set<Service>(['notification', 'ingestion', 'ticket']);
+const MIGRATED = new Set<Service>([
+  'notification',
+  'ingestion',
+  'ticket',
+  'auth',
+]);
 
 /** Per service: the files that may call `unscoped(…)`. */
 const UNSCOPED: Record<Service, readonly string[]> = {
-  auth: [],
+  auth: [
+    'auth/auth.service.ts',
+    'auth/two-factor-auth.service.ts',
+    'billing/dunning.service.ts',
+    'billing/entitlement-writer.service.ts',
+    'billing/plan-admin.service.ts',
+    'billing/plan-catalog.service.ts',
+    'billing/plan-change.service.ts',
+    'finance/finance.service.ts',
+    'invitations/invitations.service.ts',
+    'job-runs/job-runs.module.ts',
+    'ops/ops.module.ts',
+    'organizations/organizations.service.ts',
+    'otp/otp.service.ts',
+    'platform/platform.service.ts',
+    'prisma/database.seeder.ts',
+    'roles/roles.service.ts',
+    'sessions/expired-records.job.ts',
+    'sessions/sessions.service.ts',
+    'users/expired-lock.sweep.ts',
+    'users/users.service.ts',
+  ],
   ticket: [
     'analytics/export.processor.ts',
     'analytics/export.service.ts',

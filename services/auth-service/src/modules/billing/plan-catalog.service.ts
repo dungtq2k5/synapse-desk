@@ -39,10 +39,12 @@ export class PlanCatalogService {
   ): Promise<(PlanEntitlements & { planId: string }) | null> {
     if (!priceId) return null;
 
-    const price = await this.prisma.subscriptionPlanPrice.findUnique({
-      where: { stripePriceId: priceId },
-      include: { plan: true },
-    });
+    const price = await this.prisma
+      .unscoped('shared catalog')
+      .subscriptionPlanPrice.findUnique({
+        where: { stripePriceId: priceId },
+        include: { plan: true },
+      });
 
     // A soft-deleted plan is not a plan. `development-conventions.md` §7.1 —
     // every read filters it, and a

@@ -16,8 +16,10 @@ import {
   TwoFactorAuthServiceController,
   TwoFactorAuthServiceControllerMethods,
   unpackRequestOrigin,
+  unpackCallerContext,
 } from '@synapsedesk/grpc-proto';
 import { TwoFactorAuthService } from './two-factor-auth.service';
+import { requireSelf } from '@synapsedesk/nest-common';
 
 @Controller()
 @TwoFactorAuthServiceControllerMethods()
@@ -26,7 +28,9 @@ export class TwoFactorAuthGrpcController implements TwoFactorAuthServiceControll
 
   generateTwoFactor(
     request: GenerateTwoFactorRequest,
+    metadata?: Metadata,
   ): Promise<GenerateTwoFactorResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.twoFactorAuthService.generateTwoFactor(request);
   }
 
@@ -34,6 +38,7 @@ export class TwoFactorAuthGrpcController implements TwoFactorAuthServiceControll
     request: ActivateTwoFactorRequest,
     metadata?: Metadata,
   ): Promise<ActivateTwoFactorResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.twoFactorAuthService.activateTwoFactor(
       request,
       unpackRequestOrigin(metadata),
@@ -57,19 +62,25 @@ export class TwoFactorAuthGrpcController implements TwoFactorAuthServiceControll
 
   disableTwoFactor(
     request: DisableTwoFactorRequest,
+    metadata?: Metadata,
   ): Promise<DisableTwoFactorResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.twoFactorAuthService.disableTwoFactor(request);
   }
 
   regenerateBackupCodes(
     request: RegenerateBackupCodesRequest,
+    metadata?: Metadata,
   ): Promise<RegenerateBackupCodesResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.twoFactorAuthService.regenerateBackupCodes(request);
   }
 
   getBackupCodesStatus(
     request: BackupCodesStatusRequest,
+    metadata?: Metadata,
   ): Promise<BackupCodesStatusResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.twoFactorAuthService.getBackupCodesStatus(request);
   }
 }

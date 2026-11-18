@@ -111,7 +111,7 @@ export class TwoFactorAuthService {
   async generateTwoFactor(
     request: GenerateTwoFactorRequest,
   ): Promise<GenerateTwoFactorResponse> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('own account').user.findUnique({
       where: { id: request.userId, deletedAt: null },
       select: { email: true, isTwoFactorEnabled: true },
     });
@@ -135,7 +135,7 @@ export class TwoFactorAuthService {
       secret,
     });
 
-    await this.prisma.user.update({
+    await this.prisma.unscoped('own account').user.update({
       where: { id: request.userId },
       data: {
         // Encrypted, not hashed: a TOTP secret has to be readable to verify a
@@ -179,7 +179,7 @@ export class TwoFactorAuthService {
       });
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('own account').user.findUnique({
       where: { id: request.userId, deletedAt: null },
       select: {
         id: true,
@@ -336,7 +336,7 @@ export class TwoFactorAuthService {
   async disableTwoFactor(
     request: DisableTwoFactorRequest,
   ): Promise<DisableTwoFactorResponse> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('own account').user.findUnique({
       where: { id: request.userId, deletedAt: null },
       select: {
         id: true,
@@ -385,7 +385,7 @@ export class TwoFactorAuthService {
       });
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.unscoped('own account').$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
         data: {
@@ -418,7 +418,7 @@ export class TwoFactorAuthService {
   async regenerateBackupCodes(
     request: RegenerateBackupCodesRequest,
   ): Promise<RegenerateBackupCodesResponse> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('own account').user.findUnique({
       where: { id: request.userId, deletedAt: null },
       select: {
         id: true,
@@ -458,10 +458,12 @@ export class TwoFactorAuthService {
   async getBackupCodesStatus(
     request: BackupCodesStatusRequest,
   ): Promise<BackupCodesStatusResponse> {
-    const codes = await this.prisma.twoFactorBackupCode.findMany({
-      where: { userId: request.userId },
-      select: { isUsed: true, expiresAt: true },
-    });
+    const codes = await this.prisma
+      .unscoped('own account')
+      .twoFactorBackupCode.findMany({
+        where: { userId: request.userId },
+        select: { isUsed: true, expiresAt: true },
+      });
 
     const live = codes.filter((c) => !c.isUsed && c.expiresAt > new Date());
 
@@ -499,7 +501,7 @@ export class TwoFactorAuthService {
       })),
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.unscoped('own account').$transaction(async (tx) => {
       await tx.twoFactorBackupCode.deleteMany({ where: { userId } });
       await tx.twoFactorBackupCode.createMany({ data: rows });
 
@@ -526,10 +528,12 @@ export class TwoFactorAuthService {
   ): Promise<number> {
     const normalized = normalizeBackupCode(candidate);
 
-    const codes = await this.prisma.twoFactorBackupCode.findMany({
-      where: { userId, isUsed: false, expiresAt: { gt: new Date() } },
-      select: { id: true, codeHash: true },
-    });
+    const codes = await this.prisma
+      .unscoped('own account')
+      .twoFactorBackupCode.findMany({
+        where: { userId, isUsed: false, expiresAt: { gt: new Date() } },
+        select: { id: true, codeHash: true },
+      });
 
     // A sequential loop rather than `Array.find`, which cannot take an async
     // predicate. Worst case is ten scrypts — ~0.4 s on a WRONG code, on a rare
@@ -550,7 +554,7 @@ export class TwoFactorAuthService {
       });
     }
 
-    await this.prisma.twoFactorBackupCode.update({
+    await this.prisma.unscoped('own account').twoFactorBackupCode.update({
       where: { id: match.id },
       data: { isUsed: true },
     });
@@ -632,16 +636,18 @@ export class TwoFactorAuthService {
     );
     if (step === null) return false;
 
-    const { count } = await this.prisma.user.updateMany({
-      where: {
-        id: user.id,
-        OR: [
-          { twoFactorLastTimeStep: null },
-          { twoFactorLastTimeStep: { lt: step } },
-        ],
-      },
-      data: { twoFactorLastTimeStep: step },
-    });
+    const { count } = await this.prisma
+      .unscoped('own account')
+      .user.updateMany({
+        where: {
+          id: user.id,
+          OR: [
+            { twoFactorLastTimeStep: null },
+            { twoFactorLastTimeStep: { lt: step } },
+          ],
+        },
+        data: { twoFactorLastTimeStep: step },
+      });
     return count === 1;
   }
 

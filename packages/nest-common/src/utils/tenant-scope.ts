@@ -120,6 +120,28 @@ export function requireActorOrSystem(context: CallerContext): string | null {
 }
 
 /**
+ * The request's `userId`, once it's proven the caller's own; otherwise
+ * `NOT_FOUND`, with the text a missing user gets.
+ *
+ * For the RPCs that are only ever about the caller (their OTPs, their 2FA,
+ * their profile) but name the user in the request: the gateway always sends
+ * the caller's own id, and this holds a gRPC caller to the same. Another
+ * user's id answers exactly as an id that doesn't exist.
+ *
+ * @example requireSelf(unpackCallerContext(metadata), request.userId)
+ */
+export function requireSelf(context: CallerContext, userId: string): string {
+  if (!hasIdentity(context) || context.sub !== userId) {
+    throw new RpcException({
+      code: status.NOT_FOUND,
+      message: 'User not found',
+    });
+  }
+
+  return userId;
+}
+
+/**
  * Refuses anyone but a platform Super Admin, with `PERMISSION_DENIED`.
  *
  * The gateway's `SuperAdminGuard` already gates `/platform/*`; this is the

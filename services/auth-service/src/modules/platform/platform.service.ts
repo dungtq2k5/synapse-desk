@@ -135,14 +135,14 @@ export class PlatformService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.organization.findMany({
+      this.prisma.unscoped('platform').organization.findMany({
         where,
         include: ORGANIZATION_COUNTS,
         orderBy,
         skip,
         take,
       }),
-      this.prisma.organization.count({ where }),
+      this.prisma.unscoped('platform').organization.count({ where }),
     ]);
 
     return {
@@ -169,15 +169,15 @@ export class PlatformService {
   ): Promise<ResolveAuditNamesResponse> {
     requireActor(context);
     const [users, organizations, plans] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.unscoped('platform').user.findMany({
         where: { id: { in: request.userIds } },
         select: { id: true, fullName: true },
       }),
-      this.prisma.organization.findMany({
+      this.prisma.unscoped('platform').organization.findMany({
         where: { id: { in: request.organizationIds } },
         select: { id: true, name: true },
       }),
-      this.prisma.subscriptionPlan.findMany({
+      this.prisma.unscoped('platform').subscriptionPlan.findMany({
         where: { id: { in: request.planIds } },
         select: { id: true, name: true },
       }),
@@ -197,10 +197,12 @@ export class PlatformService {
     context: CallerContext,
   ): Promise<OrganizationUsageResponse> {
     requireActor(context);
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: request.organizationId },
-      include: { plan: { select: { name: true } } },
-    });
+    const organization = await this.prisma
+      .unscoped('platform')
+      .organization.findUnique({
+        where: { id: request.organizationId },
+        include: { plan: { select: { name: true } } },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -226,59 +228,66 @@ export class PlatformService {
     const slug = request.slug.trim().toLowerCase();
 
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
-        const organization = await tx.organization.create({
-          data: {
-            // **The base, and every override below it wins.** Order is the
-            // whole of it: `{ ...overrides, ...FREE_TIER_ENTITLEMENTS }` would
-            // compile, look identical, and silently discard every number a
-            // Super Admin typed.
-            //
-            // That a platform-created tenant starts on the FREE tier unless
-            // overridden is now a stated choice rather than an inherited one.
-            // It is what the schema defaults did, so nothing changes today —
-            // but a route whose purpose is provisioning a customer arguably
-            // wants a plan required instead, and that is a decision somebody
-            // can now see to make.
-            ...FREE_TIER_ORGANIZATION_GRANTS,
-            name: request.name.trim(),
-            slug,
-            domain: request.domain?.trim().toLowerCase() || null,
-            status: OrgStatus.PENDING_ONBOARDING,
-            allowedEmailDomains: request.allowedEmailDomains.map((domain) =>
-              domain.trim().toLowerCase(),
-            ),
-            // Absent keeps the free-tier value rather than 0 — a tenant created
-            // with zero seats could never be used.
-            ...(request.maxAgentSeats !== undefined
-              ? { maxAgentSeats: request.maxAgentSeats }
-              : {}),
-            ...(request.maxStorageBytes !== undefined
-              ? { maxStorageBytes: BigInt(request.maxStorageBytes) }
-              : {}),
-            ...(request.monthlyAiTokenBudget !== undefined
-              ? { monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget) }
-              : {}),
-          },
+      const created = await this.prisma
+        .unscoped('platform')
+        .$transaction(async (tx) => {
+          const organization = await tx.organization.create({
+            data: {
+              // **The base, and every override below it wins.** Order is the
+              // whole of it: `{ ...overrides, ...FREE_TIER_ENTITLEMENTS }` would
+              // compile, look identical, and silently discard every number a
+              // Super Admin typed.
+              //
+              // That a platform-created tenant starts on the FREE tier unless
+              // overridden is now a stated choice rather than an inherited one.
+              // It is what the schema defaults did, so nothing changes today —
+              // but a route whose purpose is provisioning a customer arguably
+              // wants a plan required instead, and that is a decision somebody
+              // can now see to make.
+              ...FREE_TIER_ORGANIZATION_GRANTS,
+              name: request.name.trim(),
+              slug,
+              domain: request.domain?.trim().toLowerCase() || null,
+              status: OrgStatus.PENDING_ONBOARDING,
+              allowedEmailDomains: request.allowedEmailDomains.map((domain) =>
+                domain.trim().toLowerCase(),
+              ),
+              // Absent keeps the free-tier value rather than 0 — a tenant created
+              // with zero seats could never be used.
+              ...(request.maxAgentSeats !== undefined
+                ? { maxAgentSeats: request.maxAgentSeats }
+                : {}),
+              ...(request.maxStorageBytes !== undefined
+                ? { maxStorageBytes: BigInt(request.maxStorageBytes) }
+                : {}),
+              ...(request.monthlyAiTokenBudget !== undefined
+                ? { monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget) }
+                : {}),
+            },
+          });
+
+          const admin = await tx.user.create({
+            data: {
+              organizationId: organization.id,
+              email: adminEmail,
+              fullName: request.adminFullName.trim(),
+            },
+          });
+
+          const orgAdminRoleId = await this.rolesService.getSystemRoleId(
+            SystemRoleName.ORG_ADMIN,
+            tx,
+          );
+          // Through RolesService so `roles.user_assigned` moves with the grant.
+          await this.rolesService.grantRoles(
+            tx,
+            admin.id,
+            [orgAdminRoleId],
+            organization.id,
+          );
+
+          return { organization, admin };
         });
-
-        const admin = await tx.user.create({
-          data: {
-            organizationId: organization.id,
-            email: adminEmail,
-            fullName: request.adminFullName.trim(),
-          },
-        });
-
-        const orgAdminRoleId = await this.rolesService.getSystemRoleId(
-          SystemRoleName.ORG_ADMIN,
-          tx,
-        );
-        // Through RolesService so `roles.user_assigned` moves with the grant.
-        await this.rolesService.grantRoles(tx, admin.id, [orgAdminRoleId]);
-
-        return { organization, admin };
-      });
 
       this.audit.record(context, {
         action: AuditAction.PLATFORM_ORGANIZATION_CREATED,
@@ -452,11 +461,13 @@ export class PlatformService {
       });
     }
 
-    const organization = await this.prisma.organization.update({
-      where: { id: existing.id },
-      data: { status: to },
-      include: ORGANIZATION_COUNTS,
-    });
+    const organization = await this.prisma
+      .unscoped('platform')
+      .organization.update({
+        where: { id: existing.id },
+        data: { status: to },
+        include: ORGANIZATION_COUNTS,
+      });
 
     // Losing access is immediate; regaining it needs no session surgery.
     let revokedSessionCount = 0;
@@ -514,11 +525,13 @@ export class PlatformService {
       });
     }
 
-    const organization = await this.prisma.organization.update({
-      where: { id: existing.id },
-      data: { billingCycleStart: new Date() },
-      include: ORGANIZATION_COUNTS,
-    });
+    const organization = await this.prisma
+      .unscoped('platform')
+      .organization.update({
+        where: { id: existing.id },
+        data: { billingCycleStart: new Date() },
+        include: ORGANIZATION_COUNTS,
+      });
 
     this.audit.record(context, {
       action: AuditAction.PLATFORM_BILLING_CYCLE_RESET,
@@ -554,7 +567,7 @@ export class PlatformService {
     const existing = await this.load(request.organizationId);
     const actorId = requireActor(context);
 
-    await this.prisma.organization.update({
+    await this.prisma.unscoped('platform').organization.update({
       where: { id: existing.id },
       data: softDeleteData(actorId),
     });
@@ -595,10 +608,12 @@ export class PlatformService {
     request: PlatformOrganizationIdRequest,
     context: CallerContext,
   ): Promise<PlatformOrganizationResponse> {
-    const existing = await this.prisma.organization.findFirst({
-      where: { id: request.organizationId, deletedAt: { not: null } },
-      select: { id: true, slug: true },
-    });
+    const existing = await this.prisma
+      .unscoped('platform')
+      .organization.findFirst({
+        where: { id: request.organizationId, deletedAt: { not: null } },
+        select: { id: true, slug: true },
+      });
     if (!existing) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -647,7 +662,7 @@ export class PlatformService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.unscoped('platform').user.findMany({
         where,
         include: {
           organization: { select: { name: true } },
@@ -657,7 +672,7 @@ export class PlatformService {
         skip,
         take,
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.unscoped('platform').user.count({ where }),
     ]);
 
     // Avatars are NOT resolved on the platform paths, and that is deliberate
@@ -700,14 +715,14 @@ export class PlatformService {
     const where: Prisma.RoleWhereInput = { organizationId: null };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.role.findMany({
+      this.prisma.unscoped('platform').role.findMany({
         where,
         include: ROLE_INCLUDE,
         orderBy,
         skip,
         take,
       }),
-      this.prisma.role.count({ where }),
+      this.prisma.unscoped('platform').role.count({ where }),
     ]);
 
     return {
@@ -731,7 +746,7 @@ export class PlatformService {
     const actorId = requireActor(context);
 
     try {
-      const role = await this.prisma.role.create({
+      const role = await this.prisma.unscoped('platform').role.create({
         data: {
           organizationId: null,
           name: request.name.trim(),
@@ -789,14 +804,18 @@ export class PlatformService {
       liveSessions,
       seatAllocation,
     ] = await Promise.all([
-      this.prisma.organization.count({ where: { deletedAt: null } }),
-      this.prisma.organization.groupBy({
+      this.prisma
+        .unscoped('platform')
+        .organization.count({ where: { deletedAt: null } }),
+      this.prisma.unscoped('platform').organization.groupBy({
         by: ['status'],
         where: { deletedAt: null },
         _count: { _all: true },
       }),
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { deletedAt: null, isLocked: false } }),
+      this.prisma.unscoped('platform').user.count(),
+      this.prisma
+        .unscoped('platform')
+        .user.count({ where: { deletedAt: null, isLocked: false } }),
       // **A fourth count, for the seats line only.** `activeUsers` above means
       // "not deleted and not locked", which is the right meaning for a figure
       // about activity — and the wrong one for a figure about billing. The
@@ -817,16 +836,16 @@ export class PlatformService {
       // out, this line reported platform accounts as occupied seats beside a
       // `seatsAllocated` computed only from tenants. The rule is "a live user
       // IN A TENANT" — one table wider, not one predicate shorter.
-      this.prisma.user.count({
+      this.prisma.unscoped('platform').user.count({
         where: { deletedAt: null, organizationId: { not: null } },
       }),
-      this.prisma.userInvitation.count({
+      this.prisma.unscoped('platform').userInvitation.count({
         where: { status: InvitationStatus.PENDING, expiresAt: { gt: now } },
       }),
-      this.prisma.deviceSession.count({
+      this.prisma.unscoped('platform').deviceSession.count({
         where: { rotatedAt: null, expiresAt: { gt: now } },
       }),
-      this.prisma.organization.aggregate({
+      this.prisma.unscoped('platform').organization.aggregate({
         where: { deletedAt: null },
         _sum: { maxAgentSeats: true },
       }),
@@ -880,7 +899,7 @@ export class PlatformService {
   private async revokeAllTenantSessions(
     organizationId: string,
   ): Promise<number> {
-    const members = await this.prisma.user.findMany({
+    const members = await this.prisma.unscoped('platform').user.findMany({
       where: { organizationId },
       select: { id: true },
     });
@@ -901,10 +920,12 @@ export class PlatformService {
    * them.
    */
   private async load(organizationId: string): Promise<OrganizationRow> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      include: ORGANIZATION_COUNTS,
-    });
+    const organization = await this.prisma
+      .unscoped('platform')
+      .organization.findUnique({
+        where: { id: organizationId },
+        include: ORGANIZATION_COUNTS,
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -920,7 +941,7 @@ export class PlatformService {
     data: Prisma.OrganizationUpdateInput,
   ): Promise<OrganizationRow> {
     try {
-      return await this.prisma.organization.update({
+      return await this.prisma.unscoped('platform').organization.update({
         where: { id },
         data,
         include: ORGANIZATION_COUNTS,

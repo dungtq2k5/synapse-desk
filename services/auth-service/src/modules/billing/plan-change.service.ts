@@ -8,6 +8,7 @@ import {
   CallerContext,
   FREE_PLAN_SEED,
   type OverLimitItem,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   isUniqueConstraintViolation,
@@ -112,7 +113,7 @@ export class PlanChangeService {
   ): Promise<ListTenantPlansResponse> {
     requireTenant(context);
 
-    const plans = await this.prisma.subscriptionPlan.findMany({
+    const plans = await this.prisma.scoped(context).subscriptionPlan.findMany({
       // **`prices: { some: {} }` is part of "joinable", not an optimization.**
       // The Free plan is seeded with `stripeProductId: null` and no prices at
       // all — it is assigned rather than sold. Listing it would offer a plan
@@ -138,15 +139,17 @@ export class PlanChangeService {
    * @example await planChange.listPublicPlans() // { items: [Free, Starter, Pro, Enterprise] }
    */
   async listPublicPlans(): Promise<ListTenantPlansResponse> {
-    const plans = await this.prisma.subscriptionPlan.findMany({
-      where: {
-        deletedAt: null,
-        isActive: true,
-        OR: [{ prices: { some: {} } }, { name: FREE_PLAN_SEED.name }],
-      },
-      include: PLAN_PRICES,
-      orderBy: { maxAgentSeats: 'asc' },
-    });
+    const plans = await this.prisma
+      .unscoped('shared catalog')
+      .subscriptionPlan.findMany({
+        where: {
+          deletedAt: null,
+          isActive: true,
+          OR: [{ prices: { some: {} } }, { name: FREE_PLAN_SEED.name }],
+        },
+        include: PLAN_PRICES,
+        orderBy: { maxAgentSeats: 'asc' },
+      });
     const free = plans.filter((plan) => plan.name === FREE_PLAN_SEED.name);
     const priced = plans.filter((plan) => plan.name !== FREE_PLAN_SEED.name);
 
@@ -373,19 +376,21 @@ export class PlanChangeService {
   private async resolve(request: PlanChangeRequest, context: CallerContext) {
     const organizationId = requireTenant(context);
 
-    const organization = await this.prisma.organization.findFirst({
-      // Tenant-scoped by construction: the id is the verified caller's, never
-      // the request's.
-      where: { id: organizationId, deletedAt: null },
-      select: {
-        id: true,
-        entitlementsPinned: true,
-        stripeSubscriptionId: true,
-        maxStorageBytes: true,
-        maxDocumentUploads: true,
-        plan: { select: { name: true, stripeProductId: true } },
-      },
-    });
+    const organization = await this.prisma
+      .scoped(context)
+      .organization.findFirst({
+        // Tenant-scoped by construction: the id is the verified caller's, never
+        // the request's.
+        where: { id: organizationId, deletedAt: null },
+        select: {
+          id: true,
+          entitlementsPinned: true,
+          stripeSubscriptionId: true,
+          maxStorageBytes: true,
+          maxDocumentUploads: true,
+          plan: { select: { name: true, stripeProductId: true } },
+        },
+      });
 
     if (!organization) {
       throw new RpcException({
@@ -420,10 +425,12 @@ export class PlanChangeService {
       });
     }
 
-    const price = await this.prisma.subscriptionPlanPrice.findUnique({
-      where: { stripePriceId: request.priceId },
-      include: { plan: true },
-    });
+    const price = await this.prisma
+      .scoped(context)
+      .subscriptionPlanPrice.findUnique({
+        where: { stripePriceId: request.priceId },
+        include: { plan: true },
+      });
 
     // 3 — the caller sends both ids and they must agree. Trusting `priceId`
     // alone would let a caller name Pro's plan and Starter's price; trusting
@@ -454,17 +461,19 @@ export class PlanChangeService {
   private async resolveForCheckout(priceId: string, context: CallerContext) {
     const organizationId = requireTenant(context);
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      select: {
-        id: true,
-        entitlementsPinned: true,
-        stripeSubscriptionId: true,
-        maxStorageBytes: true,
-        maxDocumentUploads: true,
-        plan: { select: { name: true, stripeProductId: true } },
-      },
-    });
+    const organization = await this.prisma
+      .scoped(context)
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        select: {
+          id: true,
+          entitlementsPinned: true,
+          stripeSubscriptionId: true,
+          maxStorageBytes: true,
+          maxDocumentUploads: true,
+          plan: { select: { name: true, stripeProductId: true } },
+        },
+      });
 
     if (!organization) {
       throw new RpcException({
@@ -493,10 +502,12 @@ export class PlanChangeService {
       });
     }
 
-    const price = await this.prisma.subscriptionPlanPrice.findUnique({
-      where: { stripePriceId: priceId },
-      include: { plan: true },
-    });
+    const price = await this.prisma
+      .scoped(context)
+      .subscriptionPlanPrice.findUnique({
+        where: { stripePriceId: priceId },
+        include: { plan: true },
+      });
 
     // Validated against the catalog BEFORE Stripe is called. A price the
     // webhook could not map is a price that would take payment and then fail
@@ -524,7 +535,7 @@ export class PlanChangeService {
     maxAgentSeats: number,
   ): Promise<OverLimitItem[]> {
     const seatsInUse = await this.organizations.seatsInUse(
-      this.prisma,
+      this.prisma.scoped(systemContext(organizationId)),
       organizationId,
     );
 
@@ -583,7 +594,7 @@ export class PlanChangeService {
    */
   private async release(idempotencyKey: string): Promise<void> {
     try {
-      await this.prisma.billingEvent.deleteMany({
+      await this.prisma.unscoped('job by row id').billingEvent.deleteMany({
         where: { stripeEventId: idempotencyKey },
       });
     } catch (error) {
@@ -632,17 +643,19 @@ export class PlanChangeService {
     request: PlanChangeRequest,
   ): Promise<void> {
     try {
-      await this.prisma.billingEvent.create({
-        data: {
-          stripeEventId: idempotencyKey,
-          organizationId,
-          eventType: 'plan.change_requested',
-          stripeCreatedAt: new Date(),
-          source: BillingEventSource.LOCAL,
-          payload: { planId: request.planId, priceId: request.priceId },
-          status: BillingEventStatus.PROCESSED,
-        },
-      });
+      await this.prisma
+        .scoped(systemContext(organizationId))
+        .billingEvent.create({
+          data: {
+            stripeEventId: idempotencyKey,
+            organizationId,
+            eventType: 'plan.change_requested',
+            stripeCreatedAt: new Date(),
+            source: BillingEventSource.LOCAL,
+            payload: { planId: request.planId, priceId: request.priceId },
+            status: BillingEventStatus.PROCESSED,
+          },
+        });
     } catch (error) {
       if (isUniqueConstraintViolation(error)) {
         throw new RpcException({

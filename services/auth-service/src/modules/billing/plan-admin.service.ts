@@ -8,6 +8,7 @@ import {
   FREE_TIER_ORGANIZATION_GRANTS,
   PLAN_SORTABLE_FIELDS,
   type PlanLimitDimension,
+  systemContext,
 } from '@synapsedesk/contracts';
 import Stripe from 'stripe';
 import { isUniqueConstraintViolation, withHttpStatus } from '@synapsedesk/core';
@@ -160,7 +161,7 @@ export class PlanAdminService {
     };
 
     const [rows, totalItems] = await Promise.all([
-      this.prisma.subscriptionPlan.findMany({
+      this.prisma.scoped(context).subscriptionPlan.findMany({
         where,
         include: PLAN_INCLUDE,
         // Defaults to creation order, which is how a ladder reads. There is no
@@ -169,7 +170,7 @@ export class PlanAdminService {
         skip,
         take,
       }),
-      this.prisma.subscriptionPlan.count({ where }),
+      this.prisma.scoped(context).subscriptionPlan.count({ where }),
     ]);
 
     const items = rows.map(toSubscriptionPlanResponse);
@@ -209,8 +210,9 @@ export class PlanAdminService {
       stripeProductId: request.stripeProductId ?? null,
     });
 
-    const plan = await this.prisma.subscriptionPlan
-      .create({
+    const plan = await this.prisma
+      .scoped(context)
+      .subscriptionPlan.create({
         data: {
           name,
           stripeProductId: request.stripeProductId ?? null,
@@ -323,10 +325,12 @@ export class PlanAdminService {
     prices: { stripePriceId: string }[],
   ): Promise<void> {
     if (prices.length === 0) return;
-    const taken = await this.prisma.subscriptionPlanPrice.findFirst({
-      where: { stripePriceId: { in: prices.map((p) => p.stripePriceId) } },
-      select: { stripePriceId: true, plan: { select: { name: true } } },
-    });
+    const taken = await this.prisma
+      .unscoped('platform')
+      .subscriptionPlanPrice.findFirst({
+        where: { stripePriceId: { in: prices.map((p) => p.stripePriceId) } },
+        select: { stripePriceId: true, plan: { select: { name: true } } },
+      });
     if (taken) {
       throw new RpcException({
         code: status.ALREADY_EXISTS,
@@ -352,9 +356,11 @@ export class PlanAdminService {
           message: `${stripePriceId} isn't on ${plan.name}.`,
         });
       }
-      const subscribed = await this.prisma.organization.count({
-        where: { stripePriceId },
-      });
+      const subscribed = await this.prisma
+        .unscoped('platform')
+        .organization.count({
+          where: { stripePriceId },
+        });
       if (subscribed > 0) {
         throw new RpcException({
           code: status.FAILED_PRECONDITION,
@@ -397,6 +403,7 @@ export class PlanAdminService {
     const amounts = await this.amountsOf(addPrices, { name, stripeProductId });
 
     const plan = await this.prisma
+      .unscoped('platform')
       .$transaction(async (tx) => {
         if (removePrices.length > 0) {
           await tx.subscriptionPlanPrice.deleteMany({
@@ -505,7 +512,7 @@ export class PlanAdminService {
       });
     }
 
-    await this.prisma.subscriptionPlan.update({
+    await this.prisma.scoped(context).subscriptionPlan.update({
       where: { id: existing.id },
       data: {
         deletedAt: new Date(),
@@ -560,11 +567,13 @@ export class PlanAdminService {
 
     const plan = await this.load(request.planId);
 
-    const subscribers = await this.prisma.organization.findMany({
-      where: { planId: plan.id, deletedAt: null },
-      select: SUBSCRIBER_SELECT,
-      orderBy: { name: 'asc' },
-    });
+    const subscribers = await this.prisma
+      .scoped(context)
+      .organization.findMany({
+        where: { planId: plan.id, deletedAt: null },
+        select: SUBSCRIBER_SELECT,
+        orderBy: { name: 'asc' },
+      });
 
     const projections: PlanSubscriberProjection[] = [];
 
@@ -774,13 +783,15 @@ export class PlanAdminService {
 
   /** A live organization with what a projection reads, and its plan. */
   private async loadOrganization(organizationId: string) {
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      select: {
-        ...SUBSCRIBER_SELECT,
-        plan: { select: { id: true, name: true, stripeProductId: true } },
-      },
-    });
+    const organization = await this.prisma
+      .unscoped('platform')
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        select: {
+          ...SUBSCRIBER_SELECT,
+          plan: { select: { id: true, name: true, stripeProductId: true } },
+        },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -910,7 +921,7 @@ export class PlanAdminService {
     plan: Grants,
   ): Promise<{ overLimit: string[]; overLimitItems: OverLimit[] }> {
     const seatsInUse = await this.organizations.seatsInUse(
-      this.prisma,
+      this.prisma.scoped(systemContext(subscriber.id)),
       subscriber.id,
     );
 
@@ -937,7 +948,7 @@ export class PlanAdminService {
     budgetDeferred: boolean,
     link: { planId?: string | null } = {},
   ): Promise<void> {
-    await this.prisma.organization.update({
+    await this.prisma.unscoped('platform').organization.update({
       where: { id: organizationId },
       data: {
         ...link,
@@ -960,10 +971,12 @@ export class PlanAdminService {
   }
 
   private async load(planId: string): Promise<PlanRow> {
-    const plan = await this.prisma.subscriptionPlan.findFirst({
-      where: { id: planId, deletedAt: null },
-      include: PLAN_INCLUDE,
-    });
+    const plan = await this.prisma
+      .unscoped('platform')
+      .subscriptionPlan.findFirst({
+        where: { id: planId, deletedAt: null },
+        include: PLAN_INCLUDE,
+      });
 
     if (!plan) {
       throw new RpcException({

@@ -463,72 +463,74 @@ export class AuthService {
     const { email, fullName, passwordHash, emailDomain } = input;
 
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        const existingOrg = await tx.organization.findFirst({
-          where: {
-            allowedEmailDomains: { has: emailDomain },
-            deletedAt: null,
-          },
-          // `maxAgentSeats` for the seat alarm below. Only on the FOUND branch:
-          // the created branch is a founder, and the alarm is not evaluated
-          // there — see `fireSeatAlarm`.
-          select: { id: true, name: true, maxAgentSeats: true },
-        });
-
-        const org =
-          existingOrg ??
-          (await tx.organization.create({
-            data: {
-              // What a self-service workspace gets, stated rather than
-              // inherited. These used to be seven `@default()`s nobody reading
-              // this file could see, and they set every new tenant to the
-              // PLATFORM CEILING on four dimensions.
-              ...FREE_TIER_ORGANIZATION_GRANTS,
-              name: `Workspace for ${email}`,
-              slug: generateUniqueOrganizationSlug(email),
-              status: OrgStatus.PENDING_ONBOARDING,
-              allowedEmailDomains: [emailDomain],
+      const result = await this.prisma
+        .unscoped('before a tenant')
+        .$transaction(async (tx) => {
+          const existingOrg = await tx.organization.findFirst({
+            where: {
+              allowedEmailDomains: { has: emailDomain },
+              deletedAt: null,
             },
-            select: { id: true, name: true },
-          }));
+            // `maxAgentSeats` for the seat alarm below. Only on the FOUND branch:
+            // the created branch is a founder, and the alarm is not evaluated
+            // there — see `fireSeatAlarm`.
+            select: { id: true, name: true, maxAgentSeats: true },
+          });
 
-        // Now that the tenant is known, the conflict question is answerable.
-        const existing = await tx.user.findFirst({
-          where: { email, organizationId: org.id, deletedAt: null },
-          select: { fullName: true },
+          const org =
+            existingOrg ??
+            (await tx.organization.create({
+              data: {
+                // What a self-service workspace gets, stated rather than
+                // inherited. These used to be seven `@default()`s nobody reading
+                // this file could see, and they set every new tenant to the
+                // PLATFORM CEILING on four dimensions.
+                ...FREE_TIER_ORGANIZATION_GRANTS,
+                name: `Workspace for ${email}`,
+                slug: generateUniqueOrganizationSlug(email),
+                status: OrgStatus.PENDING_ONBOARDING,
+                allowedEmailDomains: [emailDomain],
+              },
+              select: { id: true, name: true },
+            }));
+
+          // Now that the tenant is known, the conflict question is answerable.
+          const existing = await tx.user.findFirst({
+            where: { email, organizationId: org.id, deletedAt: null },
+            select: { fullName: true },
+          });
+          if (existing) return { taken: existing };
+
+          const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
+
+          // `select`, not `include: USER_WITH_ACCESS`. The caller reads four
+          // scalars off this row and never touches the relations, so including
+          // them fetched an organization, every department and every role WITH
+          // its permissions to throw all of it away.
+          //
+          // It also cost correctness noise: a multi-relation include issues its
+          // relation loads concurrently, and inside a transaction those land on
+          // the single connection the transaction has pinned — which pg only
+          // tolerates by queueing them, a queue it removes in pg@9.
+          const created = await tx.user.create({
+            data: {
+              organizationId: org.id,
+              fullName,
+              email,
+              passwordHash,
+              isEmailVerified: false,
+              roles: { connect: { id: roleId } },
+            },
+            select: {
+              id: true,
+              email: true,
+              fullName: true,
+              organizationId: true,
+            },
+          });
+
+          return { created, organizationName: org.name, seatAlarm };
         });
-        if (existing) return { taken: existing };
-
-        const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
-
-        // `select`, not `include: USER_WITH_ACCESS`. The caller reads four
-        // scalars off this row and never touches the relations, so including
-        // them fetched an organization, every department and every role WITH
-        // its permissions to throw all of it away.
-        //
-        // It also cost correctness noise: a multi-relation include issues its
-        // relation loads concurrently, and inside a transaction those land on
-        // the single connection the transaction has pinned — which pg only
-        // tolerates by queueing them, a queue it removes in pg@9.
-        const created = await tx.user.create({
-          data: {
-            organizationId: org.id,
-            fullName,
-            email,
-            passwordHash,
-            isEmailVerified: false,
-            roles: { connect: { id: roleId } },
-          },
-          select: {
-            id: true,
-            email: true,
-            fullName: true,
-            organizationId: true,
-          },
-        });
-
-        return { created, organizationName: org.name, seatAlarm };
-      });
 
       if ('taken' in result) return result;
 
@@ -546,10 +548,12 @@ export class AuthService {
       // thing that makes that impossible; this gives the loser the same answer
       // the pre-check does.
       if (isUniqueConstraintViolation(error)) {
-        const winner = await this.prisma.user.findFirst({
-          where: { email, deletedAt: null },
-          select: { fullName: true },
-        });
+        const winner = await this.prisma
+          .unscoped('before a tenant')
+          .user.findFirst({
+            where: { email, deletedAt: null },
+            select: { fullName: true },
+          });
         return { taken: { fullName: winner?.fullName ?? fullName } };
       }
       throw error;
@@ -574,14 +578,16 @@ export class AuthService {
 
     // findMany, not findUnique: an address is unique per TENANT now, so one
     // address may legitimately name several accounts.
-    const candidates = await this.prisma.user.findMany({
-      where: { email, deletedAt: null },
-      // Roles, permissions and departments are loaded here because
-      // buildJwtPayload needs them. Without this include the token ships with
-      // `permissionCodes: []` and PermissionGuard denies everything, with
-      // nothing in the logs to explain why.
-      include: USER_WITH_ACCESS,
-    });
+    const candidates = await this.prisma
+      .unscoped('before a tenant')
+      .user.findMany({
+        where: { email, deletedAt: null },
+        // Roles, permissions and departments are loaded here because
+        // buildJwtPayload needs them. Without this include the token ships with
+        // `permissionCodes: []` and PermissionGuard denies everything, with
+        // nothing in the logs to explain why.
+        include: USER_WITH_ACCESS,
+      });
 
     const matched: UserWithAccess[] = [];
     let compared = false;
@@ -672,7 +678,7 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.unscoped('before a tenant').user.findFirst({
       where: {
         // Constrained to the verified set: an organizationId outside it cannot
         // select anything, however well-formed the request looks.
@@ -723,7 +729,7 @@ export class AuthService {
     if (!user.isLocked || !user.lockedUntil) return false;
     if (user.lockedUntil.getTime() > Date.now()) return false;
 
-    await this.prisma.user.updateMany({
+    await this.prisma.unscoped('before a tenant').user.updateMany({
       where: { id: user.id, isLocked: true },
       data: { isLocked: false, lockedUntil: null },
     });
@@ -860,10 +866,12 @@ export class AuthService {
     // findMany because the address may name accounts in several tenants. Google
     // proves the address, not which tenant is meant, so the same selection step
     // as password login applies.
-    const candidates = await this.prisma.user.findMany({
-      where: { email: identity.email, deletedAt: null },
-      include: USER_WITH_ACCESS,
-    });
+    const candidates = await this.prisma
+      .unscoped('before a tenant')
+      .user.findMany({
+        where: { email: identity.email, deletedAt: null },
+        include: USER_WITH_ACCESS,
+      });
 
     if (candidates.length > 1) {
       return {
@@ -911,10 +919,12 @@ export class AuthService {
    * state — no session — is reached either way.
    */
   async logout(request: LogoutRequest): Promise<LogoutResponse> {
-    const session = await this.prisma.deviceSession.findUnique({
-      where: { refreshTokenHash: hashToken(request.refreshToken) },
-      select: { id: true, userId: true },
-    });
+    const session = await this.prisma
+      .unscoped('before a tenant')
+      .deviceSession.findUnique({
+        where: { refreshTokenHash: hashToken(request.refreshToken) },
+        select: { id: true, userId: true },
+      });
     if (!session) return { revokedSessionCount: 0 };
 
     const count = await this.sessionsService.deleteAndMark(
@@ -965,7 +975,7 @@ export class AuthService {
   ): Promise<ChangePasswordResponse> {
     const userId = requireActor(context);
 
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.scoped(context).user.findFirst({
       where: { id: userId, ...tenantScope(context) },
       select: { id: true, email: true, fullName: true, passwordHash: true },
     });
@@ -1012,7 +1022,7 @@ export class AuthService {
       this.BCRYPT_ROUNDS,
     );
 
-    await this.prisma.user.update({
+    await this.prisma.scoped(context).user.update({
       where: { id: user.id },
       data: { passwordHash },
     });
@@ -1065,20 +1075,22 @@ export class AuthService {
   ): Promise<RefreshTokenResponse> {
     const presentedHash = hashToken(request.refreshToken);
 
-    const session = await this.prisma.deviceSession.findUnique({
-      where: { refreshTokenHash: presentedHash },
-      select: {
-        id: true,
-        userId: true,
-        familyId: true,
-        expiresAt: true,
-        rotatedAt: true,
-        deviceName: true,
-        isTrusted: true,
-        deviceTokenHash: true,
-        trustedUntil: true,
-      },
-    });
+    const session = await this.prisma
+      .unscoped('before a tenant')
+      .deviceSession.findUnique({
+        where: { refreshTokenHash: presentedHash },
+        select: {
+          id: true,
+          userId: true,
+          familyId: true,
+          expiresAt: true,
+          rotatedAt: true,
+          deviceName: true,
+          isTrusted: true,
+          deviceTokenHash: true,
+          trustedUntil: true,
+        },
+      });
 
     if (!session) {
       throw new RpcException({
@@ -1102,14 +1114,16 @@ export class AuthService {
     }
 
     if (session.expiresAt <= new Date()) {
-      await this.prisma.deviceSession.delete({ where: { id: session.id } });
+      await this.prisma
+        .unscoped('before a tenant')
+        .deviceSession.delete({ where: { id: session.id } });
       throw new RpcException({
         code: status.UNAUTHENTICATED,
         message: 'Session has expired',
       });
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('before a tenant').user.findUnique({
       where: { id: session.userId, deletedAt: null },
       include: USER_WITH_ACCESS,
     });
@@ -1125,7 +1139,7 @@ export class AuthService {
 
     const refreshToken = generateSecureToken();
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.unscoped('before a tenant').$transaction(async (tx) => {
       // The old row is retained, marked spent, so a later replay is DETECTABLE.
       // Deleting it would make replay indistinguishable from an unknown token.
       await tx.deviceSession.update({
@@ -1185,7 +1199,7 @@ export class AuthService {
   async trustDevice(userId: string, deviceSessionId: string): Promise<string> {
     const deviceToken = generateSecureToken();
 
-    await this.prisma.deviceSession.update({
+    await this.prisma.unscoped('before a tenant').deviceSession.update({
       where: { id: deviceSessionId, userId },
       data: {
         isTrusted: true,
@@ -1211,29 +1225,31 @@ export class AuthService {
   ): Promise<IssuedSession> {
     const refreshToken = generateSecureToken();
 
-    const session = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.deviceSession.create({
-        data: {
-          userId: user.id,
-          refreshTokenHash: hashToken(refreshToken),
-          deviceName: device.name,
-          ipAddress: device.ip,
-          userAgent: device.userAgent,
-          // Trust is granted only after a successful 2FA challenge with
-          // explicit consent — never as a side effect of logging in.
-          isTrusted: false,
-          expiresAt: addDays(new Date(), this.REFRESH_TOKEN_TTL_DAYS),
-        },
-        select: { id: true, familyId: true },
-      });
+    const session = await this.prisma
+      .unscoped('before a tenant')
+      .$transaction(async (tx) => {
+        const created = await tx.deviceSession.create({
+          data: {
+            userId: user.id,
+            refreshTokenHash: hashToken(refreshToken),
+            deviceName: device.name,
+            ipAddress: device.ip,
+            userAgent: device.userAgent,
+            // Trust is granted only after a successful 2FA challenge with
+            // explicit consent — never as a side effect of logging in.
+            isTrusted: false,
+            expiresAt: addDays(new Date(), this.REFRESH_TOKEN_TTL_DAYS),
+          },
+          select: { id: true, familyId: true },
+        });
 
-      await tx.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() },
-      });
+        await tx.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
 
-      return created;
-    });
+        return created;
+      });
     // Signed once the row exists: the token names its family.
     const accessToken = this.generateAccessToken(
       this.buildJwtPayload(user, session.familyId),
@@ -1260,7 +1276,7 @@ export class AuthService {
 
   /** Loads a user with everything the JWT payload and mapper need. */
   async loadUserForAuth(userId: string): Promise<UserWithAccess> {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('before a tenant').user.findUnique({
       where: { id: userId, deletedAt: null },
       include: USER_WITH_ACCESS,
     });
@@ -1288,7 +1304,7 @@ export class AuthService {
 
     // findMany: one address may hold accounts in several tenants, and each
     // needs its own reset token.
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.unscoped('before a tenant').user.findMany({
       where: { email, deletedAt: null },
       select: {
         id: true,
@@ -1356,7 +1372,7 @@ export class AuthService {
   ): Promise<string> {
     const token = generateSecureToken();
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.unscoped('before a tenant').$transaction(async (tx) => {
       // Five clicks on "forgot password" must not leave five live tokens.
       await tx.passwordResetToken.updateMany({
         where: { userId, isUsed: false },
@@ -1432,35 +1448,37 @@ export class AuthService {
       this.BCRYPT_ROUNDS,
     );
 
-    const reset = await this.prisma.$transaction(async (tx) => {
-      // Invalidate all reset tokens for this user (including the one used)
-      await tx.passwordResetToken.updateMany({
-        where: { userId: record.userId },
-        data: { isUsed: true },
-      });
+    const reset = await this.prisma
+      .unscoped('before a tenant')
+      .$transaction(async (tx) => {
+        // Invalidate all reset tokens for this user (including the one used)
+        await tx.passwordResetToken.updateMany({
+          where: { userId: record.userId },
+          data: { isUsed: true },
+        });
 
-      await tx.user.update({
-        where: { id: record.userId },
-        data: {
-          passwordHash,
-          ...(record.verifiesEmail ? { isEmailVerified: true } : {}),
-        },
-      });
+        await tx.user.update({
+          where: { id: record.userId },
+          data: {
+            passwordHash,
+            ...(record.verifiesEmail ? { isEmailVerified: true } : {}),
+          },
+        });
 
-      // The point of the whole flow. A reset that leaves the attacker's
-      // session alive accomplishes nothing — and that includes their trusted
-      // devices, which would otherwise let them back in without 2FA.
-      const families = await tx.deviceSession.findMany({
-        where: { userId: record.userId },
-        select: { familyId: true },
-        distinct: ['familyId'],
-      });
-      const { count } = await tx.deviceSession.deleteMany({
-        where: { userId: record.userId },
-      });
+        // The point of the whole flow. A reset that leaves the attacker's
+        // session alive accomplishes nothing — and that includes their trusted
+        // devices, which would otherwise let them back in without 2FA.
+        const families = await tx.deviceSession.findMany({
+          where: { userId: record.userId },
+          select: { familyId: true },
+          distinct: ['familyId'],
+        });
+        const { count } = await tx.deviceSession.deleteMany({
+          where: { userId: record.userId },
+        });
 
-      return { count, families: families.map(({ familyId }) => familyId) };
-    });
+        return { count, families: families.map(({ familyId }) => familyId) };
+      });
     // After the commit: their access tokens stop now, not at expiry.
     await this.sessionsService.markRevoked(reset.families);
 
@@ -1484,15 +1502,17 @@ export class AuthService {
   ): Promise<boolean> {
     if (!deviceToken) return false;
 
-    const trusted = await this.prisma.deviceSession.findFirst({
-      where: {
-        userId,
-        isTrusted: true,
-        deviceTokenHash: hashToken(deviceToken),
-        trustedUntil: { gt: new Date() },
-      },
-      select: { id: true },
-    });
+    const trusted = await this.prisma
+      .unscoped('before a tenant')
+      .deviceSession.findFirst({
+        where: {
+          userId,
+          isTrusted: true,
+          deviceTokenHash: hashToken(deviceToken),
+          trustedUntil: { gt: new Date() },
+        },
+        select: { id: true },
+      });
 
     return Boolean(trusted);
   }
@@ -1501,15 +1521,17 @@ export class AuthService {
   private async findUsablePasswordResetToken(token: string) {
     if (!token) return null;
 
-    return this.prisma.passwordResetToken.findFirst({
-      where: {
-        tokenHash: hashToken(token),
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-        user: { deletedAt: null, isLocked: false },
-      },
-      include: { user: { select: { email: true } } },
-    });
+    return this.prisma
+      .unscoped('before a tenant')
+      .passwordResetToken.findFirst({
+        where: {
+          tokenHash: hashToken(token),
+          isUsed: false,
+          expiresAt: { gt: new Date() },
+          user: { deletedAt: null, isLocked: false },
+        },
+        include: { user: { select: { email: true } } },
+      });
   }
 
   /** The access token's claims; `sid` is the session family it belongs to. */
@@ -1616,13 +1638,13 @@ export class AuthService {
     // Write, then re-read. A write carrying a multi-relation include makes
     // Prisma open an implicit transaction and load the relations concurrently
     // on its one connection — the pg deprecation. Two plain statements instead.
-    await this.prisma.user.update({
+    await this.prisma.unscoped('before a tenant').user.update({
       where: { id: user.id },
       data: patch,
       select: { id: true },
     });
 
-    return this.prisma.user.findUniqueOrThrow({
+    return this.prisma.unscoped('before a tenant').user.findUniqueOrThrow({
       where: { id: user.id },
       include: USER_WITH_ACCESS,
     });
@@ -1639,57 +1661,59 @@ export class AuthService {
     device: RequestOrigin,
     emailDomain: string,
   ): Promise<UserWithAccess> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      // **Bound to a name rather than left inline.** Whether this sign-up
-      // found the tenant or created it decides the role and the seat alarm
-      // (`signUpTerms`), and an inline `findFirst() || create()` would discard
-      // which branch ran.
-      const existingOrg = await tx.organization.findFirst({
-        where: { allowedEmailDomains: { has: emailDomain }, deletedAt: null },
-        // `maxAgentSeats` for the alarm. Found branch only — see
-        // `fireSeatAlarm`.
-        select: { id: true, name: true, maxAgentSeats: true },
-      });
+    const created = await this.prisma
+      .unscoped('before a tenant')
+      .$transaction(async (tx) => {
+        // **Bound to a name rather than left inline.** Whether this sign-up
+        // found the tenant or created it decides the role and the seat alarm
+        // (`signUpTerms`), and an inline `findFirst() || create()` would discard
+        // which branch ran.
+        const existingOrg = await tx.organization.findFirst({
+          where: { allowedEmailDomains: { has: emailDomain }, deletedAt: null },
+          // `maxAgentSeats` for the alarm. Found branch only — see
+          // `fireSeatAlarm`.
+          select: { id: true, name: true, maxAgentSeats: true },
+        });
 
-      const org =
-        existingOrg ||
-        (await tx.organization.create({
+        const org =
+          existingOrg ||
+          (await tx.organization.create({
+            data: {
+              // The same free tier as password registration. Two sign-up paths
+              // that provisioned differently would be a difference nobody chose.
+              ...FREE_TIER_ORGANIZATION_GRANTS,
+              name: `Workspace for ${identity.email}`,
+              slug: generateUniqueOrganizationSlug(identity.email),
+              status: OrgStatus.PENDING_ONBOARDING,
+              allowedEmailDomains: [emailDomain],
+            },
+            select: { id: true, name: true },
+          }));
+
+        const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
+
+        const user = await tx.user.create({
           data: {
-            // The same free tier as password registration. Two sign-up paths
-            // that provisioned differently would be a difference nobody chose.
-            ...FREE_TIER_ORGANIZATION_GRANTS,
-            name: `Workspace for ${identity.email}`,
-            slug: generateUniqueOrganizationSlug(identity.email),
-            status: OrgStatus.PENDING_ONBOARDING,
-            allowedEmailDomains: [emailDomain],
+            organizationId: org.id,
+            email: identity.email,
+            // Google may withhold the name; the local part is a usable stand-in
+            // and fullName is NOT NULL. Same helper the inbound-email path uses,
+            // because it is the same question with a different provider.
+            fullName:
+              identity.fullName ??
+              extractEmailLocalPart(identity.email) ??
+              identity.email,
+            // No `avatarUrl` — see linkGoogleIdentity. Google's CDN URL is not a
+            // storage object path, and this column holds only the latter.
+            passwordHash: null,
+            isEmailVerified: identity.emailVerified,
+            roles: { connect: { id: roleId } },
           },
-          select: { id: true, name: true },
-        }));
+          select: { id: true },
+        });
 
-      const { roleId, seatAlarm } = await this.signUpTerms(existingOrg, tx);
-
-      const user = await tx.user.create({
-        data: {
-          organizationId: org.id,
-          email: identity.email,
-          // Google may withhold the name; the local part is a usable stand-in
-          // and fullName is NOT NULL. Same helper the inbound-email path uses,
-          // because it is the same question with a different provider.
-          fullName:
-            identity.fullName ??
-            extractEmailLocalPart(identity.email) ??
-            identity.email,
-          // No `avatarUrl` — see linkGoogleIdentity. Google's CDN URL is not a
-          // storage object path, and this column holds only the latter.
-          passwordHash: null,
-          isEmailVerified: identity.emailVerified,
-          roles: { connect: { id: roleId } },
-        },
-        select: { id: true },
+        return { userId: user.id, organizationName: org.name, seatAlarm };
       });
-
-      return { userId: user.id, organizationName: org.name, seatAlarm };
-    });
 
     this.fireSeatAlarm(created.seatAlarm);
 
@@ -1697,10 +1721,12 @@ export class AuthService {
     // really are needed here — buildJwtPayload reads them — so the read stays,
     // it just moves off the transaction's single pinned connection, where the
     // include's concurrent relation loads had to queue behind one another.
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: created.userId },
-      include: USER_WITH_ACCESS,
-    });
+    const user = await this.prisma
+      .unscoped('before a tenant')
+      .user.findUniqueOrThrow({
+        where: { id: created.userId },
+        include: USER_WITH_ACCESS,
+      });
 
     this.notifications.sendEmail({
       template: EmailTemplateName.WELCOME,
