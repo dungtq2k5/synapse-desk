@@ -7,6 +7,7 @@ export * from './utils/format-error';
 export * from './utils/analytics-range';
 export * from './utils/limit-alert-publisher';
 export * from './utils/tenant-scope';
+export * from './utils/tenant-client';
 export * from './utils/soft-delete';
 export * from './contracts/webhook.contract';
 export * from './configs/inbound-email.config';
