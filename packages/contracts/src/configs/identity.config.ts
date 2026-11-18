@@ -165,8 +165,15 @@ export type CallerContext = RequestOrigin & {
  * user has. A job that needs to read across the tenant boundary is a job whose
  * design should be questioned, and it should fail loudly rather than succeed
  * quietly.
+ *
+ * `null` for the few jobs that walk every tenant (the rollups' timezone and
+ * billing-cycle lookups): a system caller with no tenant, which
+ * `requireTenant` still refuses.
+ *
+ * @example systemContext(organizationId) // a job working for one tenant
+ * @example systemContext(null) // a sweep across every tenant
  */
-export function systemContext(organizationId: string): CallerContext {
+export function systemContext(organizationId: string | null): CallerContext {
   return {
     isSystem: true,
     sub: null,

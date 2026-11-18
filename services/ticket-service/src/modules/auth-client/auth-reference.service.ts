@@ -19,6 +19,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   resolveAnalyticsRangeDays,
   MAX_ATTACHMENTS_PER_MESSAGE,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { formatErrorMsg, requireTenant } from '@synapsedesk/nest-common';
 
@@ -406,7 +407,12 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.organizationService
-          .listOrganizationTimezones({ organizationIds })
+          // A system caller with no tenant: the lookup crosses tenants, and
+          // auth-service answers only a job.
+          .listOrganizationTimezones(
+            { organizationIds },
+            packRequestContext(systemContext(null)),
+          )
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 

@@ -165,6 +165,12 @@ export interface RecordGenerationOutcomeRequest {
    * justifies the co-pilot.
    */
   sentText: string;
+  /**
+   * The ticket the reply was posted on. The generation must be this ticket's,
+   * in the caller's tenant, or the answer is NOT_FOUND, as for a missing id:
+   * `generated_from_id` comes from the client.
+   */
+  ticketId: string;
 }
 
 export interface RecordGenerationOutcomeResponse {

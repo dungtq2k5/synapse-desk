@@ -1469,6 +1469,8 @@ describe('Ticket messages & attachments (e2e)', () => {
         // and decide ACCEPTED vs EDITED. Sending the draft back instead would
         // make every message look accepted.
         'Have you tried restarting it?',
+        // The reply's ticket: ingestion-service closes only that ticket's draft.
+        ticket.id,
         expect.anything(),
       );
     });
@@ -1578,6 +1580,8 @@ describe('Ticket messages & attachments (e2e)', () => {
             generationId,
             resultingMessageId: message.id,
             sentText: 'Restart the router.',
+            // Read back from the reply, since the pending row keeps no ticket.
+            ticketId: message.ticketId,
           },
           expect.anything(),
         );

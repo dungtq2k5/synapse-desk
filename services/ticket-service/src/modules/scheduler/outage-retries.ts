@@ -116,7 +116,10 @@ export class OutageRetries {
     for (const row of rows) {
       const message = await this.prisma.ticketMessage.findUnique({
         where: { id: row.messageId },
-        select: { ticket: { select: { organizationId: true } } },
+        select: {
+          ticketId: true,
+          ticket: { select: { organizationId: true } },
+        },
       });
       if (!message) {
         this.logger.warn(
@@ -130,6 +133,7 @@ export class OutageRetries {
         row.generationId,
         row.messageId,
         row.sentText,
+        message.ticketId,
         systemContext(message.ticket.organizationId),
       );
       if (result.ok) {

@@ -33,9 +33,19 @@ export class TicketAccessService {
    * NOT_FOUND rather than PERMISSION_DENIED for a row that exists but is not
    * theirs: "you may not see this" confirms the ticket exists, which turns id
    * enumeration into a tenant-membership oracle.
+   *
+   * `missing` is the refusal's text. A caller that reached the ticket through
+   * a child row (a message, an attachment) passes the child's own "no such"
+   * text, so another tenant's child answers exactly as a missing one does.
+   *
+   * @example await access.load(message.ticketId, context, 'No message with that id')
    */
-  load(ticketId: string, context: CallerContext): Promise<Ticket> {
-    return this.find(ticketId, context, false);
+  load(
+    ticketId: string,
+    context: CallerContext,
+    missing = 'No ticket with that id',
+  ): Promise<Ticket> {
+    return this.find(ticketId, context, false, missing);
   }
 
   /**
@@ -47,13 +57,14 @@ export class TicketAccessService {
   loadForReading(ticketId: string, context: CallerContext): Promise<Ticket> {
     const mayRestore =
       context.isSuperAdmin || context.permissionCodes.includes('ticket.delete');
-    return this.find(ticketId, context, mayRestore);
+    return this.find(ticketId, context, mayRestore, 'No ticket with that id');
   }
 
   private async find(
     ticketId: string,
     context: CallerContext,
     withDeleted: boolean,
+    missing: string,
   ): Promise<Ticket> {
     const ticket = await this.prisma.ticket.findFirst({
       where: {
@@ -66,7 +77,7 @@ export class TicketAccessService {
     if (!ticket) {
       throw new RpcException({
         code: status.NOT_FOUND,
-        message: 'No ticket with that id',
+        message: missing,
       });
     }
 

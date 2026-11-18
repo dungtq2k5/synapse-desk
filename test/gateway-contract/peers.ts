@@ -74,6 +74,8 @@ export class FakePeer {
   private readonly queued = new Map<string, Programmed[]>();
   private readonly standing = new Map<string, Programmed>();
   private readonly recorded: Recorded[] = [];
+  /** What every method no row programmed answers; `UNIMPLEMENTED` when unset. */
+  private fallback: Programmed | undefined;
 
   /** `127.0.0.1:<port>`, which is what the gateway's `*_SERVICE_URL` takes. */
   address = '';
@@ -120,6 +122,14 @@ export class FakePeer {
     };
   }
 
+  /**
+   * Every method nobody programmed fails with this, until `reset()`. For a row
+   * that drives many routes at once and only cares how a refusal travels back.
+   */
+  failByDefault(code: GrpcStatus, details: string): void {
+    this.fallback = { kind: 'fail', code, details };
+  }
+
   /** Every call to a method, in order — request and metadata. */
   calls(method?: string): Recorded[] {
     return method === undefined
@@ -131,10 +141,15 @@ export class FakePeer {
   reset(): void {
     this.recorded.length = 0;
     this.queued.clear();
+    this.fallback = undefined;
   }
 
   private next(method: string): Programmed | undefined {
-    return this.queued.get(method)?.shift() ?? this.standing.get(method);
+    return (
+      this.queued.get(method)?.shift() ??
+      this.standing.get(method) ??
+      this.fallback
+    );
   }
 
   private addEveryService(definition: PackageDefinition): void {

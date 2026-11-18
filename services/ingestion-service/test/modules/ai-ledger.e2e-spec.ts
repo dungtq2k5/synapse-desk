@@ -35,6 +35,7 @@ import {
 } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { faultInjector } from '@synapsedesk/testing/fault';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 
 describe('The AI ledger and quota gate (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
@@ -773,11 +774,24 @@ describe('The acceptance loop (e2e)', () => {
   let tenant: TenantFixture;
 
   const MESSAGE_ID = '55555555-5555-4555-8555-555555555555';
+  const TICKET_ID = '77777777-7777-4777-8777-777777777777';
+
+  const asTenant = () =>
+    memberContext({ id: tenant.userId, organizationId: tenant.organizationId });
+
+  /** The reply that closes `generationId`'s loop, as ticket-service sends it. */
+  const reply = (generationId: string, sentText: string) => ({
+    generationId,
+    resultingMessageId: MESSAGE_ID,
+    sentText,
+    ticketId: TICKET_ID,
+  });
 
   const draft = async (content: string) => {
     return fx.prisma.aiGeneration.create({
       data: {
         organizationId: tenant.organizationId,
+        ticketId: TICKET_ID,
         purpose: AiGenerationPurpose.DRAFT,
         modelName: GENERATION_MODEL_BY_TIER.FAST,
         promptTokens: 500,
@@ -807,9 +821,8 @@ describe('The acceptance loop (e2e)', () => {
 
     await expect(
       ledger.recordOutcome(
-        row.id,
-        MESSAGE_ID,
-        'The expense limit is 500 per claim.',
+        reply(row.id, 'The expense limit is 500 per claim.'),
+        asTenant(),
       ),
     ).resolves.toBe(AiGenerationOutcome.ACCEPTED);
 
@@ -828,9 +841,8 @@ describe('The acceptance loop (e2e)', () => {
 
     await expect(
       ledger.recordOutcome(
-        row.id,
-        MESSAGE_ID,
-        'The expense limit is 500 per claim.\n',
+        reply(row.id, 'The expense limit is 500 per claim.\n'),
+        asTenant(),
       ),
     ).resolves.toBe(AiGenerationOutcome.ACCEPTED);
   });
@@ -840,9 +852,8 @@ describe('The acceptance loop (e2e)', () => {
 
     await expect(
       ledger.recordOutcome(
-        row.id,
-        MESSAGE_ID,
-        'The expense limit is 750 per claim.',
+        reply(row.id, 'The expense limit is 750 per claim.'),
+        asTenant(),
       ),
     ).resolves.toBe(AiGenerationOutcome.EDITED);
   });
@@ -853,11 +864,61 @@ describe('The acceptance loop (e2e)', () => {
     // reconstruct.
     await expect(
       ledger.recordOutcome(
-        '66666666-6666-4666-8666-666666666666',
-        MESSAGE_ID,
-        'anything',
+        reply('66666666-6666-4666-8666-666666666666', 'anything'),
+        asTenant(),
       ),
     ).rejects.toBeInstanceOf(RpcException);
+  });
+
+  it('**another tenant’s generation is NOT_FOUND, with the missing id’s text, and stays as it was**', async () => {
+    // `generatedFromId` comes from the client: a reply posted in tenant B
+    // naming A's generation must not set A's outcome.
+    const row = await draft('The expense limit is 500 per claim.');
+    const other = buildTenant();
+    const asOther = memberContext({
+      id: other.userId,
+      organizationId: other.organizationId,
+    });
+
+    const onA = await ledger
+      .recordOutcome(
+        reply(row.id, 'The expense limit is 500 per claim.'),
+        asOther,
+      )
+      .catch((error: RpcException) => error.getError());
+    const missingId = faker.string.uuid();
+    const onMissing = await ledger
+      .recordOutcome(reply(missingId, 'x'), asOther)
+      .catch((error: RpcException) => error.getError());
+
+    expect([onA, onMissing]).toEqual([
+      { code: status.NOT_FOUND, message: `No generation with id '${row.id}'` },
+      {
+        code: status.NOT_FOUND,
+        message: `No generation with id '${missingId}'`,
+      },
+    ]);
+    await expect(
+      fx.prisma.aiGeneration.findUniqueOrThrow({ where: { id: row.id } }),
+    ).resolves.toMatchObject({ outcome: null, resultingMessageId: null });
+  });
+
+  it('**a generation from another ticket is NOT_FOUND**: the reply closes only its own ticket’s draft', async () => {
+    const row = await draft('The expense limit is 500 per claim.');
+
+    await expectRpc(
+      ledger.recordOutcome(
+        {
+          ...reply(row.id, 'The expense limit is 500 per claim.'),
+          ticketId: faker.string.uuid(),
+        },
+        asTenant(),
+      ),
+      status.NOT_FOUND,
+    );
+    await expect(
+      fx.prisma.aiGeneration.findUniqueOrThrow({ where: { id: row.id } }),
+    ).resolves.toMatchObject({ outcome: null });
   });
 
   it('**an outcome that arrives after the sweep still overwrites DISCARDED**', async () => {
@@ -878,7 +939,7 @@ describe('The acceptance loop (e2e)', () => {
     ).resolves.toMatchObject({ outcome: AiGenerationOutcome.DISCARDED });
 
     await expect(
-      ledger.recordOutcome(row.id, MESSAGE_ID, 'Restart the router.'),
+      ledger.recordOutcome(reply(row.id, 'Restart the router.'), asTenant()),
     ).resolves.toBe(AiGenerationOutcome.ACCEPTED);
     await expect(
       fx.prisma.aiGeneration.findUniqueOrThrow({ where: { id: row.id } }),

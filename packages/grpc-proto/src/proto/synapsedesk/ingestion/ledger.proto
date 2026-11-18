@@ -144,6 +144,10 @@ message RecordGenerationOutcomeRequest {
   // trailing newline reports as EDITED and understates the one metric that
   // justifies the co-pilot.
   string sent_text = 3;
+  // The ticket the reply was posted on. The generation must be this ticket's,
+  // in the caller's tenant, or the answer is NOT_FOUND, as for a missing id:
+  // `generated_from_id` comes from the client.
+  string ticket_id = 4;
 }
 
 message RecordGenerationOutcomeResponse {

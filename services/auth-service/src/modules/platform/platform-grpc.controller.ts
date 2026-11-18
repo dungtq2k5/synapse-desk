@@ -1,4 +1,4 @@
-import { JobHealthService } from '@synapsedesk/nest-common';
+import { JobHealthService, requireSuperAdmin } from '@synapsedesk/nest-common';
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
@@ -27,6 +27,9 @@ import {
   RoleResponse,
   SetOrganizationStatusRequest,
   unpackCallerContext,
+  CallerContext,
+  GetPlatformMetricsRequest,
+  GetFinanceSnapshotRequest,
   unpackRequestOrigin,
   UpdatePlatformOrganizationRequest,
   ApplyPlanRequest,
@@ -49,10 +52,10 @@ import { PlanAdminService } from '../billing/plan-admin.service';
 import { FinanceService } from '../finance/finance.service';
 
 /**
- * Authorization for this whole surface lives at the GATEWAY, in
- * `SuperAdminGuard`. This service trusts that gate — the same arrangement as
- * every permission-gated RPC — which is why nothing here re-checks
- * `isSuperAdmin`.
+ * Authorization for this whole surface is checked twice: at the GATEWAY, in
+ * `SuperAdminGuard`, and here, by `requireSuperAdmin` on every RPC but the job
+ * heartbeat. Each read here crosses tenants, so a gRPC caller that skipped the
+ * gateway must not get one.
  */
 @Controller()
 @PlatformServiceControllerMethods()
@@ -66,7 +69,9 @@ export class PlatformGrpcController implements PlatformServiceController {
 
   listOrganizations(
     request: ListPlatformOrganizationsRequest,
+    metadata?: Metadata,
   ): Promise<ListPlatformOrganizationsResponse> {
+    this.superAdmin(metadata);
     return this.platformService.listOrganizations(request);
   }
 
@@ -76,14 +81,16 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<CreatePlatformOrganizationResponse> {
     return this.platformService.createOrganization(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
       unpackRequestOrigin(metadata),
     );
   }
 
   getOrganization(
     request: PlatformOrganizationIdRequest,
+    metadata?: Metadata,
   ): Promise<PlatformOrganizationResponse> {
+    this.superAdmin(metadata);
     return this.platformService.getOrganization(request);
   }
 
@@ -93,7 +100,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<OrganizationUsageResponse> {
     return this.platformService.getOrganizationUsage(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -103,7 +110,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<PlatformOrganizationResponse> {
     return this.platformService.updateOrganization(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -113,7 +120,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<PlatformOrganizationResponse> {
     return this.platformService.setOrganizationStatus(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -123,7 +130,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<PlatformOrganizationResponse> {
     return this.platformService.resetBillingCycle(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -133,7 +140,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<OffboardOrganizationResponse> {
     return this.platformService.offboardOrganization(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -143,19 +150,23 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<PlatformOrganizationResponse> {
     return this.platformService.restoreOrganization(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
   listUsers(
     request: ListPlatformUsersRequest,
+    metadata?: Metadata,
   ): Promise<ListPlatformUsersResponse> {
+    this.superAdmin(metadata);
     return this.platformService.listUsers(request);
   }
 
   listGlobalRoles(
     request: ListGlobalRolesRequest,
+    metadata?: Metadata,
   ): Promise<ListGlobalRolesResponse> {
+    this.superAdmin(metadata);
     return this.platformService.listGlobalRoles(request);
   }
 
@@ -165,7 +176,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<RoleResponse> {
     return this.platformService.createGlobalRole(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
@@ -177,31 +188,28 @@ export class PlatformGrpcController implements PlatformServiceController {
     request: ListPlansRequest,
     metadata?: Metadata,
   ): Promise<ListPlansResponse> {
-    return this.planAdmin.listPlans(request, unpackCallerContext(metadata));
+    return this.planAdmin.listPlans(request, this.superAdmin(metadata));
   }
 
   createPlan(
     request: CreatePlanRequest,
     metadata?: Metadata,
   ): Promise<SubscriptionPlanResponse> {
-    return this.planAdmin.createPlan(request, unpackCallerContext(metadata));
+    return this.planAdmin.createPlan(request, this.superAdmin(metadata));
   }
 
   getPlan(
     request: PlanIdRequest,
     metadata?: Metadata,
   ): Promise<SubscriptionPlanResponse> {
-    return this.planAdmin.getPlan(
-      request.planId,
-      unpackCallerContext(metadata),
-    );
+    return this.planAdmin.getPlan(request.planId, this.superAdmin(metadata));
   }
 
   updatePlan(
     request: UpdatePlanRequest,
     metadata?: Metadata,
   ): Promise<SubscriptionPlanResponse> {
-    return this.planAdmin.updatePlan(request, unpackCallerContext(metadata));
+    return this.planAdmin.updatePlan(request, this.superAdmin(metadata));
   }
 
   async deletePlan(
@@ -211,7 +219,7 @@ export class PlatformGrpcController implements PlatformServiceController {
     return {
       deleted: await this.planAdmin.deletePlan(
         request.planId,
-        unpackCallerContext(metadata),
+        this.superAdmin(metadata),
       ),
     };
   }
@@ -220,24 +228,28 @@ export class PlatformGrpcController implements PlatformServiceController {
     request: ApplyPlanRequest,
     metadata?: Metadata,
   ): Promise<ApplyPlanResponse> {
-    return this.planAdmin.applyPlan(request, unpackCallerContext(metadata));
+    return this.planAdmin.applyPlan(request, this.superAdmin(metadata));
   }
 
   assignPlan(
     request: AssignPlanRequest,
     metadata?: Metadata,
   ): Promise<ApplyPlanResponse> {
-    return this.planAdmin.assignPlan(request, unpackCallerContext(metadata));
+    return this.planAdmin.assignPlan(request, this.superAdmin(metadata));
   }
 
   releasePlan(
     request: ReleasePlanRequest,
     metadata?: Metadata,
   ): Promise<ApplyPlanResponse> {
-    return this.planAdmin.releasePlan(request, unpackCallerContext(metadata));
+    return this.planAdmin.releasePlan(request, this.superAdmin(metadata));
   }
 
-  getMetrics(): Promise<PlatformMetricsResponse> {
+  getMetrics(
+    _request: GetPlatformMetricsRequest,
+    metadata?: Metadata,
+  ): Promise<PlatformMetricsResponse> {
+    this.superAdmin(metadata);
     return this.platformService.getMetrics();
   }
 
@@ -248,14 +260,20 @@ export class PlatformGrpcController implements PlatformServiceController {
    * and merging them would let a Stripe outage take the tenancy dashboard with
    * it.
    */
-  getFinanceSnapshot(): Promise<FinanceSnapshotResponse> {
+  getFinanceSnapshot(
+    _request: GetFinanceSnapshotRequest,
+    metadata?: Metadata,
+  ): Promise<FinanceSnapshotResponse> {
+    this.superAdmin(metadata);
     return this.finance.getSnapshot();
   }
 
   /** The time series. Entirely local, and therefore always answerable. */
   listBillingEvents(
     request: ListBillingEventsRequest,
+    metadata?: Metadata,
   ): Promise<ListBillingEventsResponse> {
+    this.superAdmin(metadata);
     return this.finance.listEvents(request);
   }
 
@@ -271,10 +289,14 @@ export class PlatformGrpcController implements PlatformServiceController {
   ): Promise<ResolveAuditNamesResponse> {
     return this.platformService.resolveAuditNames(
       request,
-      unpackCallerContext(metadata),
+      this.superAdmin(metadata),
     );
   }
 
+  /**
+   * The one RPC here open to any caller: the gateway's metrics scrape reads it
+   * with no user, and it returns job heartbeats, no tenant's data.
+   */
   async getAuthJobHealth(): Promise<AuthJobHealthResponse> {
     const rows = await this.jobHealth.list();
 
@@ -292,5 +314,13 @@ export class PlatformGrpcController implements PlatformServiceController {
         consecutiveFailures: row.consecutiveFailures,
       })),
     };
+  }
+
+  /** The caller's context, once it's proven a Super Admin's. */
+  private superAdmin(metadata?: Metadata): CallerContext {
+    const context = unpackCallerContext(metadata);
+    requireSuperAdmin(context);
+
+    return context;
   }
 }
