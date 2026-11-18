@@ -508,6 +508,37 @@ describe('the inbound-email webhook', () => {
       60_000,
     );
 
+    rowFor('Webhooks')(
+      '**the two lookups that take the tenant from the request go as the system for the resolved tenant, with no user**',
+      async () => {
+        // Auth and notification serve these to system callers only, and read
+        // the tenant from the request; both carry the tenant the address
+        // resolved to.
+        const mail = resendMail({ headers: { 'In-Reply-To': '<parent@x>' } });
+        createsTicketFor(mail);
+        peers.notification
+          .on('NotificationService/ResolveTicketByMessageId')
+          .reply({});
+
+        const { response } = await run(mail);
+
+        expect(response.status).toBe(200);
+        expect(response.body?.data.outcome).toBe('TICKET_CREATED');
+        const [sender] = peers.auth.calls('UserService/ResolveInboundSender');
+        const [thread] = peers.notification.calls(
+          'NotificationService/ResolveTicketByMessageId',
+        );
+        for (const call of [sender, thread]) {
+          expect(call.metadata).toMatchObject({
+            is_system: 'true',
+            organization_id: ORGANIZATION,
+          });
+          expect(call.metadata).not.toHaveProperty('user_id');
+          expect(call.request).toMatchObject({ organizationId: ORGANIZATION });
+        }
+      },
+    );
+
     /** Waits for the publish, which is fire-and-forget and lands after the response. */
     const published = async (count: number) => {
       const deadline = Date.now() + 4_000;
