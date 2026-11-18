@@ -6,6 +6,7 @@ import {
   EXPORT_QUEUE,
   ExportKind,
   MAX_EXPORT_ROWS,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { safeTimezone } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
@@ -87,7 +88,7 @@ export class ExportProcessor extends WorkerHost {
 
     const { exportId } = job.data;
 
-    const row = await this.prisma.export.findUnique({
+    const row = await this.prisma.unscoped('job by row id').export.findUnique({
       where: { id: exportId },
     });
     if (!row) {
@@ -209,14 +210,18 @@ export class ExportProcessor extends WorkerHost {
     };
 
     await this.assertWithinRowCap(
-      this.prisma.ticket.count({ where }),
+      this.prisma
+        .scoped(systemContext(row.organizationId))
+        .ticket.count({ where }),
       'ticket',
     );
 
-    const tickets = await this.prisma.ticket.findMany({
-      where,
-      orderBy: [{ createdAt: 'asc' }],
-    });
+    const tickets = await this.prisma
+      .scoped(systemContext(row.organizationId))
+      .ticket.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }],
+      });
 
     return {
       header: [
@@ -264,14 +269,18 @@ export class ExportProcessor extends WorkerHost {
     };
 
     await this.assertWithinRowCap(
-      this.prisma.auditLog.count({ where }),
+      this.prisma
+        .scoped(systemContext(row.organizationId))
+        .auditLog.count({ where }),
       'audit log',
     );
 
-    const entries = await this.prisma.auditLog.findMany({
-      where,
-      orderBy: [{ createdAt: 'asc' }],
-    });
+    const entries = await this.prisma
+      .scoped(systemContext(row.organizationId))
+      .auditLog.findMany({
+        where,
+        orderBy: [{ createdAt: 'asc' }],
+      });
 
     return {
       header: [
@@ -326,14 +335,16 @@ export class ExportProcessor extends WorkerHost {
     toDay: Date;
     departmentId: string | null;
   }) {
-    const stats = await this.prisma.ticketDailyStat.findMany({
-      where: {
-        organizationId: row.organizationId,
-        day: { gte: row.fromDay, lte: row.toDay },
-        ...(row.departmentId ? { departmentId: row.departmentId } : {}),
-      },
-      orderBy: [{ day: 'asc' }],
-    });
+    const stats = await this.prisma
+      .scoped(systemContext(row.organizationId))
+      .ticketDailyStat.findMany({
+        where: {
+          organizationId: row.organizationId,
+          day: { gte: row.fromDay, lte: row.toDay },
+          ...(row.departmentId ? { departmentId: row.departmentId } : {}),
+        },
+        orderBy: [{ day: 'asc' }],
+      });
 
     return {
       // **Sums and counts, exactly as stored.** No rate is exported: a
@@ -389,13 +400,15 @@ export class ExportProcessor extends WorkerHost {
     fromDay: Date;
     toDay: Date;
   }) {
-    const stats = await this.prisma.agentDailyStat.findMany({
-      where: {
-        organizationId: row.organizationId,
-        day: { gte: row.fromDay, lte: row.toDay },
-      },
-      orderBy: [{ day: 'asc' }, { agentId: 'asc' }],
-    });
+    const stats = await this.prisma
+      .scoped(systemContext(row.organizationId))
+      .agentDailyStat.findMany({
+        where: {
+          organizationId: row.organizationId,
+          day: { gte: row.fromDay, lte: row.toDay },
+        },
+        orderBy: [{ day: 'asc' }, { agentId: 'asc' }],
+      });
 
     return {
       // Agent IDs, not names. This service has never known a display name (RDM

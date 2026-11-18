@@ -64,7 +64,7 @@ export class AiAttachmentService {
     messageId: string,
     context: CallerContext,
   ): Promise<AiAttachments> {
-    const rows = await this.prisma.messageAttachment.findMany({
+    const rows = await this.prisma.scoped(context).messageAttachment.findMany({
       // **The refusal exclusion reaches the FILES, not only the text** —
       //
       //
@@ -98,7 +98,7 @@ export class AiAttachmentService {
     ticketId: string,
     context: CallerContext,
   ): Promise<AiAttachments> {
-    const rows = await this.prisma.messageAttachment.findMany({
+    const rows = await this.prisma.scoped(context).messageAttachment.findMany({
       where: { ticketId, ticket: { openingExcludedFromAiContext: false } },
       orderBy: { createdAt: 'asc' },
     });
@@ -244,9 +244,13 @@ export class AiAttachmentService {
     // draft is built from, so its files must not be either — and falling back
     // to the previous message means the attachments and the text the model sees
     // describe the same exchange.
-    const messageId = await this.newestUserMessageId(ticketId, {
-      excludingRefused: true,
-    });
+    const messageId = await this.newestUserMessageId(
+      ticketId,
+      {
+        excludingRefused: true,
+      },
+      context,
+    );
     // **No user message left: the opening's files.** That is the first
     // answer's case (`AnswerOpening` runs before any message exists), and a
     // thread whose every user message was refused: the description still leads
@@ -282,7 +286,7 @@ export class AiAttachmentService {
     ticketId: string,
     context: CallerContext,
   ): Promise<AiAttachments> {
-    const message = await this.prisma.ticketMessage.findFirst({
+    const message = await this.prisma.scoped(context).ticketMessage.findFirst({
       // **No exclusion clause, and it is NOT an oversight** — the refused
       // opening message is still the opening message.
       //
@@ -306,9 +310,11 @@ export class AiAttachmentService {
     // and `description` were written with. A refused opening yields NOTHING
     // (`forOpening`), not the earliest message's files, for the reason the
     // clause above gives: a later file is not what the opening describes.
-    const openingFiles = await this.prisma.messageAttachment.count({
-      where: { ticketId },
-    });
+    const openingFiles = await this.prisma
+      .scoped(context)
+      .messageAttachment.count({
+        where: { ticketId },
+      });
     if (openingFiles > 0) return this.forOpening(ticketId, context);
 
     if (!message) return { parts: [], skipped: [] };
@@ -324,17 +330,17 @@ export class AiAttachmentService {
    * The opening's DESCRIPTION still leads the transcript: only its files are
    * excluded here.
    */
-  async markRefused(ticketId: string): Promise<void> {
-    const messageId = await this.lastUserMessageId(ticketId);
+  async markRefused(ticketId: string, context: CallerContext): Promise<void> {
+    const messageId = await this.lastUserMessageId(ticketId, context);
     if (messageId) {
-      await this.prisma.ticketMessage.update({
+      await this.prisma.scoped(context).ticketMessage.update({
         where: { id: messageId },
         data: { excludedFromAiContext: true },
       });
       return;
     }
 
-    await this.prisma.ticket.update({
+    await this.prisma.scoped(context).ticket.update({
       where: { id: ticketId },
       data: { openingExcludedFromAiContext: true },
     });
@@ -349,7 +355,10 @@ export class AiAttachmentService {
    * definitions of "the last user message" would eventually disagree, and the
    * disagreement would be a refused question quietly staying in context.
    */
-  async lastUserMessageId(ticketId: string): Promise<string | null> {
+  async lastUserMessageId(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<string | null> {
     // **Includes refused ones, deliberately** — the opposite of what
     // `forLastUserMessage` wants, which is why the two ask separately rather
     // than sharing a call.
@@ -357,7 +366,11 @@ export class AiAttachmentService {
     // This resolves the message a refusal is about to be written back TO.
     // Skipping already-excluded rows would be wrong on a retry: the row it
     // wants is precisely the one a previous attempt already flagged.
-    return this.newestUserMessageId(ticketId, { excludingRefused: false });
+    return this.newestUserMessageId(
+      ticketId,
+      { excludingRefused: false },
+      context,
+    );
   }
 
   /**
@@ -372,8 +385,9 @@ export class AiAttachmentService {
   private async newestUserMessageId(
     ticketId: string,
     { excludingRefused }: { excludingRefused: boolean },
+    context: CallerContext,
   ): Promise<string | null> {
-    const message = await this.prisma.ticketMessage.findFirst({
+    const message = await this.prisma.scoped(context).ticketMessage.findFirst({
       where: {
         ticketId,
         isAiGenerated: false,

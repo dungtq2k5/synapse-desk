@@ -118,7 +118,7 @@ export class ExportService {
     // Matched on the whole request, not just the kind: two different ranges are
     // two different exports. Only PENDING — a RUNNING one is already reading,
     // and a READY one is a file the caller can have again.
-    const inFlight = await this.prisma.export.findFirst({
+    const inFlight = await this.prisma.scoped(context).export.findFirst({
       where: {
         organizationId,
         // **The REQUESTER is part of the identity, not just the range.**
@@ -150,7 +150,7 @@ export class ExportService {
       return { exportId: inFlight.id, status: inFlight.status };
     }
 
-    const row = await this.prisma.export.create({
+    const row = await this.prisma.scoped(context).export.create({
       data: {
         organizationId,
         requestedById,
@@ -237,7 +237,7 @@ export class ExportService {
     // visibility (`unrestricted`), so handing it to a colleague hands them a
     // view they may not have. Tenant scoping alone is not enough — the boundary
     // that matters here is per-user, which is why the column exists.
-    const row = await this.prisma.export.findFirst({
+    const row = await this.prisma.scoped(context).export.findFirst({
       where: {
         id: exportId,
         organizationId,
@@ -264,7 +264,7 @@ export class ExportService {
       rollupComputedAt: Date | null;
     },
   ): Promise<void> {
-    await this.prisma.export.update({
+    await this.prisma.unscoped('job by row id').export.update({
       where: { id: exportId },
       data: {
         status: ExportStatus.READY,
@@ -291,7 +291,7 @@ export class ExportService {
    * a job that never ran.
    */
   async fail(exportId: string, reason: string): Promise<void> {
-    await this.prisma.export.update({
+    await this.prisma.unscoped('job by row id').export.update({
       where: { id: exportId },
       data: {
         status: ExportStatus.FAILED,

@@ -191,7 +191,7 @@ export class MessagesService {
         message: 'Only the person who asked can have the question answered',
       });
     }
-    const messages = await this.prisma.ticketMessage.count({
+    const messages = await this.prisma.scoped(context).ticketMessage.count({
       where: { ticketId: ticket.id },
     });
     if (messages > 0) {
@@ -238,7 +238,7 @@ export class MessagesService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.ticketMessage.findMany({
+      this.prisma.scoped(context).ticketMessage.findMany({
         where,
         orderBy,
         skip,
@@ -248,7 +248,7 @@ export class MessagesService {
       // The SAME `where`. A count computed without the note filter would tell a
       // non-agent exactly how many notes they cannot see — the leak the filter
       // exists to prevent, reintroduced through the pagination meta.
-      this.prisma.ticketMessage.count({ where }),
+      this.prisma.scoped(context).ticketMessage.count({ where }),
     ]);
 
     return {
@@ -314,6 +314,7 @@ export class MessagesService {
       const existing = await this.findByClientMessageId(
         ticket.id,
         request.clientMessageId,
+        context,
       );
       // No skipped list on a duplicate: the original write already reported
       // its own, and re-confirming here would fail every path a second time —
@@ -330,7 +331,7 @@ export class MessagesService {
     // A redelivered mail is refused before its files are confirmed, so they
     // stay under `pending/` rather than moving out to be orphaned.
     await refuseRedelivery(
-      this.prisma,
+      this.prisma.scoped(context),
       ticket.organizationId,
       request.inboundMessageId,
     );
@@ -386,7 +387,7 @@ export class MessagesService {
       // that is both is deduped by whichever arrives second.
       message = request.inboundMessageId
         ? await withInboundDedup(() =>
-            this.prisma.$transaction(async (tx) => {
+            this.prisma.scoped(context).$transaction(async (tx) => {
               const created = await tx.ticketMessage.create({
                 data,
                 include: { attachments: true },
@@ -402,7 +403,7 @@ export class MessagesService {
               return created;
             }),
           )
-        : await this.prisma.ticketMessage.create({
+        : await this.prisma.scoped(context).ticketMessage.create({
             data,
             include: { attachments: true },
           });
@@ -412,6 +413,7 @@ export class MessagesService {
         const winner = await this.findByClientMessageId(
           ticket.id,
           request.clientMessageId,
+          context,
         );
         if (winner)
           return { message: this.respond(winner, context), skippedAttachments };
@@ -478,7 +480,7 @@ export class MessagesService {
     const ticket = await this.tickets.load(request.ticketId, context);
     const content = this.requireContent(request.content);
 
-    const message = await this.prisma.ticketMessage.create({
+    const message = await this.prisma.scoped(context).ticketMessage.create({
       data: {
         ticketId: ticket.id,
         // No sender. Attributing a generated message to a real person would
@@ -546,7 +548,7 @@ export class MessagesService {
       context,
     );
 
-    const updated = await this.prisma.ticketMessage.update({
+    const updated = await this.prisma.scoped(context).ticketMessage.update({
       where: { id: message.id },
       data: { excludedFromAiContext: true },
       include: { attachments: true },
@@ -594,7 +596,7 @@ export class MessagesService {
 
     this.assertMayEdit(existing, context);
 
-    const message = await this.prisma.ticketMessage.update({
+    const message = await this.prisma.scoped(context).ticketMessage.update({
       where: { id: existing.id },
       data: { content, editedAt: new Date() },
       include: { attachments: true },
@@ -656,7 +658,7 @@ export class MessagesService {
       });
     }
 
-    const message = await this.prisma.ticketMessage.update({
+    const message = await this.prisma.scoped(context).ticketMessage.update({
       where: { id: existing.id },
       data: {
         content: REDACTED_MESSAGE_PLACEHOLDER,
@@ -735,9 +737,11 @@ export class MessagesService {
     }
 
     if (message) {
-      const existing = await this.prisma.messageAttachment.count({
-        where: { messageId: message.id },
-      });
+      const existing = await this.prisma
+        .scoped(context)
+        .messageAttachment.count({
+          where: { messageId: message.id },
+        });
       if (existing >= limits.maxPerMessage) {
         throw new RpcException({
           code: status.FAILED_PRECONDITION,
@@ -852,30 +856,32 @@ export class MessagesService {
       throw StorageReferenceService.asClientError(error);
     }
 
-    const attachment = await this.prisma.messageAttachment.create({
-      data: {
-        messageId: message.id,
-        fileName: requireFileName(request.fileName),
-        // An object PATH, never a URL. Reads resolve it to a fresh signed URL
-        // per request, so revoking access takes effect on the NEXT read rather
-        // than whenever a stored URL happens to expire.
-        //
-        // The CONFIRMED path — the object moved out of `pending/` on the way
-        // through, so `request.objectPath` is where it no
-        // longer is.
-        fileUrl: confirmed.objectPath,
-        fileSizeBytes: BigInt(confirmed.sizeBytes),
-        mimeType: confirmed.contentType,
-        // The same rule as the nested route, through the same helper — the
-        // eligibility decision exists once, so the two paths cannot disagree
-        // about which types get text.
-        extractedText: await this.binder.extractIfParseable(
-          confirmed.objectPath,
-          confirmed.contentType,
-          context,
-        ),
-      },
-    });
+    const attachment = await this.prisma
+      .scoped(context)
+      .messageAttachment.create({
+        data: {
+          messageId: message.id,
+          fileName: requireFileName(request.fileName),
+          // An object PATH, never a URL. Reads resolve it to a fresh signed URL
+          // per request, so revoking access takes effect on the NEXT read rather
+          // than whenever a stored URL happens to expire.
+          //
+          // The CONFIRMED path — the object moved out of `pending/` on the way
+          // through, so `request.objectPath` is where it no
+          // longer is.
+          fileUrl: confirmed.objectPath,
+          fileSizeBytes: BigInt(confirmed.sizeBytes),
+          mimeType: confirmed.contentType,
+          // The same rule as the nested route, through the same helper — the
+          // eligibility decision exists once, so the two paths cannot disagree
+          // about which types get text.
+          extractedText: await this.binder.extractIfParseable(
+            confirmed.objectPath,
+            confirmed.contentType,
+            context,
+          ),
+        },
+      });
 
     return toAttachmentResponse(attachment, message.ticketId);
   }
@@ -890,7 +896,7 @@ export class MessagesService {
       context,
     );
 
-    const items = await this.prisma.messageAttachment.findMany({
+    const items = await this.prisma.scoped(context).messageAttachment.findMany({
       where: { messageId: message.id },
       orderBy: { createdAt: 'asc' },
     });
@@ -977,7 +983,7 @@ export class MessagesService {
       });
     }
 
-    await this.prisma.messageAttachment.delete({
+    await this.prisma.scoped(context).messageAttachment.delete({
       where: { id: attachment.id },
     });
 
@@ -1027,7 +1033,7 @@ export class MessagesService {
       // The thread so far, so the reply answers the conversation rather than
       // the last line of it. rag-service owns no conversation rows — a second
       // copy in a second database is a consistency problem nobody asked for.
-      const history = await this.prisma.ticketMessage.findMany({
+      const history = await this.prisma.scoped(context).ticketMessage.findMany({
         // The same exclusion as the co-pilot's transcript. Two
         // Prisma readers, one clause each, and a refusal that reached only one
         // of them would be a defence on one surface and a delay on the other.
@@ -1042,7 +1048,7 @@ export class MessagesService {
       // The opening question is the description, which isn't a message: it
       // leads the transcript, unless the thread has outgrown the window.
       if (history.length < AI_REPLY_TRANSCRIPT_TURNS) {
-        const opening = await this.prisma.ticket.findUnique({
+        const opening = await this.prisma.scoped(context).ticket.findUnique({
           where: { id: ticketId },
           select: {
             description: true,
@@ -1087,7 +1093,7 @@ export class MessagesService {
         attachments.parts,
       );
 
-      const reply = await this.prisma.ticketMessage.create({
+      const reply = await this.prisma.scoped(context).ticketMessage.create({
         data: {
           ticketId,
           // No sender. Attributing a generated message to a real person would
@@ -1126,7 +1132,7 @@ export class MessagesService {
       // Swallowed like everything else in this handler. The caller's own
       // message is already committed and is what the RPC promises to return; a
       // failed bookkeeping write must not turn that into an error.
-      await this.excludeRefused(ticketId, error);
+      await this.excludeRefused(ticketId, error, context);
 
       // At the budget cap an opening question goes to a person, as a streamed
       // answer at the cap does: nothing else would ever answer it.
@@ -1148,7 +1154,7 @@ export class MessagesService {
     context: CallerContext,
   ): Promise<void> {
     try {
-      const notice = await this.prisma.ticketMessage.create({
+      const notice = await this.prisma.scoped(context).ticketMessage.create({
         data: {
           ticketId: ticket.id,
           senderId: null,
@@ -1200,11 +1206,12 @@ export class MessagesService {
   private async excludeRefused(
     ticketId: string,
     error: unknown,
+    context: CallerContext,
   ): Promise<void> {
     if (!isDraftRefusal(error)) return;
 
     try {
-      await this.aiAttachments.markRefused(ticketId);
+      await this.aiAttachments.markRefused(ticketId, context);
     } catch (writeError) {
       this.logger.error(
         `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,
@@ -1388,8 +1395,9 @@ export class MessagesService {
   private async findByClientMessageId(
     ticketId: string,
     clientMessageId: string,
+    context: CallerContext,
   ): Promise<MessageWithAttachments | null> {
-    return this.prisma.ticketMessage.findFirst({
+    return this.prisma.scoped(context).ticketMessage.findFirst({
       where: { ticketId, clientMessageId },
       include: { attachments: true },
     });
@@ -1410,7 +1418,7 @@ export class MessagesService {
   ): Promise<LoadedMessage> {
     const ticket = await this.tickets.load(ticketId, context);
 
-    const message = await this.prisma.ticketMessage.findFirst({
+    const message = await this.prisma.scoped(context).ticketMessage.findFirst({
       where: {
         id: messageId,
         ticketId: ticket.id,
@@ -1449,10 +1457,12 @@ export class MessagesService {
     message: TicketMessage | null;
     ticket: Ticket;
   }> {
-    const attachment = await this.prisma.messageAttachment.findUnique({
-      where: { id: attachmentId },
-      include: { message: true },
-    });
+    const attachment = await this.prisma
+      .scoped(context)
+      .messageAttachment.findUnique({
+        where: { id: attachmentId },
+        include: { message: true },
+      });
     const ticketId = attachment?.message?.ticketId ?? attachment?.ticketId;
 
     if (

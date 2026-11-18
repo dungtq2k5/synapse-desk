@@ -66,7 +66,7 @@ export class TicketAccessService {
     withDeleted: boolean,
     missing: string,
   ): Promise<Ticket> {
-    const ticket = await this.prisma.ticket.findFirst({
+    const ticket = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         id: ticketId,
         ...tenantScope(context),

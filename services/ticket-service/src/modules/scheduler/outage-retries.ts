@@ -51,22 +51,24 @@ export class OutageRetries {
    */
   async retryExtractions(now: Date = new Date()): Promise<number> {
     const since = new Date(now.getTime() - EXTRACTION_RETRY_HOURS * 3_600_000);
-    const rows = await this.prisma.messageAttachment.findMany({
-      where: {
-        extractedText: null,
-        mimeType: { in: [...PARSE_ELIGIBLE_MIME_TYPES] },
-        createdAt: { gte: since },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: RETRY_BATCH,
-      select: {
-        id: true,
-        fileUrl: true,
-        mimeType: true,
-        ticket: { select: { organizationId: true } },
-        message: { select: { ticket: { select: { organizationId: true } } } },
-      },
-    });
+    const rows = await this.prisma
+      .unscoped('cross-tenant job')
+      .messageAttachment.findMany({
+        where: {
+          extractedText: null,
+          mimeType: { in: [...PARSE_ELIGIBLE_MIME_TYPES] },
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: RETRY_BATCH,
+        select: {
+          id: true,
+          fileUrl: true,
+          mimeType: true,
+          ticket: { select: { organizationId: true } },
+          message: { select: { ticket: { select: { organizationId: true } } } },
+        },
+      });
 
     let extracted = 0;
     for (const row of rows) {
@@ -81,10 +83,12 @@ export class OutageRetries {
       );
       if (result.ok) {
         // Only where still missing: a concurrent confirm-time write wins.
-        const { count } = await this.prisma.messageAttachment.updateMany({
-          where: { id: row.id, extractedText: null },
-          data: { extractedText: result.markdown },
-        });
+        const { count } = await this.prisma
+          .unscoped('cross-tenant job')
+          .messageAttachment.updateMany({
+            where: { id: row.id, extractedText: null },
+            data: { extractedText: result.markdown },
+          });
         extracted += count;
       } else if (result.code === NEVER_PARSED) {
         this.logger.warn(
@@ -107,20 +111,24 @@ export class OutageRetries {
    * @returns how many outcomes were recorded.
    */
   async retryOutcomes(): Promise<number> {
-    const rows = await this.prisma.pendingDraftOutcome.findMany({
-      orderBy: { createdAt: 'asc' },
-      take: RETRY_BATCH,
-    });
+    const rows = await this.prisma
+      .unscoped('cross-tenant job')
+      .pendingDraftOutcome.findMany({
+        orderBy: { createdAt: 'asc' },
+        take: RETRY_BATCH,
+      });
 
     let recorded = 0;
     for (const row of rows) {
-      const message = await this.prisma.ticketMessage.findUnique({
-        where: { id: row.messageId },
-        select: {
-          ticketId: true,
-          ticket: { select: { organizationId: true } },
-        },
-      });
+      const message = await this.prisma
+        .unscoped('cross-tenant job')
+        .ticketMessage.findUnique({
+          where: { id: row.messageId },
+          select: {
+            ticketId: true,
+            ticket: { select: { organizationId: true } },
+          },
+        });
       if (!message) {
         this.logger.warn(
           `Outcome of generation ${row.generationId} dropped: its reply ${row.messageId} is gone`,
@@ -150,8 +158,10 @@ export class OutageRetries {
   }
 
   private async forget(generationId: string): Promise<void> {
-    await this.prisma.pendingDraftOutcome.deleteMany({
-      where: { generationId },
-    });
+    await this.prisma
+      .unscoped('cross-tenant job')
+      .pendingDraftOutcome.deleteMany({
+        where: { generationId },
+      });
   }
 }

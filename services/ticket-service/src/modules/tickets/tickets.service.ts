@@ -128,7 +128,7 @@ export class TicketsService {
     request: GetTicketByNumberRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    const ticket = await this.prisma.ticket.findFirst({
+    const ticket = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         ticketNumber: BigInt(request.ticketNumber),
         ...tenantScope(context),
@@ -176,8 +176,10 @@ export class TicketsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.ticket.findMany({ where, orderBy, skip, take }),
-      this.prisma.ticket.count({ where }),
+      this.prisma
+        .scoped(context)
+        .ticket.findMany({ where, orderBy, skip, take }),
+      this.prisma.scoped(context).ticket.count({ where }),
     ]);
 
     const unread = await this.unreadCounts(
@@ -218,7 +220,7 @@ export class TicketsService {
 
     if (ids.length === 0) return { items: [] };
 
-    const items = await this.prisma.ticket.findMany({
+    const items = await this.prisma.scoped(context).ticket.findMany({
       where: {
         ...tenantScope(context),
         ...this.visibilityScope(context),
@@ -258,7 +260,7 @@ export class TicketsService {
   ): Promise<ListTicketStatusChangesResponse> {
     const ticket = await this.access.loadForReading(request.id, context);
 
-    const rows = await this.prisma.ticketStatusChange.findMany({
+    const rows = await this.prisma.scoped(context).ticketStatusChange.findMany({
       where: { ticketId: ticket.id },
       // Oldest first: this is a path, and a path reads forwards. Every other
       // list in this system is newest-first because those are feeds.
@@ -326,7 +328,7 @@ export class TicketsService {
     // OUTSIDE the transaction, as `CreateMessage` does: a network call per
     // file must not hold a transaction open.
     await refuseRedelivery(
-      this.prisma,
+      this.prisma.scoped(context),
       organizationId,
       request.inboundMessageId,
     );
@@ -360,7 +362,7 @@ export class TicketsService {
     // ceremony.
     const ticket = request.inboundMessageId
       ? await withInboundDedup(() =>
-          this.prisma.$transaction(async (tx) => {
+          this.prisma.scoped(context).$transaction(async (tx) => {
             const created = await tx.ticket.create({ data });
 
             await recordInboundEmail(
@@ -373,7 +375,7 @@ export class TicketsService {
             return created;
           }),
         )
-      : await this.prisma.ticket.create({ data });
+      : await this.prisma.scoped(context).ticket.create({ data });
 
     // AFTER the commit, never inside it. An event announcing a ticket a later
     // rollback erases is an event no consumer can un-handle — the same rule
@@ -412,7 +414,7 @@ export class TicketsService {
     // Deliberately NO status here. Status moves through the state machine and
     // nowhere else — accepting it on a general update would be a second,
     // unvalidated path around the transition table.
-    const ticket = await this.prisma.ticket.update({
+    const ticket = await this.prisma.scoped(context).ticket.update({
       where: { id: existing.id },
       data,
     });
@@ -587,7 +589,7 @@ export class TicketsService {
       // Through the same scoped load every singular write uses, so an id the
       // caller cannot see fails as NOT_FOUND rather than updating a row.
       const existing = await this.load(id, context);
-      await this.prisma.ticket.update({
+      await this.prisma.scoped(context).ticket.update({
         where: { id: existing.id },
         data: { priority },
       });
@@ -636,7 +638,9 @@ export class TicketsService {
     // The cost, stated: raw SQL puts these table and column names outside the
     // compiler's reach, so a Prisma rename breaks this at runtime rather than
     // at build. The rollup accepts that trade and so does this.
-    const [stored] = await this.prisma.$queryRaw<[{ last_read_at: Date }]>`
+    const [stored] = await this.prisma.scoped(context).$queryRaw<
+      [{ last_read_at: Date }]
+    >`
       INSERT INTO ticket_read_states (ticket_id, user_id, organization_id, last_read_at)
       VALUES (${ticket.id}::uuid, ${userId}::uuid, ${ticket.organizationId}::uuid, ${lastReadAt})
       ON CONFLICT (ticket_id, user_id) DO UPDATE
@@ -655,7 +659,7 @@ export class TicketsService {
   ): Promise<DeleteTicketResponse> {
     const ticket = await this.load(request.id, context);
 
-    await this.prisma.ticket.update({
+    await this.prisma.scoped(context).ticket.update({
       where: { id: ticket.id },
       data: softDeleteData(requireActor(context)),
     });
@@ -669,7 +673,7 @@ export class TicketsService {
   ): Promise<TicketResponse> {
     // Deliberately NOT `this.load`, which excludes soft-deleted rows — the only
     // rows this method can act on.
-    const existing = await this.prisma.ticket.findFirst({
+    const existing = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         id: request.id,
         organizationId: requireTenant(context),
@@ -688,7 +692,7 @@ export class TicketsService {
     // partial unique index over a soft-deletable column, so this cannot
     // conflict with a row created while it was gone.
     return this.respond(
-      await this.prisma.ticket.update({
+      await this.prisma.scoped(context).ticket.update({
         where: { id: existing.id },
         data: restoreData(),
       }),
@@ -727,12 +731,12 @@ export class TicketsService {
     // assembled from it loses a row whenever the broker is down — acceptable
     // for an admin trail, not for a screen showing a customer what happened to
     // their ticket.
-    const [ticket] = await this.prisma.$transaction([
-      this.prisma.ticket.update({
+    const [ticket] = await this.prisma.scoped(context).$transaction([
+      this.prisma.scoped(context).ticket.update({
         where: { id: existing.id },
         data: { status: to, ...transitionSideEffects(to) },
       }),
-      this.prisma.ticketStatusChange.create({
+      this.prisma.scoped(context).ticketStatusChange.create({
         data: {
           ticketId: existing.id,
           organizationId: existing.organizationId,
@@ -882,15 +886,17 @@ export class TicketsService {
     // second check.
     if (ticketIds.length === 0 || !userId) return new Map();
 
-    const readStates = await this.prisma.ticketReadState.findMany({
-      where: { userId, ticketId: { in: ticketIds } },
-      select: { ticketId: true, lastReadAt: true },
-    });
+    const readStates = await this.prisma
+      .scoped(context)
+      .ticketReadState.findMany({
+        where: { userId, ticketId: { in: ticketIds } },
+        select: { ticketId: true, lastReadAt: true },
+      });
     const watermark = new Map(
       readStates.map((row) => [row.ticketId, row.lastReadAt]),
     );
 
-    const grouped = await this.prisma.ticketMessage.groupBy({
+    const grouped = await this.prisma.scoped(context).ticketMessage.groupBy({
       by: ['ticketId'],
       where: {
         ticketId: { in: ticketIds },
@@ -960,7 +966,7 @@ export class TicketsService {
     const files =
       tickets.length === 0
         ? []
-        : await this.prisma.messageAttachment.findMany({
+        : await this.prisma.scoped(context).messageAttachment.findMany({
             where: { ticketId: { in: tickets.map((ticket) => ticket.id) } },
             orderBy: { createdAt: 'asc' },
           });

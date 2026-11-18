@@ -12,6 +12,7 @@ import {
   resolutionSeconds,
   TicketStatSums,
   TicketStatus,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   bucketKey,
@@ -260,7 +261,7 @@ export class AnalyticsService {
     );
 
     const [grouped, dataThrough] = await Promise.all([
-      this.prisma.agentDailyStat.groupBy({
+      this.prisma.scoped(context).agentDailyStat.groupBy({
         by: ['agentId'],
         where: {
           organizationId,
@@ -322,16 +323,20 @@ export class AnalyticsService {
     // not a table scan, which is why this can sit on every endpoint.
     const newest =
       table === 'agentDailyStat'
-        ? await this.prisma.agentDailyStat.findFirst({
-            where: { organizationId },
-            orderBy: { day: 'desc' },
-            select: { day: true },
-          })
-        : await this.prisma.ticketDailyStat.findFirst({
-            where: { organizationId },
-            orderBy: { day: 'desc' },
-            select: { day: true },
-          });
+        ? await this.prisma
+            .scoped(systemContext(organizationId))
+            .agentDailyStat.findFirst({
+              where: { organizationId },
+              orderBy: { day: 'desc' },
+              select: { day: true },
+            })
+        : await this.prisma
+            .scoped(systemContext(organizationId))
+            .ticketDailyStat.findFirst({
+              where: { organizationId },
+              orderBy: { day: 'desc' },
+              select: { day: true },
+            });
 
     return newest ? toIsoDay(newest.day) : undefined;
   }
@@ -349,14 +354,18 @@ export class AnalyticsService {
     request: AnalyticsRangeRequest,
     range: { from: Date; to: Date },
   ): Promise<DailyRow[]> {
-    const rows = await this.prisma.ticketDailyStat.findMany({
-      where: {
-        organizationId,
-        day: { gte: range.from, lte: range.to },
-        ...(request.departmentId ? { departmentId: request.departmentId } : {}),
-      },
-      orderBy: { day: 'asc' },
-    });
+    const rows = await this.prisma
+      .scoped(systemContext(organizationId))
+      .ticketDailyStat.findMany({
+        where: {
+          organizationId,
+          day: { gte: range.from, lte: range.to },
+          ...(request.departmentId
+            ? { departmentId: request.departmentId }
+            : {}),
+        },
+        orderBy: { day: 'asc' },
+      });
 
     return rows.map((row) => ({
       day: row.day,
@@ -384,7 +393,7 @@ export class AnalyticsService {
     organizationId: string,
     request: AnalyticsRangeRequest,
   ): Promise<number> {
-    return this.prisma.ticket.count({
+    return this.prisma.scoped(systemContext(organizationId)).ticket.count({
       where: {
         organizationId,
         deletedAt: null,
@@ -409,8 +418,10 @@ export class AnalyticsService {
     organizationId: string,
     request: AnalyticsRangeRequest,
   ): Promise<number | null> {
-    const rows = await this.prisma.$queryRawUnsafe<{ median: number | null }[]>(
-      `
+    const rows = await this.prisma
+      .scoped(systemContext(organizationId))
+      .$queryRawUnsafe<{ median: number | null }[]>(
+        `
       SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (
                ORDER BY EXTRACT(EPOCH FROM (NOW() - created_at))
              )::bigint AS median
@@ -420,9 +431,9 @@ export class AnalyticsService {
         AND status NOT IN ('RESOLVED', 'CLOSED')
         AND ($2::uuid IS NULL OR current_department_id = $2::uuid)
       `,
-      organizationId,
-      request.departmentId ?? null,
-    );
+        organizationId,
+        request.departmentId ?? null,
+      );
 
     const median = rows[0]?.median;
 
@@ -443,9 +454,15 @@ export class AnalyticsService {
     };
 
     const [byStatus, byPriority, bySource] = await Promise.all([
-      this.prisma.ticket.groupBy({ by: ['status'], where, _count: true }),
-      this.prisma.ticket.groupBy({ by: ['priority'], where, _count: true }),
-      this.prisma.ticket.groupBy({ by: ['source'], where, _count: true }),
+      this.prisma
+        .scoped(systemContext(organizationId))
+        .ticket.groupBy({ by: ['status'], where, _count: true }),
+      this.prisma
+        .scoped(systemContext(organizationId))
+        .ticket.groupBy({ by: ['priority'], where, _count: true }),
+      this.prisma
+        .scoped(systemContext(organizationId))
+        .ticket.groupBy({ by: ['source'], where, _count: true }),
     ]);
 
     return {

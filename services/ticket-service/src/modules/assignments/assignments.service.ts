@@ -14,11 +14,14 @@ import {
 import { ReassignmentReason, TICKET_PATTERNS } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { requireActor } from '@synapsedesk/nest-common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  type ScopedTransaction,
+} from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketsService } from '../tickets/tickets.service';
-import { Prisma, TicketAssignment } from '../../generated/prisma/client';
+import { TicketAssignment } from '../../generated/prisma/client';
 import {
   fromProtoReassignmentReason,
   toAssignmentResponse,
@@ -107,7 +110,7 @@ export class AssignmentsService {
     context: CallerContext,
   ): Promise<UnassignTicketResponse> {
     const ticket = await this.tickets.load(request.ticketId, context);
-    const current = await this.loadCurrent(ticket.id);
+    const current = await this.loadCurrent(ticket.id, context);
 
     if (!current) {
       // FAILED_PRECONDITION (409), not NOT_FOUND: the ticket exists and the
@@ -119,7 +122,7 @@ export class AssignmentsService {
       });
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.scoped(context).$transaction(async (tx) => {
       await this.closeCurrent(tx, current.id);
       await this.syncTicketCache(tx, ticket.id, null, null);
     });
@@ -153,7 +156,7 @@ export class AssignmentsService {
     // table has no `organization_id` of its own to filter on.
     const ticket = await this.tickets.loadForReading(request.ticketId, context);
 
-    const items = await this.prisma.ticketAssignment.findMany({
+    const items = await this.prisma.scoped(context).ticketAssignment.findMany({
       where: { ticketId: ticket.id },
       orderBy: { createdAt: 'asc' },
     });
@@ -201,7 +204,7 @@ export class AssignmentsService {
     await this.authReference.assertUserExists(assigneeId, context);
     await this.authReference.assertDepartmentExists(departmentId, context);
 
-    const previous = await this.loadCurrent(ticket.id);
+    const previous = await this.loadCurrent(ticket.id, context);
 
     if (previous?.assignedToId === assigneeId) {
       // Refused rather than written as a no-op row. A second identical
@@ -233,6 +236,7 @@ export class AssignmentsService {
       departmentId,
       reason,
       actorId,
+      context,
     );
 
     // `assigned` vs `reassigned` follows the DATA, not the RPC name — see
@@ -284,9 +288,10 @@ export class AssignmentsService {
     departmentId: string,
     reason: ReassignmentReason,
     actorId: string,
+    context: CallerContext,
   ): Promise<TicketAssignment> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.scoped(context).$transaction(async (tx) => {
         if (previous) await this.closeCurrent(tx, previous.id);
 
         const assignment = await tx.ticketAssignment.create({
@@ -321,7 +326,7 @@ export class AssignmentsService {
   }
 
   private closeCurrent(
-    tx: Prisma.TransactionClient,
+    tx: ScopedTransaction,
     assignmentId: string,
   ): Promise<TicketAssignment> {
     return tx.ticketAssignment.update({
@@ -338,7 +343,7 @@ export class AssignmentsService {
    * another team's agent on it.
    */
   private async syncTicketCache(
-    tx: Prisma.TransactionClient,
+    tx: ScopedTransaction,
     ticketId: string,
     assigneeId: string | null,
     departmentId: string | null,
@@ -352,8 +357,11 @@ export class AssignmentsService {
     });
   }
 
-  private loadCurrent(ticketId: string): Promise<TicketAssignment | null> {
-    return this.prisma.ticketAssignment.findFirst({
+  private loadCurrent(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<TicketAssignment | null> {
+    return this.prisma.scoped(context).ticketAssignment.findFirst({
       where: { ticketId, isCurrent: true },
     });
   }

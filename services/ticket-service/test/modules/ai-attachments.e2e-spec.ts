@@ -735,9 +735,9 @@ describe('Attachments as model input (e2e)', () => {
         excludedFromAiContext: true,
       });
 
-      await expect(service.lastUserMessageId(ticket.id)).resolves.toBe(
-        refused.id,
-      );
+      await expect(
+        service.lastUserMessageId(ticket.id, caller()),
+      ).resolves.toBe(refused.id);
     });
   });
 });

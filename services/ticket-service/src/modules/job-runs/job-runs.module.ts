@@ -33,7 +33,8 @@ import { PrismaService } from '../prisma/prisma.service';
   providers: [
     {
       provide: JOB_RUN_STORE,
-      useFactory: (prisma: PrismaService): JobRunStore => prisma.jobRun,
+      useFactory: (prisma: PrismaService): JobRunStore =>
+        prisma.unscoped('cross-tenant job').jobRun,
       inject: [PrismaService],
     },
     {

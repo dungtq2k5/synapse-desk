@@ -106,6 +106,19 @@ export type FaultInjector = {
     method: string,
     error: Error,
     options?: { once?: boolean },
+  ) => jest.SpyInstance; /**
+   * Replaces `<model>.<method>` on the clients `prisma.scoped()` hands out:
+   * every call, or the first only with `{ once: true }`. `failScoped` is this
+   * with a rejection.
+   *
+   * @example faults.replaceScoped(fx.prisma, 'ticket', 'count', () => Promise.resolve(140_000), { once: true })
+   */
+  replaceScoped: (
+    prisma: { scoped: (context: never) => object },
+    model: string,
+    method: string,
+    implementation: (...args: never[]) => unknown,
+    options?: { once?: boolean },
   ) => jest.SpyInstance;
 };
 
@@ -132,6 +145,41 @@ export function faultInjector(): FaultInjector {
     spies.push(spy);
 
     return spy;
+  }
+
+  function replaceScoped(
+    prisma: { scoped: (context: never) => object },
+    model: string,
+    method: string,
+    implementation: (...args: never[]) => unknown,
+    options?: { once?: boolean },
+  ): jest.SpyInstance {
+    const scoped = prisma.scoped.bind(prisma);
+    let armed = true;
+
+    return track(
+      jest.spyOn(prisma, 'scoped').mockImplementation((context: never) => {
+        const client = scoped(context);
+
+        return new Proxy(client, {
+          get(target, property, receiver) {
+            const value: unknown = Reflect.get(target, property, receiver);
+            if (property !== model) return value;
+
+            return new Proxy(value as object, {
+              get(delegate, name, inner) {
+                if (name !== method || !armed) {
+                  return Reflect.get(delegate, name, inner) as unknown;
+                }
+                if (options?.once) armed = false;
+
+                return implementation;
+              },
+            });
+          },
+        });
+      }),
+    );
   }
 
   return {
@@ -164,33 +212,14 @@ export function faultInjector(): FaultInjector {
           .spyOn(target, method as never)
           .mockRejectedValueOnce(error as never),
       ),
-    failScoped: (prisma, model, method, error, options) => {
-      const scoped = prisma.scoped.bind(prisma);
-      let armed = true;
-
-      return track(
-        jest.spyOn(prisma, 'scoped').mockImplementation((context: never) => {
-          const client = scoped(context);
-
-          return new Proxy(client, {
-            get(target, property, receiver) {
-              const value: unknown = Reflect.get(target, property, receiver);
-              if (property !== model) return value;
-
-              return new Proxy(value as object, {
-                get(delegate, name, inner) {
-                  if (name !== method || !armed) {
-                    return Reflect.get(delegate, name, inner) as unknown;
-                  }
-                  if (options?.once) armed = false;
-
-                  return () => Promise.reject(error);
-                },
-              });
-            },
-          });
-        }),
-      );
-    },
+    failScoped: (prisma, model, method, error, options) =>
+      replaceScoped(
+        prisma,
+        model,
+        method,
+        () => Promise.reject(error),
+        options,
+      ),
+    replaceScoped,
   };
 }
