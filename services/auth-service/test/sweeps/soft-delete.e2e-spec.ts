@@ -1,3 +1,5 @@
+import { status } from '@grpc/grpc-js';
+import { expectRpc } from '@synapsedesk/testing/rpc';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -10,6 +12,8 @@ import { addMember, createDepartment, seedTenantWithUser } from '../factories';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
 import { UsersService } from '../../src/modules/users/users.service';
 import { PlatformService } from '../../src/modules/platform/platform.service';
+import { AuthService } from '../../src/modules/auth/auth.service';
+import { SessionsService } from '../../src/modules/sessions/sessions.service';
 
 /**
  * the soft-delete sweep.
@@ -274,6 +278,70 @@ describe('soft-delete sweep (e2e)', () => {
       );
 
       expect(list.items.map((d) => d.id)).toContain(gone.id);
+    });
+  });
+
+  describe('a deleted row is not a target', () => {
+    it('a soft-deleted department cannot be assigned to a user', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const member = await addMember(fx.prisma, t.org.id);
+      const gone = await createDepartment(fx.prisma, t.org.id);
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
+
+      await expectRpc(
+        users.setUserDepartments(
+          {
+            id: member.id,
+            departments: [{ departmentId: gone.id, isPrimary: true }],
+          },
+          superuser(t),
+        ),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('a soft-deleted user cannot be added to a department', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const gone = await addMember(fx.prisma, t.org.id);
+      const dept = await createDepartment(fx.prisma, t.org.id);
+      await users.deleteUser({ id: gone.id }, superuser(t));
+
+      await expectRpc(
+        departments.addDepartmentMembers(
+          { departmentId: dept.id, userIds: [gone.id], isPrimary: false },
+          superuser(t),
+        ),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('a soft-deleted user cannot change their password', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const gone = await addMember(fx.prisma, t.org.id);
+      await users.deleteUser({ id: gone.id }, superuser(t));
+
+      await expectRpc(
+        fx.moduleRef
+          .get(AuthService)
+          .changePassword(
+            { currentPassword: 'irrelevant', newPassword: 'Irrelevant1!x' },
+            superuser({ user: gone }),
+          ),
+        status.NOT_FOUND,
+      );
+    });
+
+    it("a soft-deleted user's sessions are not listed", async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const gone = await addMember(fx.prisma, t.org.id);
+      await users.deleteUser({ id: gone.id }, superuser(t));
+
+      await expectRpc(
+        fx.moduleRef
+          .get(SessionsService)
+          .listUserSessions({ userId: gone.id }, superuser(t)),
+        status.NOT_FOUND,
+      );
     });
   });
 });

@@ -12,7 +12,7 @@ import "synapsedesk/auth/role.proto";
 //
 // Every RPC here reads or writes ACROSS tenants, which is exactly why it is a
 // separate service rather than extra methods on the tenant-facing ones: the
-// tenant services apply `tenantScope` unconditionally, and a cross-tenant
+// tenant services scope every query to the caller's tenant, and a cross-tenant
 // method living beside them would be one forgotten filter away from leaking.
 // The gateway gates the whole surface with SuperAdminGuard.
 

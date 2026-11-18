@@ -500,7 +500,7 @@ export class RolesService {
     request: AssignRoleUsersRequest,
     context: CallerContext,
   ): Promise<RoleResponse> {
-    const organizationId = requireTenant(context);
+    requireTenant(context);
     const role = await this.load(request.roleId, context);
     const userIds = [...new Set(request.userIds)];
 
@@ -525,7 +525,7 @@ export class RolesService {
         // locked user is suspended, not gone, and granting them a role is
         // exactly the sort of thing an admin does while an account is locked.
         const targets = await tx.user.findMany({
-          where: { id: { in: userIds }, organizationId, deletedAt: null },
+          where: { id: { in: userIds }, deletedAt: null },
           select: { id: true, roles: { select: { id: true } } },
         });
 
@@ -615,7 +615,7 @@ export class RolesService {
     request: RevokeRoleUserRequest,
     context: CallerContext,
   ): Promise<RoleResponse> {
-    const organizationId = requireTenant(context);
+    requireTenant(context);
     const role = await this.load(request.roleId, context);
 
     // Read INSIDE, for the reason `assignRoleUsers` gives: `after` is derived
@@ -625,7 +625,7 @@ export class RolesService {
       .scoped(context)
       .$transaction(async (tx) => {
         const target = await tx.user.findFirst({
-          where: { id: request.userId, organizationId, deletedAt: null },
+          where: { id: request.userId, deletedAt: null },
           select: { id: true, roles: { select: { id: true } } },
         });
 

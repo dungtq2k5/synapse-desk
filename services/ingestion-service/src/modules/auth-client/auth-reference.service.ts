@@ -57,7 +57,7 @@ export class AuthReferenceService implements OnModuleInit {
    * Confirms every department id resolves IN THE CALLER'S TENANT.
    *
    * Tenant scoping is the point rather than mere existence: auth-service
-   * applies `tenantScope` to `GetDepartment` using the context packed below, so
+   * scopes `GetDepartment` to the tenant in the context packed below, so
    * a valid id belonging to another organization comes back NOT_FOUND. Without
    * that, an admin could scope a document to a department in somebody else's
    * workspace — and since `department_ids` is exactly what the retrieval filter

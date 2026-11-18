@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import {
   AuditAction,
@@ -21,11 +22,12 @@ import {
   type IdTakingMethod,
   idTakingMethods,
   probeCall,
+  superAdminReach,
   snapshot,
   tenantIdentifiers,
   wireRequest,
 } from '@synapsedesk/grpc-proto/testing/tenant-probe';
-import { memberContext } from '@synapsedesk/testing/context';
+import { memberContext, superAdminContext } from '@synapsedesk/testing/context';
 import { E2eFixture, bootstrapE2eTest } from '../utils/bootstrap';
 import {
   buildTenant,
@@ -392,19 +394,8 @@ describe('Cross-tenant probe: ticket-service (e2e)', () => {
 
   beforeEach(async () => fx.reset());
 
-  it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
-    expect(
-      Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
-    ).toEqual([]);
-  });
-
-  it('**every id-taking RPC has a row**, and no row names an RPC that is gone', () => {
-    expect(Object.keys(PROBE).sort()).toEqual(
-      methods.map((m) => m.name).sort(),
-    );
-  });
-
-  const probe = async (name: string, method: IdTakingMethod) => {
+  /** A's world for one row: A seeded, A's identifiers, and the request on A's ids. */
+  const setUp = async (name: string, method: IdTakingMethod) => {
     const a = await seedA();
     // A's rows here, plus values that are A's data without being ids.
     const local = new Set([
@@ -420,8 +411,26 @@ describe('Cross-tenant probe: ticket-service (e2e)', () => {
     ]);
     const row = PROBE[name] as { build: (a: A) => Record<string, unknown> };
 
+    return { local, foreign, request: wireRequest(method, row.build(a)) };
+  };
+
+  it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
+    expect(
+      Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
+    ).toEqual([]);
+  });
+
+  it('**every id-taking RPC has a row**, and no row names an RPC that is gone', () => {
+    expect(Object.keys(PROBE).sort()).toEqual(
+      methods.map((m) => m.name).sort(),
+    );
+  });
+
+  const probe = async (name: string, method: IdTakingMethod) => {
+    const { request, local, foreign } = await setUp(name, method);
+
     const report = await probeCall({
-      request: wireRequest(method, row.build(a)),
+      request,
       call: controllerCall(controllers, name, asB),
       local,
       foreign,
@@ -442,5 +451,137 @@ describe('Cross-tenant probe: ticket-service (e2e)', () => {
   )(
     '**%s** as tenant B on A’s ids: answers as for a missing id, names nothing of A’s, changes nothing of A’s',
     probe,
+  );
+  /**
+   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * tenant route with no tenant, as the gateway lets a Super Admin do. The
+   * expectation is the behavior before the scoped client, recorded by running
+   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
+   * a row; one that reaches A's data says why.
+   *
+   * `PROBE_RECORD=<file>` writes each outcome to the file instead.
+   */
+  const SUPER_ADMIN: Record<string, string> = {
+    'AiService/ClassifyTicket': 'refused UNAVAILABLE',
+    'AiService/GenerateDraft': 'refused UNAVAILABLE',
+    'AiService/GenerateSummary': 'refused UNAVAILABLE',
+    'AiService/GetSuggestions': 'refused UNAVAILABLE',
+    'AiService/GetSummary':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'AiService/ListSimilarTickets': 'refused UNAVAILABLE',
+    'AnalyticsService/CreateExport': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetAgentStats': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetDeflection': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetExport': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetOverview': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetResponseTimes': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetSatisfaction': 'refused FAILED_PRECONDITION',
+    'AnalyticsService/GetVolume': 'refused FAILED_PRECONDITION',
+    'AssignmentService/AssignTicket': 'refused UNAVAILABLE',
+    'AssignmentService/AssignTicketToSelf': 'refused UNAVAILABLE',
+    'AssignmentService/ListAssignments':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'AssignmentService/ReassignTicket': 'refused UNAVAILABLE',
+    'AssignmentService/UnassignTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'AuditService/ListAuditLogs': 'refused FAILED_PRECONDITION',
+    'FeedbackService/GetFeedback': 'refused FAILED_PRECONDITION',
+    'FeedbackService/SubmitFeedback': 'refused FAILED_PRECONDITION',
+    'FeedbackService/WithdrawFeedback': 'refused FAILED_PRECONDITION',
+    'MessageService/AnswerOpening': 'refused PERMISSION_DENIED',
+    'MessageService/AppendAiMessage':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/ConfirmAttachment': 'refused UNAVAILABLE',
+    'MessageService/CreateMessage': 'refused PERMISSION_DENIED',
+    'MessageService/DeleteAttachment':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/DownloadAttachment': 'refused NOT_FOUND',
+    'MessageService/ExcludeFromAiContext':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/GetAiAttachments': 'answers',
+    'MessageService/IngestAttachment': 'refused UNAVAILABLE',
+    'MessageService/ListAttachments':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/ListMessages':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/RedactMessage':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/UpdateMessage': 'refused PERMISSION_DENIED',
+    'MessageService/UploadAttachment': 'refused UNAVAILABLE',
+    'TicketService/BulkChangeTicketPriority':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/BulkChangeTicketStatus':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/ChangeTicketStatus':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/CloseTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/CreateTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/DeleteTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/EscalateTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/GetTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/ListTicketStatusChanges':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/ListTickets':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/ListTicketsByIds':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/MarkTicketRead':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/ReopenTicket': 'refused ABORTED',
+    'TicketService/ResolveTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/RestoreTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/UpdateTicket':
+      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+  };
+  const asSuperAdmin = () => superAdminContext();
+
+  it('**every id-taking RPC has a Super Admin expectation**', () => {
+    if (process.env.PROBE_RECORD) return;
+    expect(Object.keys(SUPER_ADMIN).sort()).toEqual(
+      methods
+        .filter((method) => 'build' in PROBE[method.name])
+        .map((method) => method.name)
+        .sort(),
+    );
+  });
+
+  it.each(
+    methods
+      .filter((method) => 'build' in PROBE[method.name])
+      .map(
+        (method) =>
+          [
+            method.name,
+            SUPER_ADMIN[method.name] ?? 'unrecorded',
+            method,
+          ] as const,
+      ),
+  )(
+    '**%s** as a Super Admin on A’s ids: %s',
+    async (name, expected, method) => {
+      const { request, local, foreign } = await setUp(name, method);
+
+      const reached = await superAdminReach({
+        request,
+        call: controllerCall(controllers, name, asSuperAdmin()),
+        local,
+        foreign,
+        prisma: fx.prisma,
+      });
+
+      if (process.env.PROBE_RECORD) {
+        appendFileSync(
+          process.env.PROBE_RECORD,
+          `${JSON.stringify([name, reached])}\n`,
+        );
+        return;
+      }
+      expect(reached).toBe(expected.split(':')[0]);
+    },
   );
 });

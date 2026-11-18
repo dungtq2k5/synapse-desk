@@ -85,7 +85,7 @@ type OrganizationRow = Organization & {
 /**
  * Cross-tenant administration.
  *
- * NOTHING here calls `tenantScope`, which is the entire point and also the
+ * NOTHING here is tenant-scoped, which is the entire point and also the
  * entire risk: these queries deliberately span every customer. That is why the
  * surface lives in its own service behind `SuperAdminGuard` rather than as
  * extra methods on the tenant-facing ones, where a missing filter would be
@@ -555,7 +555,7 @@ export class PlatformService {
    * Offboards a tenant for real: soft-deletes the row and cuts off access.
    *
    * This is the irreversible-ish half that `DELETE /organizations/current` only
-   * REQUESTS. Child rows are deliberately not marked: `tenantScope` already
+   * REQUESTS. Child rows are deliberately not marked: the tenant filter already
    * excludes rows whose organization is gone, and the gateway's lifecycle gate
    * refuses a deleted tenant outright — so marking them would be a large write
    * that has to be undone one by one on restore.

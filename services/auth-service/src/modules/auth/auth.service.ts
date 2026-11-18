@@ -49,7 +49,6 @@ import {
   AuditPublisher,
   formatErrorMsg,
   requireActor,
-  tenantScope,
 } from '@synapsedesk/nest-common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -976,7 +975,7 @@ export class AuthService {
     const userId = requireActor(context);
 
     const user = await this.prisma.scoped(context).user.findFirst({
-      where: { id: userId, ...tenantScope(context) },
+      where: { id: userId, deletedAt: null },
       select: { id: true, email: true, fullName: true, passwordHash: true },
     });
     if (!user) {

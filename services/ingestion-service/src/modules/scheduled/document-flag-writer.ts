@@ -144,7 +144,6 @@ export class DocumentFlagWriter {
         where: {
           isStaged: false,
           document: {
-            organizationId,
             deletedAt: null,
             status: DocumentStatus.INDEXED,
           },
@@ -258,7 +257,6 @@ export class DocumentFlagWriter {
       .scoped(systemContext(organizationId))
       .document.findMany({
         where: {
-          organizationId,
           deletedAt: null,
           status: DocumentStatus.INDEXED,
           fileUpdatedAt: { lt: cutoff },
@@ -328,7 +326,6 @@ export class DocumentFlagWriter {
       .document.findMany({
         where: {
           id: { in: flagged.map((document) => document.documentId) },
-          organizationId,
           deletedAt: null,
           status: DocumentStatus.INDEXED,
         },
@@ -387,7 +384,6 @@ export class DocumentFlagWriter {
       .scoped(systemContext(organizationId))
       .documentFlag.updateMany({
         where: {
-          organizationId,
           documentId,
           flagType,
           resolvedAt: null,
@@ -486,7 +482,6 @@ export class DocumentFlagWriter {
       .scoped(systemContext(organizationId))
       .documentFlag.findMany({
         where: {
-          organizationId,
           flagType,
           documentId: { in: findings.map((finding) => finding.documentId) },
           OR: [

@@ -1,15 +1,18 @@
+import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { PERMISSION_CODES } from '@synapsedesk/contracts';
 import {
   CLEAN,
   controllerCall,
+  type IdTakingMethod,
   idTakingMethods,
   probeCall,
+  superAdminReach,
   snapshot,
   tenantIdentifiers,
   wireRequest,
 } from '@synapsedesk/grpc-proto/testing/tenant-probe';
-import { memberContext } from '@synapsedesk/testing/context';
+import { memberContext, superAdminContext } from '@synapsedesk/testing/context';
 import { E2eFixture, bootstrapE2eTest } from '../utils/bootstrap';
 import { NotificationsGrpcController } from '../../src/modules/feed/notifications-grpc.controller';
 
@@ -162,6 +165,20 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
 
   beforeEach(async () => fx.reset());
 
+  /** A's world for one row: A seeded, A's identifiers, and the request on A's ids. */
+  const setUp = async (name: string, method: IdTakingMethod) => {
+    const a = await seedA();
+    // A's rows here, plus values that are A's data without being ids.
+    const local = new Set([
+      ...tenantIdentifiers(await snapshot(fx.prisma), a.organizationId),
+      a.providerMessageId,
+    ]);
+    const foreign = new Set([a.user, a.ticket]);
+    const row = PROBE[name] as { build: (a: A) => Record<string, unknown> };
+
+    return { local, foreign, request: wireRequest(method, row.build(a)) };
+  };
+
   it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
     expect(
       Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
@@ -181,17 +198,10 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
   )(
     '**%s** as tenant B on A’s ids: answers as for a missing id, names nothing of A’s, changes nothing of A’s',
     async (name, method) => {
-      const a = await seedA();
-      // A's rows here, plus values that are A's data without being ids.
-      const local = new Set([
-        ...tenantIdentifiers(await snapshot(fx.prisma), a.organizationId),
-        a.providerMessageId,
-      ]);
-      const foreign = new Set([a.user, a.ticket]);
-      const row = PROBE[name] as { build: (a: A) => Record<string, unknown> };
+      const { request, local, foreign } = await setUp(name, method);
 
       const report = await probeCall({
-        request: wireRequest(method, row.build(a)),
+        request,
         call: controllerCall({ NotificationService: controller }, name, asB),
         local,
         foreign,
@@ -203,6 +213,78 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
         onA: report.onA,
         onMissing: report.onMissing,
       });
+    },
+  );
+  /**
+   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * tenant route with no tenant, as the gateway lets a Super Admin do. The
+   * expectation is the behavior before the scoped client, recorded by running
+   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
+   * a row; one that reaches A's data says why.
+   *
+   * `PROBE_RECORD=<file>` writes each outcome to the file instead.
+   */
+  const SUPER_ADMIN: Record<string, string> = {
+    'NotificationService/Archive': 'refused NOT_FOUND',
+    'NotificationService/DeleteWebhookEndpoint': 'refused FAILED_PRECONDITION',
+    'NotificationService/ForgetDevice': 'refused NOT_FOUND',
+    'NotificationService/GetWebhookEndpoint': 'refused FAILED_PRECONDITION',
+    'NotificationService/ListWebhookDeliveries': 'refused FAILED_PRECONDITION',
+    'NotificationService/MarkManyRead': 'answers',
+    'NotificationService/MarkRead': 'refused NOT_FOUND',
+    'NotificationService/ResolveTicketByMessageId': 'answers',
+    'NotificationService/RotateWebhookSecret': 'refused FAILED_PRECONDITION',
+    'NotificationService/TestWebhookEndpoint': 'refused FAILED_PRECONDITION',
+    'NotificationService/UpdateWebhookEndpoint': 'refused FAILED_PRECONDITION',
+  };
+  const asSuperAdmin = () => superAdminContext();
+
+  it('**every id-taking RPC has a Super Admin expectation**', () => {
+    if (process.env.PROBE_RECORD) return;
+    expect(Object.keys(SUPER_ADMIN).sort()).toEqual(
+      methods
+        .filter((method) => 'build' in PROBE[method.name])
+        .map((method) => method.name)
+        .sort(),
+    );
+  });
+
+  it.each(
+    methods
+      .filter((method) => 'build' in PROBE[method.name])
+      .map(
+        (method) =>
+          [
+            method.name,
+            SUPER_ADMIN[method.name] ?? 'unrecorded',
+            method,
+          ] as const,
+      ),
+  )(
+    '**%s** as a Super Admin on A’s ids: %s',
+    async (name, expected, method) => {
+      const { request, local, foreign } = await setUp(name, method);
+
+      const reached = await superAdminReach({
+        request,
+        call: controllerCall(
+          { NotificationService: controller },
+          name,
+          asSuperAdmin(),
+        ),
+        local,
+        foreign,
+        prisma: fx.prisma,
+      });
+
+      if (process.env.PROBE_RECORD) {
+        appendFileSync(
+          process.env.PROBE_RECORD,
+          `${JSON.stringify([name, reached])}\n`,
+        );
+        return;
+      }
+      expect(reached).toBe(expected.split(':')[0]);
     },
   );
 });

@@ -1093,7 +1093,7 @@ describe('Tickets (e2e)', () => {
 
     it('5. **an ACTORLESS caller cannot transition at all, so no row can be authorless**', async () => {
       // Why `changed_by_id` is NOT nullable. `transition` loads the ticket
-      // through `tenantScope`, which refuses a caller with no `sub` — so the
+      // after `requireActor`, which refuses a caller with no `sub` — so the
       // "system moved it" row the column could have modelled has no way to be
       // written, and a nullable column would have described a state the code
       // cannot reach.

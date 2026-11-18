@@ -79,7 +79,6 @@ export class DiscardedDraftSweep {
       .aiGeneration.groupBy({
         by: ['outcome'],
         where: {
-          organizationId,
           purpose: AiGenerationPurpose.DRAFT,
           outcome: { not: null },
           createdAt: { gte: since },

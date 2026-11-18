@@ -443,8 +443,8 @@ export class DocumentsService {
     );
     const search = toSearchFilter(page.searchTerm);
 
+    requireTenant(context);
     const where: Prisma.DocumentWhereInput = {
-      organizationId: requireTenant(context),
       ...(request.includeDeleted ? {} : { deletedAt: null }),
       ...this.visibilityScope(context),
       // UNSPECIFIED (0) is falsy and means "no filter", so `fromProto*`
@@ -612,7 +612,7 @@ export class DocumentsService {
       this.usedBytes(organizationId),
       this.authReference.getStorageLimitBytes(context),
       this.prisma.scoped(context).document.count({
-        where: { organizationId, deletedAt: null },
+        where: { deletedAt: null },
       }),
     ]);
 
@@ -777,10 +777,10 @@ export class DocumentsService {
   ): Promise<DocumentResponse> {
     // Deliberately NOT `load`, which excludes deleted rows — the only rows this
     // can act on.
+    requireTenant(context);
     const existing = await this.prisma.scoped(context).document.findFirst({
       where: {
         id: request.id,
-        organizationId: requireTenant(context),
         deletedAt: { not: null },
       },
       include: { departmentLinks: { select: { departmentId: true } } },
@@ -870,9 +870,9 @@ export class DocumentsService {
 
     if (ids.length === 0) return { items: [] };
 
+    requireTenant(context);
     const items = await this.prisma.scoped(context).document.findMany({
       where: {
-        organizationId: requireTenant(context),
         ...this.visibilityScope(context),
         // Soft-deleted documents ARE returned by id. A citation
         // pointing at a retired document still has to render its title.
@@ -922,6 +922,7 @@ export class DocumentsService {
 
     if (ids.length === 0) return { items: [] };
 
+    requireTenant(context);
     const chunks = await this.prisma.scoped(context).documentChunk.findMany({
       where: {
         // Staged chunks too, as retrieval's hydration reads them: for the
@@ -930,7 +931,6 @@ export class DocumentsService {
         id: { in: ids },
         // The boundary, applied through the parent.
         document: {
-          organizationId: requireTenant(context),
           ...this.visibilityScope(context),
         },
       },
@@ -1352,7 +1352,7 @@ export class DocumentsService {
    */
   private async documentCount(organizationId: string): Promise<number> {
     return this.prisma.scoped(systemContext(organizationId)).document.count({
-      where: { organizationId, deletedAt: null },
+      where: { deletedAt: null },
     });
   }
 
@@ -1366,7 +1366,7 @@ export class DocumentsService {
     const result = await this.prisma
       .scoped(systemContext(organizationId))
       .document.aggregate({
-        where: { organizationId, deletedAt: null },
+        where: { deletedAt: null },
         _sum: STORED_BYTES_SUM,
       });
 
@@ -1426,10 +1426,10 @@ export class DocumentsService {
    * enumeration into a knowledge-base oracle.
    */
   private async load(documentId: string, context: CallerContext) {
+    requireTenant(context);
     const document = await this.prisma.scoped(context).document.findFirst({
       where: {
         id: documentId,
-        organizationId: requireTenant(context),
         deletedAt: null,
         ...this.visibilityScope(context),
       },

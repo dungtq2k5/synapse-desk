@@ -165,7 +165,6 @@ export class AiAnalyticsService {
 
     const flags = await this.prisma.scoped(context).documentFlag.findMany({
       where: {
-        organizationId,
         resolvedAt: null,
         // The two flags that mean "the corpus is not answering". `OUTDATED` and
         // `DUPLICATE` are corpus HYGIENE, which is a different backlog and
@@ -288,7 +287,6 @@ export class AiAnalyticsService {
     const newest = await this.prisma
       .scoped(systemContext(organizationId))
       .aiGenerationDailyStat.findFirst({
-        where: { organizationId },
         orderBy: { day: 'desc' },
         select: { day: true },
       });
@@ -303,7 +301,7 @@ export class AiAnalyticsService {
     const rows = await this.prisma
       .scoped(systemContext(organizationId))
       .aiGenerationDailyStat.findMany({
-        where: { organizationId, day: { gte: range.from, lte: range.to } },
+        where: { day: { gte: range.from, lte: range.to } },
         orderBy: { day: 'asc' },
       });
 

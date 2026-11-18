@@ -66,8 +66,6 @@ export class AuthGenerationStore implements GenerationStore {
   async clear(organizationId: string): Promise<void> {
     await this.prisma
       .scoped(systemContext(organizationId))
-      .limitAlertGeneration.deleteMany({
-        where: { organizationId },
-      });
+      .limitAlertGeneration.deleteMany({});
   }
 }

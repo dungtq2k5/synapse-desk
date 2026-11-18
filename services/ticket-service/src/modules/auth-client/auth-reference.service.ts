@@ -250,7 +250,7 @@ export class AuthReferenceService implements OnModuleInit {
    * Confirms a user id resolves IN THE CALLER'S TENANT.
    *
    * Tenant scoping is the point, not merely existence: auth-service applies
-   * `tenantScope` to `GetUser` using the context packed below, so a valid id
+   * the tenant scope to `GetUser` using the context packed below, so a valid id
    * belonging to another organization comes back NOT_FOUND. Without that, an
    * admin could author a ticket on behalf of a user in someone else's
    * workspace — a cross-tenant write dressed as a normal request.

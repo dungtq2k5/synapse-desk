@@ -16,7 +16,7 @@ import {
   systemContext,
 } from '@synapsedesk/contracts';
 import { isSameText, withHttpStatus } from '@synapsedesk/core';
-import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { formatErrorMsg, requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { QuotaCounterService } from './quota-counter.service';
@@ -347,6 +347,9 @@ export class AiLedgerService {
     },
     context: CallerContext,
   ): Promise<AiGenerationOutcome> {
+    // The reply's tenant: refuses a Super Admin, whom the scoped client would
+    // let set any tenant's outcome.
+    requireTenant(context);
     const db = this.prisma.scoped(context);
     const where = { id: reply.generationId, ticketId: reply.ticketId };
     const generation = await db.aiGeneration.findFirst({

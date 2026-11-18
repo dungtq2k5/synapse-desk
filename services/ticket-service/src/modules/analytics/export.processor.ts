@@ -189,7 +189,6 @@ export class ExportProcessor extends WorkerHost {
    */
   private async ticketExportRows(row: ExportRow) {
     const where: Prisma.TicketWhereInput = {
-      organizationId: row.organizationId,
       createdAt: {
         gte: zonedEdge(row.fromDay, zoneOf(row), 'start'),
         lte: zonedEdge(row.toDay, zoneOf(row), 'end'),
@@ -260,7 +259,6 @@ export class ExportProcessor extends WorkerHost {
   /** One row per audit entry. Same pre-flight discipline as the ticket export. */
   private async auditLogRows(row: ExportRow) {
     const where: Prisma.AuditLogWhereInput = {
-      organizationId: row.organizationId,
       createdAt: {
         gte: zonedEdge(row.fromDay, zoneOf(row), 'start'),
         lte: zonedEdge(row.toDay, zoneOf(row), 'end'),
@@ -339,7 +337,6 @@ export class ExportProcessor extends WorkerHost {
       .scoped(systemContext(row.organizationId))
       .ticketDailyStat.findMany({
         where: {
-          organizationId: row.organizationId,
           day: { gte: row.fromDay, lte: row.toDay },
           ...(row.departmentId ? { departmentId: row.departmentId } : {}),
         },
@@ -404,7 +401,6 @@ export class ExportProcessor extends WorkerHost {
       .scoped(systemContext(row.organizationId))
       .agentDailyStat.findMany({
         where: {
-          organizationId: row.organizationId,
           day: { gte: row.fromDay, lte: row.toDay },
         },
         orderBy: [{ day: 'asc' }, { agentId: 'asc' }],

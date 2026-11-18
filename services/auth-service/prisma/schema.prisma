@@ -444,6 +444,8 @@ model UserDepartment {
   assignedBy User?      @relation("UserDepartmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@id([userId, departmentId])
+  // The members list filters by department alone, which the key cannot serve.
+  @@index([departmentId])
   @@map("user_departments")
 }
 
@@ -565,6 +567,8 @@ model TwoFactorBackupCode {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Every read, regeneration and reset is by user.
+  @@index([userId])
   @@map("two_factor_backup_codes")
 }
 

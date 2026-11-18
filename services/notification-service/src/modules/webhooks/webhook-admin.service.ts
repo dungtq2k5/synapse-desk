@@ -62,6 +62,9 @@ export class WebhookAdminService {
   ) {}
 
   async list(context: CallerContext): Promise<ListWebhookEndpointsResponse> {
+    // A tenant's own list: refuses a Super Admin, whom the scoped client would
+    // give every tenant's.
+    requireTenant(context);
     const rows = await this.prisma.scoped(context).webhookEndpoint.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -312,6 +315,9 @@ export class WebhookAdminService {
   // ---------------------------------------------------------------- Internals
 
   private async load(endpointId: string, context: CallerContext) {
+    // A tenant's own endpoint: refuses a Super Admin, whom the scoped client
+    // would let reach every tenant's (and rotate its secret).
+    requireTenant(context);
     const row = await this.prisma.scoped(context).webhookEndpoint.findFirst({
       where: { id: endpointId },
     });

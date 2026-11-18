@@ -190,7 +190,6 @@ export class ConflictCheckService {
       .scoped(systemContext(organizationId))
       .documentFlag.findMany({
         where: {
-          organizationId,
           flagType: DocumentFlagType.CONFLICTING,
           resolvedAt: null,
           OR: [{ documentId }, { relatedDocumentId: documentId }],

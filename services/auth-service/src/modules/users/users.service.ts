@@ -64,7 +64,6 @@ import {
   requireTenant,
   restoreData,
   softDeleteData,
-  tenantScope,
   formatErrorMsg,
 } from '@synapsedesk/nest-common';
 import { type AnyTransaction, PrismaService } from '../prisma/prisma.service';
@@ -190,8 +189,9 @@ export class UsersService {
     const { skip, take, orderBy } = toPrismaPage(page, USER_SORTABLE_FIELDS);
 
     const search = toSearchFilter(page.searchTerm);
+    requireActor(context);
     const where: Prisma.UserWhereInput = {
-      ...tenantScope(context),
+      deletedAt: null,
       ...(request.includeDeleted ? { deletedAt: undefined } : {}),
       ...(request.departmentId
         ? { userDepartments: { some: { departmentId: request.departmentId } } }
@@ -292,7 +292,6 @@ export class UsersService {
       .scoped(systemContext(request.organizationId))
       .user.findMany({
         where: {
-          organizationId: request.organizationId,
           deletedAt: null,
           // A locked account cannot act on the alert, which is the whole point
           // of addressing it by permission.
@@ -663,7 +662,6 @@ export class UsersService {
     const existing = await this.prisma.scoped(context).user.findFirst({
       where: {
         id: request.id,
-        organizationId,
         deletedAt: { not: null },
       },
       select: { id: true, email: true },
@@ -951,7 +949,7 @@ export class UsersService {
     const existing = await this.prisma
       .scoped(systemContext(organizationId))
       .user.findFirst({
-        where: { organizationId, email, deletedAt: null },
+        where: { email, deletedAt: null },
         select: { id: true },
       });
 
@@ -1125,8 +1123,9 @@ export class UsersService {
     // Every department must be in the caller's tenant. Nothing in the junction
     // table's FKs prevents linking a foreign department, because both ids are
     // individually valid.
+    requireActor(context);
     const valid = await tx.department.findMany({
-      where: { id: { in: ids }, ...tenantScope(context) },
+      where: { id: { in: ids }, deletedAt: null },
       select: { id: true },
     });
     if (valid.length !== new Set(ids).size) {
@@ -1215,10 +1214,11 @@ export class UsersService {
      */
     { includeDeleted = false }: { includeDeleted?: boolean } = {},
   ): Promise<UserSummaryRow> {
+    requireActor(context);
     const user = await this.prisma.scoped(context).user.findFirst({
       where: {
         id,
-        ...tenantScope(context),
+        deletedAt: null,
         ...(includeDeleted ? { deletedAt: undefined } : {}),
       },
       include: USER_SUMMARY_INCLUDE,
