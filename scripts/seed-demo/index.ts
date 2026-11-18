@@ -37,7 +37,7 @@ import { faker } from '@faker-js/faker';
 import { openClients } from './clients';
 import { readManifest, writeManifest, type Manifest } from './manifest';
 import { PROFILES } from './profiles';
-import { parseArgs } from './args';
+import { applyRefusal, parseArgs, rerunRefusal } from './args';
 import { SEED_EDGES, STEPS } from './registry';
 
 /** The seed the last run used, or `undefined` when there is no manifest. */
@@ -79,39 +79,14 @@ async function main(): Promise<void> {
   const clients = openClients();
 
   try {
-    if (args.apply && !args.force) {
-      const existing = await clients.auth.organization.count();
-
-      if (existing > 0) {
-        throw new Error(
-          `postgres_auth already holds ${existing} organization(s). This seeder is ADDITIVE — a second run doubles the demo and pushes the first run's tenants over their seat limits. Re-run with --force --seed=<a different number>, or reset with 'npm run db:reset'.`,
-        );
-      }
-    }
-
-    // **`--force` and determinism pull against each other, and the collision is
-    // guaranteed rather than likely.** The factories' counters reset in a fresh
-    // process and `faker.seed()` replays the same draws, so a second run at the
-    // same seed regenerates the FIRST run's slugs exactly — and `slug` is
-    // globally unique. Left alone, that surfaces as a unique-constraint
-    // violation three factories deep, which reads as a factory bug.
-    //
-    // Measured, not predicted: re-running `--apply --force` at the default seed
-    // failed on `org-1-gmpjqj`, the slug the previous run had already written.
-    if (args.apply && args.force) {
-      const previous = safeManifestSeed();
-
-      // **Compared against what the last run actually used**, not against the
-      // default. Scoped to `DEFAULT_SEED` this covered only the case that
-      // happened to be hit first: `--force --seed=99` twice collides exactly
-      // the same way, and the manifest already records which seed produced the
-      // rows now in the database.
-      if (previous !== undefined && previous === args.seed) {
-        throw new Error(
-          `--force at seed ${args.seed} would regenerate the previous run's tenants exactly — the last run used that seed, and same seed + same counters means the same slugs, which are globally unique. Pass --seed=<a different number>.`,
-        );
-      }
-    }
+    const refusal = applyRefusal(args, {
+      organizations:
+        args.apply && (!args.only || args.only === 'auth')
+          ? await clients.auth.organization.count()
+          : 0,
+      previousSeed: safeManifestSeed(),
+    });
+    if (refusal) throw new Error(refusal);
 
     const manifest: Manifest =
       args.only && args.only !== 'auth'
@@ -128,12 +103,16 @@ async function main(): Promise<void> {
 
       say(`── ${step.service}`);
 
-      const lines = await step.run({
-        manifest,
-        profile,
-        apply: args.apply,
-        clients,
-      });
+      const context = { manifest, profile, apply: args.apply, clients };
+      if (args.apply && step.existingRows) {
+        const twice = rerunRefusal(
+          step.service,
+          await step.existingRows(context),
+        );
+        if (twice) throw new Error(twice);
+      }
+
+      const lines = await step.run(context);
 
       lines.forEach((line) => say(`   ${line}`));
 

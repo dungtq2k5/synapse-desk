@@ -60,6 +60,14 @@ export const ticketStep: SeedStep = {
       context.profile,
       context.apply,
     ),
+  existingRows: (context) =>
+    context.clients.ticket.ticket.count({
+      where: {
+        organizationId: {
+          in: tenantsOf(context).map((tenant) => tenant.organizationId),
+        },
+      },
+    }),
 };
 
 export async function seedTickets(

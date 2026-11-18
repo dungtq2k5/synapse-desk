@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { faker } from '@faker-js/faker';
 import { OrgStatus } from '@synapsedesk/contracts';
-import { DEFAULT_SEED, parseArgs } from './args';
+import { DEFAULT_SEED, applyRefusal, parseArgs, rerunRefusal } from './args';
 import { SEED_EDGES, STEPS } from './registry';
 import { PROFILES, bytesFor, countFor, type Profile } from './profiles';
 import { DEMO_PASSWORD, planTenant, seedPassword } from './steps/auth.step';
@@ -447,5 +447,50 @@ describe('seedPassword', () => {
     expect(() =>
       seedPassword({ SEED_DEMO_PASSWORD: 'alllowercaseletters' }),
     ).toThrow(/an uppercase letter, a number, a symbol/);
+  });
+});
+
+describe('the --apply guards', () => {
+  const seeded = { organizations: 5, previousSeed: DEFAULT_SEED };
+  const args = (...argv: string[]) => parseArgs(argv);
+
+  it('**`--only` of a step that mints no tenants** passes on the database the seed just filled, without `--force`', () => {
+    expect(
+      applyRefusal(args('--apply', '--only=analytics'), seeded),
+    ).toBeNull();
+    expect(applyRefusal(args('--apply', '--only=ticket'), seeded)).toBeNull();
+  });
+
+  it('**a full run, or `--only=auth`,** is still refused on a populated database', () => {
+    expect(applyRefusal(args('--apply'), seeded)).toMatch(/ADDITIVE/u);
+    expect(applyRefusal(args('--apply', '--only=auth'), seeded)).toMatch(
+      /ADDITIVE/u,
+    );
+  });
+
+  it('**`--force` at the previous run’s seed** is still refused, and passes at another', () => {
+    expect(applyRefusal(args('--apply', '--force'), seeded)).toMatch(
+      /regenerate/u,
+    );
+    expect(
+      applyRefusal(args('--apply', '--force', '--seed=7'), seeded),
+    ).toBeNull();
+  });
+
+  it('**a dry run** is never refused', () => {
+    expect(applyRefusal(args(), seeded)).toBeNull();
+  });
+
+  it('**the steps that would double their rows** say so: ticket and ingestion, not auth or analytics', () => {
+    expect(
+      STEPS.filter((step) => step.existingRows).map((step) => step.service),
+    ).toEqual(['ticket', 'ingestion']);
+  });
+
+  it('**a second `--only` run of such a step** is refused, naming it; the first passes', () => {
+    expect(rerunRefusal('ticket', 0)).toBeNull();
+    expect(rerunRefusal('ticket', 152)).toBe(
+      "The ticket step already wrote 152 row(s) for the manifest's tenants; running it again would double them. Reset with 'npm run db:reset' and seed again.",
+    );
   });
 });
