@@ -52,7 +52,7 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 | If you want to | Read |
 | :--- | :--- |
 | Write code in this repo | [`docs/development-conventions.md`](docs/development-conventions.md) |
-| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 51 ADRs, append-only |
+| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 52 ADRs, append-only |
 | Follow an end-to-end path | [`docs/reference/flows/`](docs/reference/flows/) |
 | Build a client | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
 | Know what is currently broken | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md) |

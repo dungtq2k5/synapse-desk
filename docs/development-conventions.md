@@ -133,10 +133,13 @@ findOne(@CurrentUser('organizationId') orgId: string | null) { … }
 ### 4.2 Tenant isolation
 
 - `organizationId === null` means **platform Super Admin** (`is_super_admin = true`), kept in lockstep by a DB CHECK constraint. It does *not* mean "no tenant".
-- Every query touching a tenant-scoped table **MUST** filter by the caller's `organizationId`, except when `isSuperAdmin`.
+- Every query touching a tenant-scoped table is filtered by the caller's `organizationId`, except for a Super Admin. The scoped client does this; don't write the filter by hand.
 - Cross-tenant reads via a resource id **MUST** go through `RequestContextService.validateOrganizationScoping()`.
 - The gateway **MUST NOT** accept `organizationId` as client input. Sole exception: `/platform/*`, where the tenant is an explicit path segment and `SUPER` is required.
-- Scoping is **entirely manual** — there is no Prisma middleware ([known-gaps](./reference/known-gaps.md) #1). Treat a missing `organizationId` filter as a security bug in review.
+- **Query tenant data through `prisma.scoped(context)`**, never the bare client ([ADR 0053](./decisions/0053-every-query-on-tenant-data-goes-through-a-tenant-scoped-client.md)). It adds the tenant to every read and bulk write and checks every create. A new model needs a `TenantRule`, or the build fails.
+- **`prisma.unscoped(reason)` is for what crosses tenants by nature,** with a reason from `UNSCOPED_REASONS`, in a file the guard lists. Raw SQL on a tenant table binds the organization id as a parameter, also in a listed file.
+- **Soft delete stays at the call site:** the scoped client adds the tenant only.
+- **A new id-taking RPC is covered by its service's `tenant-probe.e2e-spec.ts`,** whose table must list it.
 
 ### 4.3 Provenance
 

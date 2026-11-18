@@ -92,6 +92,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0050](./decisions/0050-a-tickets-opening-carries-its-own-files.md) | A ticket's opening carries its own files; it never becomes the first message |
 | [0051](./decisions/0051-a-documents-new-version-is-staged-then-swapped.md) | A document's new version is built staged and swapped in; until then the live one answers |
 | [0052](./decisions/0052-a-conflict-flag-never-names-a-document-its-readers-cannot-open.md) | A conflict flag never names a document its readers can't open |
+| [0053](./decisions/0053-every-query-on-tenant-data-goes-through-a-tenant-scoped-client.md) | Every query on tenant data goes through a tenant-scoped client |
 
 ## `reference/` — what is true today
 
