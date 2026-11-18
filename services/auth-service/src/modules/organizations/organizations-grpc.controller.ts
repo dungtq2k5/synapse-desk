@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
+import { requireSystem } from '@synapsedesk/nest-common';
 import {
   CompleteOnboardingRequest,
   DeleteOrganizationRequest,
@@ -144,17 +145,25 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     );
   }
 
-  /** Service-to-service only — reads no caller context by design. */
+  /**
+   * Any tenant's timezone, for the background jobs that bucket every tenant's
+   * day. Cross-tenant by design, so only a system caller (`systemContext`)
+   * gets an answer; a user's context is refused.
+   */
   listOrganizationTimezones(
     request: ListOrganizationTimezonesRequest,
+    metadata?: Metadata,
   ): Promise<ListOrganizationTimezonesResponse> {
+    requireSystem(unpackCallerContext(metadata));
     return this.organizationsService.listOrganizationTimezones(request);
   }
 
-  /** Service-to-service only. */
+  /** Any tenant's billing-cycle start, for the quota job: system callers only. */
   listOrganizationCycles(
     request: ListOrganizationCyclesRequest,
+    metadata?: Metadata,
   ): Promise<ListOrganizationCyclesResponse> {
+    requireSystem(unpackCallerContext(metadata));
     return this.organizationsService.listOrganizationCycles(request);
   }
 

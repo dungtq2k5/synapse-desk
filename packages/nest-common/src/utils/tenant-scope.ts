@@ -118,3 +118,37 @@ export function requireActorOrSystem(context: CallerContext): string | null {
 
   return requireActor(context);
 }
+
+/**
+ * Refuses anyone but a platform Super Admin, with `PERMISSION_DENIED`.
+ *
+ * The gateway's `SuperAdminGuard` already gates `/platform/*`; this is the
+ * service holding the same line itself, so a gRPC caller that skips the
+ * gateway can't read across tenants.
+ *
+ * @example requireSuperAdmin(unpackCallerContext(metadata))
+ */
+export function requireSuperAdmin(context: CallerContext): void {
+  if (!context.isSuperAdmin) {
+    throw new RpcException({
+      code: status.PERMISSION_DENIED,
+      message: 'This operation is for platform Super Admins only',
+    });
+  }
+}
+
+/**
+ * Refuses anyone but a background job (`systemContext()`), with
+ * `PERMISSION_DENIED`. For the lookups that cross tenants by design and that
+ * only jobs make, so a user's context never reaches them.
+ *
+ * @example requireSystem(unpackCallerContext(metadata))
+ */
+export function requireSystem(context: CallerContext): void {
+  if (context.isSystem !== true) {
+    throw new RpcException({
+      code: status.PERMISSION_DENIED,
+      message: 'This lookup is for background jobs only',
+    });
+  }
+}

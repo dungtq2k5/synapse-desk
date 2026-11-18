@@ -66,12 +66,14 @@ export class LedgerClientService implements OnModuleInit {
     generationId: string,
     resultingMessageId: string,
     sentText: string,
+    ticketId: string,
     context: CallerContext,
   ): Promise<string | null> {
     const result = await this.send(
       generationId,
       resultingMessageId,
       sentText,
+      ticketId,
       context,
     );
     if (result.ok) return result.outcome;
@@ -98,20 +100,21 @@ export class LedgerClientService implements OnModuleInit {
    * timeout). Never throws; used by `recordOutcome` and by the hourly retry.
    *
    * @example
-   * const result = await ledger.send(generationId, messageId, text, ctx);
+   * const result = await ledger.send(generationId, messageId, text, ticketId, ctx);
    * if (!result.ok && isTransient(result.code)) keepForLater();
    */
   async send(
     generationId: string,
     resultingMessageId: string,
     sentText: string,
+    ticketId: string,
     context: CallerContext,
   ): Promise<OutcomeAttempt> {
     try {
       const response = await firstValueFrom(
         this.ledger
           .recordGenerationOutcome(
-            { generationId, resultingMessageId, sentText },
+            { generationId, resultingMessageId, sentText, ticketId },
             packRequestContext(context),
           )
           .pipe(timeout(GRPC_DEADLINE_MS)),

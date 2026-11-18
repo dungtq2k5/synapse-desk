@@ -433,6 +433,7 @@ export class MessagesService {
         request.generatedFromId,
         message.id,
         message.content,
+        ticket.id,
         context,
       );
     }
@@ -512,6 +513,7 @@ export class MessagesService {
         request.generationId,
         message.id,
         message.content,
+        ticket.id,
         context,
       );
     }
@@ -1464,8 +1466,13 @@ export class MessagesService {
       });
     }
 
-    // Throws NOT_FOUND if the caller may not see the ticket it hangs off.
-    const ticket = await this.tickets.load(ticketId, context);
+    // NOT_FOUND if the caller may not see the ticket it hangs off, with the
+    // missing attachment's text, so the two can't be told apart.
+    const ticket = await this.access.load(
+      ticketId,
+      context,
+      'No attachment with that id',
+    );
 
     return { attachment, message: attachment.message, ticket };
   }

@@ -98,18 +98,28 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    */
   async recordGenerationOutcome(
     request: RecordGenerationOutcomeRequest,
+    metadata?: Metadata,
   ): Promise<RecordGenerationOutcomeResponse> {
-    if (!request.generationId || !request.resultingMessageId) {
+    if (
+      !request.generationId ||
+      !request.resultingMessageId ||
+      !request.ticketId
+    ) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
-        message: 'A generation id and a resulting message id are both required',
+        message:
+          'A generation id, a resulting message id and a ticket id are all required',
       });
     }
 
     const outcome = await this.ledger.recordOutcome(
-      request.generationId,
-      request.resultingMessageId,
-      request.sentText,
+      {
+        generationId: request.generationId,
+        resultingMessageId: request.resultingMessageId,
+        sentText: request.sentText,
+        ticketId: request.ticketId,
+      },
+      unpackCallerContext(metadata),
     );
 
     return { outcome: toProtoAiGenerationOutcome(outcome) };

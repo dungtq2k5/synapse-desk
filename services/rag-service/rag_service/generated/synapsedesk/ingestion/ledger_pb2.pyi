@@ -98,14 +98,16 @@ class RecordGenerationResponse(_message.Message):
     def __init__(self, generation_id: _Optional[str] = ...) -> None: ...
 
 class RecordGenerationOutcomeRequest(_message.Message):
-    __slots__ = ("generation_id", "resulting_message_id", "sent_text")
+    __slots__ = ("generation_id", "resulting_message_id", "sent_text", "ticket_id")
     GENERATION_ID_FIELD_NUMBER: _ClassVar[int]
     RESULTING_MESSAGE_ID_FIELD_NUMBER: _ClassVar[int]
     SENT_TEXT_FIELD_NUMBER: _ClassVar[int]
+    TICKET_ID_FIELD_NUMBER: _ClassVar[int]
     generation_id: str
     resulting_message_id: str
     sent_text: str
-    def __init__(self, generation_id: _Optional[str] = ..., resulting_message_id: _Optional[str] = ..., sent_text: _Optional[str] = ...) -> None: ...
+    ticket_id: str
+    def __init__(self, generation_id: _Optional[str] = ..., resulting_message_id: _Optional[str] = ..., sent_text: _Optional[str] = ..., ticket_id: _Optional[str] = ...) -> None: ...
 
 class RecordGenerationOutcomeResponse(_message.Message):
     __slots__ = ("outcome",)

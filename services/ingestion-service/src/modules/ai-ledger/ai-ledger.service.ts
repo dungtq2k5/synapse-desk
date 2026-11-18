@@ -15,7 +15,7 @@ import {
   QUOTA_ALERT_THRESHOLDS,
 } from '@synapsedesk/contracts';
 import { isSameText, withHttpStatus } from '@synapsedesk/core';
-import { formatErrorMsg } from '@synapsedesk/nest-common';
+import { formatErrorMsg, requireTenant } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { QuotaCounterService } from './quota-counter.service';
@@ -287,30 +287,46 @@ export class AiLedgerService {
    * no-op: the caller is about to tell a user their reply was sent, and a
    * quietly dropped outcome makes the acceptance rate wrong in a way that
    * cannot be reconstructed.
+   *
+   * **Only the caller's tenant's generation, on the reply's ticket.** The id
+   * reaches here from a client (`generatedFromId` on a posted reply), so
+   * another tenant's generation, or one from another ticket, is NOT_FOUND
+   * with the same text as a missing one.
+   *
+   * @example await ledger.recordOutcome({ generationId, resultingMessageId, sentText, ticketId }, context)
    */
   async recordOutcome(
-    generationId: string,
-    resultingMessageId: string,
-    sentText: string,
+    reply: {
+      generationId: string;
+      resultingMessageId: string;
+      sentText: string;
+      ticketId: string;
+    },
+    context: CallerContext,
   ): Promise<AiGenerationOutcome> {
-    const generation = await this.prisma.aiGeneration.findUnique({
-      where: { id: generationId },
+    const where = {
+      id: reply.generationId,
+      organizationId: requireTenant(context),
+      ticketId: reply.ticketId,
+    };
+    const generation = await this.prisma.aiGeneration.findFirst({
+      where,
       select: { content: true },
     });
     if (!generation) {
       throw new RpcException({
         code: status.NOT_FOUND,
-        message: `No generation with id '${generationId}'`,
+        message: `No generation with id '${reply.generationId}'`,
       });
     }
 
-    const outcome = isSameText(generation.content ?? '', sentText)
+    const outcome = isSameText(generation.content ?? '', reply.sentText)
       ? AiGenerationOutcome.ACCEPTED
       : AiGenerationOutcome.EDITED;
 
-    await this.prisma.aiGeneration.update({
-      where: { id: generationId },
-      data: { outcome, resultingMessageId },
+    await this.prisma.aiGeneration.updateMany({
+      where,
+      data: { outcome, resultingMessageId: reply.resultingMessageId },
     });
 
     return outcome;

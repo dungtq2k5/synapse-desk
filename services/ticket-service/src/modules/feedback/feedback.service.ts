@@ -425,7 +425,12 @@ export class FeedbackService {
       });
     }
 
-    // Throws NOT_FOUND if the ticket is another tenant's or not theirs to see.
-    return this.access.load(message.ticketId, context);
+    // NOT_FOUND if the ticket is another tenant's or not theirs to see, with
+    // the missing message's text, so the two can't be told apart.
+    return this.access.load(
+      message.ticketId,
+      context,
+      'No message with that id',
+    );
   }
 }

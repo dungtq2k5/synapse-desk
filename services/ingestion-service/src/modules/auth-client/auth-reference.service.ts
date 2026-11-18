@@ -18,6 +18,7 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENTS_PER_TENANT,
   resolveAnalyticsRangeDays,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 
@@ -425,7 +426,12 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.organizationService
-          .listOrganizationTimezones({ organizationIds })
+          // A system caller with no tenant: the lookup crosses tenants, and
+          // auth-service answers only a job.
+          .listOrganizationTimezones(
+            { organizationIds },
+            packRequestContext(systemContext(null)),
+          )
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
@@ -468,7 +474,10 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.organizationService
-          .listOrganizationCycles({ organizationIds })
+          .listOrganizationCycles(
+            { organizationIds },
+            packRequestContext(systemContext(null)),
+          )
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
