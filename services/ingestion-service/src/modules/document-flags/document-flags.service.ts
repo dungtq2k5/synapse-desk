@@ -79,7 +79,7 @@ export class DocumentFlagsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.documentFlag.findMany({
+      this.prisma.scoped(context).documentFlag.findMany({
         where,
         orderBy,
         skip,
@@ -88,7 +88,7 @@ export class DocumentFlagsService {
       }),
       // The SAME `where`. A count computed without the scope would tell a
       // caller how many flags exist that they cannot see.
-      this.prisma.documentFlag.count({ where }),
+      this.prisma.scoped(context).documentFlag.count({ where }),
     ]);
 
     return {
@@ -130,7 +130,9 @@ export class DocumentFlagsService {
     // By id alone, and safely: `load` has already proved this row is one the
     // caller may act on, which is the check `delete({ where: { id } })` cannot
     // express by itself.
-    await this.prisma.documentFlag.delete({ where: { id: flag.id } });
+    await this.prisma
+      .scoped(context)
+      .documentFlag.delete({ where: { id: flag.id } });
 
     // **The ONLY trace left**: the row is gone and this table has no
     // `deleted_at`. Every other action has a surviving row to corroborate it;
@@ -207,7 +209,7 @@ export class DocumentFlagsService {
       });
     }
 
-    const resolved = await this.prisma.documentFlag.update({
+    const resolved = await this.prisma.scoped(context).documentFlag.update({
       where: { id: flag.id },
       data: {
         resolvedAt: new Date(),
@@ -251,7 +253,7 @@ export class DocumentFlagsService {
     // `findFirst`, never `findUnique`: the latter takes only unique fields and
     // cannot express the tenant filter (known-gaps #1), which is exactly how
     // the old `resolve()` would have let any tenant resolve any flag by id.
-    const flag = await this.prisma.documentFlag.findFirst({
+    const flag = await this.prisma.scoped(context).documentFlag.findFirst({
       where: { id, ...this.scope(context) },
       include: DOCUMENT_FLAG_INCLUDE,
     });

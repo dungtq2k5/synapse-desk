@@ -1,5 +1,6 @@
 import { DocumentStatus } from '@synapsedesk/contracts';
 import { Prisma } from '../generated/prisma/client';
+import type { ScopedTransaction } from '../modules/prisma/prisma.service';
 
 /**
  * A `documents` filter matching a document with no live version: no chunk row
@@ -27,7 +28,7 @@ export const WITHOUT_LIVE_VERSION = {
  * await setStatusUnlessLive(tx, document.id, DocumentStatus.PENDING);
  */
 export async function setStatusUnlessLive(
-  client: Prisma.TransactionClient,
+  client: ScopedTransaction,
   documentId: string,
   status: DocumentStatus,
 ): Promise<void> {

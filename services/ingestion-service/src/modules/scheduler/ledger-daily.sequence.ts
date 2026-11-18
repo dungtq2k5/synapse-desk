@@ -155,10 +155,12 @@ export class LedgerDailySequence {
       this.logger,
       'document-flags',
       async () => {
-        const tenants = await this.prisma.document.groupBy({
-          by: ['organizationId'],
-          where: { deletedAt: null },
-        });
+        const tenants = await this.prisma
+          .unscoped('cross-tenant job')
+          .document.groupBy({
+            by: ['organizationId'],
+            where: { deletedAt: null },
+          });
 
         let count = 0;
         for (const tenant of tenants) {
@@ -179,7 +181,8 @@ export class LedgerDailySequence {
       this.logger,
       'conflict-sweep',
       async () => {
-        const unchecked = await this.prisma.$queryRaw<{ id: string }[]>`
+        const unchecked = await this.prisma.unscoped('cross-tenant job')
+          .$queryRaw<{ id: string }[]>`
           SELECT id FROM (
             SELECT id,
                    row_number() OVER (

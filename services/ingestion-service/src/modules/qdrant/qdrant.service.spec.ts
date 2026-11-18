@@ -33,9 +33,10 @@ describe('QdrantService.ensureCollection (unit)', () => {
   /** The service for one provider, over a Qdrant mock with no alias yet. */
   function build(provider = 'gemini'): void {
     jest.mocked(QdrantClient).mockClear();
-    const prisma = {
+    const rows = {
       documentChunk: { findFirst: jest.fn(() => Promise.resolve(embedded)) },
-    } as unknown as PrismaService;
+    };
+    const prisma = { unscoped: () => rows } as unknown as PrismaService;
     service = new QdrantService(
       {
         getOrThrow: () => 'http://qdrant.test',

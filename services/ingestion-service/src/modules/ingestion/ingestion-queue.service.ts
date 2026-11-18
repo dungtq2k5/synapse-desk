@@ -1,7 +1,11 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { FinishedStatus, Queue } from 'bullmq';
-import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/contracts';
+import {
+  INGESTION_QUEUE,
+  INGESTION_JOB_NAME,
+  systemContext,
+} from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IngestionJobData } from './ingestion.processor';
@@ -53,8 +57,9 @@ export class IngestionQueueService {
       removeOnFail: 500,
     });
 
-    await this.prisma.ingestionJob
-      .update({
+    await this.prisma
+      .scoped(systemContext(data.organizationId))
+      .ingestionJob.update({
         where: { id: data.ingestionJobId },
         data: { bullmqJobId: String(job.id ?? '') },
       })

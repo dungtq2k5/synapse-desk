@@ -29,6 +29,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Schema objects and the seed cross every tenant by nature. */
+  private get db() {
+    return this.prisma.unscoped('schema');
+  }
+
   /**
    * The schema objects, on EVERY boot.
    *
@@ -106,7 +111,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   async assertSchemaExists(): Promise<void> {
     const expected = ['documents', 'document_chunks', 'ingestion_jobs'];
 
-    const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`
+    const rows = await this.db.$queryRaw<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = ANY(${expected})
     `;
@@ -144,7 +149,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // `WHERE deleted_at IS NULL` so a soft delete releases the slot. Restoring
     // into a hash somebody else has since taken is then a P2002 the service
     // catches and names, exactly as Domain A's user restore does.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "documents_org_hash_key"
         ON "documents" ("organization_id", "file_hash")
         WHERE "deleted_at" IS NULL;
@@ -160,17 +165,17 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // btree_gin is what lets a GIN index carry the plain `organization_id`
     // alongside the tsvector; without the extension Postgres rejects the mixed
     // operator classes.
-    await this.prisma.$executeRawUnsafe(
+    await this.db.$executeRawUnsafe(
       `CREATE EXTENSION IF NOT EXISTS btree_gin;`,
     );
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "document_chunks_fts_idx"
         ON "document_chunks"
         USING GIN ("organization_id", to_tsvector('simple', "content_text"));
     `);
 
     // `department_ids` is queried with && (array overlap) on every retrieval.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "document_chunks_dept_idx"
         ON "document_chunks" USING GIN ("department_ids");
     `);
@@ -179,11 +184,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // largest table in the system. Without these it is a sequential scan, and
     // the job that keeps Table 19's counters honest becomes the slowest thing
     // running.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "ai_generations_retrieved_idx"
         ON "ai_generations" USING GIN ("retrieved_chunk_ids");
     `);
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "ai_generations_cited_idx"
         ON "ai_generations" USING GIN ("cited_chunk_ids");
     `);
@@ -200,7 +205,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // terminal ones: a status added later is excluded until someone decides it
     // belongs here, and the failure mode of that default is a permitted
     // duplicate rather than a document nothing can ever re-run.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "ingestion_jobs_one_live_per_document"
         ON "ingestion_jobs" ("document_id")
         WHERE "status" IN ('QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING');

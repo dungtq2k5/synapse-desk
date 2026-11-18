@@ -90,6 +90,23 @@ export type FaultInjector = {
     method: K,
     error: Error,
   ) => jest.SpyInstance;
+  /**
+   * Fails `<model>.<method>` on the clients `prisma.scoped()` hands out:
+   * every call, or the first only with `{ once: true }`.
+   *
+   * For writes that go through the tenant-scoped client, which builds a new
+   * client per call, so a spy on the bare client's delegate never fires.
+   * Calls made through a transaction's `tx` are not intercepted.
+   *
+   * @example faults.failScoped(fx.prisma, 'document', 'update', new Error('injected failure'), { once: true })
+   */
+  failScoped: (
+    prisma: { scoped: (context: never) => object },
+    model: string,
+    method: string,
+    error: Error,
+    options?: { once?: boolean },
+  ) => jest.SpyInstance;
 };
 
 /**
@@ -147,5 +164,33 @@ export function faultInjector(): FaultInjector {
           .spyOn(target, method as never)
           .mockRejectedValueOnce(error as never),
       ),
+    failScoped: (prisma, model, method, error, options) => {
+      const scoped = prisma.scoped.bind(prisma);
+      let armed = true;
+
+      return track(
+        jest.spyOn(prisma, 'scoped').mockImplementation((context: never) => {
+          const client = scoped(context);
+
+          return new Proxy(client, {
+            get(target, property, receiver) {
+              const value: unknown = Reflect.get(target, property, receiver);
+              if (property !== model) return value;
+
+              return new Proxy(value as object, {
+                get(delegate, name, inner) {
+                  if (name !== method || !armed) {
+                    return Reflect.get(delegate, name, inner) as unknown;
+                  }
+                  if (options?.once) armed = false;
+
+                  return () => Promise.reject(error);
+                },
+              });
+            },
+          });
+        }),
+      );
+    },
   };
 }

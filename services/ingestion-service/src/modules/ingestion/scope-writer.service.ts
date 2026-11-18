@@ -91,14 +91,16 @@ export class ScopeWriterService {
    * and only for the part nobody thought to check.
    */
   async writeChunks(documentId: string, scope: DocumentScope): Promise<number> {
-    const result = await this.prisma.documentChunk.updateMany({
-      where: { documentId },
-      data: {
-        isOrganizationWide: scope.isOrganizationWide,
-        departmentIds: scope.departmentIds,
-        isDeleted: scope.isDeleted,
-      },
-    });
+    const result = await this.prisma
+      .unscoped('job by row id')
+      .documentChunk.updateMany({
+        where: { documentId },
+        data: {
+          isOrganizationWide: scope.isOrganizationWide,
+          departmentIds: scope.departmentIds,
+          isDeleted: scope.isDeleted,
+        },
+      });
 
     return result.count;
   }
@@ -152,11 +154,11 @@ export class ScopeWriterService {
    */
   async findScopeDrift(documentId: string): Promise<string[]> {
     const [document, chunks] = await Promise.all([
-      this.prisma.document.findUnique({
+      this.prisma.unscoped('job by row id').document.findUnique({
         where: { id: documentId },
         include: { departmentLinks: { select: { departmentId: true } } },
       }),
-      this.prisma.documentChunk.findMany({
+      this.prisma.unscoped('job by row id').documentChunk.findMany({
         where: { documentId },
         select: {
           id: true,
@@ -193,14 +195,16 @@ export class ScopeWriterService {
    * when the row is gone.
    */
   async currentScope(documentId: string): Promise<DocumentScope | null> {
-    const document = await this.prisma.document.findUnique({
-      where: { id: documentId },
-      select: {
-        isOrganizationWide: true,
-        deletedAt: true,
-        departmentLinks: { select: { departmentId: true } },
-      },
-    });
+    const document = await this.prisma
+      .unscoped('job by row id')
+      .document.findUnique({
+        where: { id: documentId },
+        select: {
+          isOrganizationWide: true,
+          deletedAt: true,
+          departmentLinks: { select: { departmentId: true } },
+        },
+      });
 
     if (!document) return null;
 

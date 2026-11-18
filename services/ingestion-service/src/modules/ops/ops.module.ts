@@ -43,7 +43,7 @@ import { QdrantService } from '../qdrant/qdrant.service';
         qdrant: QdrantService,
       ) =>
         new GrpcHealthService([
-          postgresProbe(prisma),
+          postgresProbe(prisma.unscoped('schema')),
           natsProbe(nats),
           // The quota counter's client, reused rather than re-dialled.
           redisProbe(redis),

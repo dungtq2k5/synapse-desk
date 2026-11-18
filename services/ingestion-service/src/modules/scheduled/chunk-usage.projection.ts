@@ -84,7 +84,7 @@ export class ChunkUsageProjection {
    * @throws {ProjectionCursorMissingError} when the cursor row is absent.
    */
   async project(until: Date): Promise<number> {
-    return this.prisma.$transaction(
+    return this.prisma.unscoped('cross-tenant job').$transaction(
       async (tx) => {
         const cursor = await tx.projectionCursor.findUnique({
           where: { name: CURSOR },
@@ -134,9 +134,11 @@ export class ChunkUsageProjection {
    * matches what a re-index already does to them.
    */
   async backfill(until: Date): Promise<number> {
-    const existing = await this.prisma.projectionCursor.findUnique({
-      where: { name: CURSOR },
-    });
+    const existing = await this.prisma
+      .unscoped('cross-tenant job')
+      .projectionCursor.findUnique({
+        where: { name: CURSOR },
+      });
 
     if (!existing) {
       const zeroed = await this.resetCounters();
@@ -147,13 +149,15 @@ export class ChunkUsageProjection {
       // forward by a fixed span, so a lower bound of 1970 would be thousands of
       // empty transactions before reaching any data. `null` means the ledger is
       // empty and there is nothing to project, so the cursor starts at the top.
-      const [oldest] = await this.prisma.aiGeneration.findMany({
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-        take: 1,
-      });
+      const [oldest] = await this.prisma
+        .unscoped('cross-tenant job')
+        .aiGeneration.findMany({
+          select: { createdAt: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        });
 
-      await this.prisma.projectionCursor.create({
+      await this.prisma.unscoped('cross-tenant job').projectionCursor.create({
         data: { name: CURSOR, until: oldest?.createdAt ?? until },
       });
     }
@@ -163,33 +167,35 @@ export class ChunkUsageProjection {
     // Half-open, disjoint windows, so adding across them totals the same as one
     // pass — and each commits its own cursor.
     for (;;) {
-      const advanced = await this.prisma.$transaction(
-        async (tx) => {
-          const cursor = await tx.projectionCursor.findUniqueOrThrow({
-            where: { name: CURSOR },
-          });
+      const advanced = await this.prisma
+        .unscoped('cross-tenant job')
+        .$transaction(
+          async (tx) => {
+            const cursor = await tx.projectionCursor.findUniqueOrThrow({
+              where: { name: CURSOR },
+            });
 
-          if (cursor.until >= until) return null;
+            if (cursor.until >= until) return null;
 
-          const next = new Date(
-            Math.min(
-              cursor.until.getTime() +
-                PROJECTION_BACKFILL_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-              until.getTime(),
-            ),
-          );
+            const next = new Date(
+              Math.min(
+                cursor.until.getTime() +
+                  PROJECTION_BACKFILL_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+                until.getTime(),
+              ),
+            );
 
-          const rows = await this.projectInterval(tx, cursor.until, next);
+            const rows = await this.projectInterval(tx, cursor.until, next);
 
-          await tx.projectionCursor.update({
-            where: { name: CURSOR },
-            data: { until: next },
-          });
+            await tx.projectionCursor.update({
+              where: { name: CURSOR },
+              data: { until: next },
+            });
 
-          return rows.retrieved + rows.cited;
-        },
-        { timeout: PROJECTION_TRANSACTION_TIMEOUT_MS },
-      );
+            return rows.retrieved + rows.cited;
+          },
+          { timeout: PROJECTION_TRANSACTION_TIMEOUT_MS },
+        );
 
       if (advanced === null) break;
 
@@ -209,6 +215,9 @@ export class ChunkUsageProjection {
    * Written in SQL rather than as a read-modify-write loop: the arrays are
    * unnested and aggregated in one statement, so two overlapping runs cannot
    * interleave a read and a write and lose an increment.
+   *
+   * A chunk is matched by its id AND its tenant, so a generation that named
+   * another tenant's chunk never counts on it.
    */
   private async projectInterval(
     tx: Prisma.TransactionClient,
@@ -222,12 +231,15 @@ export class ChunkUsageProjection {
             COALESCE(c.last_retrieved_at, usage.last_seen), usage.last_seen
           )
       FROM (
-        SELECT chunk_id, COUNT(*) AS hits, MAX(created_at) AS last_seen
+        SELECT organization_id, chunk_id, COUNT(*) AS hits,
+               MAX(created_at) AS last_seen
         FROM ai_generations, UNNEST(retrieved_chunk_ids) AS chunk_id
         WHERE created_at >= ${since} AND created_at < ${until}
-        GROUP BY chunk_id
+        GROUP BY organization_id, chunk_id
       ) AS usage
       WHERE c.id = usage.chunk_id
+        -- Only a generation of the chunk's own tenant counts on it.
+        AND c.organization_id = usage.organization_id
     `;
 
     const cited = await tx.$executeRaw`
@@ -237,12 +249,15 @@ export class ChunkUsageProjection {
             COALESCE(c.last_cited_at, usage.last_seen), usage.last_seen
           )
       FROM (
-        SELECT chunk_id, COUNT(*) AS hits, MAX(created_at) AS last_seen
+        SELECT organization_id, chunk_id, COUNT(*) AS hits,
+               MAX(created_at) AS last_seen
         FROM ai_generations, UNNEST(cited_chunk_ids) AS chunk_id
         WHERE created_at >= ${since} AND created_at < ${until}
-        GROUP BY chunk_id
+        GROUP BY organization_id, chunk_id
       ) AS usage
       WHERE c.id = usage.chunk_id
+        -- Only a generation of the chunk's own tenant counts on it.
+        AND c.organization_id = usage.organization_id
     `;
 
     return { retrieved, cited };
@@ -258,7 +273,7 @@ export class ChunkUsageProjection {
     let total = 0;
 
     for (;;) {
-      const zeroed = await this.prisma.$executeRaw`
+      const zeroed = await this.prisma.unscoped('cross-tenant job').$executeRaw`
         UPDATE document_chunks
         SET retrieval_count = 0, citation_count = 0
         WHERE id IN (

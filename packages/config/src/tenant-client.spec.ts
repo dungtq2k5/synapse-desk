@@ -31,13 +31,31 @@ import {
 type Service = 'auth' | 'ticket' | 'ingestion' | 'notification';
 
 /** Services whose code has moved to `scoped(context)`: no direct use left. */
-const MIGRATED = new Set<Service>(['notification']);
+const MIGRATED = new Set<Service>(['notification', 'ingestion']);
 
 /** Per service: the files that may call `unscoped(…)`. */
 const UNSCOPED: Record<Service, readonly string[]> = {
   auth: [],
   ticket: [],
-  ingestion: [],
+  ingestion: [
+    'services/ingestion-service/src/ai-reembed.ts',
+    'analytics/ai-generation-rollup.job.ts',
+    'ingestion/conflict-check.service.ts',
+    'ingestion/ingestion-reconcile.sweep.ts',
+    'ingestion/ingestion.processor.ts',
+    'ingestion/scope-reconcile.sweep.ts',
+    'ingestion/scope-writer.service.ts',
+    'job-runs/job-runs.module.ts',
+    'ops/ops.module.ts',
+    'platform/platform.service.ts',
+    'prisma/database.seeder.ts',
+    'qdrant/qdrant.service.ts',
+    'scheduled/chunk-usage.projection.ts',
+    'scheduled/discarded-draft.sweep.ts',
+    'scheduled/document-flag-writer.ts',
+    'scheduled/quota-reconciliation.job.ts',
+    'scheduler/ledger-daily.sequence.ts',
+  ],
   notification: [
     'prisma/database.seeder.ts',
     'job-runs/job-runs.module.ts',
@@ -165,10 +183,16 @@ describe.each(SERVICES)(
         .filter((file) => !file.short.endsWith('prisma/prisma.service.ts'))
         .flatMap((file) =>
           [
+            // `this.prisma` used any way but `.scoped(…)` / `.unscoped(…)`:
+            // a call, or the bare client passed along as a value.
             ...file.code.matchAll(
-              /(?<![\w/$])prisma\.(?!scoped\(|unscoped\()([$A-Za-z]\w*)/gu,
+              /\bthis\.prisma\b(?!\s*\.\s*(?:scoped|unscoped)\()(?:\s*\.\s*[$\w]+)?/gu,
             ),
-          ].map((match) => `${file.short}: prisma.${match[1]}`),
+            // Any other client named `prisma` (a factory's parameter).
+            ...file.code.matchAll(
+              /(?<![\w/$.])prisma\s*\.\s*(?!scoped\(|unscoped\()[$A-Za-z]\w*/gu,
+            ),
+          ].map((match) => `${file.short}: ${match[0].replace(/\s+/gu, '')}`),
         );
 
       expect(found).toEqual([]);

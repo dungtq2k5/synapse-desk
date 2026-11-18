@@ -151,7 +151,7 @@ class Reembed {
     // if a deployment outgrows a few million chunks.
     const claimed = new Set(
       (
-        await this.prisma.documentChunk.findMany({
+        await this.prisma.unscoped('cross-tenant job').documentChunk.findMany({
           where: { vectorPointId: { not: null } },
           select: { vectorPointId: true },
         })
@@ -165,22 +165,24 @@ class Reembed {
     let cursor: string | undefined;
 
     for (;;) {
-      const page = (await this.prisma.documentChunk.findMany({
-        where: { isStaged: false, vectorPointId: { not: null } },
-        orderBy: { id: 'asc' },
-        take: PAGE_SIZE,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        select: {
-          id: true,
-          vectorPointId: true,
-          contentText: true,
-          documentId: true,
-          organizationId: true,
-          departmentIds: true,
-          isOrganizationWide: true,
-          isDeleted: true,
-        },
-      })) as LiveChunk[];
+      const page = (await this.prisma
+        .unscoped('cross-tenant job')
+        .documentChunk.findMany({
+          where: { isStaged: false, vectorPointId: { not: null } },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+          select: {
+            id: true,
+            vectorPointId: true,
+            contentText: true,
+            documentId: true,
+            organizationId: true,
+            departmentIds: true,
+            isOrganizationWide: true,
+            isDeleted: true,
+          },
+        })) as LiveChunk[];
       if (page.length === 0) break;
       cursor = page[page.length - 1].id;
 

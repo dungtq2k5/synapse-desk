@@ -15,6 +15,7 @@ import {
   Mean,
   meanLatencyMs,
   Rate,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   bucketKey,
@@ -162,7 +163,7 @@ export class AiAnalyticsService {
     const rows = answeringOnly(await this.dailyRows(organizationId, range));
     const totals = sumAll(rows);
 
-    const flags = await this.prisma.documentFlag.findMany({
+    const flags = await this.prisma.scoped(context).documentFlag.findMany({
       where: {
         organizationId,
         resolvedAt: null,
@@ -220,7 +221,7 @@ export class AiAnalyticsService {
     const organizationId = requireTenant(context);
     const limit = clampLimit(request.limit);
 
-    const rows = await this.prisma.$queryRawUnsafe<
+    const rows = await this.prisma.scoped(context).$queryRawUnsafe<
       {
         document_id: string;
         title: string;
@@ -284,11 +285,13 @@ export class AiAnalyticsService {
   private async dataThrough(
     organizationId: string,
   ): Promise<string | undefined> {
-    const newest = await this.prisma.aiGenerationDailyStat.findFirst({
-      where: { organizationId },
-      orderBy: { day: 'desc' },
-      select: { day: true },
-    });
+    const newest = await this.prisma
+      .scoped(systemContext(organizationId))
+      .aiGenerationDailyStat.findFirst({
+        where: { organizationId },
+        orderBy: { day: 'desc' },
+        select: { day: true },
+      });
 
     return newest ? newest.day.toISOString().slice(0, 10) : undefined;
   }
@@ -297,10 +300,12 @@ export class AiAnalyticsService {
     organizationId: string,
     range: { from: Date; to: Date },
   ): Promise<AiDailyRow[]> {
-    const rows = await this.prisma.aiGenerationDailyStat.findMany({
-      where: { organizationId, day: { gte: range.from, lte: range.to } },
-      orderBy: { day: 'asc' },
-    });
+    const rows = await this.prisma
+      .scoped(systemContext(organizationId))
+      .aiGenerationDailyStat.findMany({
+        where: { organizationId, day: { gte: range.from, lte: range.to } },
+        orderBy: { day: 'asc' },
+      });
 
     return rows.map((row) => ({
       day: row.day,

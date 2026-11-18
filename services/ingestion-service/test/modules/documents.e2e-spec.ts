@@ -975,10 +975,12 @@ describe('Documents (e2e)', () => {
       // every screen says is deleted and the RAG pipeline keeps serving.
       const document = await createDocument(fx.prisma, tenant);
       await createChunks(fx.prisma, document, 2);
-      faults.failOnce(
-        fx.prisma.document,
+      faults.failScoped(
+        fx.prisma,
+        'document',
         'update',
         new Error('injected failure'),
+        { once: true },
       );
 
       await expect(

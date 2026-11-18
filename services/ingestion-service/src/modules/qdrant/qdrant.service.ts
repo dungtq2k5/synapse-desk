@@ -180,10 +180,12 @@ export class QdrantService implements OnApplicationBootstrap {
       return true;
     }
 
-    const embedded = await this.prisma.documentChunk.findFirst({
-      where: { vectorPointId: { not: null } },
-      select: { id: true },
-    });
+    const embedded = await this.prisma
+      .unscoped('schema')
+      .documentChunk.findFirst({
+        where: { vectorPointId: { not: null } },
+        select: { id: true },
+      });
     if (embedded) return false;
 
     const name = `${this.collection}_1`;

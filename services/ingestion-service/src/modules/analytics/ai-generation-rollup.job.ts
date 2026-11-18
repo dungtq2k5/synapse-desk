@@ -8,6 +8,7 @@ import {
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
+import { systemContext } from '@synapsedesk/contracts';
 
 const DEFAULT_TRAILING_DAYS = 2;
 
@@ -109,7 +110,9 @@ export class AiGenerationRollupJob {
   }
 
   private async activeTenants(window: RollupWindow): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ organization_id: string }[]>`
+    const rows = await this.prisma.unscoped('cross-tenant job').$queryRaw<
+      { organization_id: string }[]
+    >`
       SELECT DISTINCT organization_id FROM ai_generations
       WHERE created_at >= ${window.since} AND created_at < ${window.until}
     `;
@@ -132,8 +135,9 @@ export class AiGenerationRollupJob {
     timezone: string,
     window: RollupWindow,
   ): Promise<number> {
-    const [, inserted] = await this.prisma.$transaction([
-      this.prisma.$executeRawUnsafe(
+    const db = this.prisma.scoped(systemContext(organizationId));
+    const [, inserted] = await db.$transaction([
+      db.$executeRawUnsafe(
         `
         DELETE FROM ai_generation_daily_stats
         WHERE organization_id = $1::uuid
@@ -145,7 +149,7 @@ export class AiGenerationRollupJob {
         window.until,
         timezone,
       ),
-      this.prisma.$executeRawUnsafe(
+      db.$executeRawUnsafe(
         `
         INSERT INTO ai_generation_daily_stats (
           id, organization_id, day, purpose, model_name,

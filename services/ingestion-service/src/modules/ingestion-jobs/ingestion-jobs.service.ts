@@ -21,7 +21,10 @@ import {
   RESUMABLE_INGESTION_STATUSES,
 } from '@synapsedesk/contracts';
 import { requireTenant } from '@synapsedesk/nest-common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  type ScopedTransaction,
+} from '../prisma/prisma.service';
 import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
 import { IngestionJob, Prisma } from '../../generated/prisma/client';
 import { documentVisibility } from '../../common/document-visibility';
@@ -104,10 +107,12 @@ export class IngestionJobsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.ingestionJob.findMany({ where, orderBy, skip, take }),
+      this.prisma
+        .scoped(context)
+        .ingestionJob.findMany({ where, orderBy, skip, take }),
       // The SAME `where`. A count computed without the scope would tell a
       // caller how many jobs exist that they cannot see.
-      this.prisma.ingestionJob.count({ where }),
+      this.prisma.scoped(context).ingestionJob.count({ where }),
     ]);
 
     return {
@@ -138,7 +143,7 @@ export class IngestionJobsService {
       documentId: request.id,
     };
 
-    const items = await this.prisma.ingestionJob.findMany({
+    const items = await this.prisma.scoped(context).ingestionJob.findMany({
       where,
       orderBy: { createdAt: 'asc' },
     });
@@ -182,18 +187,21 @@ export class IngestionJobsService {
 
     // `load` already proved the parent document is in this tenant and not
     // soft-deleted, so this read needs no scope of its own.
-    const document = await this.prisma.document.findUniqueOrThrow({
-      where: { id: source.documentId },
-      select: {
-        fileUrl: true,
-        fileType: true,
-        pendingFileUrl: true,
-        pendingFileType: true,
-        ocrLanguages: true,
-      },
-    });
+    const document = await this.prisma
+      .scoped(context)
+      .document.findUniqueOrThrow({
+        where: { id: source.documentId },
+        select: {
+          fileUrl: true,
+          fileType: true,
+          pendingFileUrl: true,
+          pendingFileType: true,
+          ocrLanguages: true,
+        },
+      });
 
     const retry = await this.prisma
+      .scoped(context)
       .$transaction(async (tx) => {
         // BEFORE the insert, and that ordering is load-bearing.
         //
@@ -273,7 +281,7 @@ export class IngestionJobsService {
     // Re-read rather than returning the row created above: `enqueue` records
     // `bullmqJobId` on it, and that id is how someone finds the job in Redis.
     return toIngestionJobResponse(
-      await this.prisma.ingestionJob.findUniqueOrThrow({
+      await this.prisma.scoped(context).ingestionJob.findUniqueOrThrow({
         where: { id: retry.id },
       }),
     );
@@ -295,7 +303,7 @@ export class IngestionJobsService {
   ): Promise<CancelIngestionJobResponse> {
     const job = await this.load(request.id, context);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.scoped(context).$transaction(async (tx) => {
       // Conditional, and interactive so the throw rolls the document write
       // back: the worker may have completed between the read above and here,
       // and cancelling a finished job would report an indexed document failed.
@@ -336,7 +344,7 @@ export class IngestionJobsService {
    * @throws RpcException FAILED_PRECONDITION, always — naming the successor.
    */
   private async refuseSuperseded(
-    tx: Prisma.TransactionClient,
+    tx: ScopedTransaction,
     sourceId: string,
   ): Promise<never> {
     // `updateMany` reports a count and nothing else, so the winner's id costs
@@ -392,7 +400,7 @@ export class IngestionJobsService {
     // cannot express the tenant filter (known-gaps #1). One query with both
     // predicates is also what keeps "no such job" and "not yours"
     // indistinguishable — a separate check could report them differently.
-    const job = await this.prisma.ingestionJob.findFirst({
+    const job = await this.prisma.scoped(context).ingestionJob.findFirst({
       where: { id, ...this.scope(context) },
     });
 

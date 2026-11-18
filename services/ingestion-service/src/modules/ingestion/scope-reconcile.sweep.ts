@@ -123,7 +123,9 @@ export class ScopeReconcileSweep {
    * always fine.
    */
   private async findCandidates(): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ document_id: string }[]>`
+    const rows = await this.prisma.unscoped('cross-tenant job').$queryRaw<
+      { document_id: string }[]
+    >`
       SELECT document_id FROM (
         SELECT DISTINCT c.document_id
         FROM document_chunks c
@@ -161,7 +163,9 @@ export class ScopeReconcileSweep {
    * decides what moves.
    */
   private async countTenantMismatches(): Promise<number> {
-    const [row] = await this.prisma.$queryRaw<{ count: bigint }[]>`
+    const [row] = await this.prisma.unscoped('cross-tenant job').$queryRaw<
+      { count: bigint }[]
+    >`
       SELECT count(*) AS count
       FROM document_chunks c
       JOIN documents d ON d.id = c.document_id
@@ -180,10 +184,12 @@ export class ScopeReconcileSweep {
     // The candidate query is allowed to over-select; this is the verdict.
     if (drifted.length === 0) return;
 
-    const document = await this.prisma.document.findUnique({
-      where: { id: documentId },
-      include: { departmentLinks: { select: { departmentId: true } } },
-    });
+    const document = await this.prisma
+      .unscoped('cross-tenant job')
+      .document.findUnique({
+        where: { id: documentId },
+        include: { departmentLinks: { select: { departmentId: true } } },
+      });
     if (!document) return;
 
     const truth: DocumentScope = {
@@ -221,14 +227,16 @@ export class ScopeReconcileSweep {
     documentId: string,
     fallback: DocumentScope,
   ): Promise<DocumentScope> {
-    const chunk = await this.prisma.documentChunk.findFirst({
-      where: { documentId },
-      select: {
-        isOrganizationWide: true,
-        departmentIds: true,
-        isDeleted: true,
-      },
-    });
+    const chunk = await this.prisma
+      .unscoped('cross-tenant job')
+      .documentChunk.findFirst({
+        where: { documentId },
+        select: {
+          isOrganizationWide: true,
+          departmentIds: true,
+          isDeleted: true,
+        },
+      });
 
     return chunk ?? fallback;
   }
