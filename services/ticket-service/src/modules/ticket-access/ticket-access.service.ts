@@ -55,8 +55,7 @@ export class TicketAccessService {
    * until it's restored.
    */
   loadForReading(ticketId: string, context: CallerContext): Promise<Ticket> {
-    const mayRestore =
-      context.isSuperAdmin || context.permissionCodes.includes('ticket.delete');
+    const mayRestore = context.permissionCodes.includes('ticket.delete');
     return this.find(ticketId, context, mayRestore, 'No ticket with that id');
   }
 
@@ -98,8 +97,6 @@ export class TicketAccessService {
    * makes somebody a customer.
    */
   isAgent(context: CallerContext): boolean {
-    if (context.isSuperAdmin) return true;
-
     return (
       context.permissionCodes.includes('ticket.read.all') ||
       context.permissionCodes.includes('ticket.message.moderate')
@@ -136,7 +133,6 @@ export class TicketAccessService {
    * Returns `{}` for an agent, so a caller can spread both unconditionally.
    */
   visibilityScope(context: CallerContext): Prisma.TicketWhereInput {
-    if (context.isSuperAdmin) return {};
     if (context.permissionCodes.includes('ticket.read.all')) return {};
 
     // Mine to raise, or mine to work. Past assignees are excluded: the

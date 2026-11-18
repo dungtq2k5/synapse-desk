@@ -1360,10 +1360,7 @@ export class MessagesService {
   }
 
   private canModerate(context: CallerContext): boolean {
-    return (
-      context.isSuperAdmin ||
-      context.permissionCodes.includes('ticket.message.moderate')
-    );
+    return context.permissionCodes.includes('ticket.message.moderate');
   }
 
   private requireContent(content: string): string {

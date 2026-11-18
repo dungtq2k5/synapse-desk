@@ -216,23 +216,24 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
     },
   );
   /**
-   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * **What a Super Admin gets** on each id-taking RPC, called through the
    * tenant route with no tenant, as the gateway lets a Super Admin do. The
-   * expectation is the behavior before the scoped client, recorded by running
-   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
-   * a row; one that reaches A's data says why.
+   * scoped client refuses one (`FAILED_PRECONDITION`, "use the platform
+   * API"); a row with any other outcome says why. A change to who a Super
+   * Admin reaches fails a row.
    *
    * `PROBE_RECORD=<file>` writes each outcome to the file instead.
    */
   const SUPER_ADMIN: Record<string, string> = {
-    'NotificationService/Archive': 'refused NOT_FOUND',
+    'NotificationService/Archive': 'refused FAILED_PRECONDITION',
     'NotificationService/DeleteWebhookEndpoint': 'refused FAILED_PRECONDITION',
-    'NotificationService/ForgetDevice': 'refused NOT_FOUND',
+    'NotificationService/ForgetDevice': 'refused FAILED_PRECONDITION',
     'NotificationService/GetWebhookEndpoint': 'refused FAILED_PRECONDITION',
     'NotificationService/ListWebhookDeliveries': 'refused FAILED_PRECONDITION',
-    'NotificationService/MarkManyRead': 'answers',
-    'NotificationService/MarkRead': 'refused NOT_FOUND',
-    'NotificationService/ResolveTicketByMessageId': 'answers',
+    'NotificationService/MarkManyRead': 'refused FAILED_PRECONDITION',
+    'NotificationService/MarkRead': 'refused FAILED_PRECONDITION',
+    'NotificationService/ResolveTicketByMessageId':
+      "answers: scoped to the tenant the request names, not the caller's",
     'NotificationService/RotateWebhookSecret': 'refused FAILED_PRECONDITION',
     'NotificationService/TestWebhookEndpoint': 'refused FAILED_PRECONDITION',
     'NotificationService/UpdateWebhookEndpoint': 'refused FAILED_PRECONDITION',

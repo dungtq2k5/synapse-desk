@@ -639,7 +639,6 @@ export class TicketsController {
     query: ListTicketsQueryDto,
   ): void {
     if (!query.includeDeleted) return;
-    if (context.isSuperAdmin) return;
     if (context.permissionCodes.includes('ticket.delete')) return;
 
     throw new ForbiddenException(

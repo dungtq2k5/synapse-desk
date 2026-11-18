@@ -293,11 +293,11 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
     probe,
   );
   /**
-   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * **What a Super Admin gets** on each id-taking RPC, called through the
    * tenant route with no tenant, as the gateway lets a Super Admin do. The
-   * expectation is the behavior before the scoped client, recorded by running
-   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
-   * a row; one that reaches A's data says why.
+   * scoped client refuses one (`FAILED_PRECONDITION`, "use the platform
+   * API"); a row with any other outcome says why. A change to who a Super
+   * Admin reaches fails a row.
    *
    * `PROBE_RECORD=<file>` writes each outcome to the file instead.
    */
@@ -332,7 +332,8 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
     'DocumentService/RetryIngestionJob': 'refused FAILED_PRECONDITION',
     'DocumentService/SetDocumentDepartments': 'refused FAILED_PRECONDITION',
     'DocumentService/UpdateDocument': 'refused FAILED_PRECONDITION',
-    'IngestionPlatformService/GetPlatformUsage': 'answers',
+    'IngestionPlatformService/GetPlatformUsage':
+      'answers: a platform RPC; a Super Admin is who it serves',
   };
   const asSuperAdmin = () => superAdminContext();
 

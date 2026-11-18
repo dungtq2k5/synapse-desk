@@ -1651,17 +1651,16 @@ describe('Tickets (e2e)', () => {
   });
 
   describe('a Super Admin', () => {
-    it('reads across tenants — the platform view', async () => {
-      const other = buildTenant();
+    it('is refused on the tenant route: the platform API is theirs', async () => {
       await createTicket(fx.prisma, tenant);
-      await createTicket(fx.prisma, other);
 
-      const list = await tickets.listTickets(
-        { page: pageRequest(), includeDeleted: false } as never,
-        superAdminContext(),
+      await expectRpc(
+        tickets.listTickets(
+          { page: pageRequest(), includeDeleted: false } as never,
+          superAdminContext(),
+        ),
+        status.FAILED_PRECONDITION,
       );
-
-      expect(list.items).toHaveLength(2);
     });
   });
 

@@ -161,7 +161,7 @@ export class PlanAdminService {
     };
 
     const [rows, totalItems] = await Promise.all([
-      this.prisma.scoped(context).subscriptionPlan.findMany({
+      this.prisma.unscoped('platform').subscriptionPlan.findMany({
         where,
         include: PLAN_INCLUDE,
         // Defaults to creation order, which is how a ladder reads. There is no
@@ -170,7 +170,7 @@ export class PlanAdminService {
         skip,
         take,
       }),
-      this.prisma.scoped(context).subscriptionPlan.count({ where }),
+      this.prisma.unscoped('platform').subscriptionPlan.count({ where }),
     ]);
 
     const items = rows.map(toSubscriptionPlanResponse);
@@ -211,7 +211,7 @@ export class PlanAdminService {
     });
 
     const plan = await this.prisma
-      .scoped(context)
+      .unscoped('platform')
       .subscriptionPlan.create({
         data: {
           name,
@@ -512,7 +512,7 @@ export class PlanAdminService {
       });
     }
 
-    await this.prisma.scoped(context).subscriptionPlan.update({
+    await this.prisma.unscoped('platform').subscriptionPlan.update({
       where: { id: existing.id },
       data: {
         deletedAt: new Date(),
@@ -568,7 +568,7 @@ export class PlanAdminService {
     const plan = await this.load(request.planId);
 
     const subscribers = await this.prisma
-      .scoped(context)
+      .unscoped('platform')
       .organization.findMany({
         where: { planId: plan.id, deletedAt: null },
         select: SUBSCRIBER_SELECT,

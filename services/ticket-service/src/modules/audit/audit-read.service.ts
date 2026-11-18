@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
-import { status } from '@grpc/grpc-js';
 import {
   AuditLogResponse,
   CallerContext,
@@ -21,7 +19,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AUDIT_LOG_SORTABLE_FIELDS } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
-import { requireTenant } from '@synapsedesk/nest-common';
+import { requireSuperAdmin } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLog, Prisma } from '../../generated/prisma/client';
 
@@ -57,8 +55,9 @@ export class AuditReadService {
     const from = fromProtoTimestamp(request.from);
     const to = fromProtoTimestamp(request.to);
 
+    const { db, scope } = this.view(request.platformScope, context);
     const where: Prisma.AuditLogWhereInput = {
-      ...this.scope(request.platformScope, context),
+      ...scope,
       // UNSPECIFIED (0) is falsy and means "no filter", so an absent field and
       // `fromProto*` answering null are the same thing on both of these.
       ...(fromProtoAuditAction(request.action)
@@ -80,10 +79,8 @@ export class AuditReadService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma
-        .scoped(context)
-        .auditLog.findMany({ where, orderBy, skip, take }),
-      this.prisma.scoped(context).auditLog.count({ where }),
+      db.auditLog.findMany({ where, orderBy, skip, take }),
+      db.auditLog.count({ where }),
     ]);
 
     return {
@@ -104,8 +101,9 @@ export class AuditReadService {
     request: ListAuditActionsRequest,
     context: CallerContext,
   ): Promise<ListAuditActionsResponse> {
-    const rows = await this.prisma.scoped(context).auditLog.findMany({
-      where: this.scope(request.platformScope, context),
+    const { db, scope } = this.view(request.platformScope, context);
+    const rows = await db.auditLog.findMany({
+      where: scope,
       select: { action: true },
       distinct: ['action'],
     });
@@ -129,31 +127,27 @@ export class AuditReadService {
   }
 
   /**
-   * The two disjoint views.
+   * The two disjoint views, each with its client.
+   *
+   * A tenant's trail reads through the scoped client, which refuses a Super
+   * Admin: there is no "their own tenant" trail for them, and they must ask
+   * for the platform view explicitly. The platform's trail is cross-tenant by
+   * design, so it reads unscoped, after the Super Admin check.
    *
    * `organizationId: null` is an EXPLICIT null, not an omitted key: omitting it
    * would match every row in every tenant, which is the one outcome this method
    * exists to prevent.
    */
-  private scope(
-    platformScope: boolean,
-    context: CallerContext,
-  ): Prisma.AuditLogWhereInput {
+  private view(platformScope: boolean, context: CallerContext) {
     if (!platformScope) {
-      // `requireTenant` throws for a Super Admin, whose context carries a null
-      // organization — which is correct: there is no "their own tenant" trail
-      // for them to read, and they must ask for the platform view explicitly.
-      return { organizationId: requireTenant(context) };
+      return { db: this.prisma.scoped(context), scope: {} };
     }
 
-    if (!context.isSuperAdmin) {
-      throw new RpcException({
-        code: status.PERMISSION_DENIED,
-        message: 'The platform audit trail is restricted to Super Admins',
-      });
-    }
-
-    return { organizationId: null };
+    requireSuperAdmin(context);
+    return {
+      db: this.prisma.unscoped('platform'),
+      scope: { organizationId: null },
+    };
   }
 }
 

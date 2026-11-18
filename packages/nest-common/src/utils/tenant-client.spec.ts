@@ -3,7 +3,6 @@ import { status } from '@grpc/grpc-js';
 import { systemContext, type CallerContext } from '@synapsedesk/contracts';
 import {
   scopedArgs,
-  scopeTenant,
   tenantExtension,
   type TenantRule,
   type TenantRules,
@@ -301,34 +300,6 @@ describe('scopedArgs', () => {
   });
 });
 
-describe('scopeTenant', () => {
-  it('**a member** is bound to their tenant', () => {
-    expect(scopeTenant(member())).toBe(ORG);
-  });
-
-  it('**a system caller with a tenant** is bound to it, like anyone else', () => {
-    expect(scopeTenant(systemContext(ORG))).toBe(ORG);
-  });
-
-  it('**a Super Admin** has no tenant, so no tenant filter', () => {
-    expect(
-      scopeTenant(member({ isSuperAdmin: true, organizationId: null })),
-    ).toBeNull();
-  });
-
-  it('**a system caller with no tenant** is refused: it must use the unscoped client', () => {
-    expect(code(() => scopeTenant(systemContext(null)))).toBe(
-      status.FAILED_PRECONDITION,
-    );
-  });
-
-  it('**a caller with no identity** is refused', () => {
-    expect(
-      code(() => scopeTenant(member({ sub: null, organizationId: null }))),
-    ).toBe(status.UNAUTHENTICATED);
-  });
-});
-
 describe('tenantExtension', () => {
   const rules: TenantRules = { Ticket: tenant };
   const run = (context: CallerContext) => {
@@ -349,15 +320,34 @@ describe('tenantExtension', () => {
     });
   });
 
-  it('**passes every query through** for a Super Admin', () => {
-    expect(run(member({ isSuperAdmin: true, organizationId: null }))).toEqual({
-      where: {},
+  it('**scopes a system caller** to its tenant, like anyone else', () => {
+    expect(run(systemContext(ORG))).toEqual({
+      where: { AND: [{ organizationId: ORG }] },
     });
   });
 
-  it('**refuses to build** for a caller with no tenant', () => {
+  it('**refuses a Super Admin**: a tenant route is not the platform API', () => {
+    expect(
+      code(() =>
+        tenantExtension(
+          rules,
+          member({ isSuperAdmin: true, organizationId: null }),
+        ),
+      ),
+    ).toBe(status.FAILED_PRECONDITION);
+  });
+
+  it('**refuses a system caller with no tenant**: it must use the unscoped client', () => {
     expect(code(() => tenantExtension(rules, systemContext(null)))).toBe(
       status.FAILED_PRECONDITION,
     );
+  });
+
+  it('**refuses a caller with no identity**', () => {
+    expect(
+      code(() =>
+        tenantExtension(rules, member({ sub: null, organizationId: null })),
+      ),
+    ).toBe(status.UNAUTHENTICATED);
   });
 });

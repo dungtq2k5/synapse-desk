@@ -124,8 +124,7 @@ export class FeedService {
           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
         ) AS "counted_at"
       FROM "notifications"
-      WHERE (${unreadTenant(context)}::uuid IS NULL
-             OR "organization_id" = ${unreadTenant(context)}::uuid)
+      WHERE "organization_id" = ${requireTenant(context)}::uuid
         AND "recipient_id" = ${requireActor(context)}::uuid
         AND "read_at" IS NULL
         AND "archived_at" IS NULL
@@ -328,14 +327,3 @@ function clampLimit(limit: number | undefined): number {
 }
 
 export { type NotificationResponse } from '@synapsedesk/grpc-proto';
-
-/**
- * The tenant an unread count is held to: the caller's, or none for a Super
- * Admin, who has no tenant and whose count is by recipient alone (as before
- * the tenant clause). Anyone else without a tenant is refused.
- */
-function unreadTenant(context: CallerContext): string | null {
-  return context.isSuperAdmin && !context.organizationId
-    ? null
-    : requireTenant(context);
-}

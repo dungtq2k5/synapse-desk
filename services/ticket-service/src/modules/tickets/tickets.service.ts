@@ -556,6 +556,9 @@ export class TicketsService {
     // one value for the whole request, so it is the request that is refused
     // and not fifty individual tickets.
     assertNotTerminal(to);
+    // The caller too: a Super Admin has no tenant here, so the whole request
+    // is refused, not each ticket in it.
+    requireTenant(context);
 
     return this.bulkApply(ids, (id) =>
       this.transition(id, to, context, request.reason),
@@ -585,6 +588,8 @@ export class TicketsService {
         message: 'A target priority is required',
       });
     }
+    // As for status: a Super Admin is refused as a whole request.
+    requireTenant(context);
 
     return this.bulkApply(ids, async (id) => {
       // Through the same scoped load every singular write uses, so an id the

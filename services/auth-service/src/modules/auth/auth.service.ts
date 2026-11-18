@@ -974,7 +974,7 @@ export class AuthService {
   ): Promise<ChangePasswordResponse> {
     const userId = requireActor(context);
 
-    const user = await this.prisma.scoped(context).user.findFirst({
+    const user = await this.prisma.unscoped('own account').user.findFirst({
       where: { id: userId, deletedAt: null },
       select: { id: true, email: true, fullName: true, passwordHash: true },
     });
@@ -1021,7 +1021,7 @@ export class AuthService {
       this.BCRYPT_ROUNDS,
     );
 
-    await this.prisma.scoped(context).user.update({
+    await this.prisma.unscoped('own account').user.update({
       where: { id: user.id },
       data: { passwordHash },
     });

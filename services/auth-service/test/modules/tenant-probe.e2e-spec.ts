@@ -381,27 +381,23 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     probe,
   );
   /**
-   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * **What a Super Admin gets** on each id-taking RPC, called through the
    * tenant route with no tenant, as the gateway lets a Super Admin do. The
-   * expectation is the behavior before the scoped client, recorded by running
-   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
-   * a row; one that reaches A's data says why.
+   * scoped client refuses one (`FAILED_PRECONDITION`, "use the platform
+   * API"); a row with any other outcome says why. A change to who a Super
+   * Admin reaches fails a row.
    *
    * `PROBE_RECORD=<file>` writes each outcome to the file instead.
    */
   const SUPER_ADMIN: Record<string, string> = {
-    'DepartmentService/AddDepartmentMembers':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'DepartmentService/DeleteDepartment': 'refused ABORTED',
-    'DepartmentService/GetDepartment': 'answers',
-    'DepartmentService/ListDepartmentMembers':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'DepartmentService/ListDepartmentsByIds': 'answers',
-    'DepartmentService/RemoveDepartmentMember':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'DepartmentService/RestoreDepartment': 'refused NOT_FOUND',
-    'DepartmentService/UpdateDepartment':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'DepartmentService/AddDepartmentMembers': 'refused FAILED_PRECONDITION',
+    'DepartmentService/DeleteDepartment': 'refused FAILED_PRECONDITION',
+    'DepartmentService/GetDepartment': 'refused FAILED_PRECONDITION',
+    'DepartmentService/ListDepartmentMembers': 'refused FAILED_PRECONDITION',
+    'DepartmentService/ListDepartmentsByIds': 'refused FAILED_PRECONDITION',
+    'DepartmentService/RemoveDepartmentMember': 'refused FAILED_PRECONDITION',
+    'DepartmentService/RestoreDepartment': 'refused FAILED_PRECONDITION',
+    'DepartmentService/UpdateDepartment': 'refused FAILED_PRECONDITION',
     'InvitationService/CreateInvitations': 'refused PERMISSION_DENIED',
     'InvitationService/GetInvitation': 'refused NOT_FOUND',
     'InvitationService/ResendInvitation': 'refused NOT_FOUND',
@@ -419,19 +415,18 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     'OtpService/VerifyPhone':
       "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
     'PlatformService/AssignPlan': 'refused NOT_FOUND',
-    'PlatformService/ResolveAuditNames': 'answers',
+    'PlatformService/ResolveAuditNames':
+      'answers: a platform RPC; a Super Admin is who it serves',
     'RoleService/AssignRoleUsers': 'refused FAILED_PRECONDITION',
     'RoleService/DeleteRole': 'refused FAILED_PRECONDITION',
     'RoleService/GetRole': 'refused FAILED_PRECONDITION',
     'RoleService/RevokeRoleUser': 'refused FAILED_PRECONDITION',
     'RoleService/SetRolePermissions': 'refused FAILED_PRECONDITION',
     'RoleService/UpdateRole': 'refused FAILED_PRECONDITION',
-    'SessionService/ListUserSessions':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'SessionService/ListUserSessions': 'refused FAILED_PRECONDITION',
     'SessionService/RevokeSession': 'refused NOT_FOUND',
     'SessionService/RevokeSessionTrust': 'refused NOT_FOUND',
-    'SessionService/RevokeUserSessions':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'SessionService/RevokeUserSessions': 'refused FAILED_PRECONDITION',
     'TwoFactorAuthService/ActivateTwoFactor':
       "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused UNAUTHENTICATED)",
     'TwoFactorAuthService/DisableTwoFactor':
@@ -443,29 +438,23 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     'TwoFactorAuthService/RegenerateBackupCodes':
       "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
     'UserService/CreateUser': 'refused FAILED_PRECONDITION',
-    'UserService/DeleteUser':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/DeleteUser': 'refused FAILED_PRECONDITION',
     'UserService/GetCurrentUser':
       "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
-    'UserService/GetUser':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'UserService/GetUserPermissions': 'answers',
-    'UserService/ListPermissionHolders': 'answers',
-    'UserService/ListUsers':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'UserService/ListUsersByIds': 'answers',
-    'UserService/LockUser':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'UserService/ResetUserTwoFactor':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/GetUser': 'refused FAILED_PRECONDITION',
+    'UserService/GetUserPermissions': 'refused FAILED_PRECONDITION',
+    'UserService/ListPermissionHolders':
+      "answers: scoped to the tenant the request names, not the caller's",
+    'UserService/ListUsers': 'refused FAILED_PRECONDITION',
+    'UserService/ListUsersByIds':
+      "answers: scoped to the tenant the request names, not the caller's",
+    'UserService/LockUser': 'refused FAILED_PRECONDITION',
+    'UserService/ResetUserTwoFactor': 'refused FAILED_PRECONDITION',
     'UserService/RestoreUser': 'refused FAILED_PRECONDITION',
-    'UserService/SetUserDepartments':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/SetUserDepartments': 'refused FAILED_PRECONDITION',
     'UserService/SetUserRoles': 'refused FAILED_PRECONDITION',
-    'UserService/UnlockUser':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
-    'UserService/UpdateUser':
-      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/UnlockUser': 'refused FAILED_PRECONDITION',
+    'UserService/UpdateUser': 'refused FAILED_PRECONDITION',
   };
   /** The seeded Super Admin, a real account as on the platform. */
   let superAdminId: string;

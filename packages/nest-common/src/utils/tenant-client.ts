@@ -208,17 +208,6 @@ export function scopedArgs(
   });
 }
 
-/**
- * The tenant a scoped client is bound to, or `null` for a Super Admin, who
- * has none and gets no tenant filter (soft delete stays at the call sites).
- * Anyone else without a tenant is refused, as `requireTenant` refuses them.
- */
-export function scopeTenant(context: CallerContext): string | null {
-  if (context.isSuperAdmin && !context.organizationId) return null;
-
-  return requireTenant(context);
-}
-
 type QueryInput = {
   model?: string;
   operation: string;
@@ -231,21 +220,20 @@ type QueryInput = {
  * tenant. A service's `PrismaService.scoped()` passes it to its own client,
  * which keeps the model types intact.
  *
- * A Super Admin (no tenant) gets the same extension passing every query
- * through, so `scoped()` has one return type for every caller.
+ * Built only for a caller with a tenant, through `requireTenant`: a Super
+ * Admin is refused (`FAILED_PRECONDITION`, "use the platform API"), and so is
+ * a job with no tenant. Cross-tenant work goes through `unscoped(reason)`.
  *
  * @example this.$extends(tenantExtension(TENANT_RULES, context))
  */
 export function tenantExtension(rules: TenantRules, context: CallerContext) {
-  const organizationId = scopeTenant(context);
+  const organizationId = requireTenant(context);
 
   return {
     name: 'tenant-scope',
     query: {
       $allModels: {
         $allOperations({ model, operation, args, query }: QueryInput) {
-          if (organizationId === null) return query(args);
-
           return query(
             scopedArgs(
               model ?? '?',

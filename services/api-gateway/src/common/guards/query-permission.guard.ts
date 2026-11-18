@@ -37,11 +37,9 @@ export class QueryPermissionGuard implements CanActivate {
     for (const rule of rules) {
       if (!isRequested(request, rule.query)) continue;
 
-      // Super admins bypass, matching `PermissionGuard` — a rule enforced one
-      // way in one guard and another way in its neighbour is the kind of
-      // difference nobody discovers deliberately.
-      if (caller.isSuperAdmin) continue;
-
+      // No Super Admin bypass, unlike `PermissionGuard`: these rules guard
+      // tenant routes, which refuse a Super Admin anyway ("use the platform
+      // API").
       if (!caller.permissionCodes.includes(rule.permission)) {
         throw new ForbiddenException(
           `Using '${rule.query}' requires the ${rule.permission} permission`,
