@@ -1,7 +1,10 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { type CreateInAppNotificationCommand } from '@synapsedesk/contracts';
+import {
+  type CreateInAppNotificationCommand,
+  systemContext,
+} from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import {
   WEBHOOK_BACKOFF_MS,
@@ -62,9 +65,9 @@ export class WebhookDispatchService {
   private async enqueue(
     command: CreateInAppNotificationCommand,
   ): Promise<number> {
-    const endpoints = await this.prisma.webhookEndpoint.findMany({
+    const db = this.prisma.scoped(systemContext(command.organizationId));
+    const endpoints = await db.webhookEndpoint.findMany({
       where: {
-        organizationId: command.organizationId,
         isActive: true,
         eventTypes: { has: command.type },
       },
@@ -81,7 +84,7 @@ export class WebhookDispatchService {
       // subject is JetStream and delivery is at-least-once, so the second
       // arrival of one event is a duplicate-key no-op rather than a second
       // POST the receiver has to deduplicate.
-      const delivery = await this.prisma.webhookDelivery
+      const delivery = await db.webhookDelivery
         .create({
           data: {
             endpointId: endpoint.id,

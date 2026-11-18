@@ -6,6 +6,7 @@ import {
   EMAIL_INBOUND_PATTERNS,
   EmailTemplateName,
   type InboundEmailRejectedEvent,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
@@ -109,15 +110,16 @@ export class InboundRejectionConsumer {
     const now = new Date();
     const cutoff = new Date(now.getTime() - AUTO_REPLY_WINDOW_MS);
 
-    const moved = await this.prisma.inboundAutoReply.updateMany({
-      where: { organizationId, email, lastSentAt: { lt: cutoff } },
+    const db = this.prisma.scoped(systemContext(organizationId));
+    const moved = await db.inboundAutoReply.updateMany({
+      where: { email, lastSentAt: { lt: cutoff } },
       data: { lastSentAt: now },
     });
 
     if (moved.count > 0) return true;
 
     try {
-      await this.prisma.inboundAutoReply.create({
+      await db.inboundAutoReply.create({
         data: { organizationId, email, lastSentAt: now },
       });
 
@@ -133,8 +135,10 @@ export class InboundRejectionConsumer {
       //
       // Fire-and-forget: a failed prune costs disk, and blocking a courtesy
       // reply on housekeeping would be the wrong trade.
-      void this.prisma.inboundAutoReply
-        .deleteMany({ where: { lastSentAt: { lt: cutoff } } })
+      // Every tenant's expired rows, which is housekeeping, not a read.
+      void this.prisma
+        .unscoped('cross-tenant job')
+        .inboundAutoReply.deleteMany({ where: { lastSentAt: { lt: cutoff } } })
         .catch((error: unknown) =>
           this.logger.warn(
             `Could not prune expired auto-reply rows: ${formatErrorMsg(error)}`,

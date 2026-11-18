@@ -161,7 +161,10 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     metadata?: Metadata,
   ): Promise<ListDevicesResponse> {
     const context = unpackCallerContext(metadata);
-    const devices = await this.devices.listForUser(requireActor(context));
+    const devices = await this.devices.listForUser(
+      requireActor(context),
+      context,
+    );
 
     return { items: devices.map(toDeviceTokenResponse) };
   }
@@ -171,7 +174,7 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     metadata?: Metadata,
   ): Promise<ForgetDeviceResponse> {
     const context = unpackCallerContext(metadata);
-    await this.devices.remove(request.id, requireActor(context));
+    await this.devices.remove(request.id, context);
 
     return { forgotten: true };
   }

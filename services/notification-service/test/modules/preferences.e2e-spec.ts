@@ -126,6 +126,7 @@ describe('Preferences and quiet hours (e2e)', () => {
         ME,
         NOTIFICATION_TYPES.ticketAssigned,
         NotificationChannel.EMAIL,
+        me(),
       );
 
       expect(resolved).toMatchObject({
@@ -144,6 +145,7 @@ describe('Preferences and quiet hours (e2e)', () => {
         ME,
         NOTIFICATION_TYPES.ticketAssigned,
         NotificationChannel.EMAIL,
+        me(),
       );
 
       expect(resolved).toMatchObject({
@@ -168,11 +170,13 @@ describe('Preferences and quiet hours (e2e)', () => {
         ME,
         NOTIFICATION_TYPES.quotaThreshold,
         NotificationChannel.EMAIL,
+        me(),
       );
       const other = await resolver.resolveOne(
         ME,
         NOTIFICATION_TYPES.ticketAssigned,
         NotificationChannel.EMAIL,
+        me(),
       );
 
       expect(specific).toMatchObject({
@@ -194,6 +198,7 @@ describe('Preferences and quiet hours (e2e)', () => {
         ME,
         NOTIFICATION_TYPES.ticketAssigned,
         NotificationChannel.IN_APP,
+        me(),
       );
 
       expect(inAppChannel).toMatchObject({

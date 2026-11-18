@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { CallerContext, NotificationReadPayload } from '@synapsedesk/contracts';
-import { requireActor } from '@synapsedesk/nest-common';
+import { requireActor, requireTenant } from '@synapsedesk/nest-common';
 import {
   ListNotificationsRequest,
   ListNotificationsResponse,
@@ -60,7 +60,7 @@ export class FeedService {
     const take = clampLimit(request.limit);
     const cursor = decodeCursor(request.cursor);
 
-    const rows = await this.prisma.notification.findMany({
+    const rows = await this.prisma.scoped(context).notification.findMany({
       where: {
         ...this.baseFilter(recipientId, request),
         ...(cursor ? cursorPredicate(cursor) : {}),
@@ -101,7 +101,7 @@ export class FeedService {
    * user has ever received, and nothing surfaces that except latency.
    */
   async unreadCount(context: CallerContext): Promise<UnreadCount> {
-    return this.countUnread(requireActor(context));
+    return this.countUnread(context);
   }
 
   /**
@@ -112,10 +112,10 @@ export class FeedService {
    * and not this process's clock. The bell keeps the newest count it's given,
    * whichever way it arrives (an answer, a refetch, a push).
    */
-  private async countUnread(recipientId: string): Promise<UnreadCount> {
+  private async countUnread(context: CallerContext): Promise<UnreadCount> {
     // Microseconds, in UTC, at a fixed width: two counts a millisecond apart
     // still order, and comparing the strings compares the times.
-    const [row] = await this.prisma.$queryRaw<
+    const [row] = await this.prisma.scoped(context).$queryRaw<
       { count: number; counted_at: string }[]
     >`
       SELECT count(*)::int AS "count",
@@ -124,7 +124,8 @@ export class FeedService {
           'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
         ) AS "counted_at"
       FROM "notifications"
-      WHERE "recipient_id" = ${recipientId}::uuid
+      WHERE "organization_id" = ${requireTenant(context)}::uuid
+        AND "recipient_id" = ${requireActor(context)}::uuid
         AND "read_at" IS NULL
         AND "archived_at" IS NULL
     `;
@@ -211,17 +212,19 @@ export class FeedService {
     // The ids BEFORE the update, so the realtime payload can name them. After
     // the update they no longer match `readAt: null` and the query returns
     // nothing — the mistake that makes a second tab update silently do nothing.
-    const affected = await this.prisma.notification.findMany({
+    const db = this.prisma.scoped(context);
+    const affected = await db.notification.findMany({
       where,
       select: { id: true },
     });
 
-    const { count } = await this.prisma.notification.updateMany({
+    const { count } = await db.notification.updateMany({
       where,
       data: { readAt: new Date() },
     });
 
     return this.respond(
+      context,
       recipientId,
       count,
       affected.map((row) => row.id),
@@ -236,16 +239,18 @@ export class FeedService {
   ): Promise<MarkReadResponse> {
     const recipientId = requireActor(context);
 
-    const { count } = await this.prisma.notification.updateMany({
-      where: { id, recipientId },
-      data:
-        change === 'read'
-          ? { readAt: new Date() }
-          : // Archiving implies read. A dismissed notification that still
-            // counted toward the badge would leave a number the user cannot
-            // clear without opening something they deliberately dismissed.
-            { archivedAt: new Date(), readAt: new Date() },
-    });
+    const { count } = await this.prisma
+      .scoped(context)
+      .notification.updateMany({
+        where: { id, recipientId },
+        data:
+          change === 'read'
+            ? { readAt: new Date() }
+            : // Archiving implies read. A dismissed notification that still
+              // counted toward the badge would leave a number the user cannot
+              // clear without opening something they deliberately dismissed.
+              { archivedAt: new Date(), readAt: new Date() },
+      });
 
     if (count === 0) {
       // **404, not 403**. A 403 confirms the id exists,
@@ -257,17 +262,17 @@ export class FeedService {
       });
     }
 
-    return this.respond(recipientId, count, [id], change);
+    return this.respond(context, recipientId, count, [id], change);
   }
 
   private async respond(
+    context: CallerContext,
     recipientId: string,
     updated: number,
     notificationIds: string[],
     change: 'read' | 'archived',
   ): Promise<MarkReadResponse> {
-    const { count: unreadCount, countedAt } =
-      await this.countUnread(recipientId);
+    const { count: unreadCount, countedAt } = await this.countUnread(context);
 
     if (updated > 0) {
       // So a second tab stops showing a badge the user cleared. `read_at` is

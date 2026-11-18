@@ -25,9 +25,11 @@ export class WebhookRetentionJob {
       Date.now() - WEBHOOK_RETENTION_DAYS * 24 * 60 * 60 * 1000,
     );
 
-    const { count } = await this.prisma.webhookDelivery.deleteMany({
-      where: { createdAt: { lt: cutoff } },
-    });
+    const { count } = await this.prisma
+      .unscoped('cross-tenant job')
+      .webhookDelivery.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
 
     if (count > 0) {
       this.logger.log(

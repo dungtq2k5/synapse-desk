@@ -60,7 +60,12 @@ export class PreferencesService {
 
     for (const type of types) {
       for (const channel of PREFERENCE_CHANNELS) {
-        const resolved = await this.resolver.resolveOne(userId, type, channel);
+        const resolved = await this.resolver.resolveOne(
+          userId,
+          type,
+          channel,
+          context,
+        );
 
         items.push({
           type: resolved.type,
@@ -87,7 +92,6 @@ export class PreferencesService {
     context: CallerContext,
   ): Promise<PreferenceResponse> {
     const userId = requireActor(context);
-    const organizationId = requireTenant(context);
 
     const type = this.validateType(request.type);
     const channel = this.validateChannel(request.channel);
@@ -97,23 +101,25 @@ export class PreferencesService {
     // carry, so a PATCH sending only `isEnabled` does not reset `digest` to its
     // default. Overwriting the field it did not mention is the classic PATCH
     // bug, and here it would switch a user off a digest they had chosen.
-    const row = await this.prisma.notificationPreference.upsert({
-      where: { userId_type_channel: { userId, type, channel } },
-      create: {
-        userId,
-        organizationId,
-        type,
-        channel,
-        isEnabled: request.isEnabled ?? true,
-        digest: digest ?? DigestMode.IMMEDIATE,
-      },
-      update: {
-        ...(request.isEnabled === undefined
-          ? {}
-          : { isEnabled: request.isEnabled }),
-        ...(digest ? { digest } : {}),
-      },
-    });
+    const row = await this.prisma
+      .scoped(context)
+      .notificationPreference.upsert({
+        where: { userId_type_channel: { userId, type, channel } },
+        create: {
+          userId,
+          organizationId: requireTenant(context),
+          type,
+          channel,
+          isEnabled: request.isEnabled ?? true,
+          digest: digest ?? DigestMode.IMMEDIATE,
+        },
+        update: {
+          ...(request.isEnabled === undefined
+            ? {}
+            : { isEnabled: request.isEnabled }),
+          ...(digest ? { digest } : {}),
+        },
+      });
 
     return {
       // Both columns are Postgres `VarChar`, so these are plain strings

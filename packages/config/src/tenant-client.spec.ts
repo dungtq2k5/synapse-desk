@@ -31,14 +31,22 @@ import {
 type Service = 'auth' | 'ticket' | 'ingestion' | 'notification';
 
 /** Services whose code has moved to `scoped(context)`: no direct use left. */
-const MIGRATED = new Set<Service>([]);
+const MIGRATED = new Set<Service>(['notification']);
 
 /** Per service: the files that may call `unscoped(…)`. */
 const UNSCOPED: Record<Service, readonly string[]> = {
   auth: [],
   ticket: [],
   ingestion: [],
-  notification: [],
+  notification: [
+    'prisma/database.seeder.ts',
+    'job-runs/job-runs.module.ts',
+    'ops/ops.module.ts',
+    'push/device-token.service.ts',
+    'webhooks/webhook-delivery.processor.ts',
+    'webhooks/webhook-retention.job.ts',
+    'inbound-email/inbound-rejection.consumer.ts',
+  ],
 };
 
 /** Per service: the files that may hold raw SQL. */
