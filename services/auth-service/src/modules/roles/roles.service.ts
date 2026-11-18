@@ -794,12 +794,7 @@ export class RolesService {
 
   // -------------------------------------------------------------------------
 
-  /**
-   * The no-escalation rule, applied to a set of codes.
-   *
-   * A Super Admin is exempt: they hold no tenant RBAC rows at all, so a naive
-   * subset check would forbid them from creating any role whatsoever.
-   */
+  /** The no-escalation rule, applied to a set of codes. */
   private assertGrantable(codes: string[], context: CallerContext): string[] {
     const unique = [...new Set(codes)];
 
@@ -812,8 +807,6 @@ export class RolesService {
         message: `Unknown permission code(s): ${unknown.join(', ')}`,
       });
     }
-
-    if (context.isSuperAdmin) return unique;
 
     const held = new Set<string>(context.permissionCodes);
     const escalating = unique.filter((code) => !held.has(code));

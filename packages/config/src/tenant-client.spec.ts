@@ -66,6 +66,7 @@ const UNSCOPED: Record<Service, readonly string[]> = {
     'analytics/export.processor.ts',
     'analytics/export.service.ts',
     'analytics/ticket-rollup.job.ts',
+    'audit/audit-read.service.ts',
     'audit/audit.consumer.ts',
     'job-runs/job-runs.module.ts',
     'ops/ops.module.ts',

@@ -157,7 +157,7 @@ export class UsersService {
   ): Promise<UserResponse> {
     const userId = requireActor(context);
 
-    const user = await this.prisma.scoped(context).user.update({
+    const user = await this.prisma.unscoped('own account').user.update({
       where: { id: userId },
       data: this.toProfileData(request),
     });
@@ -1291,12 +1291,14 @@ export class UsersService {
       throw StorageReferenceService.asClientError(error);
     }
 
-    const existing = await this.prisma.scoped(context).user.findUniqueOrThrow({
-      where: { id: actorId },
-      select: { avatarUrl: true },
-    });
+    const existing = await this.prisma
+      .unscoped('own account')
+      .user.findUniqueOrThrow({
+        where: { id: actorId },
+        select: { avatarUrl: true },
+      });
 
-    const user = await this.prisma.scoped(context).user.update({
+    const user = await this.prisma.unscoped('own account').user.update({
       where: { id: actorId },
       data: { avatarUrl: request.objectPath },
     });
@@ -1324,12 +1326,14 @@ export class UsersService {
   async deleteAvatar(context: CallerContext): Promise<UserResponse> {
     const actorId = requireActor(context);
 
-    const existing = await this.prisma.scoped(context).user.findUniqueOrThrow({
-      where: { id: actorId },
-      select: { avatarUrl: true },
-    });
+    const existing = await this.prisma
+      .unscoped('own account')
+      .user.findUniqueOrThrow({
+        where: { id: actorId },
+        select: { avatarUrl: true },
+      });
 
-    const user = await this.prisma.scoped(context).user.update({
+    const user = await this.prisma.unscoped('own account').user.update({
       where: { id: actorId },
       data: { avatarUrl: null },
     });

@@ -93,9 +93,7 @@ export class ExportService {
 
     // Resolved BEFORE the dedupe, because it is part of what makes two requests
     // the same request — see the `where` below.
-    const unrestricted =
-      context.isSuperAdmin ||
-      context.permissionCodes.includes('ticket.read.all');
+    const unrestricted = context.permissionCodes.includes('ticket.read.all');
 
     // Resolved HERE, not in the worker: `from_day`/`to_day` are the tenant's
     // local dates, and the row exports compare them against a `timestamptz`.

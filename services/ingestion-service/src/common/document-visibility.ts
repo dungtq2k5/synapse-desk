@@ -30,8 +30,6 @@ import { Prisma } from '../generated/prisma/client';
 export function documentVisibility(
   context: CallerContext,
 ): Prisma.DocumentWhereInput {
-  if (context.isSuperAdmin) return {};
-
   return {
     OR: [
       { isOrganizationWide: true },

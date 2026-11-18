@@ -669,13 +669,13 @@ class RealtimeGatewayTest {
 
   @Test
   void ticketJoinAlsoJoinsTheInternalRoomOnlyForAnAgent() throws Exception {
-    // A super admin with no ticket permission: an agent all the same.
+    // An agent by permission, not by role.
     JwtPrincipal principal = new JwtPrincipal(
       "u1",
       "o1",
-      true,
+      false,
       List.of(),
-      List.of(),
+      List.of("ticket.message.moderate"),
       true,
       false
     );

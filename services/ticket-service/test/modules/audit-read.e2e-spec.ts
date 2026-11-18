@@ -399,7 +399,7 @@ describe('Audit logs read API (e2e)', () => {
       expect([...methods].sort(compareAlphabetically)).toEqual([
         'listAuditActions',
         'listAuditLogs',
-        'scope',
+        'view',
       ]);
     });
   });

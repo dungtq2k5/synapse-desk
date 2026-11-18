@@ -91,11 +91,13 @@ export class SessionsService {
     const userId = requireActor(context);
     const currentFamilyId = await this.resolveFamilyId(request.refreshToken);
 
-    const sessions = await this.prisma.scoped(context).deviceSession.findMany({
-      where: { userId, ...liveSession() },
-      select: SESSION_FIELDS,
-      orderBy: { createdAt: 'desc' },
-    });
+    const sessions = await this.prisma
+      .unscoped('own account')
+      .deviceSession.findMany({
+        where: { userId, ...liveSession() },
+        select: SESSION_FIELDS,
+        orderBy: { createdAt: 'desc' },
+      });
 
     return {
       items: sessions.map((session) =>
@@ -119,10 +121,12 @@ export class SessionsService {
 
     // Scoped to the caller: a session id belonging to someone else must 404,
     // not 403 — otherwise the endpoint confirms that the id exists.
-    const session = await this.prisma.scoped(context).deviceSession.findFirst({
-      where: { id: request.sessionId, userId },
-      select: { familyId: true },
-    });
+    const session = await this.prisma
+      .unscoped('own account')
+      .deviceSession.findFirst({
+        where: { id: request.sessionId, userId },
+        select: { familyId: true },
+      });
     if (!session) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -135,7 +139,7 @@ export class SessionsService {
     const currentFamilyId = await this.resolveFamilyId(request.refreshToken);
 
     const { count } = await this.prisma
-      .scoped(context)
+      .unscoped('own account')
       .deviceSession.deleteMany({
         where: { familyId: session.familyId },
       });
@@ -159,10 +163,12 @@ export class SessionsService {
   ): Promise<RevokeTrustResponse> {
     const userId = requireActor(context);
 
-    const session = await this.prisma.scoped(context).deviceSession.findFirst({
-      where: { id: request.sessionId, userId },
-      select: { familyId: true },
-    });
+    const session = await this.prisma
+      .unscoped('own account')
+      .deviceSession.findFirst({
+        where: { id: request.sessionId, userId },
+        select: { familyId: true },
+      });
     if (!session) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -171,7 +177,7 @@ export class SessionsService {
     }
 
     const { count } = await this.prisma
-      .scoped(context)
+      .unscoped('own account')
       .deviceSession.updateMany({
         where: { familyId: session.familyId },
         data: UNTRUSTED,
@@ -184,7 +190,7 @@ export class SessionsService {
     const userId = requireActor(context);
 
     const { count } = await this.prisma
-      .scoped(context)
+      .unscoped('own account')
       .deviceSession.updateMany({
         // Not filtered by `liveSession()`: a spent or expired row can still carry
         // a live `deviceTokenHash`, and trust outlives the session it was granted

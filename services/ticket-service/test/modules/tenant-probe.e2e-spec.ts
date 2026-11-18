@@ -453,22 +453,21 @@ describe('Cross-tenant probe: ticket-service (e2e)', () => {
     probe,
   );
   /**
-   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * **What a Super Admin gets** on each id-taking RPC, called through the
    * tenant route with no tenant, as the gateway lets a Super Admin do. The
-   * expectation is the behavior before the scoped client, recorded by running
-   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
-   * a row; one that reaches A's data says why.
+   * scoped client refuses one (`FAILED_PRECONDITION`, "use the platform
+   * API"); a row with any other outcome says why. A change to who a Super
+   * Admin reaches fails a row.
    *
    * `PROBE_RECORD=<file>` writes each outcome to the file instead.
    */
   const SUPER_ADMIN: Record<string, string> = {
-    'AiService/ClassifyTicket': 'refused UNAVAILABLE',
-    'AiService/GenerateDraft': 'refused UNAVAILABLE',
-    'AiService/GenerateSummary': 'refused UNAVAILABLE',
-    'AiService/GetSuggestions': 'refused UNAVAILABLE',
-    'AiService/GetSummary':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'AiService/ListSimilarTickets': 'refused UNAVAILABLE',
+    'AiService/ClassifyTicket': 'refused FAILED_PRECONDITION',
+    'AiService/GenerateDraft': 'refused FAILED_PRECONDITION',
+    'AiService/GenerateSummary': 'refused FAILED_PRECONDITION',
+    'AiService/GetSuggestions': 'refused FAILED_PRECONDITION',
+    'AiService/GetSummary': 'refused FAILED_PRECONDITION',
+    'AiService/ListSimilarTickets': 'refused FAILED_PRECONDITION',
     'AnalyticsService/CreateExport': 'refused FAILED_PRECONDITION',
     'AnalyticsService/GetAgentStats': 'refused FAILED_PRECONDITION',
     'AnalyticsService/GetDeflection': 'refused FAILED_PRECONDITION',
@@ -477,66 +476,45 @@ describe('Cross-tenant probe: ticket-service (e2e)', () => {
     'AnalyticsService/GetResponseTimes': 'refused FAILED_PRECONDITION',
     'AnalyticsService/GetSatisfaction': 'refused FAILED_PRECONDITION',
     'AnalyticsService/GetVolume': 'refused FAILED_PRECONDITION',
-    'AssignmentService/AssignTicket': 'refused UNAVAILABLE',
-    'AssignmentService/AssignTicketToSelf': 'refused UNAVAILABLE',
-    'AssignmentService/ListAssignments':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'AssignmentService/ReassignTicket': 'refused UNAVAILABLE',
-    'AssignmentService/UnassignTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'AssignmentService/AssignTicket': 'refused FAILED_PRECONDITION',
+    'AssignmentService/AssignTicketToSelf': 'refused FAILED_PRECONDITION',
+    'AssignmentService/ListAssignments': 'refused FAILED_PRECONDITION',
+    'AssignmentService/ReassignTicket': 'refused FAILED_PRECONDITION',
+    'AssignmentService/UnassignTicket': 'refused FAILED_PRECONDITION',
     'AuditService/ListAuditLogs': 'refused FAILED_PRECONDITION',
     'FeedbackService/GetFeedback': 'refused FAILED_PRECONDITION',
     'FeedbackService/SubmitFeedback': 'refused FAILED_PRECONDITION',
     'FeedbackService/WithdrawFeedback': 'refused FAILED_PRECONDITION',
-    'MessageService/AnswerOpening': 'refused PERMISSION_DENIED',
-    'MessageService/AppendAiMessage':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/ConfirmAttachment': 'refused UNAVAILABLE',
-    'MessageService/CreateMessage': 'refused PERMISSION_DENIED',
-    'MessageService/DeleteAttachment':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/DownloadAttachment': 'refused NOT_FOUND',
-    'MessageService/ExcludeFromAiContext':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/GetAiAttachments': 'answers',
-    'MessageService/IngestAttachment': 'refused UNAVAILABLE',
-    'MessageService/ListAttachments':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/ListMessages':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/RedactMessage':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'MessageService/UpdateMessage': 'refused PERMISSION_DENIED',
-    'MessageService/UploadAttachment': 'refused UNAVAILABLE',
-    'TicketService/BulkChangeTicketPriority':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/BulkChangeTicketStatus':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/ChangeTicketStatus':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/CloseTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'MessageService/AnswerOpening': 'refused FAILED_PRECONDITION',
+    'MessageService/AppendAiMessage': 'refused FAILED_PRECONDITION',
+    'MessageService/ConfirmAttachment': 'refused FAILED_PRECONDITION',
+    'MessageService/CreateMessage': 'refused FAILED_PRECONDITION',
+    'MessageService/DeleteAttachment': 'refused FAILED_PRECONDITION',
+    'MessageService/DownloadAttachment': 'refused FAILED_PRECONDITION',
+    'MessageService/ExcludeFromAiContext': 'refused FAILED_PRECONDITION',
+    'MessageService/GetAiAttachments': 'refused FAILED_PRECONDITION',
+    'MessageService/IngestAttachment': 'refused FAILED_PRECONDITION',
+    'MessageService/ListAttachments': 'refused FAILED_PRECONDITION',
+    'MessageService/ListMessages': 'refused FAILED_PRECONDITION',
+    'MessageService/RedactMessage': 'refused FAILED_PRECONDITION',
+    'MessageService/UpdateMessage': 'refused FAILED_PRECONDITION',
+    'MessageService/UploadAttachment': 'refused FAILED_PRECONDITION',
+    'TicketService/BulkChangeTicketPriority': 'refused FAILED_PRECONDITION',
+    'TicketService/BulkChangeTicketStatus': 'refused FAILED_PRECONDITION',
+    'TicketService/ChangeTicketStatus': 'refused FAILED_PRECONDITION',
+    'TicketService/CloseTicket': 'refused FAILED_PRECONDITION',
     'TicketService/CreateTicket': 'refused FAILED_PRECONDITION',
-    'TicketService/DeleteTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/EscalateTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/GetTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/ListTicketStatusChanges':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/ListTickets':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/ListTicketsByIds':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/MarkTicketRead':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
-    'TicketService/ReopenTicket': 'refused ABORTED',
-    'TicketService/ResolveTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/DeleteTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/EscalateTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/GetTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/ListTicketStatusChanges': 'refused FAILED_PRECONDITION',
+    'TicketService/ListTickets': 'refused FAILED_PRECONDITION',
+    'TicketService/ListTicketsByIds': 'refused FAILED_PRECONDITION',
+    'TicketService/MarkTicketRead': 'refused FAILED_PRECONDITION',
+    'TicketService/ReopenTicket': 'refused FAILED_PRECONDITION',
+    'TicketService/ResolveTicket': 'refused FAILED_PRECONDITION',
     'TicketService/RestoreTicket': 'refused FAILED_PRECONDITION',
-    'TicketService/UpdateTicket':
-      "reaches: a Super Admin works any tenant's tickets; no tenant filter for one, by design",
+    'TicketService/UpdateTicket': 'refused FAILED_PRECONDITION',
   };
   const asSuperAdmin = () => superAdminContext();
 

@@ -8,8 +8,8 @@ import { CallerContext, hasIdentity } from '@synapsedesk/contracts';
  * A create needs a concrete `organizationId`, and a Super Admin has none: a
  * Super Admin writing a tenant-owned row names the tenant explicitly through
  * `/platform/*`. **It is also the check that keeps a Super Admin off a tenant
- * route:** the scoped client gives a Super Admin no tenant filter, so a route
- * that must refuse one calls this, whether or not it uses the value.
+ * route:** the scoped client is built through it, so every scoped query
+ * refuses a Super Admin with `FAILED_PRECONDITION`.
  */
 export function requireTenant(context: CallerContext): string {
   if (!hasCaller(context)) {

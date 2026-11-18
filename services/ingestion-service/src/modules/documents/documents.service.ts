@@ -1330,10 +1330,7 @@ export class DocumentsService {
    * probe.
    */
   private async replaceTarget(documentId: string, context: CallerContext) {
-    if (
-      !context.isSuperAdmin &&
-      !context.permissionCodes.includes('document.update')
-    ) {
+    if (!context.permissionCodes.includes('document.update')) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'No document with that id',

@@ -332,9 +332,6 @@ public class TicketsCrudService {
     if (!Boolean.TRUE.equals(includeDeleted)) {
       return;
     }
-    if (context.isSuperAdmin()) {
-      return;
-    }
     if (
       context
         .permissionCodes()

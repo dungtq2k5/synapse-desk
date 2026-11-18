@@ -165,7 +165,6 @@ public class DepartmentsController {
     // privileged caller's request warmed.
     if (
       isRequested(CurrentRequest.request(), "includeDeleted") &&
-      !context.isSuperAdmin() &&
       !context.permissionCodes().contains("department.delete")
     ) {
       throw new ResponseStatusException(

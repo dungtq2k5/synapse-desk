@@ -123,29 +123,29 @@ class TicketsCrudServiceTest {
   }
 
   @Test
-  void includeDeletedIsAllowedForASuperAdminWithNoTicketPermissions() {
-    when(stub.listTickets(any())).thenReturn(
-      ListTicketsResponse.getDefaultInstance()
-    );
+  void includeDeletedIsRefusedForASuperAdminWithNoTicketPermissions() {
+    // No Super Admin bypass: the tenant route refuses one anyway.
     RequestContext context = contextWithCodes(true, List.of());
 
-    service.list(
-      context,
-      java.math.BigDecimal.ONE,
-      java.math.BigDecimal.TEN,
-      "ASC",
-      null,
-      "createdAt",
-      true,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
-    );
+    assertThatThrownBy(() ->
+      service.list(
+        context,
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "ASC",
+        null,
+        "createdAt",
+        true,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+    ).isInstanceOf(ResponseStatusException.class);
 
-    verify(stub).listTickets(any());
+    verify(stub, org.mockito.Mockito.never()).listTickets(any());
   }
 
   @Test
