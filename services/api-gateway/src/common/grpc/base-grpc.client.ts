@@ -5,7 +5,11 @@ import {
   packRequestContext,
   type GrpcPeer,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext, RequestOrigin } from '@synapsedesk/contracts';
+import {
+  CallerContext,
+  RequestContext,
+  RequestOrigin,
+} from '@synapsedesk/contracts';
 import {
   catchError,
   firstValueFrom,
@@ -70,7 +74,7 @@ export abstract class BaseGrpcClient {
    */
   protected async call<T>(
     invoke: (metadata: Metadata) => Observable<T>,
-    origin: RequestOrigin | RequestContext,
+    origin: RequestOrigin | RequestContext | CallerContext,
     deadlineMs: number = GRPC_DEADLINE_MS,
     peer: GrpcPeer = this.serviceName,
   ): Promise<T> {

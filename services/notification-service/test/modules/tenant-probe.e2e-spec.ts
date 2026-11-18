@@ -113,11 +113,11 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
   /** How to call each id-taking RPC with A's ids. */
   const PROBE: Record<string, Row> = {
     'NotificationService/ResolveTicketByMessageId': {
-      // Service-to-service: the tenant is the request field. B naming its own
-      // tenant must not resolve A's mail.
+      // System callers only, and the tenant is the request field: B naming A's
+      // tenant is refused.
       build: (a) => ({
         providerMessageId: a.providerMessageId,
-        organizationId: B.organizationId,
+        organizationId: a.organizationId,
       }),
     },
     'NotificationService/MarkRead': { build: (a) => ({ id: a.notification }) },
@@ -232,8 +232,7 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
     'NotificationService/ListWebhookDeliveries': 'refused FAILED_PRECONDITION',
     'NotificationService/MarkManyRead': 'refused FAILED_PRECONDITION',
     'NotificationService/MarkRead': 'refused FAILED_PRECONDITION',
-    'NotificationService/ResolveTicketByMessageId':
-      "answers: scoped to the tenant the request names, not the caller's",
+    'NotificationService/ResolveTicketByMessageId': 'refused PERMISSION_DENIED',
     'NotificationService/RotateWebhookSecret': 'refused FAILED_PRECONDITION',
     'NotificationService/TestWebhookEndpoint': 'refused FAILED_PRECONDITION',
     'NotificationService/UpdateWebhookEndpoint': 'refused FAILED_PRECONDITION',

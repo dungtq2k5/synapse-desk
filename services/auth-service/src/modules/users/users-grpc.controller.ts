@@ -35,7 +35,11 @@ import {
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
 import { UsersService } from './users.service';
-import { requireSelf } from '@synapsedesk/nest-common';
+import {
+  requireSelf,
+  requireSystem,
+  requireTenant,
+} from '@synapsedesk/nest-common';
 
 @Controller()
 @UserServiceControllerMethods()
@@ -93,30 +97,45 @@ export class UsersGrpcController implements UserServiceController {
   }
 
   /**
-   * Service-to-service only — notification-service resolving an audience.
+   * notification-service resolving an audience: system callers only.
    *
-   * Reads no caller context: the tenant is a FIELD of the request because the
-   * caller is a background consumer with no user. It is never routed by the
-   * gateway, which is what keeps a tenant's user list and addresses out of
-   * reach of any client.
+   * The tenant is a FIELD of the request because the caller is a background
+   * consumer with no user, so a user's context (or a Super Admin's) is
+   * refused rather than allowed to name a tenant.
    */
   listPermissionHolders(
     request: ListPermissionHoldersRequest,
+    metadata?: Metadata,
   ): Promise<ListPermissionHoldersResponse> {
+    requireSystem(unpackCallerContext(metadata));
     return this.usersService.listPermissionHolders(request);
   }
 
-  /** Takes the tenant, so it cannot create one — see the service. */
+  /**
+   * The gateway's inbound mail, for the tenant it resolved from the verified
+   * address: system callers only. Takes the tenant, so it cannot create one —
+   * see the service.
+   */
   resolveInboundSender(
     request: ResolveInboundSenderRequest,
+    metadata?: Metadata,
   ): Promise<ResolveInboundSenderResponse> {
+    requireSystem(unpackCallerContext(metadata));
     return this.usersService.resolveInboundSender(request);
   }
 
-  /** Service-to-service only, like the one above. */
-  listUsersByIds(
+  /**
+   * Users by id in the request's tenant, which must be the caller's: a
+   * gateway user's own tenant, or a job's. Another tenant answers as unknown
+   * ids do, with nothing; a Super Admin is refused (`requireTenant`).
+   */
+  async listUsersByIds(
     request: ListUsersByIdsRequest,
+    metadata?: Metadata,
   ): Promise<ListUsersByIdsResponse> {
+    const tenant = requireTenant(unpackCallerContext(metadata));
+    if (request.organizationId !== tenant) return { items: [], summaries: [] };
+
     return this.usersService.listUsersByIds(request);
   }
 

@@ -32,6 +32,8 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   OrgStatus,
   UNKNOWN_ORIGIN,
+  systemContext,
+  type CallerContext,
   type RequestContext,
   type RequestOrigin,
   InboundRejectionReason,
@@ -101,7 +103,7 @@ class InboundPeer extends BaseGrpcClient {
 
   run<T>(
     invoke: (metadata: Metadata) => Observable<T>,
-    origin: RequestOrigin | RequestContext,
+    origin: RequestOrigin | RequestContext | CallerContext,
     deadlineMs?: number,
   ): Promise<T> {
     return this.call(invoke, origin, deadlineMs);
@@ -461,7 +463,9 @@ export class InboundEmailService implements OnModuleInit {
           },
           metadata,
         ),
-      UNKNOWN_ORIGIN,
+      // The tenant resolved from the verified address, as a system caller:
+      // auth refuses anyone else.
+      systemContext(organizationId),
     );
     if (!sender.userId) {
       return {
@@ -646,7 +650,7 @@ export class InboundEmailService implements OnModuleInit {
             { providerMessageId, organizationId },
             metadata,
           ),
-        UNKNOWN_ORIGIN,
+        systemContext(organizationId),
       );
 
       if (ticketId) return ticketId;
