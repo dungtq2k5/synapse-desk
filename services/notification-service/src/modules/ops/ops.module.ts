@@ -28,7 +28,10 @@ import { PrismaService } from '../prisma/prisma.service';
     {
       provide: GrpcHealthService,
       useFactory: (prisma: PrismaService, nats: ClientProxy) =>
-        new GrpcHealthService([postgresProbe(prisma), natsProbe(nats)]),
+        new GrpcHealthService([
+          postgresProbe(prisma.unscoped('schema')),
+          natsProbe(nats),
+        ]),
       inject: [PrismaService, NATS_CLIENT],
     },
     {

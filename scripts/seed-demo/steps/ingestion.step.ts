@@ -153,6 +153,14 @@ export const ingestionStep: SeedStep = {
       context.profile,
       context.apply,
     ),
+  existingRows: (context) =>
+    context.clients.ingestion.document.count({
+      where: {
+        organizationId: {
+          in: tenantsOf(context).map((tenant) => tenant.organizationId),
+        },
+      },
+    }),
 };
 
 export async function seedDocuments(

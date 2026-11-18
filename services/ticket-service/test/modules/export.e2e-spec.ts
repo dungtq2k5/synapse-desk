@@ -6,6 +6,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { status } from '@grpc/grpc-js';
 import { expectRpc } from '@synapsedesk/testing/rpc';
+import { faultInjector } from '@synapsedesk/testing/fault';
 import { ExportKind, ExportStatus } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
@@ -29,6 +30,8 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
  *     CSV reads as "no data", which is a wrong answer rather than an error.
  */
 describe('The analytics export (e2e)', () => {
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let facade: ExportFacade;
   let processor: ExportProcessor;
@@ -608,7 +611,13 @@ describe('The analytics export (e2e)', () => {
         createdAt: at('2026-03-02T09:00:00.000Z'),
         authorId: tenant.agentId,
       });
-      jest.spyOn(fx.prisma.ticket, 'count').mockResolvedValueOnce(140_000);
+      faults.replaceScoped(
+        fx.prisma,
+        'ticket',
+        'count',
+        () => Promise.resolve(140_000),
+        { once: true },
+      );
 
       const created = await ticketExport();
       // **Does NOT reject.** The count is the same on every attempt, so a

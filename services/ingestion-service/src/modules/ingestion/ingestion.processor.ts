@@ -30,8 +30,11 @@ import {
   type IngestionOutcome,
 } from '../../common/configs/ingestion.config';
 import { setStatusUnlessLive } from '../../common/live-version';
-import { Prisma } from '../../generated/prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  type ScopedClient,
+  type ScopedTransaction,
+} from '../prisma/prisma.service';
 import { ConflictCheckQueueService } from './conflict-check-queue.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
@@ -260,6 +263,7 @@ export class IngestionProcessor {
 
     try {
       await this.setPhase(
+        organizationId,
         ingestionJobId,
         IngestionJobStatus.PARSING,
         documentId,
@@ -293,7 +297,11 @@ export class IngestionProcessor {
       );
 
       stage = IngestionStage.CHUNKING;
-      await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
+      await this.setJobStatus(
+        ingestionJobId,
+        IngestionJobStatus.CHUNKING,
+        this.prisma.scoped(systemContext(organizationId)),
+      );
       const chunks = await this.chunker.chunk(parsed.pages);
 
       // Before `stageChunks` and before any embedding call: the ceiling
@@ -348,12 +356,20 @@ export class IngestionProcessor {
       const scope = await this.stageChunks(data, chunks);
 
       stage = IngestionStage.EMBEDDING;
-      await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
+      await this.setJobStatus(
+        ingestionJobId,
+        IngestionJobStatus.EMBEDDING,
+        this.prisma.scoped(systemContext(organizationId)),
+      );
       await this.embedAndUpsert(data, scope);
 
       // Once more before the swap: a cancellation that landed while the
       // batches were embedding stops here, and the live version stays.
-      await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
+      await this.setJobStatus(
+        ingestionJobId,
+        IngestionJobStatus.EMBEDDING,
+        this.prisma.scoped(systemContext(organizationId)),
+      );
       await this.swap(documentId, organizationId, data.objectPath);
 
       // **After chunking, because that is where the SECOND drop happens** —
@@ -428,6 +444,7 @@ export class IngestionProcessor {
         // arm above exists to avoid.
         try {
           await this.setPhase(
+            organizationId,
             ingestionJobId,
             IngestionJobStatus.QUEUED,
             documentId,
@@ -606,13 +623,14 @@ export class IngestionProcessor {
    * Never touches the live version.
    */
   private async stageChunks(data: IngestionJobData, chunks: Chunk[]) {
+    const db = this.prisma.scoped(systemContext(data.organizationId));
     const { documentId, organizationId } = data;
     const scope = { organizationId, ...(await this.readScope(documentId)) };
 
     const texts = new Map(
       chunks.map((chunk) => [chunk.chunkIndex, chunk.contentText]),
     );
-    const staged = await this.prisma.documentChunk.findMany({
+    const staged = await db.documentChunk.findMany({
       where: { documentId, isStaged: true },
       select: {
         id: true,
@@ -640,15 +658,15 @@ export class IngestionProcessor {
     );
     const keptIndexes = new Set(kept.map((row) => row.chunkIndex));
 
-    await this.prisma.$transaction([
-      this.prisma.documentChunk.deleteMany({
+    await db.$transaction([
+      db.documentChunk.deleteMany({
         where: {
           documentId,
           isStaged: true,
           id: { notIn: kept.map((row) => row.id) },
         },
       }),
-      this.prisma.documentChunk.createMany({
+      db.documentChunk.createMany({
         data: chunks
           .filter((chunk) => !keptIndexes.has(chunk.chunkIndex))
           .map((chunk) => ({
@@ -697,13 +715,14 @@ export class IngestionProcessor {
     organizationId: string,
     objectPath: string,
   ) {
+    const db = this.prisma.scoped(systemContext(organizationId));
     // Read again rather than reused from `stageChunks`: a scope change while
     // the batches were embedding reached the rows, not the points of a batch
     // upserted after it. Both halves stamp it.
     const scope = await this.readScope(documentId);
     await this.qdrant.swapDocumentPoints(documentId, organizationId, scope);
 
-    const replaced = await this.prisma.$transaction(async (tx) => {
+    const replaced = await db.$transaction(async (tx) => {
       await tx.documentChunk.deleteMany({
         where: { documentId, isStaged: false },
       });
@@ -758,10 +777,12 @@ export class IngestionProcessor {
 
   /** The scope columns a chunk copies from its document, beside its tenant. */
   private async readScope(documentId: string) {
-    const document = await this.prisma.document.findUniqueOrThrow({
-      where: { id: documentId },
-      include: { departmentLinks: { select: { departmentId: true } } },
-    });
+    const document = await this.prisma
+      .unscoped('job by row id')
+      .document.findUniqueOrThrow({
+        where: { id: documentId },
+        include: { departmentLinks: { select: { departmentId: true } } },
+      });
 
     return {
       isOrganizationWide: document.isOrganizationWide,
@@ -779,9 +800,10 @@ export class IngestionProcessor {
    * rows, and purging under it would leave it swapping in half a document.
    */
   private async purgeStaged(data: IngestionJobData): Promise<void> {
+    const db = this.prisma.scoped(systemContext(data.organizationId));
     const { documentId, organizationId, ingestionJobId } = data;
     try {
-      const successor = await this.prisma.ingestionJob.count({
+      const successor = await db.ingestionJob.count({
         where: {
           documentId,
           id: { not: ingestionJobId },
@@ -790,7 +812,7 @@ export class IngestionProcessor {
       });
       if (successor > 0) return;
 
-      await this.prisma.documentChunk.deleteMany({
+      await db.documentChunk.deleteMany({
         where: { documentId, isStaged: true },
       });
       await this.qdrant.purgeStagedPoints(documentId, organizationId);
@@ -822,11 +844,12 @@ export class IngestionProcessor {
       isDeleted: boolean;
     },
   ): Promise<void> {
+    const db = this.prisma.scoped(systemContext(data.organizationId));
     const settings = await this.aiSettings.settingsFor(data.organizationId);
 
     // The staged chunks not yet embedded: `stageChunks` kept the ones an
     // earlier run of this version already paid for.
-    const pending = await this.prisma.documentChunk.findMany({
+    const pending = await db.documentChunk.findMany({
       where: {
         documentId: data.documentId,
         isStaged: true,
@@ -899,9 +922,9 @@ export class IngestionProcessor {
         );
       }
 
-      await this.prisma.$transaction(
+      await db.$transaction(
         points.map((point) =>
-          this.prisma.documentChunk.update({
+          db.documentChunk.update({
             where: { id: point.chunkId },
             data: { vectorPointId: point.vectorPointId },
           }),
@@ -914,8 +937,9 @@ export class IngestionProcessor {
     data: IngestionJobData,
     chunkCount: number,
   ): Promise<void> {
-    const [, document] = await this.prisma.$transaction([
-      this.prisma.ingestionJob.update({
+    const db = this.prisma.scoped(systemContext(data.organizationId));
+    const [, document] = await db.$transaction([
+      db.ingestionJob.update({
         where: { id: data.ingestionJobId },
         data: {
           status: IngestionJobStatus.COMPLETED,
@@ -925,7 +949,7 @@ export class IngestionProcessor {
           failedStage: null,
         },
       }),
-      this.prisma.document.update({
+      db.document.update({
         where: { id: data.documentId },
         data: { status: DocumentStatus.INDEXED },
         // The uploader, the title and the SCOPE. Taken from the
@@ -964,17 +988,18 @@ export class IngestionProcessor {
     error: unknown,
     stage: IngestionStage,
   ): Promise<void> {
+    const db = this.prisma.scoped(systemContext(data.organizationId));
     const message = formatErrorMsg(error);
     // Read BEFORE the status writes, and separately from them: the failure
     // event must go out even if the writes below throw, and reading it there
     // would tie the notification to the bookkeeping succeeding.
-    const document = await this.prisma.document.findUnique({
+    const document = await db.document.findUnique({
       where: { id: data.documentId },
       select: { createdById: true, title: true },
     });
 
     try {
-      await this.prisma.$transaction(async (tx) => {
+      await db.$transaction(async (tx) => {
         await tx.ingestionJob.update({
           where: { id: data.ingestionJobId },
           data: {
@@ -1066,8 +1091,9 @@ export class IngestionProcessor {
     error: unknown,
     stage: IngestionStage,
   ): Promise<void> {
+    const db = this.prisma.scoped(systemContext(data.organizationId));
     try {
-      await this.prisma.ingestionJob.updateMany({
+      await db.ingestionJob.updateMany({
         where: {
           id: data.ingestionJobId,
           status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
@@ -1110,21 +1136,23 @@ export class IngestionProcessor {
    *   move clears it.
    */
   private async setPhase(
+    organizationId: string,
     ingestionJobId: string,
     jobStatus: IngestionJobStatus,
     documentId: string,
     documentStatus: DocumentStatus,
     waitingReason: IngestionWaitingReason | null = null,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const db = this.prisma.scoped(systemContext(organizationId));
+    await db.$transaction(async (tx) => {
       await this.setJobStatus(ingestionJobId, jobStatus, tx, waitingReason);
       await setStatusUnlessLive(tx, documentId, documentStatus);
     });
   }
 
   /**
-   * @param client The transaction to run in. Defaults to the unwrapped client
-   *   for the phases that move the job alone — CHUNKING and EMBEDDING leave the
+   * @param client The scoped client, or a transaction on it. The phases that
+   *   move the job alone pass the client: CHUNKING and EMBEDDING leave the
    *   document at PROCESSING throughout.
    * @param waitingReason written with the status, so a job that moves again
    *   (or is put back for another reason) never keeps a stale one.
@@ -1136,7 +1164,7 @@ export class IngestionProcessor {
   private async setJobStatus(
     ingestionJobId: string,
     status: IngestionJobStatus,
-    client: Prisma.TransactionClient | PrismaService = this.prisma,
+    client: ScopedTransaction | ScopedClient,
     waitingReason: IngestionWaitingReason | null = null,
   ): Promise<void> {
     const { count } = await client.ingestionJob.updateMany({

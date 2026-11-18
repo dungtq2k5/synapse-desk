@@ -1,4 +1,6 @@
 import { Controller } from '@nestjs/common';
+import type { Metadata } from '@grpc/grpc-js';
+import { requireSelf } from '@synapsedesk/nest-common';
 import {
   OtpServiceController,
   OtpServiceControllerMethods,
@@ -9,6 +11,7 @@ import {
   RequestPhoneVerificationRequest,
   VerifyOtpRequest,
   VerifyOtpResponse,
+  unpackCallerContext,
 } from '@synapsedesk/grpc-proto';
 import { OtpService } from './otp.service';
 
@@ -19,25 +22,41 @@ export class OtpGrpcController implements OtpServiceController {
 
   requestEmailVerification(
     request: RequestEmailVerificationRequest,
+    metadata?: Metadata,
   ): Promise<RequestOtpResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.otpService.requestEmailVerification(request);
   }
 
-  verifyEmail(request: VerifyOtpRequest): Promise<VerifyOtpResponse> {
+  verifyEmail(
+    request: VerifyOtpRequest,
+    metadata?: Metadata,
+  ): Promise<VerifyOtpResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.otpService.verifyEmail(request);
   }
 
   requestPhoneVerification(
     request: RequestPhoneVerificationRequest,
+    metadata?: Metadata,
   ): Promise<RequestOtpResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.otpService.requestPhoneVerification(request);
   }
 
-  verifyPhone(request: VerifyOtpRequest): Promise<VerifyOtpResponse> {
+  verifyPhone(
+    request: VerifyOtpRequest,
+    metadata?: Metadata,
+  ): Promise<VerifyOtpResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.otpService.verifyPhone(request);
   }
 
-  getOtpStatus(request: OtpStatusRequest): Promise<OtpStatusResponse> {
+  getOtpStatus(
+    request: OtpStatusRequest,
+    metadata?: Metadata,
+  ): Promise<OtpStatusResponse> {
+    requireSelf(unpackCallerContext(metadata), request.userId);
     return this.otpService.getOtpStatus(request);
   }
 }

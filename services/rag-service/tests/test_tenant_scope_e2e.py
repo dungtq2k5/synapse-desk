@@ -29,7 +29,9 @@ from rag_service.qdrant.collection import (
     ORGANIZATION_ID,
     payload_index_fields,
 )
-from rag_service.retrieval.arms import lexical_arm, semantic_arm
+from rag_service.retrieval.arms import RetrievedChunk, lexical_arm, semantic_arm
+from rag_service.retrieval.fusion import FusedChunk
+from rag_service.retrieval.service import RetrievalService
 from rag_service.retrieval.tenant_scope import tenant_scope
 
 SHARED_TEXT = "annual leave carryover policy"
@@ -87,6 +89,33 @@ class TestTenantIsolation:
 
         assert mine.chunk_id in ids
         assert theirs.chunk_id not in ids
+
+    async def test_hydration_reads_only_the_callers_tenant(
+        self, qdrant, pool, seed, tenant_a, tenant_b
+    ):
+        # The tenant clause on the hydration query. Its ids come from the
+        # scoped arms today; handed another tenant's id from anywhere, it still
+        # returns only the caller's own chunk.
+        mine = await seed(tenant_a.organization_id, text=SHARED_TEXT)
+        theirs = await seed(tenant_b.organization_id, text=SHARED_TEXT)
+        service = RetrievalService(qdrant, pool, None, None, None, None)  # type: ignore[arg-type]
+        fused = [
+            FusedChunk(
+                chunk=RetrievedChunk(
+                    vector_point_id=chunk.vector_point_id,
+                    chunk_id=chunk.chunk_id,
+                    document_id=chunk.document_id,
+                    score=1.0,
+                ),
+                score=1.0,
+                arms=("semantic",),
+            )
+            for chunk in (mine, theirs)
+        ]
+
+        hydrated = await service._hydrate(fused, tenant_a.organization_id)
+
+        assert [chunk.chunk_id for chunk in hydrated] == [mine.chunk_id]
 
     @pytest.mark.parametrize("run_arm", ARMS)
     async def test_a_tenant_with_no_documents_gets_nothing(

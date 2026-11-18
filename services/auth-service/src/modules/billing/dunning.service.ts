@@ -56,7 +56,7 @@ export class DunningService {
         : (invoice.customer?.id ?? null);
 
     const organization = customerId
-      ? await this.prisma.organization.findUnique({
+      ? await this.prisma.unscoped('cross-tenant job').organization.findUnique({
           where: { stripeCustomerId: customerId },
           select: { id: true },
         })

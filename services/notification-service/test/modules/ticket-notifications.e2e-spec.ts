@@ -9,6 +9,7 @@ import {
 } from '@synapsedesk/contracts';
 import { compareAlphabetically } from '@synapsedesk/core';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
+import { failNextCreate } from '../utils/scoped-fault';
 import { TicketNotificationConsumer } from '../../src/modules/in-app/ticket-notification.consumer';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
@@ -520,9 +521,7 @@ describe('Ticket notifications (e2e)', () => {
     });
 
     it('22. Notifies the remaining recipients when one write fails', async () => {
-      const create = jest
-        .spyOn(fx.prisma.notification, 'create')
-        .mockRejectedValueOnce(new Error('injected failure'));
+      const restore = failNextCreate(fx.prisma, 'notification');
 
       try {
         await consumer.ticketReassigned({
@@ -537,7 +536,7 @@ describe('Ticket notifications (e2e)', () => {
 
         await expect(fx.prisma.notification.count()).resolves.toBe(1);
       } finally {
-        create.mockRestore();
+        restore();
       }
     });
 

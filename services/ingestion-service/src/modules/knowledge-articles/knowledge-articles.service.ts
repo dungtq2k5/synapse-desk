@@ -74,7 +74,7 @@ export class KnowledgeArticlesService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.document.findMany({
+      this.prisma.scoped(context).document.findMany({
         where,
         orderBy,
         skip,
@@ -83,7 +83,7 @@ export class KnowledgeArticlesService {
       }),
       // The SAME `where`. A count computed without the scope would tell an end
       // user how many articles exist that they cannot open.
-      this.prisma.document.count({ where }),
+      this.prisma.scoped(context).document.count({ where }),
     ]);
 
     return {
@@ -131,7 +131,7 @@ export class KnowledgeArticlesService {
     // Chunk rows carry their own `isDeleted`, `isOrganizationWide` and
     // `departmentIds`, and a query starting from the chunk table inherits none
     // of the three predicates above.
-    const article = await this.prisma.document.findFirst({
+    const article = await this.prisma.scoped(context).document.findFirst({
       where: { id: request.id, ...this.scope(context) },
       include: {
         _count: { select: { chunks: LIVE_CHUNKS } },
@@ -158,7 +158,7 @@ export class KnowledgeArticlesService {
     // An OPEN flag now means what its name says: `reportMissingPages` closes it
     // when a re-index reads every page (`resolveSystem`). Without that fix this
     // would stay true forever after the pages were fixed.
-    const unindexed = await this.prisma.documentFlag.findFirst({
+    const unindexed = await this.prisma.scoped(context).documentFlag.findFirst({
       where: {
         documentId: article.id,
         flagType: DocumentFlagType.PAGES_NOT_INDEXED,
@@ -197,7 +197,7 @@ export class KnowledgeArticlesService {
     take: number,
     context: CallerContext,
   ): Promise<{ position: number; page: number; skip: number }> {
-    const block = await this.prisma.documentChunk.findFirst({
+    const block = await this.prisma.scoped(context).documentChunk.findFirst({
       where: {
         id: passageId,
         documentId: articleId,
@@ -213,7 +213,7 @@ export class KnowledgeArticlesService {
     }
     // Counted, not read off `chunkIndex`: the position among the blocks the
     // reader pages through, whatever the numbering.
-    const position = await this.prisma.documentChunk.count({
+    const position = await this.prisma.scoped(context).documentChunk.count({
       where: {
         documentId: articleId,
         isStaged: false,

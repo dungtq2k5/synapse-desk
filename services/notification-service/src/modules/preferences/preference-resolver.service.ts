@@ -6,6 +6,8 @@ import {
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
   PreferenceSource,
+  systemContext,
+  type CallerContext,
 } from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { isWithinQuietHours } from './quiet-hours';
@@ -92,6 +94,7 @@ export class PreferenceResolver {
       input.userId,
       input.type,
       input.channel,
+      systemContext(input.organizationId),
     );
 
     if (!preference.isEnabled) {
@@ -120,17 +123,20 @@ export class PreferenceResolver {
     userId: string,
     type: string,
     channel: NotificationChannel,
+    context: CallerContext,
   ): Promise<ResolvedPreference> {
     // Both candidate rows in ONE query. Two round trips per channel per
     // recipient would put a handful of queries on every fan-out, and the
     // wildcard is needed often enough that fetching it lazily saves nothing.
-    const rows = await this.prisma.notificationPreference.findMany({
-      where: {
-        userId,
-        channel,
-        type: { in: [type, PREFERENCE_WILDCARD_TYPE] },
-      },
-    });
+    const rows = await this.prisma
+      .scoped(context)
+      .notificationPreference.findMany({
+        where: {
+          userId,
+          channel,
+          type: { in: [type, PREFERENCE_WILDCARD_TYPE] },
+        },
+      });
 
     const exact = rows.find((row) => row.type === type);
     if (exact) {

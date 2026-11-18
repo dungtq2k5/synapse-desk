@@ -39,6 +39,12 @@ export type SeedStep = {
    * invisible to every constraint.
    */
   run(context: StepContext): Promise<string[]>;
+  /**
+   * How many of this step's rows the manifest's tenants already hold, for a
+   * step that writes them once and would double them on a second run.
+   * Absent for a step that is safe to repeat (`analytics` backfills).
+   */
+  existingRows?(context: StepContext): Promise<number>;
 };
 
 /**

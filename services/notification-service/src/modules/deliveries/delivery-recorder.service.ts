@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  type CallerContext,
   DeliverySkipReason,
   DeliveryStatus,
   NotificationChannel,
@@ -34,8 +35,9 @@ export class DeliveryRecorder {
     notificationId: string,
     channel: NotificationChannel,
     details: { target: string | null; providerMessageId: string | null },
+    context: CallerContext,
   ): Promise<void> {
-    await this.upsert(notificationId, channel, {
+    await this.upsert(context, notificationId, channel, {
       status: DeliveryStatus.SENT,
       target: details.target,
       providerMessageId: details.providerMessageId,
@@ -56,8 +58,10 @@ export class DeliveryRecorder {
     notificationId: string,
     channel: NotificationChannel,
     details: { target: string | null; reason: DeliverySkipReason | string },
+    context: CallerContext,
   ): Promise<void> {
     await this.upsert(
+      context,
       notificationId,
       channel,
       {
@@ -76,8 +80,9 @@ export class DeliveryRecorder {
     notificationId: string,
     channel: NotificationChannel,
     details: { target: string | null; error: string },
+    context: CallerContext,
   ): Promise<void> {
-    await this.upsert(notificationId, channel, {
+    await this.upsert(context, notificationId, channel, {
       status: DeliveryStatus.FAILED,
       target: details.target,
       // Truncated: a provider stack trace can be kilobytes, and the first line
@@ -105,8 +110,9 @@ export class DeliveryRecorder {
     notificationId: string,
     channel: NotificationChannel,
     details: { target: string | null; error: string },
+    context: CallerContext,
   ): Promise<void> {
-    await this.upsert(notificationId, channel, {
+    await this.upsert(context, notificationId, channel, {
       status: DeliveryStatus.BOUNCED,
       target: details.target,
       errorLog: details.error.slice(0, 1_000),
@@ -117,13 +123,14 @@ export class DeliveryRecorder {
   }
 
   private async upsert(
+    context: CallerContext,
     notificationId: string,
     channel: NotificationChannel,
     data: Record<string, unknown>,
     { countsAsAttempt = true }: { countsAsAttempt?: boolean } = {},
   ): Promise<void> {
     try {
-      await this.prisma.notificationDelivery.upsert({
+      await this.prisma.scoped(context).notificationDelivery.upsert({
         where: {
           notificationId_channel: { notificationId, channel },
         },

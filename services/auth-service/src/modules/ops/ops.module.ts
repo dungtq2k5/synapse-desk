@@ -26,7 +26,7 @@ import { PrismaService } from '../prisma/prisma.service';
     {
       provide: GrpcHealthService,
       useFactory: (prisma: PrismaService) =>
-        new GrpcHealthService([postgresProbe(prisma)]),
+        new GrpcHealthService([postgresProbe(prisma.unscoped('schema'))]),
       inject: [PrismaService],
     },
     {

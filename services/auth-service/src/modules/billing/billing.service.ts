@@ -18,6 +18,7 @@ import type Stripe from 'stripe';
 import {
   PORTAL_CONFIGURATION_TTL_MS,
   STRIPE_PORTAL_MARKER,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { withHttpStatus } from '@synapsedesk/core';
 import {
@@ -97,7 +98,7 @@ export class BillingService {
 
     // The interval is the catalog's, by the price the last event named.
     const price = organization.stripePriceId
-      ? await this.prisma.subscriptionPlanPrice.findUnique({
+      ? await this.prisma.scoped(context).subscriptionPlanPrice.findUnique({
           where: { stripePriceId: organization.stripePriceId },
           select: { interval: true },
         })
@@ -352,10 +353,12 @@ export class BillingService {
         metadata: { organizationId: organization.id },
       });
 
-      await this.prisma.organization.update({
-        where: { id: organization.id },
-        data: { stripeCustomerId: customer.id },
-      });
+      await this.prisma
+        .scoped(systemContext(organization.id))
+        .organization.update({
+          where: { id: organization.id },
+          data: { stripeCustomerId: customer.id },
+        });
 
       return customer.id;
     } catch (error) {
@@ -366,30 +369,32 @@ export class BillingService {
   private async load(context: CallerContext) {
     const organizationId = requireTenant(context);
 
-    const organization = await this.prisma.organization.findFirst({
-      // Tenant-scoped by construction: the id comes from the verified context,
-      // never from the request, so there is no cross-tenant read to prevent.
-      where: { id: organizationId, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        maxAgentSeats: true,
-        maxStorageBytes: true,
-        monthlyAiTokenBudget: true,
-        aiModelTier: true,
-        billingCycleStart: true,
-        stripeCustomerId: true,
-        stripeSubscriptionId: true,
-        stripePriceId: true,
-        currentPeriodEnd: true,
-        cancelAtPeriodEnd: true,
-        entitlementsPinned: true,
-        // The plan's own name, for the label above. One join rather than a
-        // reverse-lookup by tier that could not tell two QUALITY plans apart.
-        plan: { select: { name: true, stripeProductId: true } },
-      },
-    });
+    const organization = await this.prisma
+      .scoped(context)
+      .organization.findFirst({
+        // Tenant-scoped by construction: the id comes from the verified context,
+        // never from the request, so there is no cross-tenant read to prevent.
+        where: { id: organizationId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          maxAgentSeats: true,
+          maxStorageBytes: true,
+          monthlyAiTokenBudget: true,
+          aiModelTier: true,
+          billingCycleStart: true,
+          stripeCustomerId: true,
+          stripeSubscriptionId: true,
+          stripePriceId: true,
+          currentPeriodEnd: true,
+          cancelAtPeriodEnd: true,
+          entitlementsPinned: true,
+          // The plan's own name, for the label above. One join rather than a
+          // reverse-lookup by tier that could not tell two QUALITY plans apart.
+          plan: { select: { name: true, stripeProductId: true } },
+        },
+      });
 
     if (!organization) {
       throw new RpcException({

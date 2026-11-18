@@ -123,36 +123,38 @@ export class IngestionReconcileSweep {
     // Oldest first: the document stuck longest is the one whose owner has been
     // waiting longest, and a backlog over the cap should drain in that order
     // rather than in whatever order the planner returns.
-    const candidates = await this.prisma.ingestionJob.findMany({
-      where: {
-        status: IngestionJobStatus.QUEUED,
-        supersededById: null,
-        organizationId: { in: allowed },
-        // Written out rather than taken from `IngestionJobsService.scope()`,
-        // which also carries `requireTenant` and `documentVisibility` — a
-        // caller-scoped pair this sweep has no caller for.
-        //
-        // `deleteDocument` soft-deletes the document and never touches
-        // `ingestion_jobs`, so without this a document deleted while its job
-        // was stranded is re-ingested: parsed, chunked and EMBEDDED against the
-        // tenant's budget, before `stageChunks` marks the chunks deleted.
-        // No disclosure, and a full metered ingestion nobody asked for.
-        document: { deletedAt: null },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: MAX_RECONCILED_PER_RUN,
-      include: {
-        document: {
-          select: {
-            fileUrl: true,
-            fileType: true,
-            pendingFileUrl: true,
-            pendingFileType: true,
-            ocrLanguages: true,
+    const candidates = await this.prisma
+      .unscoped('cross-tenant job')
+      .ingestionJob.findMany({
+        where: {
+          status: IngestionJobStatus.QUEUED,
+          supersededById: null,
+          organizationId: { in: allowed },
+          // Written out rather than taken from `IngestionJobsService.scope()`,
+          // which also carries `requireTenant` and `documentVisibility` — a
+          // caller-scoped pair this sweep has no caller for.
+          //
+          // `deleteDocument` soft-deletes the document and never touches
+          // `ingestion_jobs`, so without this a document deleted while its job
+          // was stranded is re-ingested: parsed, chunked and EMBEDDED against the
+          // tenant's budget, before `stageChunks` marks the chunks deleted.
+          // No disclosure, and a full metered ingestion nobody asked for.
+          document: { deletedAt: null },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: MAX_RECONCILED_PER_RUN,
+        include: {
+          document: {
+            select: {
+              fileUrl: true,
+              fileType: true,
+              pendingFileUrl: true,
+              pendingFileType: true,
+              ocrLanguages: true,
+            },
           },
         },
-      },
-    });
+      });
 
     const stuck: typeof candidates = [];
     for (const job of candidates) {
@@ -195,17 +197,19 @@ export class IngestionReconcileSweep {
   ): Promise<string[]> {
     // Ordered by the oldest stuck job each tenant holds, so a tenant beyond
     // `MAX_ORGANIZATIONS_PER_RUN` is reached on a later run rather than never.
-    const withStuckJobs = await this.prisma.ingestionJob.groupBy({
-      by: ['organizationId'],
-      where: {
-        status: IngestionJobStatus.QUEUED,
-        supersededById: null,
-        document: { deletedAt: null },
-      },
-      _min: { createdAt: true },
-      orderBy: { _min: { createdAt: 'asc' } },
-      take: MAX_ORGANIZATIONS_PER_RUN,
-    });
+    const withStuckJobs = await this.prisma
+      .unscoped('cross-tenant job')
+      .ingestionJob.groupBy({
+        by: ['organizationId'],
+        where: {
+          status: IngestionJobStatus.QUEUED,
+          supersededById: null,
+          document: { deletedAt: null },
+        },
+        _min: { createdAt: true },
+        orderBy: { _min: { createdAt: 'asc' } },
+        take: MAX_ORGANIZATIONS_PER_RUN,
+      });
 
     const allowed: string[] = [];
     const atCap: string[] = [];

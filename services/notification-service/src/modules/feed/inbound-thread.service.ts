@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   NotificationChannel,
   NotificationResourceType,
+  systemContext,
 } from '@synapsedesk/contracts';
 import type {
   ResolveTicketByMessageIdRequest,
@@ -40,25 +41,23 @@ export class InboundThreadService {
       return { ticketId: undefined };
     }
 
-    const delivery = await this.prisma.notificationDelivery.findFirst({
-      where: {
-        providerMessageId,
-        channel: NotificationChannel.EMAIL,
-        notification: {
-          // **Scoped to the addressed tenant.** A `Message-ID` lifted from one
-          // tenant's notification must not resolve to that tenant's ticket
-          // while the mail was addressed to another — the same cross-tenant
-          // misroute the reply token's MAC prevents by binding the tenant.
-          organizationId: request.organizationId,
-          resourceType: NotificationResourceType.TICKET,
+    // Scoped to the addressed tenant: a `Message-ID` lifted from one tenant's
+    // notification must not resolve to that tenant's ticket while the mail was
+    // addressed to another, the misroute the reply token's MAC prevents too.
+    const delivery = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .notificationDelivery.findFirst({
+        where: {
+          providerMessageId,
+          channel: NotificationChannel.EMAIL,
+          notification: { resourceType: NotificationResourceType.TICKET },
         },
-      },
-      // Newest first: one `Message-ID` should be unique, but the column is not
-      // constrained to be, and a stale duplicate must not win over a current
-      // one.
-      orderBy: { createdAt: 'desc' },
-      select: { notification: { select: { resourceId: true } } },
-    });
+        // Newest first: one `Message-ID` should be unique, but the column is not
+        // constrained to be, and a stale duplicate must not win over a current
+        // one.
+        orderBy: { createdAt: 'desc' },
+        select: { notification: { select: { resourceId: true } } },
+      });
 
     return { ticketId: delivery?.notification?.resourceId ?? undefined };
   }

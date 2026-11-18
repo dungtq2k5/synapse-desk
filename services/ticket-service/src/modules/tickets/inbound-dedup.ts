@@ -1,7 +1,7 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
-import { Prisma } from '../../generated/prisma/client';
+import type { ScopedClient, ScopedTransaction } from '../prisma/prisma.service';
 
 /**
  * A write that has already been performed for this `Message-ID`.
@@ -37,7 +37,7 @@ export class InboundEmailAlreadyProcessed extends Error {
  * carrying the original ticket rather than an error the caller has to interpret.
  */
 export async function recordInboundEmail(
-  tx: Prisma.TransactionClient,
+  tx: ScopedTransaction,
   organizationId: string,
   messageId: string,
   ticketId: string | null,
@@ -85,12 +85,12 @@ export async function recordInboundEmail(
  * dedup still catches two deliveries racing past this read.
  */
 export async function refuseRedelivery(
-  prisma: Pick<Prisma.TransactionClient, 'inboundEmail'>,
+  db: ScopedClient | ScopedTransaction,
   organizationId: string,
   messageId: string | undefined,
 ): Promise<void> {
   if (!messageId) return;
-  const seen = await prisma.inboundEmail.findUnique({
+  const seen = await db.inboundEmail.findUnique({
     where: { organizationId_messageId: { organizationId, messageId } },
     select: { id: true },
   });

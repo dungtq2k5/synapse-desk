@@ -62,7 +62,7 @@ export class AuditConsumer {
         );
       }
 
-      await this.prisma.auditLog.create({
+      await this.prisma.unscoped('cross-tenant job').auditLog.create({
         data: {
           // The publisher's id for the act, and what makes a redelivery a no-op
           // rather than a second row. Non-null by the guard above; the COLUMN

@@ -95,7 +95,7 @@ export class SessionsService {
     const userId = requireActor(context);
     const currentFamilyId = await this.resolveFamilyId(request.refreshToken);
 
-    const sessions = await this.prisma.deviceSession.findMany({
+    const sessions = await this.prisma.scoped(context).deviceSession.findMany({
       where: { userId, ...liveSession() },
       select: SESSION_FIELDS,
       orderBy: { createdAt: 'desc' },
@@ -123,7 +123,7 @@ export class SessionsService {
 
     // Scoped to the caller: a session id belonging to someone else must 404,
     // not 403 — otherwise the endpoint confirms that the id exists.
-    const session = await this.prisma.deviceSession.findFirst({
+    const session = await this.prisma.scoped(context).deviceSession.findFirst({
       where: { id: request.sessionId, userId },
       select: { familyId: true },
     });
@@ -138,9 +138,11 @@ export class SessionsService {
     // matches any row, and the answer would always be "not current".
     const currentFamilyId = await this.resolveFamilyId(request.refreshToken);
 
-    const { count } = await this.prisma.deviceSession.deleteMany({
-      where: { familyId: session.familyId },
-    });
+    const { count } = await this.prisma
+      .scoped(context)
+      .deviceSession.deleteMany({
+        where: { familyId: session.familyId },
+      });
     await this.revoked.mark([session.familyId]);
 
     return {
@@ -161,7 +163,7 @@ export class SessionsService {
   ): Promise<RevokeTrustResponse> {
     const userId = requireActor(context);
 
-    const session = await this.prisma.deviceSession.findFirst({
+    const session = await this.prisma.scoped(context).deviceSession.findFirst({
       where: { id: request.sessionId, userId },
       select: { familyId: true },
     });
@@ -172,10 +174,12 @@ export class SessionsService {
       });
     }
 
-    const { count } = await this.prisma.deviceSession.updateMany({
-      where: { familyId: session.familyId },
-      data: UNTRUSTED,
-    });
+    const { count } = await this.prisma
+      .scoped(context)
+      .deviceSession.updateMany({
+        where: { familyId: session.familyId },
+        data: UNTRUSTED,
+      });
 
     return { untrustedCount: count };
   }
@@ -183,14 +187,16 @@ export class SessionsService {
   async revokeAllTrust(context: CallerContext): Promise<RevokeTrustResponse> {
     const userId = requireActor(context);
 
-    const { count } = await this.prisma.deviceSession.updateMany({
-      // Not filtered by `liveSession()`: a spent or expired row can still carry
-      // a live `deviceTokenHash`, and trust outlives the session it was granted
-      // on by design (30 days vs 7). Missing those rows would leave the trust
-      // this endpoint exists to remove.
-      where: { userId },
-      data: UNTRUSTED,
-    });
+    const { count } = await this.prisma
+      .scoped(context)
+      .deviceSession.updateMany({
+        // Not filtered by `liveSession()`: a spent or expired row can still carry
+        // a live `deviceTokenHash`, and trust outlives the session it was granted
+        // on by design (30 days vs 7). Missing those rows would leave the trust
+        // this endpoint exists to remove.
+        where: { userId },
+        data: UNTRUSTED,
+      });
 
     return { untrustedCount: count };
   }
@@ -206,7 +212,7 @@ export class SessionsService {
   ): Promise<ListSessionsResponse> {
     await this.requireTenantUser(request.userId, context);
 
-    const sessions = await this.prisma.deviceSession.findMany({
+    const sessions = await this.prisma.scoped(context).deviceSession.findMany({
       where: { userId: request.userId, ...liveSession() },
       select: SESSION_FIELDS,
       orderBy: { createdAt: 'desc' },
@@ -293,12 +299,16 @@ export class SessionsService {
    * first: once the rows are gone nothing names them.
    */
   async deleteAndMark(where: Prisma.DeviceSessionWhereInput): Promise<number> {
-    const families = await this.prisma.deviceSession.findMany({
-      where,
-      select: { familyId: true },
-      distinct: ['familyId'],
-    });
-    const { count } = await this.prisma.deviceSession.deleteMany({ where });
+    const families = await this.prisma
+      .unscoped('own account')
+      .deviceSession.findMany({
+        where,
+        select: { familyId: true },
+        distinct: ['familyId'],
+      });
+    const { count } = await this.prisma
+      .unscoped('own account')
+      .deviceSession.deleteMany({ where });
     await this.revoked.mark(families.map(({ familyId }) => familyId));
     return count;
   }
@@ -316,10 +326,12 @@ export class SessionsService {
   ): Promise<string | null> {
     if (!refreshToken) return null;
 
-    const session = await this.prisma.deviceSession.findUnique({
-      where: { refreshTokenHash: hashToken(refreshToken) },
-      select: { familyId: true },
-    });
+    const session = await this.prisma
+      .unscoped('own account')
+      .deviceSession.findUnique({
+        where: { refreshTokenHash: hashToken(refreshToken) },
+        select: { familyId: true },
+      });
 
     return session?.familyId ?? null;
   }
@@ -335,7 +347,7 @@ export class SessionsService {
     userId: string,
     context: CallerContext,
   ): Promise<{ email: string; fullName: string }> {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.scoped(context).user.findFirst({
       where: { id: userId, ...tenantScope(context) },
       select: { email: true, fullName: true },
     });

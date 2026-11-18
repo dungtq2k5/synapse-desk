@@ -8,6 +8,7 @@ import {
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
+import { systemContext } from '@synapsedesk/contracts';
 
 /** How many trailing days a routine run recomputes. */
 const DEFAULT_TRAILING_DAYS = 2;
@@ -146,7 +147,9 @@ export class TicketRollupJob {
    * than with activity.
    */
   private async activeTenants(window: RollupWindow): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ organization_id: string }[]>`
+    const rows = await this.prisma.unscoped('cross-tenant job').$queryRaw<
+      { organization_id: string }[]
+    >`
       SELECT DISTINCT organization_id FROM tickets
       WHERE deleted_at IS NULL
         AND (
@@ -181,11 +184,12 @@ export class TicketRollupJob {
     timezone: string,
     window: RollupWindow,
   ): Promise<number> {
-    const [, inserted] = await this.prisma.$transaction([
+    const db = this.prisma.scoped(systemContext(organizationId));
+    const [, inserted] = await db.$transaction([
       // The days this window can touch, cleared first. Bounded by the same
       // timezone cast the insert uses, so the two agree by construction rather
       // than by arithmetic done twice.
-      this.prisma.$executeRawUnsafe(
+      db.$executeRawUnsafe(
         `
         DELETE FROM ticket_daily_stats
         WHERE organization_id = $1::uuid
@@ -197,7 +201,7 @@ export class TicketRollupJob {
         window.until,
         timezone,
       ),
-      this.prisma.$executeRawUnsafe(
+      db.$executeRawUnsafe(
         `
       WITH bounds AS (
         SELECT $1::uuid AS org, $2::timestamptz AS since, $3::timestamptz AS until
@@ -391,8 +395,9 @@ export class TicketRollupJob {
     timezone: string,
     window: RollupWindow,
   ): Promise<number> {
-    const [, inserted] = await this.prisma.$transaction([
-      this.prisma.$executeRawUnsafe(
+    const db = this.prisma.scoped(systemContext(organizationId));
+    const [, inserted] = await db.$transaction([
+      db.$executeRawUnsafe(
         `
         DELETE FROM agent_daily_stats
         WHERE organization_id = $1::uuid
@@ -404,7 +409,7 @@ export class TicketRollupJob {
         window.until,
         timezone,
       ),
-      this.prisma.$executeRawUnsafe(
+      db.$executeRawUnsafe(
         `
       WITH bounds AS (
         SELECT $1::uuid AS org, $2::timestamptz AS since, $3::timestamptz AS until

@@ -13,9 +13,10 @@ import {
   BudgetDecision,
   estimateCostMicros,
   QUOTA_ALERT_THRESHOLDS,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { isSameText, withHttpStatus } from '@synapsedesk/core';
-import { formatErrorMsg, requireTenant } from '@synapsedesk/nest-common';
+import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { QuotaCounterService } from './quota-counter.service';
@@ -216,25 +217,29 @@ export class AiLedgerService {
 
     const costMicros = this.safeCost(entry);
 
-    void this.prisma.aiGeneration
-      .create({
-        data: {
-          id,
-          organizationId: entry.organizationId,
-          userId: entry.userId ?? null,
-          ticketId: entry.ticketId ?? null,
-          purpose: entry.purpose,
-          modelName: entry.modelName,
-          promptTokens: entry.promptTokens,
-          completionTokens: entry.completionTokens,
-          estimatedCostMicros: costMicros,
-          latencyMs: entry.latencyMs ?? null,
-          status: entry.status ?? AiGenerationStatus.SUCCESS,
-          content: entry.content ?? null,
-          retrievedChunkIds: entry.retrievedChunkIds ?? [],
-          citedChunkIds: entry.citedChunkIds ?? [],
-        },
-      })
+    const db = this.prisma.scoped(systemContext(entry.organizationId));
+
+    void this.ownChunks(db, entry)
+      .then(({ retrieved, cited }) =>
+        db.aiGeneration.create({
+          data: {
+            id,
+            organizationId: entry.organizationId,
+            userId: entry.userId ?? null,
+            ticketId: entry.ticketId ?? null,
+            purpose: entry.purpose,
+            modelName: entry.modelName,
+            promptTokens: entry.promptTokens,
+            completionTokens: entry.completionTokens,
+            estimatedCostMicros: costMicros,
+            latencyMs: entry.latencyMs ?? null,
+            status: entry.status ?? AiGenerationStatus.SUCCESS,
+            content: entry.content ?? null,
+            retrievedChunkIds: retrieved,
+            citedChunkIds: cited,
+          },
+        }),
+      )
       .catch((error: unknown) => {
         // Swallowed and logged, like `AuditPublisher`. The consequence is
         // honest: the Redis counter and `SUM()` will now DISAGREE, and
@@ -247,6 +252,44 @@ export class AiLedgerService {
       });
 
     return id;
+  }
+
+  /**
+   * The entry's chunk ids, narrowed to chunks of its own tenant.
+   *
+   * The ids come from a service-to-service caller, and the chunk-usage
+   * projection counts them onto the chunks they name; another tenant's id
+   * would be counted on that tenant's chunk. Dropped, and logged, because a
+   * caller sending one is a bug upstream.
+   */
+  private async ownChunks(
+    db: ReturnType<PrismaService['scoped']>,
+    entry: AiGenerationEntry,
+  ): Promise<{ retrieved: string[]; cited: string[] }> {
+    const retrieved = entry.retrievedChunkIds ?? [];
+    const cited = entry.citedChunkIds ?? [];
+    const named = [...new Set([...retrieved, ...cited])];
+    if (named.length === 0) return { retrieved, cited };
+
+    const own = new Set(
+      (
+        await db.documentChunk.findMany({
+          where: { id: { in: named } },
+          select: { id: true },
+        })
+      ).map((chunk) => chunk.id),
+    );
+    const foreign = named.filter((chunkId) => !own.has(chunkId));
+    if (foreign.length > 0) {
+      this.logger.warn(
+        `Generation for ${entry.organizationId} named ${foreign.length} chunk(s) outside its tenant; dropped`,
+      );
+    }
+
+    return {
+      retrieved: retrieved.filter((chunkId) => own.has(chunkId)),
+      cited: cited.filter((chunkId) => own.has(chunkId)),
+    };
   }
 
   /**
@@ -304,12 +347,9 @@ export class AiLedgerService {
     },
     context: CallerContext,
   ): Promise<AiGenerationOutcome> {
-    const where = {
-      id: reply.generationId,
-      organizationId: requireTenant(context),
-      ticketId: reply.ticketId,
-    };
-    const generation = await this.prisma.aiGeneration.findFirst({
+    const db = this.prisma.scoped(context);
+    const where = { id: reply.generationId, ticketId: reply.ticketId };
+    const generation = await db.aiGeneration.findFirst({
       where,
       select: { content: true },
     });
@@ -324,7 +364,7 @@ export class AiLedgerService {
       ? AiGenerationOutcome.ACCEPTED
       : AiGenerationOutcome.EDITED;
 
-    await this.prisma.aiGeneration.updateMany({
+    await db.aiGeneration.updateMany({
       where,
       data: { outcome, resultingMessageId: reply.resultingMessageId },
     });
@@ -336,13 +376,12 @@ export class AiLedgerService {
     organizationId: string,
     billingCycleStart: Date,
   ): Promise<bigint> {
-    const result = await this.prisma.aiGeneration.aggregate({
-      where: {
-        organizationId,
-        createdAt: { gte: billingCycleStart },
-      },
-      _sum: { estimatedCostMicros: true },
-    });
+    const result = await this.prisma
+      .scoped(systemContext(organizationId))
+      .aiGeneration.aggregate({
+        where: { createdAt: { gte: billingCycleStart } },
+        _sum: { estimatedCostMicros: true },
+      });
 
     const trueSpend = result._sum.estimatedCostMicros ?? 0n;
     await this.counter.reconcile(organizationId, billingCycleStart, trueSpend);

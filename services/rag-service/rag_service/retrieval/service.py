@@ -29,7 +29,7 @@ from datetime import datetime
 import asyncpg
 from qdrant_client import AsyncQdrantClient
 
-from rag_service.common.caller_context import CallerContext
+from rag_service.common.caller_context import CallerContext, require_tenant
 from rag_service.embeddings import EmbeddingClient
 from rag_service.enums import AiGenerationPurpose
 from rag_service.ledger.client import GenerationEntry, LedgerClient
@@ -171,7 +171,7 @@ class RetrievalService:
         # There is no cheaper arrangement — ranking a candidate requires reading
         # it, so every candidate's text has to be in hand before the ranking,
         # whichever component does the fetching.
-        hydrated = await self._hydrate(fused)
+        hydrated = await self._hydrate(fused, require_tenant(ctx))
 
         chunks = (
             hydrated[:final_k]
@@ -275,17 +275,19 @@ class RetrievalService:
 
         return results
 
-    async def _hydrate(self, selected: list[FusedChunk]) -> list[HydratedChunk]:
+    async def _hydrate(
+        self, selected: list[FusedChunk], organization_id: str
+    ) -> list[HydratedChunk]:
         """Fetches the citation payload from Postgres in ONE query.
 
         Qdrant carries only what the filter needs; the title, page number and
         text live in `document_chunks` and `documents`. Fetching them per result
         would be N+1 on the hot path of every question.
 
-        **Re-checks nothing.** These ids came through `tenant_scope()` on both
-        arms; re-applying the boundary here would suggest the earlier
-        application was not trusted, and a reviewer who believes there are two
-        checks will eventually weaken one of them.
+        **Bound to the caller's tenant as well.** The ids came through
+        `tenant_scope()` on both arms; the tenant clause keeps a chunk of
+        another tenant out of the answer even if a later change hands this
+        function ids from somewhere else.
 
         **Reads staged rows too, on purpose.** Ingestion's swap flips Qdrant
         first and Postgres second, so for that moment the vector arm returns
@@ -312,8 +314,10 @@ class RetrievalService:
                 FROM document_chunks c
                 JOIN documents d ON d.id = c.document_id
                 WHERE c.id = ANY($1::uuid[])
+                  AND c.organization_id = $2::uuid
                 """,
                 list(by_chunk_id),
+                organization_id,
             )
 
         hydrated = [

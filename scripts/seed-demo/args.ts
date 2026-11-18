@@ -57,3 +57,50 @@ export function parseArgs(argv: string[]): Args {
     seed,
   };
 }
+
+/** What a guard needs to know about the databases before an `--apply`. */
+export type SeedState = {
+  /** Organizations already in `postgres_auth`. */
+  organizations: number;
+  /** The seed the previous run used, from its manifest; absent with none. */
+  previousSeed: number | undefined;
+};
+
+/**
+ * Why this run must not apply, or `null`.
+ *
+ * Both guards protect against minting tenants: a second full run doubles the
+ * demo, and `--force` at the previous seed regenerates its slugs, which are
+ * unique. **A `--only` run of any step but `auth` mints none** (it reads the
+ * last run's manifest), so neither applies to it; a step that would double
+ * its own rows refuses through `rerunRefusal` instead.
+ *
+ * @example applyRefusal(parseArgs(['--apply', '--only=analytics']), { organizations: 5, previousSeed: DEFAULT_SEED }) // null
+ */
+export function applyRefusal(args: Args, state: SeedState): string | null {
+  if (!args.apply) return null;
+  if (args.only && args.only !== 'auth') return null;
+
+  if (!args.force && state.organizations > 0) {
+    return `postgres_auth already holds ${state.organizations} organization(s). This seeder is ADDITIVE — a second run doubles the demo and pushes the first run's tenants over their seat limits. Re-run with --force --seed=<a different number>, or reset with 'npm run db:reset'.`;
+  }
+  if (args.force && state.previousSeed === args.seed) {
+    return `--force at seed ${args.seed} would regenerate the previous run's tenants exactly — the last run used that seed, and same seed + same counters means the same slugs, which are globally unique. Pass --seed=<a different number>.`;
+  }
+
+  return null;
+}
+
+/**
+ * Why a step that writes its rows once must not run again, or `null`.
+ *
+ * @example rerunRefusal('ticket', 152) // "The ticket step already wrote 152 row(s) …"
+ */
+export function rerunRefusal(
+  service: SeedService,
+  existing: number,
+): string | null {
+  if (existing === 0) return null;
+
+  return `The ${service} step already wrote ${existing} row(s) for the manifest's tenants; running it again would double them. Reset with 'npm run db:reset' and seed again.`;
+}

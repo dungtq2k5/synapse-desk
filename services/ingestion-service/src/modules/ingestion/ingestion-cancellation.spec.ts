@@ -21,13 +21,24 @@ import {
  * observable directly.
  */
 describe('IngestionProcessor cancellation (unit)', () => {
-  /** `setJobStatus` is private, and the mechanism is what is under test. */
-  const setJobStatus = (processor: IngestionProcessor) =>
-    (
-      processor as unknown as {
-        setJobStatus: (id: string, status: IngestionJobStatus) => Promise<void>;
-      }
-    ).setJobStatus.bind(processor);
+  /**
+   * `setJobStatus` is private, and the mechanism is what is under test. It
+   * runs on the client it's handed, here the mock the processor holds.
+   */
+  const setJobStatus =
+    (processor: IngestionProcessor) =>
+    (id: string, status: IngestionJobStatus): Promise<void> => {
+      const inner = processor as unknown as {
+        prisma: unknown;
+        setJobStatus: (
+          id: string,
+          status: IngestionJobStatus,
+          client: unknown,
+        ) => Promise<void>;
+      };
+
+      return inner.setJobStatus(id, status, inner.prisma);
+    };
 
   const processorWith = (updateMany: jest.Mock) =>
     Object.assign(Object.create(IngestionProcessor.prototype), {

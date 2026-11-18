@@ -25,6 +25,7 @@ import {
   FEEDBACK_SORTABLE_FIELDS,
   FeedbackRating,
   MAX_MESSAGE_CONTENT_LENGTH,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   parseAnalyticsRange,
@@ -98,30 +99,32 @@ export class FeedbackService {
       context,
     );
 
-    const feedback = await this.prisma.aiResponseFeedback.upsert({
-      where: {
-        ticketMessageId_userId: {
+    const feedback = await this.prisma
+      .scoped(context)
+      .aiResponseFeedback.upsert({
+        where: {
+          ticketMessageId_userId: {
+            ticketMessageId: request.ticketMessageId,
+            userId,
+          },
+        },
+        create: {
           ticketMessageId: request.ticketMessageId,
           userId,
+          organizationId,
+          rating,
+          feedbackText,
+          citationAccurate: request.citationAccurate ?? null,
         },
-      },
-      create: {
-        ticketMessageId: request.ticketMessageId,
-        userId,
-        organizationId,
-        rating,
-        feedbackText,
-        citationAccurate: request.citationAccurate ?? null,
-      },
-      // `organizationId` and `userId` are deliberately NOT updatable — they
-      // identify the row, and letting an update move either would let a resubmit
-      // re-home somebody else's feedback.
-      update: {
-        rating,
-        feedbackText,
-        citationAccurate: request.citationAccurate ?? null,
-      },
-    });
+        // `organizationId` and `userId` are deliberately NOT updatable — they
+        // identify the row, and letting an update move either would let a resubmit
+        // re-home somebody else's feedback.
+        update: {
+          rating,
+          feedbackText,
+          citationAccurate: request.citationAccurate ?? null,
+        },
+      });
 
     return toFeedbackResponse(feedback, ticket);
   }
@@ -151,14 +154,16 @@ export class FeedbackService {
       context,
     );
 
-    const feedback = await this.prisma.aiResponseFeedback.findUnique({
-      where: {
-        ticketMessageId_userId: {
-          ticketMessageId: request.ticketMessageId,
-          userId,
+    const feedback = await this.prisma
+      .scoped(context)
+      .aiResponseFeedback.findUnique({
+        where: {
+          ticketMessageId_userId: {
+            ticketMessageId: request.ticketMessageId,
+            userId,
+          },
         },
-      },
-    });
+      });
 
     // The tenant check that `assertMessageVisible` cannot make: it proved the
     // MESSAGE is the caller's to see, and this row is keyed on (message, user).
@@ -184,15 +189,17 @@ export class FeedbackService {
   ): Promise<WithdrawFeedbackResponse> {
     const userId = requireActor(context);
 
-    const existing = await this.prisma.aiResponseFeedback.findUnique({
-      where: {
-        ticketMessageId_userId: {
-          ticketMessageId: request.ticketMessageId,
-          userId,
+    const existing = await this.prisma
+      .scoped(context)
+      .aiResponseFeedback.findUnique({
+        where: {
+          ticketMessageId_userId: {
+            ticketMessageId: request.ticketMessageId,
+            userId,
+          },
         },
-      },
-      select: { id: true, organizationId: true },
-    });
+        select: { id: true, organizationId: true },
+      });
 
     // NOT_FOUND both when nothing exists and when it belongs to another tenant.
     if (existing?.organizationId !== requireTenant(context)) {
@@ -207,7 +214,9 @@ export class FeedbackService {
     // then had to remember to exclude would be a filter waiting to be forgotten
     // in one query. There is also nothing here worth an audit trail — the row
     // is one user's opinion about a machine.
-    await this.prisma.aiResponseFeedback.delete({ where: { id: existing.id } });
+    await this.prisma
+      .scoped(context)
+      .aiResponseFeedback.delete({ where: { id: existing.id } });
 
     return {};
   }
@@ -240,7 +249,8 @@ export class FeedbackService {
       });
     }
 
-    const rows = await this.prisma.$queryRaw<
+    const rows = await this.prisma.scoped(systemContext(organizationId))
+      .$queryRaw<
       {
         document_id: string;
         ratings: number;
@@ -335,11 +345,13 @@ export class FeedbackService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.aiResponseFeedback.findMany({ where, orderBy, skip, take }),
-      this.prisma.aiResponseFeedback.count({ where }),
+      this.prisma
+        .scoped(context)
+        .aiResponseFeedback.findMany({ where, orderBy, skip, take }),
+      this.prisma.scoped(context).aiResponseFeedback.count({ where }),
     ]);
 
-    const tickets = await this.ticketsOf(items);
+    const tickets = await this.ticketsOf(items, context);
 
     return {
       items: items.map((item) =>
@@ -398,8 +410,9 @@ export class FeedbackService {
    */
   private async ticketsOf(
     items: AiResponseFeedback[],
+    context: CallerContext,
   ): Promise<Map<string, RatedTicket>> {
-    const messages = await this.prisma.ticketMessage.findMany({
+    const messages = await this.prisma.scoped(context).ticketMessage.findMany({
       where: { id: { in: items.map((item) => item.ticketMessageId) } },
       select: {
         id: true,
@@ -413,7 +426,7 @@ export class FeedbackService {
     ticketMessageId: string,
     context: CallerContext,
   ): Promise<RatedTicket> {
-    const message = await this.prisma.ticketMessage.findUnique({
+    const message = await this.prisma.scoped(context).ticketMessage.findUnique({
       where: { id: ticketMessageId },
       select: { ticketId: true, isInternalNote: true },
     });

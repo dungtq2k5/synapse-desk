@@ -88,6 +88,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     private readonly configService: ConfigService,
   ) {}
 
+  /** Schema objects and the seed cross every tenant by nature. */
+  private get db() {
+    return this.prisma.unscoped('schema');
+  }
+
   async onApplicationBootstrap(): Promise<void> {
     try {
       // **The hook ASSERTS; it no longer applies.** Schema objects are created
@@ -202,7 +207,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       ? null
       : await this.hashSuperAdminPassword();
 
-    const summary = await this.prisma.$transaction(
+    const summary = await this.db.$transaction(
       async (tx) => {
         // Serialize concurrently-booting replicas. Without this, two processes
         // both pass the "does it exist?" checks below and race to insert; the
@@ -311,7 +316,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * password is read only when it will be used.
    */
   private async superAdminExists(): Promise<boolean> {
-    const existing = await this.prisma.user.findFirst({
+    const existing = await this.db.user.findFirst({
       where: {
         email: normalizeEmail(
           this.configService.getOrThrow<string>('SUPER_ADMIN_EMAIL'),
@@ -364,7 +369,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * run of the schema step (`npm run db:apply`) reproduces a complete schema.
    */
   private async applyPartialIndexes(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       -- Belt-and-braces: removing @unique makes db push drop this, but a
       -- database predating the schema change still carries it.
       DROP INDEX IF EXISTS "users_email_key";
@@ -439,7 +444,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * See `docs/decisions/0027-lock-state-is-constrained-not-conventional.md`.
    */
   private async applyCheckConstraints(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       DO $$
       BEGIN
         IF NOT EXISTS (
@@ -472,7 +477,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * creates nor keeps a hand-written trigger.
    */
   private async applyTriggers(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE OR REPLACE FUNCTION organizations_stamp_status_change()
       RETURNS trigger AS $$
       BEGIN
@@ -483,7 +488,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       END
       $$ LANGUAGE plpgsql;
     `);
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE OR REPLACE TRIGGER organizations_status_changed_at
         BEFORE UPDATE OF status ON organizations
         FOR EACH ROW EXECUTE FUNCTION organizations_stamp_status_change();
@@ -502,7 +507,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   async assertSchemaExists(): Promise<void> {
     const expected = ['roles', 'users', 'permissions', 'organizations'];
 
-    const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`
+    const rows = await this.db.$queryRaw<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = ANY(${expected})
     `;
@@ -534,7 +539,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * fresh Docker volume — exactly the audience least able to interpret it.
    */
   private async ensureGlobalRoleNameIndex(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(
+    await this.db.$executeRawUnsafe(
       `CREATE UNIQUE INDEX IF NOT EXISTS roles_global_name_key
          ON roles (name)
          WHERE organization_id IS NULL`,

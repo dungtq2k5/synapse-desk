@@ -652,6 +652,30 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       expect(second.citationCount).toBe(0);
     });
 
+    it('**a generation of another tenant naming this chunk** counts nothing on it', async () => {
+      const document = await documentWithChunks(1);
+      const [chunk] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+
+      await seedCursor(new Date(Date.now() - HOUR));
+      await fx.prisma.aiGeneration.create({
+        data: {
+          organizationId: buildTenant().organizationId,
+          purpose: AiGenerationPurpose.CHAT_ANSWER,
+          modelName: GENERATION_MODEL_BY_TIER.FAST,
+          retrievedChunkIds: [chunk.id],
+          citedChunkIds: [chunk.id],
+        },
+      });
+
+      await projection.project(new Date(Date.now() + HOUR));
+
+      await expect(
+        fx.prisma.documentChunk.findUniqueOrThrow({ where: { id: chunk.id } }),
+      ).resolves.toMatchObject({ retrievalCount: 0, citationCount: 0 });
+    });
+
     it('7. **A generation is counted by exactly ONE run** — the cursor, not a window', async () => {
       // The cursor makes consecutive intervals abut by construction; the
       // boundary row belongs to exactly one run. Asserted below.

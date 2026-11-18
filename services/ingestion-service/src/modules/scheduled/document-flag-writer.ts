@@ -11,6 +11,7 @@ import {
   LOW_CITATION_RATE,
   NEGATIVE_FEEDBACK_MIN_DOWNVOTES,
   UNCITED_MIN_RETRIEVALS,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import type { CitedDocumentFeedback } from '@synapsedesk/grpc-proto';
@@ -136,18 +137,20 @@ export class DocumentFlagWriter {
    * only: an update's staged chunks start at 0.
    */
   private async liveCounters(organizationId: string): Promise<Counters[]> {
-    const groups = await this.prisma.documentChunk.groupBy({
-      by: ['documentId'],
-      where: {
-        isStaged: false,
-        document: {
-          organizationId,
-          deletedAt: null,
-          status: DocumentStatus.INDEXED,
+    const groups = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentChunk.groupBy({
+        by: ['documentId'],
+        where: {
+          isStaged: false,
+          document: {
+            organizationId,
+            deletedAt: null,
+            status: DocumentStatus.INDEXED,
+          },
         },
-      },
-      _sum: { retrievalCount: true, citationCount: true },
-    });
+        _sum: { retrievalCount: true, citationCount: true },
+      });
 
     return groups.map((group) => ({
       documentId: group.documentId,
@@ -251,27 +254,29 @@ export class DocumentFlagWriter {
    */
   private async detectOutdated(organizationId: string): Promise<number> {
     const cutoff = daysAgo(DOCUMENT_REVIEW_DAYS);
-    const candidates = await this.prisma.document.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        status: DocumentStatus.INDEXED,
-        fileUpdatedAt: { lt: cutoff },
-      },
-      select: {
-        id: true,
-        fileUpdatedAt: true,
-        flags: {
-          where: {
-            flagType: DocumentFlagType.OUTDATED,
-            resolvedById: { not: null },
-            resolvedAt: { gte: cutoff },
-          },
-          select: { id: true },
-          take: 1,
+    const candidates = await this.prisma
+      .scoped(systemContext(organizationId))
+      .document.findMany({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: DocumentStatus.INDEXED,
+          fileUpdatedAt: { lt: cutoff },
         },
-      },
-    });
+        select: {
+          id: true,
+          fileUpdatedAt: true,
+          flags: {
+            where: {
+              flagType: DocumentFlagType.OUTDATED,
+              resolvedById: { not: null },
+              resolvedAt: { gte: cutoff },
+            },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      });
 
     return this.raise(
       organizationId,
@@ -318,15 +323,17 @@ export class DocumentFlagWriter {
 
     // ticket-service knows ids only; the flag goes on a document that still
     // answers.
-    const live = await this.prisma.document.findMany({
-      where: {
-        id: { in: flagged.map((document) => document.documentId) },
-        organizationId,
-        deletedAt: null,
-        status: DocumentStatus.INDEXED,
-      },
-      select: { id: true },
-    });
+    const live = await this.prisma
+      .scoped(systemContext(organizationId))
+      .document.findMany({
+        where: {
+          id: { in: flagged.map((document) => document.documentId) },
+          organizationId,
+          deletedAt: null,
+          status: DocumentStatus.INDEXED,
+        },
+        select: { id: true },
+      });
     const liveIds = new Set(live.map((document) => document.id));
 
     return this.raise(
@@ -376,24 +383,26 @@ export class DocumentFlagWriter {
     flagType: DocumentFlagType,
     relatedDocumentId?: string,
   ): Promise<number> {
-    const { count } = await this.prisma.documentFlag.updateMany({
-      where: {
-        organizationId,
-        documentId,
-        flagType,
-        resolvedAt: null,
-        ...(relatedDocumentId ? { relatedDocumentId } : {}),
-      },
-      data: {
-        resolvedAt: new Date(),
-        resolution: DocumentFlagResolution.FIXED,
-        // No actor: the pipeline closed this, not a person. Attributing it to
-        // anyone would put a name in a worklist beside a decision they did not
-        // make.
-        resolvedById: null,
-        resolutionComment: SYSTEM_RESOLUTION_COMMENT,
-      },
-    });
+    const { count } = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentFlag.updateMany({
+        where: {
+          organizationId,
+          documentId,
+          flagType,
+          resolvedAt: null,
+          ...(relatedDocumentId ? { relatedDocumentId } : {}),
+        },
+        data: {
+          resolvedAt: new Date(),
+          resolution: DocumentFlagResolution.FIXED,
+          // No actor: the pipeline closed this, not a person. Attributing it to
+          // anyone would put a name in a worklist beside a decision they did not
+          // make.
+          resolvedById: null,
+          resolutionComment: SYSTEM_RESOLUTION_COMMENT,
+        },
+      });
 
     if (count > 0) {
       this.logger.log(
@@ -414,8 +423,8 @@ export class DocumentFlagWriter {
    * document go.
    */
   async redactConflict(flagId: string): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.documentFlag.updateMany({
+    await this.prisma.unscoped('job by row id').$transaction([
+      this.prisma.unscoped('job by row id').documentFlag.updateMany({
         where: { id: flagId, resolvedAt: null },
         data: {
           resolvedAt: new Date(),
@@ -424,7 +433,7 @@ export class DocumentFlagWriter {
           resolutionComment: SYSTEM_RESOLUTION_COMMENT,
         },
       }),
-      this.prisma.documentFlag.update({
+      this.prisma.unscoped('job by row id').documentFlag.update({
         where: { id: flagId },
         data: {
           detail: UNREADABLE_CONFLICT_DETAIL,
@@ -473,25 +482,27 @@ export class DocumentFlagWriter {
     // whose only row is `FIXED` would still be filtered out, which is the bug
     // this replaces. Only suppressing rows come back, so the `Set` is correct
     // by construction.
-    const suppressed = await this.prisma.documentFlag.findMany({
-      where: {
-        organizationId,
-        flagType,
-        documentId: { in: findings.map((finding) => finding.documentId) },
-        OR: [
-          // Already raised.
-          { resolvedAt: null },
-          // Dismissed recently. FIXED and DOCUMENT_REPLACED are absent ON
-          // PURPOSE: they assert the problem is GONE, so a detector that finds
-          // it again is reporting news rather than arguing with anyone.
-          {
-            resolution: DocumentFlagResolution.DISMISSED,
-            resolvedAt: { gte: daysAgo(DISMISSAL_SUPPRESSION_DAYS) },
-          },
-        ],
-      },
-      select: { documentId: true, relatedDocumentId: true },
-    });
+    const suppressed = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentFlag.findMany({
+        where: {
+          organizationId,
+          flagType,
+          documentId: { in: findings.map((finding) => finding.documentId) },
+          OR: [
+            // Already raised.
+            { resolvedAt: null },
+            // Dismissed recently. FIXED and DOCUMENT_REPLACED are absent ON
+            // PURPOSE: they assert the problem is GONE, so a detector that finds
+            // it again is reporting news rather than arguing with anyone.
+            {
+              resolution: DocumentFlagResolution.DISMISSED,
+              resolvedAt: { gte: daysAgo(DISMISSAL_SUPPRESSION_DAYS) },
+            },
+          ],
+        },
+        select: { documentId: true, relatedDocumentId: true },
+      });
 
     // Keyed by the related document too, so a document holds one
     // `CONFLICTING` flag per other document; every other type has none.
@@ -507,18 +518,20 @@ export class DocumentFlagWriter {
 
     if (fresh.length === 0) return 0;
 
-    const result = await this.prisma.documentFlag.createMany({
-      data: fresh.map((finding) => ({
-        organizationId,
-        documentId: finding.documentId,
-        flagType,
-        severity,
-        detail: finding.detail,
-        relatedDocumentId: finding.relatedDocumentId ?? null,
-        relatedChunkId: finding.relatedChunkId ?? null,
-        confidenceScore: finding.confidenceScore ?? null,
-      })),
-    });
+    const result = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentFlag.createMany({
+        data: fresh.map((finding) => ({
+          organizationId,
+          documentId: finding.documentId,
+          flagType,
+          severity,
+          detail: finding.detail,
+          relatedDocumentId: finding.relatedDocumentId ?? null,
+          relatedChunkId: finding.relatedChunkId ?? null,
+          confidenceScore: finding.confidenceScore ?? null,
+        })),
+      });
 
     this.logger.log(`Raised ${result.count} ${flagType} flag(s)`);
 

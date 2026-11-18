@@ -80,7 +80,7 @@ export class LedgerClientService implements OnModuleInit {
 
     if (isTransient(result.code)) {
       try {
-        await this.prisma.pendingDraftOutcome.upsert({
+        await this.prisma.scoped(context).pendingDraftOutcome.upsert({
           where: { generationId },
           create: { generationId, messageId: resultingMessageId, sentText },
           update: { messageId: resultingMessageId, sentText },

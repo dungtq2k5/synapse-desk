@@ -76,7 +76,7 @@ export class AiService {
   ): Promise<AiSummaryResponse> {
     const ticket = await this.access.load(request.ticketId, context);
 
-    const summary = await this.prisma.aiSummary.findUnique({
+    const summary = await this.prisma.scoped(context).aiSummary.findUnique({
       where: { ticketId: ticket.id },
     });
     if (!summary) {
@@ -108,14 +108,14 @@ export class AiService {
     // summary behind — and at the cap this is where the 402 comes from.
     const draft = await this.rag.generateSummary(
       ticket.id,
-      await this.transcript(ticket.id),
+      await this.transcript(ticket.id, context),
       context,
       // MANUAL. A discretionary summary refuses at the cap like everything
       // else; the escalation path below is the one exemption (RDM §1.14).
       false,
     );
 
-    const summary = await this.prisma.aiSummary.upsert({
+    const summary = await this.prisma.scoped(context).aiSummary.upsert({
       where: { ticketId: ticket.id },
       create: {
         ticketId: ticket.id,
@@ -193,7 +193,7 @@ export class AiService {
     try {
       draft = await this.rag.generateReplyDraft(
         ticket.id,
-        await this.transcript(ticket.id),
+        await this.transcript(ticket.id, context),
         context,
         undefined,
         attachments.parts,
@@ -206,7 +206,7 @@ export class AiService {
       // defence.
       //
       // Rethrown either way: the agent still gets the refusal. This records it.
-      await this.excludeRefused(ticket.id, error);
+      await this.excludeRefused(ticket.id, error, context);
       throw error;
     }
 
@@ -243,7 +243,7 @@ export class AiService {
 
     const suggestions = await this.rag.getSuggestions(
       request.ticketId,
-      await this.transcript(request.ticketId),
+      await this.transcript(request.ticketId, context),
       context,
       // What the ticket IS, which is what a recommendation should be about —
       // the same input `Classify` uses. The transcript above still drives the
@@ -338,12 +338,12 @@ export class AiService {
 
     const draft = await this.rag.generateSummary(
       ticket.id,
-      await this.transcript(ticket.id),
+      await this.transcript(ticket.id, context),
       context,
       triggeredByEscalation,
     );
 
-    const summary = await this.prisma.aiSummary.upsert({
+    const summary = await this.prisma.scoped(context).aiSummary.upsert({
       where: { ticketId: ticket.id },
       create: {
         ticketId: ticket.id,
@@ -374,8 +374,11 @@ export class AiService {
    * and are exactly the context a summary or a draft should have. They never
    * reach the customer, because the draft is reviewed before anything is sent.
    */
-  private async transcript(ticketId: string): Promise<ConversationTurn[]> {
-    const messages = await this.prisma.ticketMessage.findMany({
+  private async transcript(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<ConversationTurn[]> {
+    const messages = await this.prisma.scoped(context).ticketMessage.findMany({
       // **Refused messages never reach a prompt**.
       //
       // Filtered in the WHERE because this query is a dedicated transcript
@@ -422,11 +425,12 @@ export class AiService {
   private async excludeRefused(
     ticketId: string,
     error: unknown,
+    context: CallerContext,
   ): Promise<void> {
     if (!isDraftRefusal(error)) return;
 
     try {
-      await this.aiAttachments.markRefused(ticketId);
+      await this.aiAttachments.markRefused(ticketId, context);
     } catch (writeError) {
       this.logger.error(
         `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,

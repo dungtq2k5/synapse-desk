@@ -44,7 +44,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
       provide: GrpcHealthService,
       useFactory: (prisma: PrismaService, nats: ClientProxy, queue: Queue) =>
         new GrpcHealthService([
-          postgresProbe(prisma),
+          postgresProbe(prisma.unscoped('schema')),
           natsProbe(nats),
           // The backend's client is the connection BullMQ already holds, so this
           // opens nothing. `info()` rather than `ping()` because BullMQ's

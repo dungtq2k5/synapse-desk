@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { LimitAlertDimension } from '@synapsedesk/contracts';
 import type { GenerationStore } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
+import { systemContext } from '@synapsedesk/contracts';
 
 /**
  * The durable half of the alarm state, in this service's own database.
@@ -19,10 +20,12 @@ export class IngestionGenerationStore implements GenerationStore {
     organizationId: string,
     dimension: LimitAlertDimension,
   ): Promise<number> {
-    const row = await this.prisma.limitAlertGeneration.findUnique({
-      where: { organizationId_dimension: { organizationId, dimension } },
-      select: { generation: true },
-    });
+    const row = await this.prisma
+      .scoped(systemContext(organizationId))
+      .limitAlertGeneration.findUnique({
+        where: { organizationId_dimension: { organizationId, dimension } },
+        select: { generation: true },
+      });
 
     return row?.generation ?? 0;
   }
@@ -39,12 +42,14 @@ export class IngestionGenerationStore implements GenerationStore {
     organizationId: string,
     dimension: LimitAlertDimension,
   ): Promise<number> {
-    const row = await this.prisma.limitAlertGeneration.upsert({
-      where: { organizationId_dimension: { organizationId, dimension } },
-      create: { organizationId, dimension, generation: 1 },
-      update: { generation: { increment: 1 } },
-      select: { generation: true },
-    });
+    const row = await this.prisma
+      .scoped(systemContext(organizationId))
+      .limitAlertGeneration.upsert({
+        where: { organizationId_dimension: { organizationId, dimension } },
+        create: { organizationId, dimension, generation: 1 },
+        update: { generation: { increment: 1 } },
+        select: { generation: true },
+      });
 
     return row.generation;
   }

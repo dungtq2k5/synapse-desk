@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import type { DevicePlatform } from '@synapsedesk/contracts';
+import type { CallerContext, DevicePlatform } from '@synapsedesk/contracts';
+import { requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -32,7 +33,9 @@ export class DeviceTokenService {
     platform: DevicePlatform;
     deviceName?: string;
   }) {
-    return this.prisma.deviceToken.upsert({
+    // A token is unique across every tenant and moves to whoever signs in on
+    // that device, so the upsert can't be held to one tenant.
+    return this.prisma.unscoped('globally unique key').deviceToken.upsert({
       where: { token: input.token },
       create: {
         userId: input.userId,
@@ -51,8 +54,8 @@ export class DeviceTokenService {
   }
 
   /** This user's devices, for the settings screen and for the fan-out. */
-  listForUser(userId: string) {
-    return this.prisma.deviceToken.findMany({
+  listForUser(userId: string, context: CallerContext) {
+    return this.prisma.scoped(context).deviceToken.findMany({
       where: { userId },
       orderBy: { createdAt: 'asc' },
     });
@@ -67,9 +70,9 @@ export class DeviceTokenService {
    * `PERMISSION_DENIED` — the same rule as every other by-id route, so this
    * cannot be used as an existence oracle across users.
    */
-  async remove(id: string, userId: string): Promise<void> {
-    const deleted = await this.prisma.deviceToken.deleteMany({
-      where: { id, userId },
+  async remove(id: string, context: CallerContext): Promise<void> {
+    const deleted = await this.prisma.scoped(context).deviceToken.deleteMany({
+      where: { id, userId: requireActor(context) },
     });
 
     if (deleted.count === 0) {
@@ -81,10 +84,10 @@ export class DeviceTokenService {
   }
 
   /** Touched after a successful send, so the settings list can show staleness. */
-  async markUsed(tokens: string[]): Promise<void> {
+  async markUsed(tokens: string[], context: CallerContext): Promise<void> {
     if (tokens.length === 0) return;
 
-    await this.prisma.deviceToken.updateMany({
+    await this.prisma.scoped(context).deviceToken.updateMany({
       where: { token: { in: tokens } },
       data: { lastUsedAt: new Date() },
     });
@@ -99,10 +102,10 @@ export class DeviceTokenService {
    * catch-and-delete turns an FCM outage into every user silently losing push,
    * with no error and no way back except reinstalling the app.
    */
-  async prune(tokens: string[]): Promise<number> {
+  async prune(tokens: string[], context: CallerContext): Promise<number> {
     if (tokens.length === 0) return 0;
 
-    const { count } = await this.prisma.deviceToken.deleteMany({
+    const { count } = await this.prisma.scoped(context).deviceToken.deleteMany({
       where: { token: { in: tokens } },
     });
 

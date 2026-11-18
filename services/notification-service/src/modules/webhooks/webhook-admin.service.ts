@@ -62,10 +62,7 @@ export class WebhookAdminService {
   ) {}
 
   async list(context: CallerContext): Promise<ListWebhookEndpointsResponse> {
-    const organizationId = requireTenant(context);
-
-    const rows = await this.prisma.webhookEndpoint.findMany({
-      where: { organizationId },
+    const rows = await this.prisma.scoped(context).webhookEndpoint.findMany({
       orderBy: { createdAt: 'asc' },
     });
 
@@ -83,16 +80,14 @@ export class WebhookAdminService {
     request: CreateWebhookEndpointRequest,
     context: CallerContext,
   ): Promise<WebhookEndpointWithSecretResponse> {
-    const organizationId = requireTenant(context);
+    const db = this.prisma.scoped(context);
 
     this.assertUrl(request.url);
     const eventTypes = this.assertEventTypes(request.eventTypes);
 
     // A cap, not a plan dimension — this bounds abuse, not billing, so it is a
     // constant rather than a grant.
-    const existing = await this.prisma.webhookEndpoint.count({
-      where: { organizationId },
-    });
+    const existing = await db.webhookEndpoint.count();
 
     if (existing >= MAX_WEBHOOK_ENDPOINTS) {
       throw new RpcException({
@@ -103,9 +98,9 @@ export class WebhookAdminService {
 
     const secret = newSecret();
 
-    const row = await this.prisma.webhookEndpoint.create({
+    const row = await db.webhookEndpoint.create({
       data: {
-        organizationId,
+        organizationId: requireTenant(context),
         url: request.url,
         description: request.description ?? null,
         eventTypes,
@@ -141,7 +136,7 @@ export class WebhookAdminService {
         ? undefined
         : this.assertEventTypes(request.eventTypes.values);
 
-    const row = await this.prisma.webhookEndpoint.update({
+    const row = await this.prisma.scoped(context).webhookEndpoint.update({
       where: { id: current.id },
       data: {
         ...(request.url === undefined ? {} : { url: request.url }),
@@ -193,7 +188,9 @@ export class WebhookAdminService {
     // Hard delete, cascading the delivery history: an endpoint is a
     // credentialed integration, and "removed" meaning "still listed somewhere"
     // is the wrong surprise for a security surface.
-    await this.prisma.webhookEndpoint.delete({ where: { id: current.id } });
+    await this.prisma
+      .scoped(context)
+      .webhookEndpoint.delete({ where: { id: current.id } });
 
     this.audit.record(context, {
       action: AuditAction.WEBHOOK_ENDPOINT_DELETED,
@@ -212,7 +209,7 @@ export class WebhookAdminService {
     const current = await this.load(endpointId, context);
     const secret = newSecret();
 
-    const row = await this.prisma.webhookEndpoint.update({
+    const row = await this.prisma.scoped(context).webhookEndpoint.update({
       where: { id: current.id },
       data: {
         secret,
@@ -288,7 +285,7 @@ export class WebhookAdminService {
       WEBHOOK_DELIVERY_LIMIT.MAX,
     );
 
-    const rows = await this.prisma.webhookDelivery.findMany({
+    const rows = await this.prisma.scoped(context).webhookDelivery.findMany({
       where: { endpointId: current.id },
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -315,10 +312,8 @@ export class WebhookAdminService {
   // ---------------------------------------------------------------- Internals
 
   private async load(endpointId: string, context: CallerContext) {
-    const organizationId = requireTenant(context);
-
-    const row = await this.prisma.webhookEndpoint.findFirst({
-      where: { id: endpointId, organizationId },
+    const row = await this.prisma.scoped(context).webhookEndpoint.findFirst({
+      where: { id: endpointId },
     });
 
     if (!row) {

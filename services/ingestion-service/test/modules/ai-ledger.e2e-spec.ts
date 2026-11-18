@@ -26,7 +26,12 @@ import {
   bootstrapE2eTest,
   memberContext,
 } from '../utils';
-import { buildTenant, TenantFixture } from '../factories';
+import {
+  buildTenant,
+  createChunks,
+  createDocument,
+  TenantFixture,
+} from '../factories';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
 import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
 import {
@@ -450,8 +455,9 @@ describe('The AI ledger and quota gate (e2e)', () => {
     });
 
     it('2. SWALLOWS a write failure and still returns an id', async () => {
-      faults.fail(
-        fx.prisma.aiGeneration,
+      faults.failScoped(
+        fx.prisma,
+        'aiGeneration',
         'create',
         new Error('injected failure'),
       );
@@ -523,7 +529,15 @@ describe('The AI ledger and quota gate (e2e)', () => {
     it('7. carries the retrieved and cited chunk arrays', async () => {
       // `retrieved` empty is the knowledge-gap signal, and `cited` being a
       // strict subset is what makes UNCITED computable at all.
-      const retrieved = [faker.string.uuid(), faker.string.uuid()];
+      // Real chunks of the tenant's: a chunk id outside it is dropped (below).
+      const document = await createDocument(fx.prisma, tenant);
+      await createChunks(fx.prisma, document, 2);
+      const retrieved = (
+        await fx.prisma.documentChunk.findMany({
+          where: { documentId: document.id },
+          orderBy: { chunkIndex: 'asc' },
+        })
+      ).map((chunk) => chunk.id);
       ledger.record(
         entry({ retrievedChunkIds: retrieved, citedChunkIds: [retrieved[0]] }),
       );
@@ -532,6 +546,34 @@ describe('The AI ledger and quota gate (e2e)', () => {
       const row = await fx.prisma.aiGeneration.findFirstOrThrow();
       expect(row.retrievedChunkIds).toEqual(retrieved);
       expect(row.citedChunkIds).toEqual([retrieved[0]]);
+    });
+
+    it('**a chunk id outside the tenant is dropped**, so usage never counts on another tenant’s chunk', async () => {
+      const own = await createDocument(fx.prisma, tenant);
+      await createChunks(fx.prisma, own, 1);
+      const theirs = await createDocument(fx.prisma, buildTenant());
+      await createChunks(fx.prisma, theirs, 1);
+      const [mine] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: own.id },
+      });
+      const [foreign] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: theirs.id },
+      });
+
+      ledger.record(
+        entry({
+          retrievedChunkIds: [mine.id, foreign.id],
+          citedChunkIds: [foreign.id],
+        }),
+      );
+      await waitForRows(1);
+
+      await expect(
+        fx.prisma.aiGeneration.findFirstOrThrow(),
+      ).resolves.toMatchObject({
+        retrievedChunkIds: [mine.id],
+        citedChunkIds: [],
+      });
     });
 
     it('8. leaves userId NULL for system work', async () => {
@@ -561,8 +603,9 @@ describe('The AI ledger and quota gate (e2e)', () => {
       // working again BEFORE its own next assertion, so it is restored here as
       // well. `mockRestore()` twice is a no-op; not restoring at all would make
       // the reconciliation below write into a mock that always rejects.
-      const create = faults.fail(
-        fx.prisma.aiGeneration,
+      const create = faults.failScoped(
+        fx.prisma,
+        'aiGeneration',
         'create',
         new Error('injected failure'),
       );

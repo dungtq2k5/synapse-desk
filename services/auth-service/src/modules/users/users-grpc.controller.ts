@@ -35,6 +35,7 @@ import {
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
 import { UsersService } from './users.service';
+import { requireSelf } from '@synapsedesk/nest-common';
 
 @Controller()
 @UserServiceControllerMethods()
@@ -48,8 +49,13 @@ export class UsersGrpcController implements UserServiceController {
    * context exists to unpack — the id comes from the JWT the gateway has just
    * validated.
    */
-  getCurrentUser(request: GetCurrentUserRequest): Promise<CurrentUserResponse> {
-    return this.usersService.getCurrentUser(request.userId);
+  getCurrentUser(
+    request: GetCurrentUserRequest,
+    metadata?: Metadata,
+  ): Promise<CurrentUserResponse> {
+    return this.usersService.getCurrentUser(
+      requireSelf(unpackCallerContext(metadata), request.userId),
+    );
   }
 
   updateOwnProfile(

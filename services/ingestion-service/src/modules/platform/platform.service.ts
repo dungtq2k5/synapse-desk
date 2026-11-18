@@ -48,7 +48,7 @@ export class PlatformUsageService {
 
     if (ids.length === 0) return { usage: [] };
 
-    const rows = await this.prisma.document.groupBy({
+    const rows = await this.prisma.unscoped('platform').document.groupBy({
       by: ['organizationId'],
       where: { organizationId: { in: ids }, deletedAt: null },
       _sum: STORED_BYTES_SUM,

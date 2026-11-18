@@ -20,6 +20,7 @@ import {
   seederObjectNames,
 } from '@synapsedesk/testing/schema-objects';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
+import { failNextCreate } from '../utils/scoped-fault';
 import { InAppNotificationService } from '../../src/modules/in-app/in-app-notification.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
@@ -698,9 +699,7 @@ describe('In-app notification delivery (e2e)', () => {
       // Existing posture in `deliver()`, kept under the new fan-out. A fan-out
       // that aborts halfway is worse than one that loses a single row: the
       // recipients it never reached have no record anything was attempted.
-      const create = jest
-        .spyOn(fx.prisma.notification, 'create')
-        .mockRejectedValueOnce(new Error('injected failure'));
+      const restore = failNextCreate(fx.prisma, 'notification');
 
       try {
         const outcome = await inApp.deliver(quotaAlert(80));
@@ -708,7 +707,7 @@ describe('In-app notification delivery (e2e)', () => {
         expect(outcome.created).toBe(1);
         await expect(fx.prisma.notification.count()).resolves.toBe(1);
       } finally {
-        create.mockRestore();
+        restore();
       }
     });
 

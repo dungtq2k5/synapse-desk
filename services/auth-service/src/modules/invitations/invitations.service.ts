@@ -38,6 +38,7 @@ import {
   OrgStatus,
   RequestOrigin,
   WEB_ROUTES,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   isUniqueConstraintViolation,
@@ -124,14 +125,16 @@ export class InvitationsService {
     request: CreateInvitationsRequest,
     origin: RequestOrigin,
   ): Promise<CreateInvitationsResponse> {
-    const inviter = await this.prisma.user.findFirst({
-      where: {
-        id: request.invitedById,
-        organizationId: request.organizationId,
-        deletedAt: null,
-      },
-      select: { fullName: true },
-    });
+    const inviter = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .user.findFirst({
+        where: {
+          id: request.invitedById,
+          organizationId: request.organizationId,
+          deletedAt: null,
+        },
+        select: { fullName: true },
+      });
     if (!inviter) {
       throw new RpcException({
         code: status.PERMISSION_DENIED,
@@ -139,10 +142,12 @@ export class InvitationsService {
       });
     }
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: request.organizationId, deletedAt: null },
-      select: { id: true, name: true, maxAgentSeats: true },
-    });
+    const organization = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .organization.findFirst({
+        where: { id: request.organizationId, deletedAt: null },
+        select: { id: true, name: true, maxAgentSeats: true },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -212,14 +217,18 @@ export class InvitationsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.userInvitation.findMany({
-        where,
-        include: { invitedBy: { select: { fullName: true } } },
-        orderBy,
-        skip,
-        take,
-      }),
-      this.prisma.userInvitation.count({ where }),
+      this.prisma
+        .scoped(systemContext(request.organizationId))
+        .userInvitation.findMany({
+          where,
+          include: { invitedBy: { select: { fullName: true } } },
+          orderBy,
+          skip,
+          take,
+        }),
+      this.prisma
+        .scoped(systemContext(request.organizationId))
+        .userInvitation.count({ where }),
     ]);
 
     return {
@@ -253,10 +262,12 @@ export class InvitationsService {
     organizationId: string,
     invitations: PreviewInvitationsRequest['invitations'],
   ): Promise<PreviewInvitationsResponse> {
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      select: { maxAgentSeats: true },
-    });
+    const organization = await this.prisma
+      .scoped(systemContext(organizationId))
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        select: { maxAgentSeats: true },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -265,7 +276,7 @@ export class InvitationsService {
     }
 
     const seatsInUse = await this.organizationsService.seatsInUse(
-      this.prisma,
+      this.prisma.scoped(systemContext(organizationId)),
       organizationId,
     );
 
@@ -275,20 +286,22 @@ export class InvitationsService {
     // otherwise be 600 queries.
     const [existingUsers, pendingInvites, roles, departments] =
       await Promise.all([
-        this.prisma.user.findMany({
+        this.prisma.scoped(systemContext(organizationId)).user.findMany({
           where: { email: { in: emails }, organizationId, deletedAt: null },
           select: { email: true },
         }),
-        this.prisma.userInvitation.findMany({
-          where: {
-            email: { in: emails },
-            organizationId,
-            status: InvitationStatus.PENDING,
-            expiresAt: { gt: new Date() },
-          },
-          select: { email: true },
-        }),
-        this.prisma.role.findMany({
+        this.prisma
+          .scoped(systemContext(organizationId))
+          .userInvitation.findMany({
+            where: {
+              email: { in: emails },
+              organizationId,
+              status: InvitationStatus.PENDING,
+              expiresAt: { gt: new Date() },
+            },
+            select: { email: true },
+          }),
+        this.prisma.scoped(systemContext(organizationId)).role.findMany({
           where: {
             OR: [
               { organizationId },
@@ -297,7 +310,7 @@ export class InvitationsService {
           },
           select: { id: true },
         }),
-        this.prisma.department.findMany({
+        this.prisma.scoped(systemContext(organizationId)).department.findMany({
           where: { organizationId, deletedAt: null },
           select: { id: true },
         }),
@@ -368,13 +381,15 @@ export class InvitationsService {
   async getInvitation(
     request: GetInvitationRequest,
   ): Promise<InvitationResponse> {
-    const invitation = await this.prisma.userInvitation.findFirst({
-      where: {
-        id: request.invitationId,
-        organizationId: request.organizationId,
-      },
-      include: { invitedBy: { select: { fullName: true } } },
-    });
+    const invitation = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .userInvitation.findFirst({
+        where: {
+          id: request.invitationId,
+          organizationId: request.organizationId,
+        },
+        include: { invitedBy: { select: { fullName: true } } },
+      });
     if (!invitation) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -402,19 +417,21 @@ export class InvitationsService {
 
     const rawToken = generateSecureToken();
 
-    const updated = await this.prisma.userInvitation.update({
-      where: { id: invitation.id },
-      data: {
-        tokenHash: hashToken(rawToken),
-        resentCount: { increment: 1 },
-        lastSentAt: new Date(),
-        expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
-      },
-      include: {
-        organization: { select: { name: true } },
-        invitedBy: { select: { fullName: true } },
-      },
-    });
+    const updated = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .userInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          tokenHash: hashToken(rawToken),
+          resentCount: { increment: 1 },
+          lastSentAt: new Date(),
+          expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
+        },
+        include: {
+          organization: { select: { name: true } },
+          invitedBy: { select: { fullName: true } },
+        },
+      });
 
     this.audit.record(
       auditActor(request.organizationId, request.actorId, origin),
@@ -432,7 +449,10 @@ export class InvitationsService {
       data: {
         organizationName: updated.organization.name,
         inviterName: updated.invitedBy?.fullName ?? 'A colleague',
-        roleNames: await this.resolveRoleNames(updated.roleIds),
+        roleNames: await this.resolveRoleNames(
+          updated.roleIds,
+          updated.organizationId,
+        ),
         acceptUrl: this.acceptUrl(rawToken),
         expiresAt: updated.expiresAt.toISOString(),
         origin,
@@ -451,14 +471,16 @@ export class InvitationsService {
       request.organizationId,
     );
 
-    await this.prisma.userInvitation.update({
-      where: { id: invitation.id },
-      data: {
-        status: InvitationStatus.REVOKED,
-        revokedById: request.actorId,
-        revokedAt: new Date(),
-      },
-    });
+    await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .userInvitation.update({
+        where: { id: invitation.id },
+        data: {
+          status: InvitationStatus.REVOKED,
+          revokedById: request.actorId,
+          revokedAt: new Date(),
+        },
+      });
 
     this.audit.record(
       auditActor(request.organizationId, request.actorId, origin),
@@ -483,17 +505,19 @@ export class InvitationsService {
   async previewInvitation(
     request: PreviewInvitationRequest,
   ): Promise<PreviewInvitationResponse> {
-    const invitation = await this.prisma.userInvitation.findFirst({
-      where: {
-        tokenHash: hashToken(request.token),
-        status: InvitationStatus.PENDING,
-        expiresAt: { gt: new Date() },
-      },
-      include: {
-        organization: { select: { name: true } },
-        invitedBy: { select: { fullName: true } },
-      },
-    });
+    const invitation = await this.prisma
+      .unscoped('before a tenant')
+      .userInvitation.findFirst({
+        where: {
+          tokenHash: hashToken(request.token),
+          status: InvitationStatus.PENDING,
+          expiresAt: { gt: new Date() },
+        },
+        include: {
+          organization: { select: { name: true } },
+          invitedBy: { select: { fullName: true } },
+        },
+      });
     if (!invitation) return { valid: false, roleNames: [] };
 
     return {
@@ -503,7 +527,10 @@ export class InvitationsService {
       // Masked: the legitimate holder already knows the address, and a guesser
       // must not learn one.
       email: maskEmail(invitation.email),
-      roleNames: await this.resolveRoleNames(invitation.roleIds),
+      roleNames: await this.resolveRoleNames(
+        invitation.roleIds,
+        invitation.organizationId,
+      ),
       expiresAt: toProtoTimestamp(invitation.expiresAt),
     };
   }
@@ -527,137 +554,144 @@ export class InvitationsService {
     const skipped: string[] = [];
 
     try {
-      const userId = await this.prisma.$transaction(async (tx) => {
-        const invitation = await tx.userInvitation.findFirst({
-          where: {
-            tokenHash: hashToken(request.token),
-            status: InvitationStatus.PENDING,
-            expiresAt: { gt: new Date() },
-          },
-          include: {
-            organization: {
-              select: { id: true, status: true, maxAgentSeats: true },
+      const userId = await this.prisma
+        .unscoped('before a tenant')
+        .$transaction(async (tx) => {
+          const invitation = await tx.userInvitation.findFirst({
+            where: {
+              tokenHash: hashToken(request.token),
+              status: InvitationStatus.PENDING,
+              expiresAt: { gt: new Date() },
             },
-          },
-        });
-        // 410-shaped: used, revoked, expired and unknown are deliberately
-        // indistinguishable.
-        if (!invitation) {
-          throw new RpcException({
-            code: status.FAILED_PRECONDITION,
-            message: 'This invitation is no longer valid',
+            include: {
+              organization: {
+                select: { id: true, status: true, maxAgentSeats: true },
+              },
+            },
           });
-        }
+          // 410-shaped: used, revoked, expired and unknown are deliberately
+          // indistinguishable.
+          if (!invitation) {
+            throw new RpcException({
+              code: status.FAILED_PRECONDITION,
+              message: 'This invitation is no longer valid',
+            });
+          }
 
-        // The tenant lifecycle gate permits auth-only traffic on a FROZEN
-        // tenant, and joining one is not auth.
-        if (!JOINABLE_ORG_STATUSES.has(invitation.organization.status)) {
-          throw new RpcException({
-            code: status.PERMISSION_DENIED,
-            message: 'This workspace is not accepting new members',
+          // The tenant lifecycle gate permits auth-only traffic on a FROZEN
+          // tenant, and joining one is not auth.
+          if (!JOINABLE_ORG_STATUSES.has(invitation.organization.status)) {
+            throw new RpcException({
+              code: status.PERMISSION_DENIED,
+              message: 'This workspace is not accepting new members',
+            });
+          }
+
+          if (
+            (await this.organizationsService.seatsInUse(
+              tx,
+              invitation.organizationId,
+            )) >= invitation.organization.maxAgentSeats
+          ) {
+            throw noSeats(NO_SEATS_TO_JOIN_MESSAGE);
+          }
+
+          // They may have registered directly since the invite was sent.
+          const existing = await tx.user.findFirst({
+            where: {
+              email: invitation.email,
+              organizationId: invitation.organizationId,
+              deletedAt: null,
+            },
+            select: { id: true },
           });
-        }
+          if (existing) {
+            throw new RpcException({
+              code: status.ALREADY_EXISTS,
+              message: 'That address already has an account here',
+            });
+          }
 
-        if (
-          (await this.organizationsService.seatsInUse(
+          // Proposals are validated against live rows. Anything that no longer
+          // resolves is SKIPPED and reported — a department deleted on day 3 must
+          // not strand a legitimate invitee on day 6.
+          const roles = await tx.role.findMany({
+            where: {
+              id: { in: invitation.roleIds },
+              OR: [
+                { organizationId: invitation.organizationId },
+                { organizationId: null },
+              ],
+            },
+            select: { id: true },
+          });
+          const departments = await tx.department.findMany({
+            where: {
+              id: { in: invitation.departmentIds },
+              organizationId: invitation.organizationId,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+
+          const liveRoleIds = new Set(roles.map((role) => role.id));
+          const liveDepartmentIds = new Set(
+            departments.map((department) => department.id),
+          );
+          skipped.push(
+            ...invitation.roleIds.filter((id) => !liveRoleIds.has(id)),
+            ...invitation.departmentIds.filter(
+              (id) => !liveDepartmentIds.has(id),
+            ),
+          );
+
+          const user = await tx.user.create({
+            data: {
+              organizationId: invitation.organizationId,
+              email: invitation.email,
+              fullName: request.fullName,
+              passwordHash,
+              // Delivery to the address IS the ownership proof — the same one
+              // `otps` provides. A second challenge would be theatre.
+              isEmailVerified: true,
+            },
+            select: { id: true },
+          });
+
+          // Through RolesService rather than a `roles: { connect }` above,
+          // because `roles.user_assigned` is a denormalized counter that must be
+          // bumped in the SAME transaction as the junction write. Connecting
+          // inline left the count short by one on every accepted invitation —
+          // and that count is what gates DELETE /roles/:id.
+          await this.rolesService.grantRoles(
             tx,
+            user.id,
+            [...liveRoleIds],
             invitation.organizationId,
-          )) >= invitation.organization.maxAgentSeats
-        ) {
-          throw noSeats(NO_SEATS_TO_JOIN_MESSAGE);
-        }
+          );
 
-        // They may have registered directly since the invite was sent.
-        const existing = await tx.user.findFirst({
-          where: {
-            email: invitation.email,
-            organizationId: invitation.organizationId,
-            deletedAt: null,
-          },
-          select: { id: true },
-        });
-        if (existing) {
-          throw new RpcException({
-            code: status.ALREADY_EXISTS,
-            message: 'That address already has an account here',
+          if (liveDepartmentIds.size > 0) {
+            await tx.userDepartment.createMany({
+              data: [...liveDepartmentIds].map((departmentId) => ({
+                userId: user.id,
+                departmentId,
+                isPrimary: departmentId === invitation.primaryDepartmentId,
+                assignedById: invitation.invitedById,
+              })),
+            });
+          }
+
+          await tx.userInvitation.update({
+            where: { id: invitation.id },
+            data: {
+              status: InvitationStatus.ACCEPTED,
+              acceptedAt: new Date(),
+              acceptedUserId: user.id,
+            },
           });
-        }
 
-        // Proposals are validated against live rows. Anything that no longer
-        // resolves is SKIPPED and reported — a department deleted on day 3 must
-        // not strand a legitimate invitee on day 6.
-        const roles = await tx.role.findMany({
-          where: {
-            id: { in: invitation.roleIds },
-            OR: [
-              { organizationId: invitation.organizationId },
-              { organizationId: null },
-            ],
-          },
-          select: { id: true },
+          return user.id;
         });
-        const departments = await tx.department.findMany({
-          where: {
-            id: { in: invitation.departmentIds },
-            organizationId: invitation.organizationId,
-            deletedAt: null,
-          },
-          select: { id: true },
-        });
-
-        const liveRoleIds = new Set(roles.map((role) => role.id));
-        const liveDepartmentIds = new Set(
-          departments.map((department) => department.id),
-        );
-        skipped.push(
-          ...invitation.roleIds.filter((id) => !liveRoleIds.has(id)),
-          ...invitation.departmentIds.filter(
-            (id) => !liveDepartmentIds.has(id),
-          ),
-        );
-
-        const user = await tx.user.create({
-          data: {
-            organizationId: invitation.organizationId,
-            email: invitation.email,
-            fullName: request.fullName,
-            passwordHash,
-            // Delivery to the address IS the ownership proof — the same one
-            // `otps` provides. A second challenge would be theatre.
-            isEmailVerified: true,
-          },
-          select: { id: true },
-        });
-
-        // Through RolesService rather than a `roles: { connect }` above,
-        // because `roles.user_assigned` is a denormalized counter that must be
-        // bumped in the SAME transaction as the junction write. Connecting
-        // inline left the count short by one on every accepted invitation —
-        // and that count is what gates DELETE /roles/:id.
-        await this.rolesService.grantRoles(tx, user.id, [...liveRoleIds]);
-
-        if (liveDepartmentIds.size > 0) {
-          await tx.userDepartment.createMany({
-            data: [...liveDepartmentIds].map((departmentId) => ({
-              userId: user.id,
-              departmentId,
-              isPrimary: departmentId === invitation.primaryDepartmentId,
-              assignedById: invitation.invitedById,
-            })),
-          });
-        }
-
-        await tx.userInvitation.update({
-          where: { id: invitation.id },
-          data: {
-            status: InvitationStatus.ACCEPTED,
-            acceptedAt: new Date(),
-            acceptedUserId: user.id,
-          },
-        });
-
-        return user.id;
-      });
 
       // The invitee lands signed in rather than at a login form.
       const user = await this.authService.loadUserForAuth(userId);
@@ -694,13 +728,15 @@ export class InvitationsService {
    * Rows leave only with their tenant, via CASCADE.
    */
   async expireStaleInvitations(): Promise<ExpireStaleInvitationsResponse> {
-    const { count } = await this.prisma.userInvitation.updateMany({
-      where: {
-        status: InvitationStatus.PENDING,
-        expiresAt: { lt: new Date() },
-      },
-      data: { status: InvitationStatus.EXPIRED },
-    });
+    const { count } = await this.prisma
+      .unscoped('cross-tenant job')
+      .userInvitation.updateMany({
+        where: {
+          status: InvitationStatus.PENDING,
+          expiresAt: { lt: new Date() },
+        },
+        data: { status: InvitationStatus.EXPIRED },
+      });
 
     if (count > 0) {
       this.logger.log(`Expired ${count} stale invitation(s)`);
@@ -722,47 +758,49 @@ export class InvitationsService {
   }): Promise<UserInvitation> {
     const rawToken = generateSecureToken();
 
-    const invitation = await this.prisma.$transaction(async (tx) => {
-      // Already a member of THIS tenant. The same address in another tenant is
-      // fine and is the whole point of the feature.
-      const existingUser = await tx.user.findFirst({
-        where: {
-          email: context.email,
-          organizationId: context.organizationId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      if (existingUser) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'That address already has an account here',
+    const invitation = await this.prisma
+      .scoped(systemContext(context.organizationId))
+      .$transaction(async (tx) => {
+        // Already a member of THIS tenant. The same address in another tenant is
+        // fine and is the whole point of the feature.
+        const existingUser = await tx.user.findFirst({
+          where: {
+            email: context.email,
+            organizationId: context.organizationId,
+            deletedAt: null,
+          },
+          select: { id: true },
         });
-      }
+        if (existingUser) {
+          throw new RpcException({
+            code: status.ALREADY_EXISTS,
+            message: 'That address already has an account here',
+          });
+        }
 
-      if (
-        (await this.organizationsService.seatsInUse(
-          tx,
-          context.organizationId,
-        )) >= context.maxAgentSeats
-      ) {
-        throw noSeats(NO_SEATS_MESSAGE);
-      }
+        if (
+          (await this.organizationsService.seatsInUse(
+            tx,
+            context.organizationId,
+          )) >= context.maxAgentSeats
+        ) {
+          throw noSeats(NO_SEATS_MESSAGE);
+        }
 
-      return tx.userInvitation.create({
-        data: {
-          organizationId: context.organizationId,
-          email: context.email,
-          tokenHash: hashToken(rawToken),
-          roleIds: context.input.roleIds,
-          departmentIds: context.input.departmentIds,
-          primaryDepartmentId: context.input.primaryDepartmentId,
-          invitedById: context.invitedById,
-          batchId: context.batchId,
-          expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
-        },
+        return tx.userInvitation.create({
+          data: {
+            organizationId: context.organizationId,
+            email: context.email,
+            tokenHash: hashToken(rawToken),
+            roleIds: context.input.roleIds,
+            departmentIds: context.input.departmentIds,
+            primaryDepartmentId: context.input.primaryDepartmentId,
+            invitedById: context.invitedById,
+            batchId: context.batchId,
+            expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
+          },
+        });
       });
-    });
 
     // **The seat alarm, at the enforcement point.** The count was just read for
     // the refusal above, so the reading is nearly free — and it includes the
@@ -801,7 +839,10 @@ export class InvitationsService {
       },
     );
 
-    const roleNames = await this.resolveRoleNames(invitation.roleIds);
+    const roleNames = await this.resolveRoleNames(
+      invitation.roleIds,
+      invitation.organizationId,
+    );
 
     // The RAW token leaves the service exactly here, in a link. Only its hash
     // is stored.
@@ -826,13 +867,15 @@ export class InvitationsService {
     invitationId: string,
     organizationId: string,
   ): Promise<UserInvitation> {
-    const invitation = await this.prisma.userInvitation.findFirst({
-      where: {
-        id: invitationId,
-        organizationId,
-        status: InvitationStatus.PENDING,
-      },
-    });
+    const invitation = await this.prisma
+      .scoped(systemContext(organizationId))
+      .userInvitation.findFirst({
+        where: {
+          id: invitationId,
+          organizationId,
+          status: InvitationStatus.PENDING,
+        },
+      });
     if (!invitation) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -843,13 +886,18 @@ export class InvitationsService {
     return invitation;
   }
 
-  private async resolveRoleNames(roleIds: string[]): Promise<string[]> {
+  private async resolveRoleNames(
+    roleIds: string[],
+    organizationId: string,
+  ): Promise<string[]> {
     if (roleIds.length === 0) return [];
 
-    const roles = await this.prisma.role.findMany({
-      where: { id: { in: roleIds } },
-      select: { name: true },
-    });
+    const roles = await this.prisma
+      .scoped(systemContext(organizationId))
+      .role.findMany({
+        where: { id: { in: roleIds } },
+        select: { name: true },
+      });
 
     return roles.map((role) => role.name);
   }

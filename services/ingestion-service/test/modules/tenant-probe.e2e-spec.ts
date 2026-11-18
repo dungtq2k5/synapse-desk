@@ -209,7 +209,6 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
         retrievedChunkIds: [a.chunk],
         citedChunkIds: [a.chunk],
       }),
-      knownFailure: '11: records chunk ids without checking their tenant',
     },
     'AiLedgerService/RecordGenerationOutcome': {
       build: (a) => ({
@@ -238,6 +237,12 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
   afterAll(async () => fx.close());
 
   beforeEach(async () => fx.reset());
+
+  it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
+    expect(
+      Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
+    ).toEqual([]);
+  });
 
   it('**every id-taking RPC has a row**, and no row names an RPC that is gone', () => {
     expect(Object.keys(PROBE).sort()).toEqual(
@@ -270,33 +275,12 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
     });
   };
 
-  /** The rows that call an RPC, known failures or not. */
-  const runnable = (known: boolean) =>
-    methods.filter((method) => {
-      const row = PROBE[method.name];
-
-      return 'build' in row && Boolean(row.knownFailure) === known;
-    });
-
-  it.each(runnable(false).map((method) => [method.name, method] as const))(
+  it.each(
+    methods
+      .filter((method) => 'build' in PROBE[method.name])
+      .map((method) => [method.name, method] as const),
+  )(
     '**%s** as tenant B on A’s ids: answers as for a missing id, names nothing of A’s, changes nothing of A’s',
     probe,
-  );
-
-  // **Known failures**: the cross-tenant reaches the scoped client will
-  // close. Each passes while its finding is still true and FAILS the day it's
-  // fixed, which forces it off this list rather than letting it be forgotten.
-  it.failing.each(
-    runnable(true).map(
-      (method) =>
-        [
-          method.name,
-          (PROBE[method.name] as { knownFailure: string }).knownFailure,
-          method,
-        ] as const,
-    ),
-  )(
-    '**%s** is a known failure until the scoped client lands (finding %s)',
-    (name, _finding, method) => probe(name, method),
   );
 });

@@ -133,7 +133,8 @@ public class TwoFactorAuthController {
     Enrollee enrollee = enrolment.require(request);
 
     GenerateTwoFactorResponse response = withMetadata(
-      enrollee.origin()
+      enrollee.origin(),
+      enrollee.sub()
     ).generateTwoFactor(
       GenerateTwoFactorRequest.newBuilder().setUserId(enrollee.sub()).build()
     );
@@ -179,7 +180,8 @@ public class TwoFactorAuthController {
     }
 
     ActivateTwoFactorResponse response = withMetadata(
-      enrollee.origin()
+      enrollee.origin(),
+      enrollee.sub()
     ).activateTwoFactor(wire.build());
 
     if (!response.hasAccessToken()) {
@@ -310,7 +312,7 @@ public class TwoFactorAuthController {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
 
-    withMetadata(context.origin()).disableTwoFactor(
+    withMetadata(context.origin(), context.sub()).disableTwoFactor(
       DisableTwoFactorRequest.newBuilder()
         .setUserId(context.sub())
         .setCode(disableTwoFactorDto.getCode())
@@ -344,7 +346,8 @@ public class TwoFactorAuthController {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     RegenerateBackupCodesResponse response = withMetadata(
-      context.origin()
+      context.origin(),
+      context.sub()
     ).regenerateBackupCodes(
       RegenerateBackupCodesRequest.newBuilder()
         .setUserId(context.sub())
@@ -372,7 +375,8 @@ public class TwoFactorAuthController {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     BackupCodesStatusResponse response = withMetadata(
-      context.origin()
+      context.origin(),
+      context.sub()
     ).getBackupCodesStatus(
       BackupCodesStatusRequest.newBuilder().setUserId(context.sub()).build()
     );
@@ -428,6 +432,20 @@ public class TwoFactorAuthController {
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin))
+      );
+  }
+
+  /** The stub for a call about the caller's own account: their id travels too. */
+  private TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub withMetadata(
+    RequestOrigin origin,
+    String sub
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(
+          CallerMetadata.of(origin, sub)
+        )
       );
   }
 }

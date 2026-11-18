@@ -9,6 +9,7 @@ import {
   NotificationResourceType,
   NOTIFICATION_TYPES,
   EmailContent,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
@@ -176,7 +177,7 @@ export class InAppNotificationService {
         }
 
         if (outcome.notificationId) {
-          await this.recordInAppDelivery(outcome.notificationId);
+          await this.recordInAppDelivery(outcome.notificationId, command);
           this.realtime.publish(command, outcome, recipient.userId);
         }
       } catch (error) {
@@ -258,7 +259,7 @@ export class InAppNotificationService {
     }
 
     try {
-      const notification = await this.prisma.notification.create({
+      const notification = await this.db(command).notification.create({
         data: {
           organizationId: command.organizationId,
           recipientId,
@@ -328,7 +329,7 @@ export class InAppNotificationService {
     // `[1:GROUP_EVENT_WINDOW]` after the prepend keeps the newest ids and drops
     // the rest, so a thread with ten thousand replies does not carry ten
     // thousand ids on every increment.
-    const [updated] = await this.prisma.$queryRaw<{ id: string }[]>`
+    const [updated] = await this.db(command).$queryRaw<{ id: string }[]>`
       UPDATE notifications
       SET group_count = group_count + 1,
           -- Back to the top of the feed. A collapsed notification that stayed
@@ -342,7 +343,8 @@ export class InAppNotificationService {
           body = ${command.body}
       WHERE id = (
         SELECT id FROM notifications
-        WHERE recipient_id = ${recipientId}
+        WHERE organization_id = ${command.organizationId}::uuid
+          AND recipient_id = ${recipientId}
           AND group_key = ${command.groupKey}
           AND read_at IS NULL
           AND archived_at IS NULL
@@ -361,7 +363,7 @@ export class InAppNotificationService {
     // another event's group committed just after the UPDATE looked, so this
     // event isn't in it yet. Only the event's own id says which of the last
     // two: calling the third a duplicate loses the event.
-    const open = await this.prisma.notification.findFirst({
+    const open = await this.db(command).notification.findFirst({
       where: {
         recipientId,
         groupKey: command.groupKey,
@@ -387,11 +389,15 @@ export class InAppNotificationService {
    * is the answer to *"was I notified at all, and on what?"*, and a channel
    * missing from it reads as one that was never tried.
    */
-  private async recordInAppDelivery(notificationId: string): Promise<void> {
+  private async recordInAppDelivery(
+    notificationId: string,
+    command: CreateInAppNotificationCommand,
+  ): Promise<void> {
     await this.deliveries.recordSent(
       notificationId,
       NotificationChannel.IN_APP,
       { target: null, providerMessageId: null },
+      systemContext(command.organizationId),
     );
   }
 
@@ -497,6 +503,7 @@ export class InAppNotificationService {
             target: recipient.email,
             providerMessageId: result?.messageId ?? null,
           },
+          systemContext(command.organizationId),
         );
 
         sent += 1;
@@ -512,6 +519,7 @@ export class InAppNotificationService {
           await this.notificationIdFor(command, recipient.userId),
           NotificationChannel.EMAIL,
           { target: recipient.email, error: formatErrorMsg(error) },
+          systemContext(command.organizationId),
         );
       }
     }
@@ -611,7 +619,10 @@ export class InAppNotificationService {
         continue;
       }
 
-      const devices = await this.deviceTokens.listForUser(recipient.userId);
+      const devices = await this.deviceTokens.listForUser(
+        recipient.userId,
+        systemContext(command.organizationId),
+      );
 
       // **No row at all**, and this is not a skip: nothing was suppressed,
       // there was nowhere to send. A `SKIPPED` row per notification per
@@ -671,8 +682,14 @@ export class InAppNotificationService {
         if (isDeadTokenError(result.error?.code)) dead.push(token);
       });
 
-      await this.deviceTokens.prune(dead);
-      await this.deviceTokens.markUsed(delivered);
+      await this.deviceTokens.prune(
+        dead,
+        systemContext(command.organizationId),
+      );
+      await this.deviceTokens.markUsed(
+        delivered,
+        systemContext(command.organizationId),
+      );
 
       if (delivered.length > 0) {
         await this.deliveries.recordSent(
@@ -685,6 +702,7 @@ export class InAppNotificationService {
             // arbitrary device.
             providerMessageId: null,
           },
+          systemContext(command.organizationId),
         );
 
         return 1;
@@ -697,6 +715,7 @@ export class InAppNotificationService {
           target,
           error: `every device rejected (${dead.length} pruned of ${tokens.length})`,
         },
+        systemContext(command.organizationId),
       );
 
       return 0;
@@ -715,6 +734,7 @@ export class InAppNotificationService {
           target,
           error: formatErrorMsg(error),
         },
+        systemContext(command.organizationId),
       );
 
       return 0;
@@ -730,6 +750,7 @@ export class InAppNotificationService {
       await this.notificationIdFor(command, recipient.userId),
       NotificationChannel.PUSH,
       { target: null, reason },
+      systemContext(command.organizationId),
     );
   }
 
@@ -742,6 +763,7 @@ export class InAppNotificationService {
       await this.notificationIdFor(command, recipient.userId),
       NotificationChannel.EMAIL,
       { target: recipient.email, reason },
+      systemContext(command.organizationId),
     );
   }
 
@@ -756,12 +778,17 @@ export class InAppNotificationService {
     command: CreateInAppNotificationCommand,
     recipientId: string,
   ): Promise<string> {
-    const row = await this.prisma.notification.findFirstOrThrow({
+    const row = await this.db(command).notification.findFirstOrThrow({
       where: { recipientId, eventId: command.eventId },
       select: { id: true },
     });
 
     return row.id;
+  }
+
+  /** The client scoped to the command's tenant: a job acting for it. */
+  private db(command: CreateInAppNotificationCommand) {
+    return this.prisma.scoped(systemContext(command.organizationId));
   }
 }
 

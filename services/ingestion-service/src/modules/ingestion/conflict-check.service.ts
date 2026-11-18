@@ -90,14 +90,16 @@ export class ConflictCheckService {
    * @returns whether the check completed.
    */
   async check(documentId: string): Promise<boolean> {
-    const document = await this.prisma.document.findFirst({
-      where: {
-        id: documentId,
-        deletedAt: null,
-        status: DocumentStatus.INDEXED,
-      },
-      include: { departmentLinks: { select: { departmentId: true } } },
-    });
+    const document = await this.prisma
+      .unscoped('job by row id')
+      .document.findFirst({
+        where: {
+          id: documentId,
+          deletedAt: null,
+          status: DocumentStatus.INDEXED,
+        },
+        include: { departmentLinks: { select: { departmentId: true } } },
+      });
     if (!document) return false;
     const organizationId = document.organizationId;
 
@@ -108,15 +110,17 @@ export class ConflictCheckService {
     );
     if (!conflicts) return false;
 
-    await this.prisma.document.update({
+    await this.prisma.unscoped('job by row id').document.update({
       where: { id: documentId },
       data: { conflictsCheckedAt: new Date() },
     });
 
-    const others = await this.prisma.document.findMany({
-      where: { id: { in: conflicts.map((conflict) => conflict.otherId) } },
-      include: { departmentLinks: { select: { departmentId: true } } },
-    });
+    const others = await this.prisma
+      .unscoped('job by row id')
+      .document.findMany({
+        where: { id: { in: conflicts.map((conflict) => conflict.otherId) } },
+        include: { departmentLinks: { select: { departmentId: true } } },
+      });
     const audiences = new Map(
       others.map((other) => [other.id, audienceOf(other)]),
     );
@@ -182,15 +186,17 @@ export class ConflictCheckService {
     onThis: Set<string>,
     onOthers: Set<string>,
   ): Promise<void> {
-    const open = await this.prisma.documentFlag.findMany({
-      where: {
-        organizationId,
-        flagType: DocumentFlagType.CONFLICTING,
-        resolvedAt: null,
-        OR: [{ documentId }, { relatedDocumentId: documentId }],
-      },
-      select: { documentId: true, relatedDocumentId: true },
-    });
+    const open = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentFlag.findMany({
+        where: {
+          organizationId,
+          flagType: DocumentFlagType.CONFLICTING,
+          resolvedAt: null,
+          OR: [{ documentId }, { relatedDocumentId: documentId }],
+        },
+        select: { documentId: true, relatedDocumentId: true },
+      });
 
     for (const flag of open) {
       const stale =
@@ -224,10 +230,12 @@ export class ConflictCheckService {
     documentId: string,
     title: string,
   ): Promise<Conflict[] | null> {
-    const chunks = await this.prisma.documentChunk.findMany({
-      where: { documentId, isStaged: false, vectorPointId: { not: null } },
-      select: { id: true, vectorPointId: true, contentText: true },
-    });
+    const chunks = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentChunk.findMany({
+        where: { documentId, isStaged: false, vectorPointId: { not: null } },
+        select: { id: true, vectorPointId: true, contentText: true },
+      });
 
     const pairs: {
       chunkId: string;
@@ -258,17 +266,19 @@ export class ConflictCheckService {
     if (chosen.length === 0) return [];
 
     const texts = new Map(chunks.map((chunk) => [chunk.id, chunk.contentText]));
-    const otherChunks = await this.prisma.documentChunk.findMany({
-      where: {
-        id: { in: chosen.map((pair) => pair.otherChunkId) },
-        isStaged: false,
-      },
-      select: {
-        id: true,
-        contentText: true,
-        document: { select: { title: true } },
-      },
-    });
+    const otherChunks = await this.prisma
+      .scoped(systemContext(organizationId))
+      .documentChunk.findMany({
+        where: {
+          id: { in: chosen.map((pair) => pair.otherChunkId) },
+          isStaged: false,
+        },
+        select: {
+          id: true,
+          contentText: true,
+          document: { select: { title: true } },
+        },
+      });
     const others = new Map(otherChunks.map((chunk) => [chunk.id, chunk]));
 
     const best = new Map<string, Conflict>();
@@ -337,22 +347,24 @@ export class ConflictCheckService {
    * @returns how many flags lost the other document.
    */
   async retestAudience(documentId: string): Promise<number> {
-    const named = await this.prisma.documentFlag.findMany({
-      where: {
-        flagType: DocumentFlagType.CONFLICTING,
-        relatedDocumentId: { not: null },
-        OR: [{ documentId }, { relatedDocumentId: documentId }],
-      },
-      select: {
-        id: true,
-        document: {
-          include: { departmentLinks: { select: { departmentId: true } } },
+    const named = await this.prisma
+      .unscoped('job by row id')
+      .documentFlag.findMany({
+        where: {
+          flagType: DocumentFlagType.CONFLICTING,
+          relatedDocumentId: { not: null },
+          OR: [{ documentId }, { relatedDocumentId: documentId }],
         },
-        relatedDocument: {
-          include: { departmentLinks: { select: { departmentId: true } } },
+        select: {
+          id: true,
+          document: {
+            include: { departmentLinks: { select: { departmentId: true } } },
+          },
+          relatedDocument: {
+            include: { departmentLinks: { select: { departmentId: true } } },
+          },
         },
-      },
-    });
+      });
 
     let redacted = 0;
     for (const flag of named) {

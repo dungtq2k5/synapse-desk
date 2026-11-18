@@ -44,6 +44,7 @@ import {
   MAX_DOCUMENT_BYTES,
   quotaCounterKey,
   UsageUnavailableReason,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation, withHttpStatus } from '@synapsedesk/core';
 import {
@@ -53,7 +54,11 @@ import {
   requireTenant,
   LimitAlertPublisher,
 } from '@synapsedesk/nest-common';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  type AnyTransaction,
+  PrismaService,
+  type ScopedClient,
+} from '../prisma/prisma.service';
 import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import { SessionsService } from '../sessions/sessions.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
@@ -142,26 +147,26 @@ export class OrganizationsService {
     const organizationId = requireTenant(context);
     const [users, departments, roles, invitations, organizations, plans] =
       await Promise.all([
-        this.prisma.user.findMany({
+        this.prisma.scoped(context).user.findMany({
           where: { id: { in: request.userIds }, organizationId },
           select: { id: true, fullName: true },
         }),
-        this.prisma.department.findMany({
+        this.prisma.scoped(context).department.findMany({
           where: { id: { in: request.departmentIds }, organizationId },
           select: { id: true, name: true },
         }),
-        this.prisma.role.findMany({
+        this.prisma.scoped(context).role.findMany({
           where: {
             id: { in: request.roleIds },
             OR: [{ organizationId }, { organizationId: null }],
           },
           select: { id: true, name: true },
         }),
-        this.prisma.userInvitation.findMany({
+        this.prisma.scoped(context).userInvitation.findMany({
           where: { id: { in: request.invitationIds }, organizationId },
           select: { id: true, email: true },
         }),
-        this.prisma.organization.findMany({
+        this.prisma.scoped(context).organization.findMany({
           where: {
             id: {
               in: request.organizationIds.filter((id) => id === organizationId),
@@ -169,7 +174,7 @@ export class OrganizationsService {
           },
           select: { id: true, name: true },
         }),
-        this.prisma.subscriptionPlan.findMany({
+        this.prisma.scoped(context).subscriptionPlan.findMany({
           where: { id: { in: request.planIds } },
           select: { id: true, name: true },
         }),
@@ -224,22 +229,24 @@ export class OrganizationsService {
       };
     }
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { inboundToken: token, deletedAt: null },
-      select: {
-        id: true,
-        status: true,
-        // The attachment ceilings RIDE this lookup rather than costing the mail
-        // path a second call. It already resolves the tenant, and inbound mail
-        // is the one attachment surface anyone who knows the address can reach.
-        maxAttachmentBytesOverride: true,
-        maxAttachmentsPerMessageOverride: true,
-        // The plan grant rides too. A tenant on a plan that narrows
-        // attachments must see that narrowing on the mail path as well —
-        // otherwise the cheapest plan gets the widest surface.
-        maxAttachmentBytes: true,
-      },
-    });
+    const organization = await this.prisma
+      .unscoped('before a tenant')
+      .organization.findFirst({
+        where: { inboundToken: token, deletedAt: null },
+        select: {
+          id: true,
+          status: true,
+          // The attachment ceilings RIDE this lookup rather than costing the mail
+          // path a second call. It already resolves the tenant, and inbound mail
+          // is the one attachment surface anyone who knows the address can reach.
+          maxAttachmentBytesOverride: true,
+          maxAttachmentsPerMessageOverride: true,
+          // The plan grant rides too. A tenant on a plan that narrows
+          // attachments must see that narrowing on the mail path as well —
+          // otherwise the cheapest plan gets the widest surface.
+          maxAttachmentBytes: true,
+        },
+      });
 
     if (!organization) {
       return {
@@ -287,10 +294,12 @@ export class OrganizationsService {
     // bounds that class of handler, and this one does not need to join them.
     if (!request.organizationId) return { inboundToken: undefined };
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: request.organizationId, deletedAt: null },
-      select: { inboundToken: true },
-    });
+    const organization = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .organization.findFirst({
+        where: { id: request.organizationId, deletedAt: null },
+        select: { inboundToken: true },
+      });
 
     return { inboundToken: organization?.inboundToken ?? undefined };
   }
@@ -317,7 +326,7 @@ export class OrganizationsService {
     const existing = await this.load(context);
     const inboundToken = generateInboundToken();
 
-    await this.prisma.organization.update({
+    await this.prisma.scoped(context).organization.update({
       where: { id: existing.id },
       data: { inboundToken },
     });
@@ -349,7 +358,7 @@ export class OrganizationsService {
     const existing = await this.load(context);
 
     if (existing.inboundToken) {
-      await this.prisma.organization.update({
+      await this.prisma.scoped(context).organization.update({
         where: { id: existing.id },
         data: { inboundToken: null },
       });
@@ -378,10 +387,12 @@ export class OrganizationsService {
   async getOrganizationStatus(
     request: GetOrganizationStatusRequest,
   ): Promise<OrganizationStatusResponse> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: request.organizationId },
-      select: { status: true, deletedAt: true },
-    });
+    const organization = await this.prisma
+      .scoped(systemContext(request.organizationId))
+      .organization.findUnique({
+        where: { id: request.organizationId },
+        select: { status: true, deletedAt: true },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -434,7 +445,7 @@ export class OrganizationsService {
     }
 
     const organization = await this.conflictOnDuplicate(() =>
-      this.prisma.organization.update({
+      this.prisma.scoped(context).organization.update({
         where: { id: existing.id },
         data,
       }),
@@ -518,7 +529,7 @@ export class OrganizationsService {
     // rule exists to make impossible. Two layers, one number.
     this.applyLimitOverrides(request, data);
 
-    const organization = await this.prisma.organization.update({
+    const organization = await this.prisma.scoped(context).organization.update({
       where: { id: existing.id },
       data,
     });
@@ -586,7 +597,10 @@ export class OrganizationsService {
   async usageOf(
     organization: Organization & { plan: { name: string } | null },
   ): Promise<OrganizationUsageResponse> {
-    const seatsUsed = await this.seatsInUse(this.prisma, organization.id);
+    const seatsUsed = await this.seatsInUse(
+      this.prisma.scoped(systemContext(organization.id)),
+      organization.id,
+    );
 
     return {
       // The PLAN, alongside the meters. This is the page a customer opens
@@ -710,10 +724,12 @@ export class OrganizationsService {
     // run over a quiet window has no tenants to resolve.
     if (ids.length === 0) return { items: [] };
 
-    const organizations = await this.prisma.organization.findMany({
-      where: { id: { in: ids }, deletedAt: null },
-      select: { id: true, timezone: true },
-    });
+    const organizations = await this.prisma
+      .unscoped('cross-tenant job')
+      .organization.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+        select: { id: true, timezone: true },
+      });
 
     return {
       items: organizations.map((organization) => ({
@@ -745,10 +761,12 @@ export class OrganizationsService {
     const ids = [...new Set((request.organizationIds ?? []).filter(Boolean))];
     if (ids.length === 0) return { items: [] };
 
-    const organizations = await this.prisma.organization.findMany({
-      where: { id: { in: ids }, deletedAt: null },
-      select: { id: true, billingCycleStart: true },
-    });
+    const organizations = await this.prisma
+      .unscoped('cross-tenant job')
+      .organization.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+        select: { id: true, billingCycleStart: true },
+      });
 
     return {
       items: organizations.map((organization) => ({
@@ -791,13 +809,13 @@ export class OrganizationsService {
   private async onboardingSteps(organizationId: string) {
     const [departmentCount, memberCount, verifiedAdminCount] =
       await Promise.all([
-        this.prisma.department.count({
+        this.prisma.scoped(systemContext(organizationId)).department.count({
           where: { organizationId, deletedAt: null },
         }),
-        this.prisma.user.count({
+        this.prisma.scoped(systemContext(organizationId)).user.count({
           where: { organizationId, deletedAt: null },
         }),
-        this.prisma.user.count({
+        this.prisma.scoped(systemContext(organizationId)).user.count({
           where: {
             organizationId,
             deletedAt: null,
@@ -860,7 +878,7 @@ export class OrganizationsService {
       });
     }
 
-    const organization = await this.prisma.organization.update({
+    const organization = await this.prisma.scoped(context).organization.update({
       where: { id: existing.id },
       data: { status: OrgStatus.ACTIVE },
     });
@@ -896,12 +914,12 @@ export class OrganizationsService {
   ): Promise<DeleteOrganizationResponse> {
     const existing = await this.load(context);
 
-    const members = await this.prisma.user.findMany({
+    const members = await this.prisma.scoped(context).user.findMany({
       where: { organizationId: existing.id, deletedAt: null },
       select: { id: true },
     });
 
-    await this.prisma.organization.update({
+    await this.prisma.scoped(context).organization.update({
       where: { id: existing.id },
       // FROZEN rather than a `deleted_at` stamp: the row must stay resolvable
       // for the platform to finalise or reverse, and FROZEN is the status the
@@ -947,9 +965,10 @@ export class OrganizationsService {
    * and the insert it guards see different snapshots.
    */
   async seatsInUse(
-    client: Prisma.TransactionClient | PrismaService,
+    anyClient: AnyTransaction | ScopedClient,
     organizationId: string,
   ): Promise<number> {
+    const client = anyClient as Prisma.TransactionClient;
     const [active, pending] = await Promise.all([
       client.user.count({ where: { organizationId, deletedAt: null } }),
       client.userInvitation.count({
@@ -986,7 +1005,10 @@ export class OrganizationsService {
     organizationId: string,
     maxAgentSeats: number,
   ): Promise<void> {
-    const seatsInUse = await this.seatsInUse(this.prisma, organizationId);
+    const seatsInUse = await this.seatsInUse(
+      this.prisma.scoped(systemContext(organizationId)),
+      organizationId,
+    );
 
     await this.limitAlerts.evaluate(
       organizationId,
@@ -1096,7 +1118,7 @@ export class OrganizationsService {
     detail: string,
     context: CallerContext,
   ): Promise<void> {
-    const admins = await this.prisma.user.findMany({
+    const admins = await this.prisma.scoped(context).user.findMany({
       where: {
         organizationId,
         deletedAt: null,
@@ -1127,13 +1149,15 @@ export class OrganizationsService {
   ): Promise<Organization & { plan: { name: string } | null }> {
     const organizationId = requireTenant(context);
 
-    const organization = await this.prisma.organization.findFirst({
-      where: { id: organizationId, deletedAt: null },
-      // The plan's name rides along for `planLabelFor`. One join, and it
-      // replaces a reverse-lookup by tier that could not tell two plans on the
-      // same tier apart.
-      include: { plan: { select: { name: true } } },
-    });
+    const organization = await this.prisma
+      .scoped(context)
+      .organization.findFirst({
+        where: { id: organizationId, deletedAt: null },
+        // The plan's name rides along for `planLabelFor`. One join, and it
+        // replaces a reverse-lookup by tier that could not tell two plans on the
+        // same tier apart.
+        include: { plan: { select: { name: true } } },
+      });
     if (!organization) {
       throw new RpcException({
         code: status.NOT_FOUND,

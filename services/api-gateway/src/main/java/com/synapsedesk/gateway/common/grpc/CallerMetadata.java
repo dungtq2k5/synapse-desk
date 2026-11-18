@@ -61,6 +61,19 @@ public final class CallerMetadata {
     return metadata;
   }
 
+  /**
+   * A caller acting on their own account: the origin and their user id, with
+   * no tenant. For the 2FA calls an enrollee makes before a session exists,
+   * and the ones beside it; auth-service holds the request's user id to this
+   * one (`requireSelf`).
+   */
+  public static Metadata of(RequestOrigin origin, String sub) {
+    Metadata metadata = of(origin);
+    metadata.put(USER_ID, sub);
+
+    return metadata;
+  }
+
   /** An authenticated caller — the full tenant filter travels with the call. */
   public static Metadata of(RequestContext context) {
     Metadata metadata = of(context.origin());

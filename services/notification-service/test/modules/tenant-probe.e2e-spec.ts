@@ -162,6 +162,12 @@ describe('Cross-tenant probe: notification-service (e2e)', () => {
 
   beforeEach(async () => fx.reset());
 
+  it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
+    expect(
+      Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
+    ).toEqual([]);
+  });
+
   it('**every id-taking RPC has a row**, and no row names an RPC that is gone', () => {
     expect(Object.keys(PROBE).sort()).toEqual(
       methods.map((m) => m.name).sort(),

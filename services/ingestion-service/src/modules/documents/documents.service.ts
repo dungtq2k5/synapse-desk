@@ -54,6 +54,7 @@ import {
   OcrLanguage,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   exceedsLimit,
@@ -350,49 +351,51 @@ export class DocumentsService {
     const ocrLanguages = assertOcrLanguages(request.ocrLanguages);
 
     try {
-      const document = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.document.create({
-          data: {
-            organizationId,
-            createdById: actorId,
-            title,
-            fileUrl: request.objectPath,
-            fileType: extensionFor(confirmed.contentType),
-            fileSizeBytes: BigInt(confirmed.sizeBytes),
-            fileHash,
-            isOrganizationWide: request.isOrganizationWide,
-            status: DocumentStatus.PENDING,
-            // Stored as given once checked: `[]` is "not specified", which is
-            // almost every upload, and the parser is what turns that into the
-            // `eng` default.
-            ocrLanguages,
-            departmentLinks: {
-              create: departmentIds.map((departmentId) => ({ departmentId })),
+      const document = await this.prisma
+        .scoped(context)
+        .$transaction(async (tx) => {
+          const created = await tx.document.create({
+            data: {
+              organizationId,
+              createdById: actorId,
+              title,
+              fileUrl: request.objectPath,
+              fileType: extensionFor(confirmed.contentType),
+              fileSizeBytes: BigInt(confirmed.sizeBytes),
+              fileHash,
+              isOrganizationWide: request.isOrganizationWide,
+              status: DocumentStatus.PENDING,
+              // Stored as given once checked: `[]` is "not specified", which is
+              // almost every upload, and the parser is what turns that into the
+              // `eng` default.
+              ocrLanguages,
+              departmentLinks: {
+                create: departmentIds.map((departmentId) => ({ departmentId })),
+              },
             },
-          },
-          include: { departmentLinks: true },
-        });
+            include: { departmentLinks: true },
+          });
 
-        // The job row is created in the SAME transaction as the document.
-        // Outside it, a crash between the two leaves a PENDING document with
-        // nothing scheduled to process it and nothing recording that fact —
-        // the document would sit "pending" forever with no job to look at.
-        const job = await tx.ingestionJob.create({
-          data: {
-            // Denormalized; the document it copies is written in this same
-            // transaction.
-            organizationId,
-            documentId: created.id,
-            // Filled in by the worker when BullMQ actually accepts it. Empty
-            // rather than a fake id: a made-up job id in Redis-shaped format is
-            // worse than an obviously absent one when somebody is debugging.
-            bullmqJobId: '',
-            status: IngestionJobStatus.QUEUED,
-          },
-        });
+          // The job row is created in the SAME transaction as the document.
+          // Outside it, a crash between the two leaves a PENDING document with
+          // nothing scheduled to process it and nothing recording that fact —
+          // the document would sit "pending" forever with no job to look at.
+          const job = await tx.ingestionJob.create({
+            data: {
+              // Denormalized; the document it copies is written in this same
+              // transaction.
+              organizationId,
+              documentId: created.id,
+              // Filled in by the worker when BullMQ actually accepts it. Empty
+              // rather than a fake id: a made-up job id in Redis-shaped format is
+              // worse than an obviously absent one when somebody is debugging.
+              bullmqJobId: '',
+              status: IngestionJobStatus.QUEUED,
+            },
+          });
 
-        return { created, job };
-      });
+          return { created, job };
+        });
 
       // AFTER the commit, never inside it. An event announcing a document a
       // rollback erases is one no consumer can un-handle.
@@ -459,7 +462,7 @@ export class DocumentsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.document.findMany({
+      this.prisma.scoped(context).document.findMany({
         where,
         orderBy,
         skip,
@@ -468,7 +471,7 @@ export class DocumentsService {
       }),
       // The SAME `where`. A count computed without the visibility filter would
       // tell a caller how many documents exist that they cannot see.
-      this.prisma.document.count({ where }),
+      this.prisma.scoped(context).document.count({ where }),
     ]);
 
     return {
@@ -559,8 +562,10 @@ export class DocumentsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.documentChunk.findMany({ where, orderBy, skip, take }),
-      this.prisma.documentChunk.count({ where }),
+      this.prisma
+        .scoped(context)
+        .documentChunk.findMany({ where, orderBy, skip, take }),
+      this.prisma.scoped(context).documentChunk.count({ where }),
     ]);
 
     return {
@@ -580,7 +585,7 @@ export class DocumentsService {
   ): Promise<DocumentChunkResponse> {
     const document = await this.load(request.documentId, context);
 
-    const chunk = await this.prisma.documentChunk.findFirst({
+    const chunk = await this.prisma.scoped(context).documentChunk.findFirst({
       where: { id: request.chunkId, documentId: document.id, isStaged: false },
     });
     if (!chunk) {
@@ -606,7 +611,7 @@ export class DocumentsService {
     const [usedBytes, limitBytes, documentCount] = await Promise.all([
       this.usedBytes(organizationId),
       this.authReference.getStorageLimitBytes(context),
-      this.prisma.document.count({
+      this.prisma.scoped(context).document.count({
         where: { organizationId, deletedAt: null },
       }),
     ]);
@@ -633,7 +638,7 @@ export class DocumentsService {
       data.isOrganizationWide = request.isOrganizationWide;
     }
 
-    const document = await this.prisma.document.update({
+    const document = await this.prisma.scoped(context).document.update({
       where: { id: existing.id },
       data,
       include: DOCUMENT_INCLUDE,
@@ -681,24 +686,26 @@ export class DocumentsService {
     const departmentIds = [...new Set(request.departmentIds)];
     await this.authReference.assertDepartmentsExist(departmentIds, context);
 
-    const document = await this.prisma.$transaction(async (tx) => {
-      await tx.departmentDocument.deleteMany({
-        where: { documentId: existing.id },
-      });
-      if (departmentIds.length > 0) {
-        await tx.departmentDocument.createMany({
-          data: departmentIds.map((departmentId) => ({
-            documentId: existing.id,
-            departmentId,
-          })),
+    const document = await this.prisma
+      .scoped(context)
+      .$transaction(async (tx) => {
+        await tx.departmentDocument.deleteMany({
+          where: { documentId: existing.id },
         });
-      }
+        if (departmentIds.length > 0) {
+          await tx.departmentDocument.createMany({
+            data: departmentIds.map((departmentId) => ({
+              documentId: existing.id,
+              departmentId,
+            })),
+          });
+        }
 
-      return tx.document.findUniqueOrThrow({
-        where: { id: existing.id },
-        include: DOCUMENT_INCLUDE,
+        return tx.document.findUniqueOrThrow({
+          where: { id: existing.id },
+          include: DOCUMENT_INCLUDE,
+        });
       });
-    });
 
     await this.fanOutScope(document, departmentIds, {
       isOrganizationWide: existing.isOrganizationWide,
@@ -745,7 +752,7 @@ export class DocumentsService {
       isDeleted: false,
     });
 
-    await this.prisma.document.update({
+    await this.prisma.scoped(context).document.update({
       where: { id: existing.id },
       data: softDeleteData(requireActor(context)),
     });
@@ -770,7 +777,7 @@ export class DocumentsService {
   ): Promise<DocumentResponse> {
     // Deliberately NOT `load`, which excludes deleted rows — the only rows this
     // can act on.
-    const existing = await this.prisma.document.findFirst({
+    const existing = await this.prisma.scoped(context).document.findFirst({
       where: {
         id: request.id,
         organizationId: requireTenant(context),
@@ -789,7 +796,7 @@ export class DocumentsService {
     // `let` here would silently disable every downstream property check.
     let document: DocumentWithScope;
     try {
-      document = await this.prisma.document.update({
+      document = await this.prisma.scoped(context).document.update({
         where: { id: existing.id },
         data: restoreData(),
         include: DOCUMENT_INCLUDE,
@@ -863,7 +870,7 @@ export class DocumentsService {
 
     if (ids.length === 0) return { items: [] };
 
-    const items = await this.prisma.document.findMany({
+    const items = await this.prisma.scoped(context).document.findMany({
       where: {
         organizationId: requireTenant(context),
         ...this.visibilityScope(context),
@@ -915,7 +922,7 @@ export class DocumentsService {
 
     if (ids.length === 0) return { items: [] };
 
-    const chunks = await this.prisma.documentChunk.findMany({
+    const chunks = await this.prisma.scoped(context).documentChunk.findMany({
       where: {
         // Staged chunks too, as retrieval's hydration reads them: for the
         // moment between the swap's Qdrant and Postgres halves an answer can
@@ -991,6 +998,7 @@ export class DocumentsService {
     // `@@index([documentId, createdAt desc])` exists because a document has a
     // job history worth reading in order.
     const job = await this.prisma
+      .scoped(context)
       .$transaction(async (tx) => {
         // The row this re-run replaces, for lineage. Claimed with a
         // `supersededById: null` guard, which is the same lock-free claim
@@ -1047,7 +1055,7 @@ export class DocumentsService {
     // Re-read rather than returning the row above: `enqueue` records
     // `bullmqJobId` on it, and that id is how someone finds the job in Redis.
     return toIngestionJobResponse(
-      await this.prisma.ingestionJob.findUniqueOrThrow({
+      await this.prisma.scoped(context).ingestionJob.findUniqueOrThrow({
         where: { id: job.id },
       }),
     );
@@ -1110,51 +1118,53 @@ export class DocumentsService {
       .digest('hex');
 
     try {
-      const replaced = await this.prisma.$transaction(async (tx) => {
-        const previous = await tx.ingestionJob.findFirst({
-          where: { documentId: document.id, supersededById: null },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true },
-        });
-
-        const job = await tx.ingestionJob.create({
-          data: {
-            organizationId: document.organizationId,
-            documentId: document.id,
-            bullmqJobId: '',
-            status: IngestionJobStatus.QUEUED,
-          },
-        });
-
-        if (previous) {
-          await tx.ingestionJob.updateMany({
-            where: { id: previous.id, supersededById: null },
-            data: { supersededById: job.id },
+      const replaced = await this.prisma
+        .scoped(context)
+        .$transaction(async (tx) => {
+          const previous = await tx.ingestionJob.findFirst({
+            where: { documentId: document.id, supersededById: null },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
           });
-        }
 
-        // Before the update, so the row it returns carries the status. A
-        // document with a live version keeps answering from it until the new
-        // file's run swaps in, and stays INDEXED.
-        await setStatusUnlessLive(tx, document.id, DocumentStatus.PENDING);
+          const job = await tx.ingestionJob.create({
+            data: {
+              organizationId: document.organizationId,
+              documentId: document.id,
+              bullmqJobId: '',
+              status: IngestionJobStatus.QUEUED,
+            },
+          });
 
-        const updated = await tx.document.update({
-          where: { id: document.id },
-          // Pending, not live: Download, citations and the flags keep
-          // describing the version that answers until the swap. The OCR
-          // languages describe the file being processed, which is this one.
-          data: {
-            pendingFileUrl: request.objectPath,
-            pendingFileType: extensionFor(confirmed.contentType),
-            pendingFileSizeBytes: BigInt(confirmed.sizeBytes),
-            pendingFileHash: fileHash,
-            ocrLanguages: assertOcrLanguages(request.ocrLanguages),
-          },
-          include: DOCUMENT_INCLUDE,
+          if (previous) {
+            await tx.ingestionJob.updateMany({
+              where: { id: previous.id, supersededById: null },
+              data: { supersededById: job.id },
+            });
+          }
+
+          // Before the update, so the row it returns carries the status. A
+          // document with a live version keeps answering from it until the new
+          // file's run swaps in, and stays INDEXED.
+          await setStatusUnlessLive(tx, document.id, DocumentStatus.PENDING);
+
+          const updated = await tx.document.update({
+            where: { id: document.id },
+            // Pending, not live: Download, citations and the flags keep
+            // describing the version that answers until the swap. The OCR
+            // languages describe the file being processed, which is this one.
+            data: {
+              pendingFileUrl: request.objectPath,
+              pendingFileType: extensionFor(confirmed.contentType),
+              pendingFileSizeBytes: BigInt(confirmed.sizeBytes),
+              pendingFileHash: fileHash,
+              ocrLanguages: assertOcrLanguages(request.ocrLanguages),
+            },
+            include: DOCUMENT_INCLUDE,
+          });
+
+          return { updated, job };
         });
-
-        return { updated, job };
-      });
 
       // AFTER the commit, both of them. An event announcing a change a
       // rollback erases is one no consumer can un-handle — and here it would
@@ -1341,7 +1351,7 @@ export class DocumentsService {
    * already makes the same choice about bytes.
    */
   private async documentCount(organizationId: string): Promise<number> {
-    return this.prisma.document.count({
+    return this.prisma.scoped(systemContext(organizationId)).document.count({
       where: { organizationId, deletedAt: null },
     });
   }
@@ -1353,10 +1363,12 @@ export class DocumentsService {
    * a failed update keeps it (so Retry can run it), so it counts.
    */
   private async usedBytes(organizationId: string): Promise<number> {
-    const result = await this.prisma.document.aggregate({
-      where: { organizationId, deletedAt: null },
-      _sum: STORED_BYTES_SUM,
-    });
+    const result = await this.prisma
+      .scoped(systemContext(organizationId))
+      .document.aggregate({
+        where: { organizationId, deletedAt: null },
+        _sum: STORED_BYTES_SUM,
+      });
 
     return storedBytes(result._sum);
   }
@@ -1414,7 +1426,7 @@ export class DocumentsService {
    * enumeration into a knowledge-base oracle.
    */
   private async load(documentId: string, context: CallerContext) {
-    const document = await this.prisma.document.findFirst({
+    const document = await this.prisma.scoped(context).document.findFirst({
       where: {
         id: documentId,
         organizationId: requireTenant(context),

@@ -49,11 +49,13 @@ export class ExpiredRecordsPruner {
     const now = new Date();
 
     const [sessions, otps, resetTokens] = await Promise.all([
-      this.prisma.deviceSession.deleteMany({
+      this.prisma.unscoped('cross-tenant job').deviceSession.deleteMany({
         where: { expiresAt: { lt: now } },
       }),
-      this.prisma.otp.deleteMany({ where: { expiresAt: { lt: now } } }),
-      this.prisma.passwordResetToken.deleteMany({
+      this.prisma
+        .unscoped('cross-tenant job')
+        .otp.deleteMany({ where: { expiresAt: { lt: now } } }),
+      this.prisma.unscoped('cross-tenant job').passwordResetToken.deleteMany({
         where: { expiresAt: { lt: now } },
       }),
     ]);

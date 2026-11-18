@@ -33,7 +33,7 @@ import {
   toPrismaPage,
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
-import { PrismaService } from '../prisma/prisma.service';
+import { type AnyTransaction, PrismaService } from '../prisma/prisma.service';
 import { ROLE_INCLUDE, RoleRow, toRoleResponse } from './role.mapper';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -82,18 +82,21 @@ export class RolesService {
    * through the same connection — on a cache miss the lookup must not deadlock
    * against the transaction that is asking for it.
    */
-  getEndUserRoleId(tx?: Prisma.TransactionClient): Promise<string> {
+  getEndUserRoleId(tx?: AnyTransaction): Promise<string> {
     return this.getSystemRoleId(SystemRoleName.END_USER, tx);
   }
 
   async getSystemRoleId(
     name: SystemRoleName,
-    tx?: Prisma.TransactionClient,
+    tx?: AnyTransaction,
   ): Promise<string> {
     const cached = this.systemRoleIds.get(name);
     if (cached) return cached;
 
-    const client = tx ?? this.prisma;
+    // System roles have no tenant: every tenant, and every caller, reads them.
+    const client =
+      (tx as Prisma.TransactionClient | undefined) ??
+      this.prisma.unscoped('shared catalog');
     const role = await client.role.findFirst({
       // organizationId: null is what makes it the GLOBAL role rather than a
       // tenant's custom role that happens to share the name.
@@ -144,14 +147,14 @@ export class RolesService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.role.findMany({
+      this.prisma.scoped(context).role.findMany({
         where,
         include: ROLE_INCLUDE,
         orderBy,
         skip,
         take,
       }),
-      this.prisma.role.count({ where }),
+      this.prisma.scoped(context).role.count({ where }),
     ]);
 
     return {
@@ -180,7 +183,7 @@ export class RolesService {
     const codes = this.assertGrantable(request.permissionCodes, context);
 
     const role = await this.conflictOnDuplicateName(() =>
-      this.prisma.role.create({
+      this.prisma.scoped(context).role.create({
         data: {
           organizationId,
           name: request.name.trim(),
@@ -216,7 +219,7 @@ export class RolesService {
     }
 
     const role = await this.conflictOnDuplicateName(() =>
-      this.prisma.role.update({
+      this.prisma.scoped(context).role.update({
         where: { id: existing.id },
         data,
         include: ROLE_INCLUDE,
@@ -260,7 +263,7 @@ export class RolesService {
       });
     }
 
-    await this.prisma.role.delete({ where: { id: role.id } });
+    await this.prisma.scoped(context).role.delete({ where: { id: role.id } });
 
     this.audit.record(context, {
       action: AuditAction.ROLE_DELETED,
@@ -280,7 +283,7 @@ export class RolesService {
     const existing = await this.loadMutable(request.id, context);
     const codes = this.assertGrantable(request.permissionCodes, context);
 
-    const role = await this.prisma.role.update({
+    const role = await this.prisma.scoped(context).role.update({
       where: { id: existing.id },
       // `set` rather than `connect`: this is REPLACE semantics, so sending the
       // same body twice is a no-op instead of a double grant, and a code left
@@ -313,9 +316,11 @@ export class RolesService {
    * it like anyone else.
    */
   async listPermissions(): Promise<ListPermissionsResponse> {
-    const permissions = await this.prisma.permission.findMany({
-      orderBy: { code: 'asc' },
-    });
+    const permissions = await this.prisma
+      .unscoped('shared catalog')
+      .permission.findMany({
+        orderBy: { code: 'asc' },
+      });
 
     return {
       items: permissions.map((permission) => ({
@@ -354,12 +359,16 @@ export class RolesService {
    * Returns the ids actually applied.
    */
   async setUserRoles(
-    tx: Prisma.TransactionClient,
+    client: AnyTransaction,
     userId: string,
     roleIds: string[],
     context: CallerContext,
   ): Promise<string[]> {
+    const tx = client as Prisma.TransactionClient;
     const organizationId = requireTenant(context);
+    // Checked here, not trusted from the caller: the user whose roles change
+    // must be this tenant's.
+    await this.assertUserOf(tx, userId, organizationId);
     const wanted = [...new Set(roleIds)];
 
     // Two branches, and both are needed: a tenant's own custom roles PLUS the
@@ -495,7 +504,7 @@ export class RolesService {
     const role = await this.load(request.roleId, context);
     const userIds = [...new Set(request.userIds)];
 
-    const changed = await this.prisma.$transaction(
+    const changed = await this.prisma.scoped(context).$transaction(
       async (tx) => {
         // **Read INSIDE the transaction.** `setUserRoles` writes
         // `roles: { set: wanted }`, so the set built here is authoritative — a
@@ -612,32 +621,34 @@ export class RolesService {
     // Read INSIDE, for the reason `assignRoleUsers` gives: `after` is derived
     // from this set and applied as a replacement, so a stale one would revert a
     // role granted between the read and the write.
-    const { before, after } = await this.prisma.$transaction(async (tx) => {
-      const target = await tx.user.findFirst({
-        where: { id: request.userId, organizationId, deletedAt: null },
-        select: { id: true, roles: { select: { id: true } } },
+    const { before, after } = await this.prisma
+      .scoped(context)
+      .$transaction(async (tx) => {
+        const target = await tx.user.findFirst({
+          where: { id: request.userId, organizationId, deletedAt: null },
+          select: { id: true, roles: { select: { id: true } } },
+        });
+
+        if (!target) {
+          throw new RpcException({
+            code: status.NOT_FOUND,
+            message: 'No user with that id',
+          });
+        }
+
+        const held = target.roles.map((role) => role.id);
+        if (!held.includes(role.id)) {
+          throw new RpcException({
+            code: status.NOT_FOUND,
+            message: 'This user does not hold that role',
+          });
+        }
+
+        const remaining = held.filter((id) => id !== role.id);
+        await this.setUserRoles(tx, target.id, remaining, context);
+
+        return { before: held, after: remaining };
       });
-
-      if (!target) {
-        throw new RpcException({
-          code: status.NOT_FOUND,
-          message: 'No user with that id',
-        });
-      }
-
-      const held = target.roles.map((role) => role.id);
-      if (!held.includes(role.id)) {
-        throw new RpcException({
-          code: status.NOT_FOUND,
-          message: 'This user does not hold that role',
-        });
-      }
-
-      const remaining = held.filter((id) => id !== role.id);
-      await this.setUserRoles(tx, target.id, remaining, context);
-
-      return { before: held, after: remaining };
-    });
 
     this.audit.record(context, {
       action: AuditAction.USER_ROLES_UPDATED,
@@ -670,10 +681,11 @@ export class RolesService {
    * @throws RpcException ABORTED when this is the last active Org Admin.
    */
   private async assertNotLastOrgAdmin(
-    tx: Prisma.TransactionClient,
+    client: AnyTransaction,
     userId: string,
     organizationId: string,
   ): Promise<void> {
+    const tx = client as Prisma.TransactionClient;
     const remaining = await tx.user.count({
       where: {
         organizationId,
@@ -704,12 +716,30 @@ export class RolesService {
    * the one path that cannot supply an actor to check against.
    */
   async grantRoles(
-    tx: Prisma.TransactionClient,
+    client: AnyTransaction,
     userId: string,
     roleIds: string[],
+    organizationId: string,
   ): Promise<void> {
+    const tx = client as Prisma.TransactionClient;
     const unique = [...new Set(roleIds)];
     if (unique.length === 0) return;
+
+    // Checked here, not trusted from the two callers: the user is the
+    // tenant's, and every role is the tenant's own or a system role.
+    await this.assertUserOf(tx, userId, organizationId);
+    const grantable = await tx.role.count({
+      where: {
+        id: { in: unique },
+        OR: [{ organizationId }, { organizationId: null, isSystemRole: true }],
+      },
+    });
+    if (grantable !== unique.length) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Unknown role(s) for this organization',
+      });
+    }
 
     await tx.user.update({
       where: { id: userId },
@@ -721,11 +751,31 @@ export class RolesService {
     });
   }
 
+  /** NOT_FOUND unless `userId` is a user of `organizationId`. */
+  private async assertUserOf(
+    client: AnyTransaction,
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const tx = client as Prisma.TransactionClient;
+    const user = await tx.user.findFirst({
+      where: { id: userId, organizationId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'User not found',
+      });
+    }
+  }
+
   /** Decrements the counter for every role a departing user held. */
   async releaseUserRoles(
-    tx: Prisma.TransactionClient,
+    client: AnyTransaction,
     userId: string,
   ): Promise<void> {
+    const tx = client as Prisma.TransactionClient;
     const held = await tx.role.findMany({
       where: { users: { some: { id: userId } } },
       select: { id: true },
@@ -781,7 +831,7 @@ export class RolesService {
   private async load(id: string, context: CallerContext): Promise<RoleRow> {
     const organizationId = requireTenant(context);
 
-    const role = await this.prisma.role.findFirst({
+    const role = await this.prisma.scoped(context).role.findFirst({
       where: {
         id,
         OR: [{ organizationId }, { organizationId: null, isSystemRole: true }],

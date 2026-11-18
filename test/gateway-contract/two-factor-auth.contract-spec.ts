@@ -474,4 +474,49 @@ describe('two-factor-auth', () => {
       expect(response.body).toMatchObject({ data: { remaining: 7, used: 3 } });
     },
   );
+  /**
+   * auth-service holds a 2FA call's `userId` to the caller's own
+   * (`requireSelf`), so the gateway sends that id as `user_id` metadata on
+   * every one: the enrollee's on setup and enable, the session's on the rest.
+   */
+  rowFor('Two Factor Auth').each([
+    ['POST', 'setup', 'GenerateTwoFactor', undefined, 'session'],
+    ['POST', 'setup', 'GenerateTwoFactor', undefined, 'challenge'],
+    ['POST', 'enable', 'ActivateTwoFactor', { code: '123456' }, 'challenge'],
+    [
+      'DELETE',
+      '',
+      'DisableTwoFactor',
+      { code: '123456', password: 'super-secret-1' },
+      'session',
+    ],
+    [
+      'POST',
+      'backup-codes',
+      'RegenerateBackupCodes',
+      { password: 'super-secret-1' },
+      'session',
+    ],
+    ['GET', 'backup-codes', 'GetBackupCodesStatus', undefined, 'session'],
+  ] as const)(
+    '**`%s /auth/2fa/%s`** (%s) sends the caller’s own id as `user_id`',
+    async (method, path, rpc, body, identity) => {
+      peers.auth.on(`TwoFactorAuthService/${rpc}`).reply({});
+
+      await new Session(gateway.baseUrl).request(
+        method,
+        `${API}/auth/2fa${path ? `/${path}` : ''}`,
+        {
+          body,
+          headers: identity === 'session' ? accessCookie() : challengeCookie(),
+        },
+      );
+
+      const [call] = peers.auth.calls(`TwoFactorAuthService/${rpc}`);
+      expect({
+        userId: (call.request as { userId: string }).userId,
+        user_id: call.metadata.user_id,
+      }).toEqual({ userId: USER, user_id: USER });
+    },
+  );
 });

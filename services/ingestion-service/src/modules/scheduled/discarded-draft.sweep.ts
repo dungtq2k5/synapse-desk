@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   AiGenerationOutcome,
   AiGenerationPurpose,
+  systemContext,
 } from '@synapsedesk/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -32,19 +33,21 @@ export class DiscardedDraftSweep {
   async sweep(now: Date = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - DISCARD_AFTER_HOURS * 3_600_000);
 
-    const result = await this.prisma.aiGeneration.updateMany({
-      where: {
-        purpose: AiGenerationPurpose.DRAFT,
-        // BOTH null checks, not just `outcome`. A row with a
-        // `resulting_message_id` but no outcome is a partially-written
-        // acceptance, and sweeping it to DISCARDED would erase the very event
-        // the metric is trying to count.
-        outcome: null,
-        resultingMessageId: null,
-        createdAt: { lt: cutoff },
-      },
-      data: { outcome: AiGenerationOutcome.DISCARDED },
-    });
+    const result = await this.prisma
+      .unscoped('cross-tenant job')
+      .aiGeneration.updateMany({
+        where: {
+          purpose: AiGenerationPurpose.DRAFT,
+          // BOTH null checks, not just `outcome`. A row with a
+          // `resulting_message_id` but no outcome is a partially-written
+          // acceptance, and sweeping it to DISCARDED would erase the very event
+          // the metric is trying to count.
+          outcome: null,
+          resultingMessageId: null,
+          createdAt: { lt: cutoff },
+        },
+        data: { outcome: AiGenerationOutcome.DISCARDED },
+      });
 
     if (result.count > 0) {
       this.logger.log(
@@ -71,16 +74,18 @@ export class DiscardedDraftSweep {
     discarded: number;
     rate: number;
   }> {
-    const rows = await this.prisma.aiGeneration.groupBy({
-      by: ['outcome'],
-      where: {
-        organizationId,
-        purpose: AiGenerationPurpose.DRAFT,
-        outcome: { not: null },
-        createdAt: { gte: since },
-      },
-      _count: { _all: true },
-    });
+    const rows = await this.prisma
+      .scoped(systemContext(organizationId))
+      .aiGeneration.groupBy({
+        by: ['outcome'],
+        where: {
+          organizationId,
+          purpose: AiGenerationPurpose.DRAFT,
+          outcome: { not: null },
+          createdAt: { gte: since },
+        },
+        _count: { _all: true },
+      });
 
     // Typed explicitly rather than via `Object.fromEntries`, whose return type
     // is `any` — which would silently disable checking on every lookup below

@@ -92,14 +92,16 @@ export class FinanceService {
 
     const [total, byStatus, plans, pastDueTenants, snapshot] =
       await Promise.all([
-        this.prisma.organization.count({ where: { deletedAt: null } }),
-        this.prisma.organization.groupBy({
+        this.prisma
+          .unscoped('platform')
+          .organization.count({ where: { deletedAt: null } }),
+        this.prisma.unscoped('platform').organization.groupBy({
           by: ['status'],
           where: { deletedAt: null },
           _count: { _all: true },
         }),
         this.liveSubscribersByPlan(),
-        this.prisma.organization.findMany({
+        this.prisma.unscoped('platform').organization.findMany({
           where: { deletedAt: null, status: OrgStatus.SUSPENDED_PAST_DUE },
           select: {
             id: true,
@@ -163,18 +165,22 @@ export class FinanceService {
   private async liveSubscribersByPlan(): Promise<
     FinanceSnapshotResponse['plans']
   > {
-    const grouped = await this.prisma.organization.groupBy({
-      by: ['planId'],
-      where: { deletedAt: null, planId: { not: null } },
-      _count: { _all: true },
-      _sum: { maxAgentSeats: true },
-    });
+    const grouped = await this.prisma
+      .unscoped('platform')
+      .organization.groupBy({
+        by: ['planId'],
+        where: { deletedAt: null, planId: { not: null } },
+        _count: { _all: true },
+        _sum: { maxAgentSeats: true },
+      });
 
     const planIds = grouped.map((row) => row.planId as string);
-    const plans = await this.prisma.subscriptionPlan.findMany({
-      where: { id: { in: planIds } },
-      select: { id: true, name: true },
-    });
+    const plans = await this.prisma
+      .unscoped('platform')
+      .subscriptionPlan.findMany({
+        where: { id: { in: planIds } },
+        select: { id: true, name: true },
+      });
     const names = new Map(plans.map((plan) => [plan.id, plan.name]));
 
     return grouped
@@ -264,7 +270,7 @@ export class FinanceService {
     const { from, to } = this.range(request);
 
     const [points, currentlyOffboarded] = await Promise.all([
-      this.prisma.$queryRaw<DayCount[]>`
+      this.prisma.unscoped('platform').$queryRaw<DayCount[]>`
         SELECT to_char(stripe_created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
                event_type AS "eventType",
                COUNT(*)::int AS count
@@ -287,7 +293,7 @@ export class FinanceService {
       // ticket-service and is a cross-service read this surface does not have.
       // Deliberately not built here; the rename is what stops the number being
       // read as history in the meantime.
-      this.prisma.$queryRaw<DayCount[]>`
+      this.prisma.unscoped('platform').$queryRaw<DayCount[]>`
         SELECT to_char(deleted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
                ${OFFBOARDED_EVENT_TYPE} AS "eventType",
                COUNT(*)::int AS count

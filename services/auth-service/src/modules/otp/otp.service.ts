@@ -118,7 +118,7 @@ export class OtpService {
     // decided the outcome, and a failed verification returns the same response
     // it would otherwise -- it just must not mark the address verified.
     if (response.verified) {
-      await this.prisma.user.update({
+      await this.prisma.unscoped('own account').user.update({
         where: { id: request.userId },
         data: { isEmailVerified: true },
       });
@@ -168,7 +168,7 @@ export class OtpService {
     // the user only on success, which is what makes this endpoint safe to use
     // for CHANGING a number.
     if (response.verified) {
-      await this.prisma.user.update({
+      await this.prisma.unscoped('own account').user.update({
         where: { id: request.userId },
         data: { phoneNumber: otp.target, isPhoneVerified: true },
       });
@@ -229,7 +229,7 @@ export class OtpService {
     // transaction reads.
     const codeHash = await hashCode(code);
 
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.unscoped('own account').$transaction(async (tx) => {
       await tx.otp.updateMany({
         where: { userId, purpose, isUsed: false },
         data: { isUsed: true },
@@ -276,7 +276,7 @@ export class OtpService {
     }
 
     if (await verifyCode(request.code, otp.codeHash)) {
-      await this.prisma.otp.update({
+      await this.prisma.unscoped('own account').otp.update({
         where: { id: otp.id },
         data: { isUsed: true },
       });
@@ -296,7 +296,7 @@ export class OtpService {
     const attemptsCount = otp.attemptsCount + 1;
     const exhausted = attemptsCount >= otp.maxAttempts;
 
-    await this.prisma.otp.update({
+    await this.prisma.unscoped('own account').otp.update({
       where: { id: otp.id },
       data: { attemptsCount, isUsed: exhausted },
     });
@@ -322,7 +322,7 @@ export class OtpService {
   }
 
   private findPending(userId: string, purpose: OtpPurpose) {
-    return this.prisma.otp.findFirst({
+    return this.prisma.unscoped('own account').otp.findFirst({
       where: {
         userId,
         purpose,
@@ -334,7 +334,7 @@ export class OtpService {
   }
 
   private async loadUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.unscoped('own account').user.findUnique({
       where: { id: userId, deletedAt: null },
       select: {
         id: true,

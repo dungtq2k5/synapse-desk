@@ -93,14 +93,14 @@ export class DepartmentsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.department.findMany({
+      this.prisma.scoped(context).department.findMany({
         where,
         include: DEPARTMENT_INCLUDE,
         orderBy,
         skip,
         take,
       }),
-      this.prisma.department.count({ where }),
+      this.prisma.scoped(context).department.count({ where }),
     ]);
 
     return {
@@ -145,7 +145,7 @@ export class DepartmentsService {
 
     if (ids.length === 0) return { items: [] };
 
-    const items = await this.prisma.department.findMany({
+    const items = await this.prisma.scoped(context).department.findMany({
       where: {
         ...tenantScope(context),
         // Spread AFTER the scope, or the scope's `deletedAt: null` wins and a
@@ -180,7 +180,7 @@ export class DepartmentsService {
     // Prisma open an implicit transaction and run those loads concurrently on
     // its single connection — deprecated in pg today, removed in pg@9.
     const department = await this.createOrConflict(() =>
-      this.prisma.department.create({
+      this.prisma.scoped(context).department.create({
         data: {
           organizationId,
           name,
@@ -197,7 +197,9 @@ export class DepartmentsService {
       metadata: { name: department.name },
     });
 
-    return toDepartmentResponse(await this.loadWithCounts(department.id));
+    return toDepartmentResponse(
+      await this.loadWithCounts(department.id, context),
+    );
   }
 
   async updateDepartment(
@@ -216,7 +218,7 @@ export class DepartmentsService {
     }
 
     const department = await this.createOrConflict(() =>
-      this.prisma.department.update({
+      this.prisma.scoped(context).department.update({
         where: { id: existing.id },
         data,
         select: { id: true, name: true, description: true },
@@ -235,7 +237,9 @@ export class DepartmentsService {
       },
     });
 
-    return toDepartmentResponse(await this.loadWithCounts(department.id));
+    return toDepartmentResponse(
+      await this.loadWithCounts(department.id, context),
+    );
   }
 
   /**
@@ -268,7 +272,7 @@ export class DepartmentsService {
       });
     }
 
-    await this.prisma.department.update({
+    await this.prisma.scoped(context).department.update({
       where: { id: department.id },
       data: softDeleteData(requireActor(context)),
     });
@@ -289,7 +293,7 @@ export class DepartmentsService {
   ): Promise<DepartmentResponse> {
     // Deliberately NOT `this.load`, which excludes soft-deleted rows — the only
     // rows this method can act on.
-    const existing = await this.prisma.department.findFirst({
+    const existing = await this.prisma.scoped(context).department.findFirst({
       where: {
         id: request.id,
         ...tenantScope(context),
@@ -309,7 +313,7 @@ export class DepartmentsService {
     // this row was deleted, that is a 409 rather than a 500.
     const department = await restoreOrConflict(
       () =>
-        this.prisma.department.update({
+        this.prisma.scoped(context).department.update({
           where: { id: existing.id },
           data: restoreData(),
           select: { id: true, name: true },
@@ -324,7 +328,9 @@ export class DepartmentsService {
       metadata: { name: department.name },
     });
 
-    return toDepartmentResponse(await this.loadWithCounts(department.id));
+    return toDepartmentResponse(
+      await this.loadWithCounts(department.id, context),
+    );
   }
 
   // ----------------------------------------------------------------------- Membership
@@ -353,7 +359,7 @@ export class DepartmentsService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.userDepartment.findMany({
+      this.prisma.scoped(context).userDepartment.findMany({
         where,
         include: {
           user: true,
@@ -363,7 +369,7 @@ export class DepartmentsService {
         skip,
         take,
       }),
-      this.prisma.userDepartment.count({ where }),
+      this.prisma.scoped(context).userDepartment.count({ where }),
     ]);
 
     // Member rows embed a user, so they leak a raw object path exactly as the
@@ -401,84 +407,86 @@ export class DepartmentsService {
       });
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // EVERY user must be in the caller's tenant, and this is the only thing
-      // that checks it: nothing in `user_departments` FKs prevents linking a
-      // foreign user to your department, because both ids are individually
-      // valid. Without this an admin could add another tenant's users and read
-      // them back through the member list.
-      const found = await tx.user.findMany({
-        where: { id: { in: userIds }, ...tenantScope(context) },
-        select: { id: true },
+    const result = await this.prisma
+      .scoped(context)
+      .$transaction(async (tx) => {
+        // EVERY user must be in the caller's tenant, and this is the only thing
+        // that checks it: nothing in `user_departments` FKs prevents linking a
+        // foreign user to your department, because both ids are individually
+        // valid. Without this an admin could add another tenant's users and read
+        // them back through the member list.
+        const found = await tx.user.findMany({
+          where: { id: { in: userIds }, ...tenantScope(context) },
+          select: { id: true },
+        });
+
+        if (found.length !== userIds.length) {
+          const known = new Set(found.map((user) => user.id));
+          throw new RpcException({
+            code: status.NOT_FOUND,
+            // NOT_FOUND rather than PERMISSION_DENIED: "that user exists but is
+            // not yours" confirms the id, turning this into a cross-tenant
+            // existence oracle.
+            message: `Unknown user(s): ${userIds.filter((id) => !known.has(id)).join(', ')}`,
+          });
+        }
+
+        const existing = await tx.userDepartment.findMany({
+          where: { departmentId: department.id, userId: { in: userIds } },
+          select: { userId: true },
+        });
+        const existingIds = new Set(existing.map((row) => row.userId));
+
+        // Demote FIRST, before anything is written to this department.
+        //
+        // Only one membership per user may be primary, and
+        // `user_departments_primary_key` enforces it immediately — the index is
+        // not DEFERRABLE, so it is checked per statement rather than at commit.
+        // Promoting someone whose primary is currently elsewhere therefore has to
+        // clear the old row before the new one exists, or the insert violates the
+        // index and the whole batch dies.
+        //
+        // This ran AFTER the writes below until a test caught it: adding a user
+        // to a new department as their primary failed outright whenever they
+        // already had a primary somewhere else — which is the single most common
+        // way the operation is used.
+        if (request.isPrimary) {
+          await tx.userDepartment.updateMany({
+            where: {
+              userId: { in: userIds },
+              departmentId: { not: department.id },
+              isPrimary: true,
+            },
+            data: { isPrimary: false },
+          });
+        }
+
+        // `updateMany` + `createMany` rather than N upserts: two statements
+        // regardless of batch size.
+        if (existingIds.size > 0) {
+          await tx.userDepartment.updateMany({
+            where: {
+              departmentId: department.id,
+              userId: { in: [...existingIds] },
+            },
+            data: { isPrimary: request.isPrimary, assignedById: actorId },
+          });
+        }
+
+        const toCreate = userIds.filter((id) => !existingIds.has(id));
+        if (toCreate.length > 0) {
+          await tx.userDepartment.createMany({
+            data: toCreate.map((userId) => ({
+              userId,
+              departmentId: department.id,
+              isPrimary: request.isPrimary,
+              assignedById: actorId,
+            })),
+          });
+        }
+
+        return { addedCount: toCreate.length, updatedCount: existingIds.size };
       });
-
-      if (found.length !== userIds.length) {
-        const known = new Set(found.map((user) => user.id));
-        throw new RpcException({
-          code: status.NOT_FOUND,
-          // NOT_FOUND rather than PERMISSION_DENIED: "that user exists but is
-          // not yours" confirms the id, turning this into a cross-tenant
-          // existence oracle.
-          message: `Unknown user(s): ${userIds.filter((id) => !known.has(id)).join(', ')}`,
-        });
-      }
-
-      const existing = await tx.userDepartment.findMany({
-        where: { departmentId: department.id, userId: { in: userIds } },
-        select: { userId: true },
-      });
-      const existingIds = new Set(existing.map((row) => row.userId));
-
-      // Demote FIRST, before anything is written to this department.
-      //
-      // Only one membership per user may be primary, and
-      // `user_departments_primary_key` enforces it immediately — the index is
-      // not DEFERRABLE, so it is checked per statement rather than at commit.
-      // Promoting someone whose primary is currently elsewhere therefore has to
-      // clear the old row before the new one exists, or the insert violates the
-      // index and the whole batch dies.
-      //
-      // This ran AFTER the writes below until a test caught it: adding a user
-      // to a new department as their primary failed outright whenever they
-      // already had a primary somewhere else — which is the single most common
-      // way the operation is used.
-      if (request.isPrimary) {
-        await tx.userDepartment.updateMany({
-          where: {
-            userId: { in: userIds },
-            departmentId: { not: department.id },
-            isPrimary: true,
-          },
-          data: { isPrimary: false },
-        });
-      }
-
-      // `updateMany` + `createMany` rather than N upserts: two statements
-      // regardless of batch size.
-      if (existingIds.size > 0) {
-        await tx.userDepartment.updateMany({
-          where: {
-            departmentId: department.id,
-            userId: { in: [...existingIds] },
-          },
-          data: { isPrimary: request.isPrimary, assignedById: actorId },
-        });
-      }
-
-      const toCreate = userIds.filter((id) => !existingIds.has(id));
-      if (toCreate.length > 0) {
-        await tx.userDepartment.createMany({
-          data: toCreate.map((userId) => ({
-            userId,
-            departmentId: department.id,
-            isPrimary: request.isPrimary,
-            assignedById: actorId,
-          })),
-        });
-      }
-
-      return { addedCount: toCreate.length, updatedCount: existingIds.size };
-    });
 
     this.audit.record(context, {
       action: AuditAction.DEPARTMENT_MEMBERS_ADDED,
@@ -508,18 +516,20 @@ export class DepartmentsService {
   ): Promise<RemoveDepartmentMemberResponse> {
     const department = await this.load(request.departmentId, context);
 
-    const membership = await this.prisma.userDepartment.findUnique({
-      // Safe as a findUnique despite the rule in `tenantScope`: `department` was
-      // already resolved under the tenant filter above, so this composite key is
-      // pinned to a department the caller may see.
-      where: {
-        userId_departmentId: {
-          userId: request.userId,
-          departmentId: department.id,
+    const membership = await this.prisma
+      .scoped(context)
+      .userDepartment.findUnique({
+        // Safe as a findUnique despite the rule in `tenantScope`: `department` was
+        // already resolved under the tenant filter above, so this composite key is
+        // pinned to a department the caller may see.
+        where: {
+          userId_departmentId: {
+            userId: request.userId,
+            departmentId: department.id,
+          },
         },
-      },
-      select: { isPrimary: true },
-    });
+        select: { isPrimary: true },
+      });
     if (!membership) {
       throw new RpcException({
         code: status.NOT_FOUND,
@@ -528,13 +538,15 @@ export class DepartmentsService {
     }
 
     if (membership.isPrimary) {
-      const otherCount = await this.prisma.userDepartment.count({
-        where: {
-          userId: request.userId,
-          departmentId: { not: department.id },
-          department: { deletedAt: null },
-        },
-      });
+      const otherCount = await this.prisma
+        .scoped(context)
+        .userDepartment.count({
+          where: {
+            userId: request.userId,
+            departmentId: { not: department.id },
+            department: { deletedAt: null },
+          },
+        });
       if (otherCount > 0) {
         throw new RpcException({
           // ABORTED -> 409, same reasoning as deleteDepartment above.
@@ -545,7 +557,7 @@ export class DepartmentsService {
       }
     }
 
-    await this.prisma.userDepartment.delete({
+    await this.prisma.scoped(context).userDepartment.delete({
       where: {
         userId_departmentId: {
           userId: request.userId,
@@ -579,7 +591,7 @@ export class DepartmentsService {
     id: string,
     context: CallerContext,
   ): Promise<DepartmentRow> {
-    const department = await this.prisma.department.findFirst({
+    const department = await this.prisma.scoped(context).department.findFirst({
       where: { id, ...tenantScope(context) },
       include: DEPARTMENT_INCLUDE,
     });
@@ -602,8 +614,11 @@ export class DepartmentsService {
    * transaction's single connection. No tenant filter — the caller has already
    * proved the row is theirs by writing to it.
    */
-  private loadWithCounts(id: string): Promise<DepartmentRow> {
-    return this.prisma.department.findUniqueOrThrow({
+  private loadWithCounts(
+    id: string,
+    context: CallerContext,
+  ): Promise<DepartmentRow> {
+    return this.prisma.scoped(context).department.findUniqueOrThrow({
       where: { id },
       include: DEPARTMENT_INCLUDE,
     });

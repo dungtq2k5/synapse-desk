@@ -3,6 +3,7 @@ import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotaCounterService } from '../ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
+import { systemContext } from '@synapsedesk/contracts';
 
 /**
  * How far back to look for tenants worth reconciling.
@@ -45,10 +46,12 @@ export class QuotaReconciliationJob {
    * silently reconcile everyone against whichever tenant's cycle it picked.
    */
   async reconcile(organizationId: string, cycleStart: Date): Promise<bigint> {
-    const result = await this.prisma.aiGeneration.aggregate({
-      where: { organizationId, createdAt: { gte: cycleStart } },
-      _sum: { estimatedCostMicros: true },
-    });
+    const result = await this.prisma
+      .scoped(systemContext(organizationId))
+      .aiGeneration.aggregate({
+        where: { organizationId, createdAt: { gte: cycleStart } },
+        _sum: { estimatedCostMicros: true },
+      });
 
     const truth = result._sum.estimatedCostMicros ?? 0n;
 
@@ -100,10 +103,12 @@ export class QuotaReconciliationJob {
     // own cycle then decides what to sum, which is the part that must be right.
     const since = new Date(Date.now() - RECENT_SPEND_WINDOW_MS);
 
-    const tenants = await this.prisma.aiGeneration.groupBy({
-      by: ['organizationId'],
-      where: { createdAt: { gte: since } },
-    });
+    const tenants = await this.prisma
+      .unscoped('cross-tenant job')
+      .aiGeneration.groupBy({
+        by: ['organizationId'],
+        where: { createdAt: { gte: since } },
+      });
     if (tenants.length === 0) return 0;
 
     const cycles = await this.authReference.listOrganizationCycles(

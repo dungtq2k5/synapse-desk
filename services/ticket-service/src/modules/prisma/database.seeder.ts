@@ -21,6 +21,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Schema objects and the seed cross every tenant by nature. */
+  private get db() {
+    return this.prisma.unscoped('schema');
+  }
+
   /**
    * The schema objects, on EVERY boot.
    *
@@ -106,7 +111,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   async assertSchemaExists(): Promise<void> {
     const expected = ['tickets', 'ticket_assignments', 'ticket_messages'];
 
-    const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`
+    const rows = await this.db.$queryRaw<{ table_name: string }[]>`
       SELECT table_name FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name = ANY(${expected})
     `;
@@ -139,7 +144,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * current assignment" and both insert. Only the index makes one of them lose.
    */
   private async applyPartialIndexes(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_assignments_current_key"
         ON "ticket_assignments" ("ticket_id") WHERE "is_current" = true;
 
@@ -171,12 +176,12 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // The job deletes and re-inserts rather than upserting, so this is not the
     // mechanism it relies on. It is the guard that turns a future bug into a
     // constraint violation instead of a silently doubled number.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_daily_stats_dept_key"
         ON "ticket_daily_stats" ("organization_id", "day", "department_id")
         WHERE "department_id" IS NOT NULL;
     `);
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_daily_stats_org_key"
         ON "ticket_daily_stats" ("organization_id", "day")
         WHERE "department_id" IS NULL;
@@ -197,7 +202,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * boot without the catalogue check.
    */
   private async applyCheckConstraints(): Promise<void> {
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       DO $$
       BEGIN
         IF NOT EXISTS (
@@ -211,7 +216,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     `);
     // A file belongs to a message or to the ticket's opening, never both and
     // never neither: one owner is what every read joins through.
-    await this.prisma.$executeRawUnsafe(`
+    await this.db.$executeRawUnsafe(`
       DO $$
       BEGIN
         IF NOT EXISTS (

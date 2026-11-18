@@ -80,8 +80,10 @@ export class AuditReadService {
     };
 
     const [items, totalItems] = await Promise.all([
-      this.prisma.auditLog.findMany({ where, orderBy, skip, take }),
-      this.prisma.auditLog.count({ where }),
+      this.prisma
+        .scoped(context)
+        .auditLog.findMany({ where, orderBy, skip, take }),
+      this.prisma.scoped(context).auditLog.count({ where }),
     ]);
 
     return {
@@ -102,7 +104,7 @@ export class AuditReadService {
     request: ListAuditActionsRequest,
     context: CallerContext,
   ): Promise<ListAuditActionsResponse> {
-    const rows = await this.prisma.auditLog.findMany({
+    const rows = await this.prisma.scoped(context).auditLog.findMany({
       where: this.scope(request.platformScope, context),
       select: { action: true },
       distinct: ['action'],

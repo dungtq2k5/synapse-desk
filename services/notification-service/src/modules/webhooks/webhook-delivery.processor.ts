@@ -6,6 +6,7 @@ import {
   NOTIFICATION_TYPES,
   NotificationPriority,
   type CreateInAppNotificationCommand,
+  systemContext,
 } from '@synapsedesk/contracts';
 import {
   JetStreamPublisher,
@@ -46,21 +47,29 @@ export class WebhookDeliveryProcessor extends WorkerHost {
   }
 
   async process(job: Job<WebhookJobData>): Promise<void> {
-    const delivery = await this.prisma.webhookDelivery.findUnique({
-      where: { id: job.data.deliveryId },
-      include: { endpoint: true },
-    });
+    // The job carries only the delivery's id, which this service wrote; the
+    // row names its tenant, and everything after this read is scoped to it.
+    const delivery = await this.prisma
+      .unscoped('job by row id')
+      .webhookDelivery.findUnique({
+        where: { id: job.data.deliveryId },
+        include: { endpoint: true },
+      });
 
     // The row can be gone (retention swept it mid-retry) or already settled (a
     // duplicate job after a redeploy). Neither is work.
     if (!delivery || delivery.status !== String(WebhookDeliveryStatus.PENDING))
       return;
 
+    const db = this.prisma.scoped(
+      systemContext(delivery.endpoint.organizationId),
+    );
+
     // Disabled between enqueue and now — the auto-disable below, or a tenant's
     // own PATCH. The row settles as FAILED with the reason, so the deliveries
     // list explains itself instead of showing a PENDING that never moves.
     if (!delivery.endpoint.isActive) {
-      await this.prisma.webhookDelivery.update({
+      await db.webhookDelivery.update({
         where: { id: delivery.id },
         data: {
           status: WebhookDeliveryStatus.FAILED,
@@ -77,7 +86,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     );
 
     if (outcome.delivered) {
-      await this.prisma.webhookDelivery.update({
+      await db.webhookDelivery.update({
         where: { id: delivery.id },
         data: {
           status: WebhookDeliveryStatus.DELIVERED,
@@ -90,7 +99,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
       // Any success resets the streak — the disable threshold is about a DEAD
       // endpoint, not a flaky one.
-      await this.prisma.webhookEndpoint.update({
+      await db.webhookEndpoint.update({
         where: { id: delivery.endpointId },
         data: { consecutiveFailures: 0 },
       });
@@ -100,7 +109,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
     const exhausted = job.attemptsMade + 1 >= WEBHOOK_MAX_ATTEMPTS;
 
-    await this.prisma.webhookDelivery.update({
+    await db.webhookDelivery.update({
       where: { id: delivery.id },
       data: {
         // FAILED only when BullMQ will not try again: the status answers "was
@@ -139,7 +148,8 @@ export class WebhookDeliveryProcessor extends WorkerHost {
     organizationId: string,
     deliveryId: string,
   ): Promise<void> {
-    const endpoint = await this.prisma.webhookEndpoint.update({
+    const db = this.prisma.scoped(systemContext(organizationId));
+    const endpoint = await db.webhookEndpoint.update({
       where: { id: endpointId },
       data: { consecutiveFailures: { increment: 1 } },
     });
@@ -153,7 +163,7 @@ export class WebhookDeliveryProcessor extends WorkerHost {
 
     const reason = `Auto-disabled after ${endpoint.consecutiveFailures} consecutive failed deliveries`;
 
-    await this.prisma.webhookEndpoint.update({
+    await db.webhookEndpoint.update({
       where: { id: endpointId },
       data: {
         isActive: false,

@@ -55,14 +55,16 @@ export class ExpiredLockSweep {
    * almost every row earns nothing.
    */
   async sweep(now: Date = new Date()): Promise<number> {
-    const expired = await this.prisma.user.findMany({
-      where: {
-        isLocked: true,
-        lockedUntil: { not: null, lte: now },
-        deletedAt: null,
-      },
-      select: { id: true, email: true, fullName: true },
-    });
+    const expired = await this.prisma
+      .unscoped('cross-tenant job')
+      .user.findMany({
+        where: {
+          isLocked: true,
+          lockedUntil: { not: null, lte: now },
+          deletedAt: null,
+        },
+        select: { id: true, email: true, fullName: true },
+      });
 
     let unlocked = 0;
 
@@ -71,10 +73,12 @@ export class ExpiredLockSweep {
       // path's lazy unlock racing the same user produce ONE unlock and one
       // audit row. At expiry both firing at once is the normal case, not an
       // edge case.
-      const { count } = await this.prisma.user.updateMany({
-        where: { id: user.id, isLocked: true },
-        data: { isLocked: false, lockedUntil: null },
-      });
+      const { count } = await this.prisma
+        .unscoped('cross-tenant job')
+        .user.updateMany({
+          where: { id: user.id, isLocked: true },
+          data: { isLocked: false, lockedUntil: null },
+        });
 
       if (count === 0) continue;
 
