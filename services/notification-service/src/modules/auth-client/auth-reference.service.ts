@@ -7,7 +7,9 @@ import {
   GRPC_DEADLINE_MS,
   USER_SERVICE_NAME,
   UserServiceClient,
+  packRequestContext,
 } from '@synapsedesk/grpc-proto';
+import { systemContext } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import {
   NotificationRecipient,
@@ -57,11 +59,11 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.userService
-          .listPermissionHolders({
-            organizationId,
-            permissionCode,
-            departmentId,
-          })
+          .listPermissionHolders(
+            { organizationId, permissionCode, departmentId },
+            // A job for this tenant: auth refuses anyone else.
+            packRequestContext(systemContext(organizationId)),
+          )
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
@@ -92,16 +94,19 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.userService
-          .listUsersByIds({
-            organizationId,
-            userIds,
-            // **The notification audience, unchanged**. `false`
-            // keeps "a notification to a deactivated account is a row nobody
-            // reads" true now that the flag exists for the GraphQL loader,
-            // which wants the opposite answer.
-            includeInactive: false,
-            projection: UserProjection.USER_PROJECTION_NOTIFICATION,
-          })
+          .listUsersByIds(
+            {
+              organizationId,
+              userIds,
+              // **The notification audience, unchanged**. `false`
+              // keeps "a notification to a deactivated account is a row nobody
+              // reads" true now that the flag exists for the GraphQL loader,
+              // which wants the opposite answer.
+              includeInactive: false,
+              projection: UserProjection.USER_PROJECTION_NOTIFICATION,
+            },
+            packRequestContext(systemContext(organizationId)),
+          )
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 

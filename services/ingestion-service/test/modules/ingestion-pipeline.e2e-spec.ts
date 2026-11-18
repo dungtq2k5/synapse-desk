@@ -2146,7 +2146,9 @@ describe('The ingestion pipeline (e2e)', () => {
             key === 'AI_EMBEDDING_PROVIDER' ? 'ollama' : config.get(key),
         } as unknown as ConfigService,
         {
-          documentChunk: { findFirst: () => Promise.resolve(null) },
+          unscoped: () => ({
+            documentChunk: { findFirst: () => Promise.resolve(null) },
+          }),
         } as unknown as PrismaService,
       );
       await expect(local.ensureCollection()).resolves.toBe(true);

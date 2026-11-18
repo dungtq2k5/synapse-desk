@@ -65,9 +65,24 @@ CONTEXT_METADATA = {
     "department_ids": "department_ids",
     "permission_codes": "permission_codes",
     "is_email_verified": "is_email_verified",
+    "is_system": "is_system",
     "ip": "ip_address",
     "user_agent": "user_agent",
 }
+
+
+def system_metadata(organization_id: str) -> list[tuple[str, str]]:
+    """The metadata of a system caller working for one tenant.
+
+    What `packRequestContext(systemContext(organizationId))` sends: the system
+    flag and the tenant, no user. For this service's own writes to a peer that
+    serves system callers only, such as the AI ledger.
+    """
+    return [
+        (CONTEXT_METADATA["is_system"], "true"),
+        (CONTEXT_METADATA["organization_id"], organization_id),
+        (CONTEXT_METADATA["is_super_admin"], "false"),
+    ]
 
 
 def unpack_caller_context(metadata: Any) -> CallerContext:

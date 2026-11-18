@@ -28,7 +28,11 @@ import {
   AiGenerationStatus,
   SCHEDULED_JOBS,
 } from '@synapsedesk/contracts';
-import { AuditPublisher, JobHealthService } from '@synapsedesk/nest-common';
+import {
+  AuditPublisher,
+  JobHealthService,
+  requireSystem,
+} from '@synapsedesk/nest-common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
@@ -67,8 +71,15 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    * `generatedFromId` on the reply that closes the acceptance loop — and
    * blocking on the write would make bookkeeping a latency cost on a path that
    * has already spent the money.
+   *
+   * System callers only: rag-service sends the system context of the tenant
+   * it generated for, and names that tenant in the request.
    */
-  recordGeneration(request: RecordGenerationRequest): RecordGenerationResponse {
+  recordGeneration(
+    request: RecordGenerationRequest,
+    metadata?: Metadata,
+  ): RecordGenerationResponse {
+    requireSystem(unpackCallerContext(metadata));
     const generationId = this.ledger.record({
       organizationId: request.organizationId,
       userId: request.userId ?? null,

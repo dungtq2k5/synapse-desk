@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 
 import grpc
 
+from rag_service.common.metadata import system_metadata
 from rag_service.generated.synapsedesk.ingestion import ledger_pb2, ledger_pb2_grpc
 
 logger = logging.getLogger(__name__)
@@ -108,7 +109,13 @@ class LedgerClient:
 
         try:
             response = await asyncio.shield(
-                self._stub.RecordGeneration(request, timeout=LEDGER_DEADLINE_SECONDS)
+                self._stub.RecordGeneration(
+                    request,
+                    timeout=LEDGER_DEADLINE_SECONDS,
+                    # The ledger serves system callers only: this service, for
+                    # the tenant it generated for.
+                    metadata=system_metadata(entry.organization_id),
+                )
             )
             return response.generation_id
         except Exception:

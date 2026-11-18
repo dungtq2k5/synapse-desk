@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import {
   JobHealthService,
   requireActor,
+  requireSystem,
   requireTenant,
 } from '@synapsedesk/nest-common';
 import { status, type Metadata } from '@grpc/grpc-js';
@@ -77,16 +78,18 @@ export class NotificationsGrpcController implements NotificationServiceControlle
   ) {}
 
   /**
-   * The `In-Reply-To` fallback.
+   * The `In-Reply-To` fallback: system callers only.
    *
-   * **No caller context, and it does not need one.** The caller is the inbound
-   * webhook, which holds a verified Resend signature and no user; the tenant it
-   * scopes on travels in the REQUEST, resolved from the address the mail was
-   * sent to rather than from anything the message claimed.
+   * The caller is the gateway's inbound webhook, which holds a verified Resend
+   * signature and no user. It sends the system context of the tenant it
+   * resolved from the address the mail was sent to, and names that tenant in
+   * the REQUEST; anyone else is refused.
    */
   resolveTicketByMessageId(
     request: ResolveTicketByMessageIdRequest,
+    metadata?: Metadata,
   ): Promise<ResolveTicketByMessageIdResponse> {
+    requireSystem(unpackCallerContext(metadata));
     return this.inboundThreads.resolveTicketByMessageId(request);
   }
 

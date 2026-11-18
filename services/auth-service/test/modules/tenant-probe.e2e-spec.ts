@@ -35,6 +35,9 @@ import { SessionsGrpcController } from '../../src/modules/sessions/sessions-grpc
 import { TwoFactorAuthGrpcController } from '../../src/modules/auth/two-factor-auth-grpc.controller';
 import { UsersGrpcController } from '../../src/modules/users/users-grpc.controller';
 import { superAdminContext } from '@synapsedesk/testing/context';
+import { expectRpc } from '@synapsedesk/testing/rpc';
+import { systemContext } from '@synapsedesk/contracts';
+import { status } from '@grpc/grpc-js';
 
 /**
  * **The cross-tenant probe**: every RPC that takes an id, called by tenant
@@ -261,16 +264,18 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     },
     'UserService/GetUser': { build: memberById },
     'UserService/GetUserPermissions': { build: memberById },
+    // Both name A's tenant: the first serves system callers only, the second
+    // only the caller's own tenant.
     'UserService/ListPermissionHolders': {
       build: (a) => ({
-        organizationId: B.org.id,
+        organizationId: a.organizationId,
         permissionCode: 'user.read',
         departmentId: a.department,
       }),
     },
     'UserService/ListUsersByIds': {
       build: (a) => ({
-        organizationId: B.org.id,
+        organizationId: a.organizationId,
         userIds: [a.admin, a.member],
         includeInactive: true,
       }),
@@ -443,11 +448,9 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
       "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
     'UserService/GetUser': 'refused FAILED_PRECONDITION',
     'UserService/GetUserPermissions': 'refused FAILED_PRECONDITION',
-    'UserService/ListPermissionHolders':
-      "answers: scoped to the tenant the request names, not the caller's",
+    'UserService/ListPermissionHolders': 'refused PERMISSION_DENIED',
     'UserService/ListUsers': 'refused FAILED_PRECONDITION',
-    'UserService/ListUsersByIds':
-      "answers: scoped to the tenant the request names, not the caller's",
+    'UserService/ListUsersByIds': 'refused FAILED_PRECONDITION',
     'UserService/LockUser': 'refused FAILED_PRECONDITION',
     'UserService/ResetUserTwoFactor': 'refused FAILED_PRECONDITION',
     'UserService/RestoreUser': 'refused FAILED_PRECONDITION',
@@ -509,4 +512,64 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
       expect(reached).toBe(expected.split(':')[0]);
     },
   );
+
+  /**
+   * **`ResolveInboundSender`**, which takes a tenant and no id, so the id
+   * sweep above never lists it. It provisions a user in the tenant it names,
+   * so only a system caller (the gateway's inbound mail) may call it.
+   */
+  describe('ResolveInboundSender: system callers only', () => {
+    // Through a promise, so a refusal the handler throws synchronously still
+    // rejects.
+    const resolve =
+      (context: Parameters<typeof controllerCall>[2]) =>
+      (request: Record<string, unknown>) =>
+        Promise.resolve().then(() =>
+          controllerCall(
+            controllers,
+            'UserService/ResolveInboundSender',
+            context,
+          )(request),
+        );
+    const naming = (organizationId: string) => ({
+      organizationId,
+      email: `${randomUUID()}@example.test`,
+      displayName: 'Inbound sender',
+    });
+
+    it('**tenant B naming A’s tenant** is refused, and A gains no user', async () => {
+      const a = await seedA();
+      const before = await fx.prisma.user.count({
+        where: { organizationId: a.organizationId },
+      });
+
+      await expectRpc(
+        resolve(superuser(B))(naming(a.organizationId)),
+        status.PERMISSION_DENIED,
+      );
+
+      expect(
+        await fx.prisma.user.count({
+          where: { organizationId: a.organizationId },
+        }),
+      ).toBe(before);
+    });
+
+    it('**a Super Admin** is refused', async () => {
+      const a = await seedA();
+
+      await expectRpc(
+        resolve(asSuperAdmin())(naming(a.organizationId)),
+        status.PERMISSION_DENIED,
+      );
+    });
+
+    it('**a system caller for the tenant** is answered', async () => {
+      const a = await seedA();
+
+      await expect(
+        resolve(systemContext(a.organizationId))(naming(a.organizationId)),
+      ).resolves.toBeDefined();
+    });
+  });
 });

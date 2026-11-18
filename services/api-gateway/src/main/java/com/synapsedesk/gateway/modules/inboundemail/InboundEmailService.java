@@ -360,9 +360,11 @@ public class InboundEmailService {
       payload.fromName()
     );
 
-    ResolveInboundSenderResponse sender = authorised(
+    // The tenant resolved from the verified address, as a system caller:
+    // auth refuses anyone else.
+    ResolveInboundSenderResponse sender = asSystem(
       users,
-      UNKNOWN_ORIGIN,
+      organizationId,
       GRPC_DEADLINE_MS
     ).resolveInboundSender(senderRequest.build());
     if (!sender.hasUserId() || sender.getUserId().isEmpty()) {
@@ -524,9 +526,9 @@ public class InboundEmailService {
       .toList();
 
     for (String providerMessageId : lookups) {
-      var resolved = authorised(
+      var resolved = asSystem(
         notifications,
-        UNKNOWN_ORIGIN,
+        organizationId,
         GRPC_DEADLINE_MS
       ).resolveTicketByMessageId(
         ResolveTicketByMessageIdRequest.newBuilder()
@@ -907,6 +909,24 @@ public class InboundEmailService {
   }
 
   /** A stub that carries the caller's context and a deadline on every call it makes. */
+  /**
+   * As the system caller for one tenant: the inbound lookups that take their
+   * tenant from the request, which their peers serve to system callers only.
+   */
+  private static <S extends AbstractStub<S>> S asSystem(
+    S stub,
+    String organizationId,
+    long deadlineMs
+  ) {
+    return stub
+      .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(
+          CallerMetadata.system(UNKNOWN_ORIGIN, organizationId)
+        )
+      );
+  }
+
   private static <S extends AbstractStub<S>> S authorised(
     S stub,
     RequestOrigin origin,

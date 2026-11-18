@@ -49,8 +49,34 @@ public final class CallerMetadata {
     GrpcMetadata.GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED,
     Metadata.ASCII_STRING_MARSHALLER
   );
+  private static final Metadata.Key<String> IS_SYSTEM = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_IS_SYSTEM,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
 
   private CallerMetadata() {}
+
+  /**
+   * A system caller working for one tenant, as a background job is: the
+   * system flag and the tenant, no user. The peers read it with
+   * `unpackCallerContext`, like every other caller.
+   *
+   * <p>For the inbound-mail path only, where the gateway holds a verified
+   * webhook and no user, and names the tenant it resolved from the address.
+   * Nothing built from a user's context reaches it: {@link #of(RequestContext)}
+   * never sets the flag.
+   */
+  public static Metadata system(RequestOrigin origin, String organizationId) {
+    Metadata metadata = of(origin);
+    metadata.put(IS_SYSTEM, "true");
+    metadata.put(ORGANIZATION_ID, organizationId);
+    metadata.put(IS_SUPER_ADMIN, "false");
+    metadata.put(DEPARTMENT_IDS, "[]");
+    metadata.put(PERMISSION_CODES, "[]");
+    metadata.put(IS_EMAIL_VERIFIED, "true");
+
+    return metadata;
+  }
 
   /** An unauthenticated caller: `login`, `register`, password reset. */
   public static Metadata of(RequestOrigin origin) {

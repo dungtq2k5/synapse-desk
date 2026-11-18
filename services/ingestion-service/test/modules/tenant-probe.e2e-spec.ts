@@ -199,10 +199,11 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
     'DocumentService/CancelIngestionJob': { build: (a) => ({ id: a.job }) },
     'DocumentService/ListDocumentIngestionJobs': { build: byId },
     'AiLedgerService/RecordGeneration': {
-      // Service-to-service: the tenant is the request field. B naming its own
-      // tenant must not record a generation that cites A's chunks.
+      // System callers only, and the tenant is the request field: B naming A's
+      // tenant is refused. (A system caller citing another tenant's chunk is
+      // the ledger's own row: the chunk is dropped.)
       build: (a) => ({
-        organizationId: B.organizationId,
+        organizationId: a.organizationId,
         userId: a.userId,
         ticketId: a.ticket,
         purpose: 'DRAFT',
@@ -302,8 +303,7 @@ describe('Cross-tenant probe: ingestion-service (e2e)', () => {
    * `PROBE_RECORD=<file>` writes each outcome to the file instead.
    */
   const SUPER_ADMIN: Record<string, string> = {
-    'AiLedgerService/RecordGeneration':
-      "answers: since the scoped client, a generation keeps only its own tenant's chunk ids (was reaches)",
+    'AiLedgerService/RecordGeneration': 'refused PERMISSION_DENIED',
     'AiLedgerService/RecordGenerationOutcome': 'refused FAILED_PRECONDITION',
     'DocumentService/CancelIngestionJob': 'refused FAILED_PRECONDITION',
     'DocumentService/ConfirmDocument': 'refused FAILED_PRECONDITION',
