@@ -145,7 +145,7 @@ message TicketStatusChangeResponse {
   // Absent on the FIRST row of a ticket's life, which has no prior status.
   optional TicketStatus from_status = 3;
   TicketStatus to_status = 4;
-  // Never empty: a transition loads its ticket through `tenantScope`, which
+  // Never empty: a transition loads its ticket after `requireActor`, which
   // refuses a caller with no identity, so every row has an actor.
   string changed_by_id = 5;
   optional string reason = 6;

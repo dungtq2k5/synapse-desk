@@ -21,6 +21,7 @@
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { RpcException } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
 import { isObservable, lastValueFrom, toArray } from 'rxjs';
 import * as protobuf from 'protobufjs';
 import { PROTO_ROOT } from '../constants';
@@ -372,6 +373,43 @@ export async function probeCall(options: {
     onA: normalized(onA),
     onMissing: normalized(onMissing),
   };
+}
+
+/**
+ * What a Super Admin gets on a tenant RPC, called on A's ids with no tenant:
+ *
+ * - `refused <CODE>`: the RPC turned them away;
+ * - `reaches`: the answer names A's data (beyond what the request carried),
+ *   or the call changed A's rows;
+ * - `answers`: it ran, and touched nothing of A's.
+ *
+ * @example await superAdminReach({ request, call, local, foreign, prisma }) // 'refused FAILED_PRECONDITION'
+ */
+export async function superAdminReach(options: {
+  request: Record<string, unknown>;
+  call: (request: Record<string, unknown>) => unknown;
+  local: ReadonlySet<string>;
+  foreign: ReadonlySet<string>;
+  prisma: RawClient;
+}): Promise<string> {
+  const { request, call, local, foreign, prisma } = options;
+  const before = await snapshot(prisma);
+  const outcome = await settle(() => call(request));
+  const after = await quietSnapshot(prisma);
+
+  if (outcome.kind === 'rejected') {
+    return `refused ${status[outcome.code ?? -1] ?? String(outcome.code)}`;
+  }
+  if (outcome.kind === 'error') return `error ${outcome.details}`;
+
+  const named = namedIdentifiers(
+    outcome,
+    new Set([...local, ...foreign]),
+    request,
+  );
+  const changed = tenantChanges(before, after, local, foreign);
+
+  return named.length > 0 || changed.length > 0 ? 'reaches' : 'answers';
 }
 
 /** What a probe row expects: no reach, and an answer that speaks for the check. */

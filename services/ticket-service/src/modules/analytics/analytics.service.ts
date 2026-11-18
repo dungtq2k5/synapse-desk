@@ -264,7 +264,6 @@ export class AnalyticsService {
       this.prisma.scoped(context).agentDailyStat.groupBy({
         by: ['agentId'],
         where: {
-          organizationId,
           day: { gte: range.from, lte: range.to },
         },
         _sum: {
@@ -326,14 +325,12 @@ export class AnalyticsService {
         ? await this.prisma
             .scoped(systemContext(organizationId))
             .agentDailyStat.findFirst({
-              where: { organizationId },
               orderBy: { day: 'desc' },
               select: { day: true },
             })
         : await this.prisma
             .scoped(systemContext(organizationId))
             .ticketDailyStat.findFirst({
-              where: { organizationId },
               orderBy: { day: 'desc' },
               select: { day: true },
             });
@@ -358,7 +355,6 @@ export class AnalyticsService {
       .scoped(systemContext(organizationId))
       .ticketDailyStat.findMany({
         where: {
-          organizationId,
           day: { gte: range.from, lte: range.to },
           ...(request.departmentId
             ? { departmentId: request.departmentId }
@@ -395,7 +391,6 @@ export class AnalyticsService {
   ): Promise<number> {
     return this.prisma.scoped(systemContext(organizationId)).ticket.count({
       where: {
-        organizationId,
         deletedAt: null,
         status: { notIn: [TicketStatus.RESOLVED, TicketStatus.CLOSED] },
         ...(request.departmentId

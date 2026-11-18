@@ -23,7 +23,7 @@ import { InvitationsService } from '../../src/modules/invitations/invitations.se
  *
  * **404, never 403.** A 403 says "that id exists, and it is not yours", which
  * is exactly what an attacker enumerating ids is after. 404 says nothing, and
- * is what `tenantScope()` produces naturally.
+ * is what the scoped client produces naturally.
  *
  * The per-module suites cover their own routes; this file catches an endpoint
  * added WITHOUT one, because a missing row here is visible and a missing test

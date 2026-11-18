@@ -49,7 +49,7 @@ export class QuotaReconciliationJob {
     const result = await this.prisma
       .scoped(systemContext(organizationId))
       .aiGeneration.aggregate({
-        where: { organizationId, createdAt: { gte: cycleStart } },
+        where: { createdAt: { gte: cycleStart } },
         _sum: { estimatedCostMicros: true },
       });
 

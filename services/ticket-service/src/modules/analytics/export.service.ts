@@ -120,7 +120,6 @@ export class ExportService {
     // and a READY one is a file the caller can have again.
     const inFlight = await this.prisma.scoped(context).export.findFirst({
       where: {
-        organizationId,
         // **The REQUESTER is part of the identity, not just the range.**
         // Without this a caller is handed an export somebody else's visibility
         // built: an Org Admin's `unrestricted` file, returned to an agent who
@@ -229,7 +228,7 @@ export class ExportService {
    * rule as everywhere else in the system.
    */
   async get(exportId: string, context: CallerContext) {
-    const organizationId = requireTenant(context);
+    requireTenant(context);
 
     // **An export belongs to the person who asked for it.**
     //
@@ -240,7 +239,6 @@ export class ExportService {
     const row = await this.prisma.scoped(context).export.findFirst({
       where: {
         id: exportId,
-        organizationId,
         requestedById: requireActor(context),
       },
     });

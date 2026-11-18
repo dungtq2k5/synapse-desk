@@ -201,7 +201,7 @@ model TicketStatusChange {
 
   /// No FK: postgres_auth. NOT nullable, and that is a fact about the write
   /// path rather than a preference: `transition` loads the ticket through
-  /// `tenantScope`, which refuses a caller with no `sub`, so no transition can
+  /// `requireActor`, which refuses a caller with no `sub`, so no transition can
   /// happen without an actor. A system-driven one — a future auto-close sweep —
   /// would have to enter somewhere other than `transition`, and this column
   /// should be revisited then rather than pre-emptively made to lie.

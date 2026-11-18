@@ -65,7 +65,7 @@ export class TicketAccessService implements OnModuleInit {
     client: Socket,
   ): Promise<boolean> {
     if (caller.permissionCodes.includes('ticket.read.all')) {
-      // Still tenant-scoped: the RPC below applies `tenantScope`, so an agent
+      // Still tenant-scoped: the RPC below is a scoped query, so an agent
       // with the permission cannot reach another tenant's ticket. Returning
       // early here would skip that — so it does not.
       return this.resolvesInTenant(ticketId, caller, client);

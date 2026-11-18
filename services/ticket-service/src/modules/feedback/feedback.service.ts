@@ -323,8 +323,8 @@ export class FeedbackService {
     // is correct: a text search is a question about text.
     const search = toSearchFilter(page.searchTerm);
 
+    requireTenant(context);
     const where: Prisma.AiResponseFeedbackWhereInput = {
-      organizationId: requireTenant(context),
       ...(search ? { feedbackText: search } : {}),
       // 0 is the proto zero value and means "no filter" — unambiguous here
       // because the only legal ratings are 1 and -1.

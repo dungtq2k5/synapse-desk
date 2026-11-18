@@ -180,7 +180,7 @@ export interface TicketStatusChangeResponse {
   fromStatus?: TicketStatus | undefined;
   toStatus: TicketStatus;
   /**
-   * Never empty: a transition loads its ticket through `tenantScope`, which
+   * Never empty: a transition loads its ticket after `requireActor`, which
    * refuses a caller with no identity, so every row has an actor.
    */
   changedById: string;

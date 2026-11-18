@@ -290,7 +290,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('REFUSES when the ticket resolves in ANOTHER tenant', async () => {
-      // The peer applies `tenantScope`, so a foreign id comes back NOT_FOUND.
+      // The peer's queries are tenant-scoped, so a foreign id comes back NOT_FOUND.
       // The relay must treat that as a refusal rather than an error to retry.
       fx.stubs.ticket.getTicket.mockReturnValue(
         throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'no such ticket')),

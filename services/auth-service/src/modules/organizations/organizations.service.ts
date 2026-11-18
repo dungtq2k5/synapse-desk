@@ -148,22 +148,20 @@ export class OrganizationsService {
     const [users, departments, roles, invitations, organizations, plans] =
       await Promise.all([
         this.prisma.scoped(context).user.findMany({
-          where: { id: { in: request.userIds }, organizationId },
+          where: { id: { in: request.userIds } },
           select: { id: true, fullName: true },
         }),
         this.prisma.scoped(context).department.findMany({
-          where: { id: { in: request.departmentIds }, organizationId },
+          where: { id: { in: request.departmentIds } },
           select: { id: true, name: true },
         }),
         this.prisma.scoped(context).role.findMany({
-          where: {
-            id: { in: request.roleIds },
-            OR: [{ organizationId }, { organizationId: null }],
-          },
+          // Own and shared roles: the scoped client's rule for roles.
+          where: { id: { in: request.roleIds } },
           select: { id: true, name: true },
         }),
         this.prisma.scoped(context).userInvitation.findMany({
-          where: { id: { in: request.invitationIds }, organizationId },
+          where: { id: { in: request.invitationIds } },
           select: { id: true, email: true },
         }),
         this.prisma.scoped(context).organization.findMany({
@@ -378,7 +376,7 @@ export class OrganizationsService {
    *
    * Unscoped deliberately: the gateway calls it with the organization id from
    * the JWT it has just verified, so the caller is asking about their OWN
-   * tenant by construction. Adding `tenantScope` here would be circular — the
+   * tenant by construction. Adding a tenant filter here would be circular — the
    * gate runs to decide whether that tenant may proceed at all.
    *
    * Returns the raw status plus a separate `deleted` flag. Collapsing them
@@ -810,14 +808,13 @@ export class OrganizationsService {
     const [departmentCount, memberCount, verifiedAdminCount] =
       await Promise.all([
         this.prisma.scoped(systemContext(organizationId)).department.count({
-          where: { organizationId, deletedAt: null },
+          where: { deletedAt: null },
         }),
         this.prisma.scoped(systemContext(organizationId)).user.count({
-          where: { organizationId, deletedAt: null },
+          where: { deletedAt: null },
         }),
         this.prisma.scoped(systemContext(organizationId)).user.count({
           where: {
-            organizationId,
             deletedAt: null,
             isEmailVerified: true,
           },
@@ -897,7 +894,7 @@ export class OrganizationsService {
    * Requests offboarding: soft-deletes the tenant and cuts off access now.
    *
    * Child rows are deliberately NOT soft-deleted with it. That would be a large
-   * write for no gain — `tenantScope` already excludes rows whose organization
+   * write for no gain — the tenant filter already excludes rows whose organization
    * is gone, and login checks organization status — whereas cascading marks
    * would have to be undone one by one if the tenant changes its mind.
    *
@@ -915,7 +912,7 @@ export class OrganizationsService {
     const existing = await this.load(context);
 
     const members = await this.prisma.scoped(context).user.findMany({
-      where: { organizationId: existing.id, deletedAt: null },
+      where: { deletedAt: null },
       select: { id: true },
     });
 
@@ -1120,7 +1117,6 @@ export class OrganizationsService {
   ): Promise<void> {
     const admins = await this.prisma.scoped(context).user.findMany({
       where: {
-        organizationId,
         deletedAt: null,
         roles: {
           some: { permissions: { some: { code: 'organization.update' } } },

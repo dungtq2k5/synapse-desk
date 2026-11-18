@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { CallerContext } from '@synapsedesk/grpc-proto';
-import { tenantScope } from '@synapsedesk/nest-common';
+import { requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Ticket } from '../../generated/prisma/client';
 
@@ -66,10 +66,11 @@ export class TicketAccessService {
     withDeleted: boolean,
     missing: string,
   ): Promise<Ticket> {
+    requireActor(context);
     const ticket = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         id: ticketId,
-        ...tenantScope(context),
+        deletedAt: null,
         ...this.visibilityScope(context),
         ...(withDeleted ? { deletedAt: undefined } : {}),
       },
@@ -127,7 +128,7 @@ export class TicketAccessService {
   /**
    * The tenant filter, plus a NARROWER one for anyone without the queue.
    *
-   * `tenantScope` alone is not enough, and this is the easiest thing in the
+   * The tenant scope alone is not enough, and this is the easiest thing in the
    * service to forget. A tenant has one shared ticket table; without the second
    * predicate every end user could read every colleague's support ticket —
    * including the ones about them.

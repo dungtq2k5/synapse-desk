@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 /**
  * Cross-tenant usage reads.
  *
- * **Nothing here calls `tenantScope`, and that is the point and the risk** —
+ * **Nothing here is tenant-scoped, and that is the point and the risk** —
  * the same deliberate exposure `auth-service`'s `PlatformService` carries, which
  * is why it lives in its own module behind its own gRPC service rather than as
  * another method on `DocumentsService`.

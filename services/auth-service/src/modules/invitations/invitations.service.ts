@@ -130,7 +130,6 @@ export class InvitationsService {
       .user.findFirst({
         where: {
           id: request.invitedById,
-          organizationId: request.organizationId,
           deletedAt: null,
         },
         select: { fullName: true },
@@ -211,7 +210,6 @@ export class InvitationsService {
     const search = toSearchFilter(page.searchTerm);
 
     const where: Prisma.UserInvitationWhereInput = {
-      organizationId: request.organizationId,
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(search ? { email: search } : {}),
     };
@@ -287,7 +285,7 @@ export class InvitationsService {
     const [existingUsers, pendingInvites, roles, departments] =
       await Promise.all([
         this.prisma.scoped(systemContext(organizationId)).user.findMany({
-          where: { email: { in: emails }, organizationId, deletedAt: null },
+          where: { email: { in: emails }, deletedAt: null },
           select: { email: true },
         }),
         this.prisma
@@ -295,7 +293,6 @@ export class InvitationsService {
           .userInvitation.findMany({
             where: {
               email: { in: emails },
-              organizationId,
               status: InvitationStatus.PENDING,
               expiresAt: { gt: new Date() },
             },
@@ -311,7 +308,7 @@ export class InvitationsService {
           select: { id: true },
         }),
         this.prisma.scoped(systemContext(organizationId)).department.findMany({
-          where: { organizationId, deletedAt: null },
+          where: { deletedAt: null },
           select: { id: true },
         }),
       ]);
@@ -386,7 +383,6 @@ export class InvitationsService {
       .userInvitation.findFirst({
         where: {
           id: request.invitationId,
-          organizationId: request.organizationId,
         },
         include: { invitedBy: { select: { fullName: true } } },
       });
@@ -766,7 +762,6 @@ export class InvitationsService {
         const existingUser = await tx.user.findFirst({
           where: {
             email: context.email,
-            organizationId: context.organizationId,
             deletedAt: null,
           },
           select: { id: true },
@@ -872,7 +867,6 @@ export class InvitationsService {
       .userInvitation.findFirst({
         where: {
           id: invitationId,
-          organizationId,
           status: InvitationStatus.PENDING,
         },
       });

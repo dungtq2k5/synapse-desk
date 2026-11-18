@@ -10,7 +10,7 @@ import { Prisma } from '../generated/prisma/client';
  * filter over a table that names one:
  *
  * ```ts
- * where: { organizationId, document: { deletedAt: null, ...documentVisibility(context) } }
+ * where: { document: { deletedAt: null, ...documentVisibility(context) } }
  * ```
  *
  * Why every worklist naming a document applies it too: ADR 0037.

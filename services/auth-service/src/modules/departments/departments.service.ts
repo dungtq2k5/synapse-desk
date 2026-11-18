@@ -40,7 +40,6 @@ import {
   restoreData,
   restoreOrConflict,
   softDeleteData,
-  tenantScope,
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
@@ -81,11 +80,12 @@ export class DepartmentsService {
       DEPARTMENT_SORTABLE_FIELDS,
     );
 
+    requireActor(context);
     const where: Prisma.DepartmentWhereInput = {
-      ...tenantScope(context),
-      // `tenantScope` always pins `deletedAt: null`; an admin asking for the
-      // recycle bin overrides it. Spread AFTER, or the scope wins and the flag
-      // silently does nothing.
+      deletedAt: null,
+      // An admin asking for the recycle bin overrides `deletedAt: null`.
+      // Spread AFTER it, or the default wins and the flag silently does
+      // nothing.
       ...(request.includeDeleted ? { deletedAt: undefined } : {}),
       ...(toSearchFilter(page.searchTerm)
         ? { name: toSearchFilter(page.searchTerm) }
@@ -121,7 +121,7 @@ export class DepartmentsService {
    * The id is a loader's cache key and carries no tenant, so this method is the
    * only thing standing between a uuid and another tenant's department.
    *
-   * **Soft-deleted departments are returned.** `tenantScope` pins
+   * **Soft-deleted departments are returned.** Reads pin
    * `deletedAt: null` by default and that is wrong here: a ticket still
    * referencing a retired department has to render its name, and omitting it
    * would make the edge null — indistinguishable from a department that never
@@ -145,11 +145,11 @@ export class DepartmentsService {
 
     if (ids.length === 0) return { items: [] };
 
+    requireActor(context);
     const items = await this.prisma.scoped(context).department.findMany({
       where: {
-        ...tenantScope(context),
-        // Spread AFTER the scope, or the scope's `deletedAt: null` wins and a
-        // retired department silently disappears from every ticket citing it.
+        // Deleted ones too: a retired department must not disappear from
+        // every ticket citing it.
         deletedAt: undefined,
         id: { in: ids },
       },
@@ -293,10 +293,10 @@ export class DepartmentsService {
   ): Promise<DepartmentResponse> {
     // Deliberately NOT `this.load`, which excludes soft-deleted rows — the only
     // rows this method can act on.
+    requireActor(context);
     const existing = await this.prisma.scoped(context).department.findFirst({
       where: {
         id: request.id,
-        ...tenantScope(context),
         deletedAt: { not: null },
       },
       select: { id: true, name: true },
@@ -416,7 +416,7 @@ export class DepartmentsService {
         // valid. Without this an admin could add another tenant's users and read
         // them back through the member list.
         const found = await tx.user.findMany({
-          where: { id: { in: userIds }, ...tenantScope(context) },
+          where: { id: { in: userIds }, deletedAt: null },
           select: { id: true },
         });
 
@@ -519,7 +519,7 @@ export class DepartmentsService {
     const membership = await this.prisma
       .scoped(context)
       .userDepartment.findUnique({
-        // Safe as a findUnique despite the rule in `tenantScope`: `department` was
+        // Safe as a findUnique: `department` was
         // already resolved under the tenant filter above, so this composite key is
         // pinned to a department the caller may see.
         where: {
@@ -591,8 +591,9 @@ export class DepartmentsService {
     id: string,
     context: CallerContext,
   ): Promise<DepartmentRow> {
+    requireActor(context);
     const department = await this.prisma.scoped(context).department.findFirst({
-      where: { id, ...tenantScope(context) },
+      where: { id, deletedAt: null },
       include: DEPARTMENT_INCLUDE,
     });
     if (!department) {

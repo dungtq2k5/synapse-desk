@@ -119,7 +119,7 @@ type SubscriberRow = {
  * tables and have opposite shapes: one is a hot single-row read that must fail
  * closed, this is a cross-tenant write that must be explicit and audited.
  *
- * **Nothing here calls `tenantScope`.** A plan is owned by no tenant and
+ * **Nothing here is tenant-scoped.** A plan is owned by no tenant and
  * applying one writes across every subscriber, which is the same deliberate
  * cross-tenant risk `PlatformService` carries — and the reason this surface is
  * reachable only through the platform gRPC controller behind `SuperAdminGuard`.

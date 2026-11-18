@@ -50,7 +50,6 @@ import {
   requireTenant,
   restoreData,
   softDeleteData,
-  tenantScope,
 } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -128,10 +127,11 @@ export class TicketsService {
     request: GetTicketByNumberRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
+    requireActor(context);
     const ticket = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         ticketNumber: BigInt(request.ticketNumber),
-        ...tenantScope(context),
+        deletedAt: null,
         ...this.visibilityScope(context),
       },
     });
@@ -157,12 +157,13 @@ export class TicketsService {
     const priorityFilter = fromProtoTicketPriority(request.priority);
     const sourceFilter = fromProtoTicketSource(request.source);
 
+    requireActor(context);
     const where: Prisma.TicketWhereInput = {
-      ...tenantScope(context),
+      deletedAt: null,
       ...this.visibilityScope(context),
-      // `tenantScope` always pins `deletedAt: null`; an admin asking for the
-      // recycle bin overrides it. Spread AFTER, or the scope wins and the flag
-      // silently does nothing.
+      // An admin asking for the recycle bin overrides `deletedAt: null`.
+      // Spread AFTER it, or the default wins and the flag silently does
+      // nothing.
       ...(request.includeDeleted ? { deletedAt: undefined } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(priorityFilter ? { priority: priorityFilter } : {}),
@@ -220,9 +221,9 @@ export class TicketsService {
 
     if (ids.length === 0) return { items: [] };
 
+    requireActor(context);
     const items = await this.prisma.scoped(context).ticket.findMany({
       where: {
-        ...tenantScope(context),
         ...this.visibilityScope(context),
         // Soft-deleted tickets ARE returned by id. A notification
         // citing a deleted ticket still has to render something, and omitting
@@ -673,10 +674,10 @@ export class TicketsService {
   ): Promise<TicketResponse> {
     // Deliberately NOT `this.load`, which excludes soft-deleted rows — the only
     // rows this method can act on.
+    requireTenant(context);
     const existing = await this.prisma.scoped(context).ticket.findFirst({
       where: {
         id: request.id,
-        organizationId: requireTenant(context),
         deletedAt: { not: null },
       },
       select: { id: true },
@@ -743,7 +744,7 @@ export class TicketsService {
           fromStatus: from,
           toStatus: to,
           // `requireActor` rather than `context.sub ?? null`: `load` above has
-          // already been through `tenantScope`, which refuses a caller with no
+          // already been through `requireActor`, which refuses a caller with no
           // identity, so a null here would be unreachable defensive code that
           // reads as a supported case.
           changedById: requireActor(context),
@@ -881,7 +882,7 @@ export class TicketsService {
     context: CallerContext,
   ): Promise<Map<string, number>> {
     const userId = context.sub;
-    // A caller with no identity cannot have read anything, and `tenantScope`
+    // A caller with no identity cannot have read anything, and `requireActor`
     // has already refused them upstream — this is the type narrowing, not a
     // second check.
     if (ticketIds.length === 0 || !userId) return new Map();

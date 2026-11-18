@@ -18,11 +18,7 @@ import {
   AuditResourceType,
   EmailTemplateName,
 } from '@synapsedesk/contracts';
-import {
-  AuditPublisher,
-  requireActor,
-  tenantScope,
-} from '@synapsedesk/nest-common';
+import { AuditPublisher, requireActor } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { hashToken } from '../../common/utils';
@@ -339,7 +335,7 @@ export class SessionsService {
   /**
    * Resolves the target of an administrative action inside the caller's tenant.
    *
-   * `findFirst` with `tenantScope`, never `findUnique({ id })` — the latter
+   * Through the scoped client, never the bare `findUnique({ id })` — the latter
    * cannot express the tenant filter, so it would hand a cross-tenant admin
    * someone else's device list.
    */
@@ -347,8 +343,9 @@ export class SessionsService {
     userId: string,
     context: CallerContext,
   ): Promise<{ email: string; fullName: string }> {
+    requireActor(context);
     const user = await this.prisma.scoped(context).user.findFirst({
-      where: { id: userId, ...tenantScope(context) },
+      where: { id: userId, deletedAt: null },
       select: { email: true, fullName: true },
     });
     if (!user) {

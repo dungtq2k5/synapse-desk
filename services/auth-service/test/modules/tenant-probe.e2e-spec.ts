@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { pageRequest } from '@synapsedesk/grpc-proto/testing/page';
 import {
@@ -6,6 +7,7 @@ import {
   type IdTakingMethod,
   idTakingMethods,
   probeCall,
+  superAdminReach,
   snapshot,
   tenantIdentifiers,
   wireRequest,
@@ -32,6 +34,7 @@ import { RolesGrpcController } from '../../src/modules/roles/roles-grpc.controll
 import { SessionsGrpcController } from '../../src/modules/sessions/sessions-grpc.controller';
 import { TwoFactorAuthGrpcController } from '../../src/modules/auth/two-factor-auth-grpc.controller';
 import { UsersGrpcController } from '../../src/modules/users/users-grpc.controller';
+import { superAdminContext } from '@synapsedesk/testing/context';
 
 /**
  * **The cross-tenant probe**: every RPC that takes an id, called by tenant
@@ -326,6 +329,19 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
     B = await seedTenantWithUser(fx.prisma);
   });
 
+  /** A's world for one row: A seeded, A's identifiers, and the request on A's ids. */
+  const setUp = async (name: string, method: IdTakingMethod) => {
+    const a = await seedA();
+    const local = tenantIdentifiers(
+      await snapshot(fx.prisma),
+      a.organizationId,
+    );
+    const row = PROBE[name] as { build: (a: A) => Record<string, unknown> };
+    const foreign = new Set<string>();
+
+    return { local, foreign, request: wireRequest(method, row.build(a)) };
+  };
+
   it('**no row is a known failure**: every cross-tenant reach found here is closed', () => {
     expect(
       Object.keys(PROBE).filter((name) => 'knownFailure' in PROBE[name]),
@@ -339,18 +355,13 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
   });
 
   const probe = async (name: string, method: IdTakingMethod) => {
-    const a = await seedA();
-    const local = tenantIdentifiers(
-      await snapshot(fx.prisma),
-      a.organizationId,
-    );
-    const row = PROBE[name] as { build: (a: A) => Record<string, unknown> };
+    const { request, local, foreign } = await setUp(name, method);
 
     const report = await probeCall({
-      request: wireRequest(method, row.build(a)),
+      request,
       call: controllerCall(controllers, name, superuser(B)),
       local,
-      foreign: new Set(),
+      foreign,
       prisma: fx.prisma,
     });
 
@@ -368,5 +379,145 @@ describe('Cross-tenant probe: auth-service (e2e)', () => {
   )(
     '**%s** as tenant B on A’s ids: answers as for a missing id, names nothing of A’s, changes nothing of A’s',
     probe,
+  );
+  /**
+   * **What a Super Admin reaches** on each id-taking RPC, called through the
+   * tenant route with no tenant, as the gateway lets a Super Admin do. The
+   * expectation is the behavior before the scoped client, recorded by running
+   * these rows against `a53b7797`. A change to who a Super Admin reaches fails
+   * a row; one that reaches A's data says why.
+   *
+   * `PROBE_RECORD=<file>` writes each outcome to the file instead.
+   */
+  const SUPER_ADMIN: Record<string, string> = {
+    'DepartmentService/AddDepartmentMembers':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'DepartmentService/DeleteDepartment': 'refused ABORTED',
+    'DepartmentService/GetDepartment': 'answers',
+    'DepartmentService/ListDepartmentMembers':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'DepartmentService/ListDepartmentsByIds': 'answers',
+    'DepartmentService/RemoveDepartmentMember':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'DepartmentService/RestoreDepartment': 'refused NOT_FOUND',
+    'DepartmentService/UpdateDepartment':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'InvitationService/CreateInvitations': 'refused PERMISSION_DENIED',
+    'InvitationService/GetInvitation': 'refused NOT_FOUND',
+    'InvitationService/ResendInvitation': 'refused NOT_FOUND',
+    'InvitationService/RevokeInvitation': 'refused NOT_FOUND',
+    'OrganizationService/ResolveTenantAuditNames':
+      'refused FAILED_PRECONDITION',
+    'OtpService/GetOtpStatus':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was answers)",
+    'OtpService/RequestEmailVerification':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
+    'OtpService/RequestPhoneVerification':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
+    'OtpService/VerifyEmail':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
+    'OtpService/VerifyPhone':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
+    'PlatformService/AssignPlan': 'refused NOT_FOUND',
+    'PlatformService/ResolveAuditNames': 'answers',
+    'RoleService/AssignRoleUsers': 'refused FAILED_PRECONDITION',
+    'RoleService/DeleteRole': 'refused FAILED_PRECONDITION',
+    'RoleService/GetRole': 'refused FAILED_PRECONDITION',
+    'RoleService/RevokeRoleUser': 'refused FAILED_PRECONDITION',
+    'RoleService/SetRolePermissions': 'refused FAILED_PRECONDITION',
+    'RoleService/UpdateRole': 'refused FAILED_PRECONDITION',
+    'SessionService/ListUserSessions':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'SessionService/RevokeSession': 'refused NOT_FOUND',
+    'SessionService/RevokeSessionTrust': 'refused NOT_FOUND',
+    'SessionService/RevokeUserSessions':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'TwoFactorAuthService/ActivateTwoFactor':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused UNAUTHENTICATED)",
+    'TwoFactorAuthService/DisableTwoFactor':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
+    'TwoFactorAuthService/GenerateTwoFactor':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
+    'TwoFactorAuthService/GetBackupCodesStatus':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was answers)",
+    'TwoFactorAuthService/RegenerateBackupCodes':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was refused FAILED_PRECONDITION)",
+    'UserService/CreateUser': 'refused FAILED_PRECONDITION',
+    'UserService/DeleteUser':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/GetCurrentUser':
+      "refused NOT_FOUND: since the scoped client, `requireSelf` holds the request's user to the caller's own (was reaches)",
+    'UserService/GetUser':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/GetUserPermissions': 'answers',
+    'UserService/ListPermissionHolders': 'answers',
+    'UserService/ListUsers':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/ListUsersByIds': 'answers',
+    'UserService/LockUser':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/ResetUserTwoFactor':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/RestoreUser': 'refused FAILED_PRECONDITION',
+    'UserService/SetUserDepartments':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/SetUserRoles': 'refused FAILED_PRECONDITION',
+    'UserService/UnlockUser':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+    'UserService/UpdateUser':
+      "reaches: a Super Admin manages any tenant's users, departments and sessions; no tenant filter for one, by design",
+  };
+  /** The seeded Super Admin, a real account as on the platform. */
+  let superAdminId: string;
+  beforeEach(async () => {
+    superAdminId = (
+      await fx.prisma.user.findFirstOrThrow({ where: { isSuperAdmin: true } })
+    ).id;
+  });
+  const asSuperAdmin = () => superAdminContext(superAdminId);
+
+  it('**every id-taking RPC has a Super Admin expectation**', () => {
+    if (process.env.PROBE_RECORD) return;
+    expect(Object.keys(SUPER_ADMIN).sort()).toEqual(
+      methods
+        .filter((method) => 'build' in PROBE[method.name])
+        .map((method) => method.name)
+        .sort(),
+    );
+  });
+
+  it.each(
+    methods
+      .filter((method) => 'build' in PROBE[method.name])
+      .map(
+        (method) =>
+          [
+            method.name,
+            SUPER_ADMIN[method.name] ?? 'unrecorded',
+            method,
+          ] as const,
+      ),
+  )(
+    '**%s** as a Super Admin on A’s ids: %s',
+    async (name, expected, method) => {
+      const { request, local, foreign } = await setUp(name, method);
+
+      const reached = await superAdminReach({
+        request,
+        call: controllerCall(controllers, name, asSuperAdmin()),
+        local,
+        foreign,
+        prisma: fx.prisma,
+      });
+
+      if (process.env.PROBE_RECORD) {
+        appendFileSync(
+          process.env.PROBE_RECORD,
+          `${JSON.stringify([name, reached])}\n`,
+        );
+        return;
+      }
+      expect(reached).toBe(expected.split(':')[0]);
+    },
   );
 });

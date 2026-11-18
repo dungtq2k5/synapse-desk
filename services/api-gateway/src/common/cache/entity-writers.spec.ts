@@ -126,7 +126,9 @@ describe('the entity cache rests on who writes these fields', () => {
     // Guards the guard: a moved file makes every count below zero, which reads
     // as "nothing writes these fields" — the most reassuring possible failure.
     expect(users()).toContain('listUsersByIds');
-    expect(readFileSync(DEPARTMENTS_SERVICE, 'utf8')).toContain('tenantScope');
+    expect(readFileSync(DEPARTMENTS_SERVICE, 'utf8')).toContain(
+      'scoped(context)',
+    );
   });
 
   it('**`fullName` is UPDATED in exactly one place, behind a gateway mutation**', () => {

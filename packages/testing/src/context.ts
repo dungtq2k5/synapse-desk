@@ -28,7 +28,7 @@ import type {
  * Built here rather than in each suite because the e2e layer bypasses the gRPC
  * hop entirely — it calls services directly — so nothing constructs this for
  * it. Getting a field wrong (an `organizationId` that does not match the
- * fixture's tenant) makes `tenantScope()` filter everything out, and the test
+ * fixture's tenant) makes the scoped client filter everything out, and the test
  * fails with an empty result and no hint why.
  */
 export function callerContext(
