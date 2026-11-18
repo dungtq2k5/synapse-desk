@@ -116,7 +116,8 @@ Same rule for a scalar: `const CHEAP_MODEL: AiModel = '…'` when the union exis
 ### 4.2 Tenant isolation
 
 - `organizationId === null` means **platform Super Admin** (`is_super_admin = true`), kept in lockstep by a DB CHECK constraint. It does *not* mean "no tenant".
-- Every query touching a tenant-scoped table is filtered by the caller's `organizationId`, except for a Super Admin. The scoped client does this; don't write the filter by hand.
+- Every query touching a tenant-scoped table is filtered by the caller's `organizationId`. The scoped client does this; don't write the filter by hand.
+- **A Super Admin reaches tenant data only through the platform API.** `scoped(context)` refuses one (`FAILED_PRECONDITION`, "use the platform API", a 400 at the gateway); `/platform/*` handlers read through `unscoped('platform')` after `requireSuperAdmin`, and a Super Admin's own account through `unscoped('own account')`.
 - Cross-tenant reads via a resource id **MUST** go through `RequestContextService.validateOrganizationScoping()`.
 - The gateway **MUST NOT** accept `organizationId` as client input. Sole exception: `/platform/*`, where the tenant is an explicit path segment and `SUPER` is required.
 - **Query tenant data through `prisma.scoped(context)`**, never the bare client ([ADR 0053](./decisions/0053-every-query-on-tenant-data-goes-through-a-tenant-scoped-client.md)). It adds the tenant to every read and bulk write and checks every create. A new model needs a `TenantRule`, or the build fails.
@@ -791,7 +792,7 @@ Two failure modes this ordering exists to prevent:
 ### Security & tenancy
 
 - [ ] Identity from the caller's verified context, never from client input.
-- [ ] Every query on a tenant table filters `organizationId` (or the caller is `isSuperAdmin`).
+- [ ] Every query on a tenant table goes through `scoped(context)`, or through `unscoped(reason)` in a file the guard lists.
 - [ ] Every query on a soft-deletable table filters `deletedAt: null`.
 - [ ] Unique-field checks handled in the service layer, soft-delete aware.
 - [ ] A new "unique among active rows" rule has its **partial index in the seeder's DDL block** ([ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md)) — a service-layer check alone loses the race. Asked **"does the row come back?"** before choosing partial vs full `@unique` (§7.2).
