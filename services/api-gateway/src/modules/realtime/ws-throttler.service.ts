@@ -60,7 +60,7 @@ export class WsThrottlerService {
         key,
         this.TTL,
         this.LIMIT,
-        0,
+        SHED_ONLY,
         gatewayName,
       );
 
@@ -129,11 +129,11 @@ export class WsThrottlerService {
         key,
         ttlMs,
         limit,
-        // No block duration: exceeding an event limit is ordinary client
+        // No real block: exceeding an event limit is ordinary client
         // behaviour — a held key, a reconnect storm — and locking the user out
         // for five minutes for typing too fast is a worse product than dropping
         // the frame.
-        0,
+        SHED_ONLY,
         event,
       );
 
@@ -151,3 +151,11 @@ export class WsThrottlerService {
     }
   }
 }
+
+/**
+ * The block duration that sheds without blocking: 1 ms, not 0. The Redis
+ * storage writes the block with `SET … PX <duration>`, and Redis refuses
+ * `PX 0`; the script's error then reads as a storage outage, which fails open,
+ * so a 0 here meant the limit was never enforced once it was exceeded.
+ */
+export const SHED_ONLY = 1;

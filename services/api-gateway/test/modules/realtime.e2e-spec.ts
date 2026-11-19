@@ -111,11 +111,17 @@ describe('the real-time relay (e2e)', () => {
     fx = await bootstrapRealtimeTest();
   }, 30_000);
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     // The default for every test: the ticket resolves, and the caller is its
     // author or assignee. Tests about refusal override it.
     fx.stubs.ticket.getTicket.mockReturnValue(of(wireTicket()));
+    // The socket counters (`{ws_event:…}`, `{ws_handshake:…}`): every row
+    // speaks as the same few users, and `message:send` allows 30 a minute, so
+    // a row late in the file would otherwise be dropped for what earlier rows
+    // sent.
+    const counters = await fx.redis.keys('{ws_*');
+    if (counters.length > 0) await fx.redis.del(...counters);
   });
 
   afterAll(() => fx.close());
