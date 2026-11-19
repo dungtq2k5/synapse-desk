@@ -6,19 +6,28 @@ export { DEMO_PASSWORD, manifest, seededActors } from '../system/seeded-actor';
 
 /**
  * Clears the gateway's rate-limit counters. Sign-in allows 5 attempts per
- * address per 15 minutes, and every row signs in through the same address;
- * the run already starts from a flushed Redis, so this changes nothing a row
- * asserts.
+ * address and account per 15 minutes, and every row signs in through the same
+ * address; the run already starts from a flushed Redis, so this changes
+ * nothing a row asserts.
+ *
+ * Both gateways' counters: `throttle:*`, and the `{…}:hits` / `{…}:blocked`
+ * pairs a NestJS throttler's Redis storage writes. Nothing else in the dev
+ * Redis has either shape.
  */
 export async function clearThrottles(): Promise<void> {
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
   try {
-    const keys = await redis.keys('throttle:*');
+    const keys = (
+      await Promise.all(THROTTLE_KEYS.map((pattern) => redis.keys(pattern)))
+    ).flat();
     if (keys.length > 0) await redis.del(...keys);
   } finally {
     redis.disconnect();
   }
 }
+
+/** The rate-limit counters' key shapes, as `KEYS` patterns. */
+const THROTTLE_KEYS = ['throttle:*', '{*}:hits', '{*}:blocked'];
 
 /**
  * Waits until the page's layout stops moving: the document's scroll size and
