@@ -1,4 +1,5 @@
 import {
+  ActivateTwoFactorResponse,
   AuthenticateTwoFactorResponse,
   BackupCodesStatusResponse,
   fromProtoTimestamp,
@@ -6,7 +7,10 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { toUserResponseDto } from '../users/user.mapper';
 import { UserResponseDto } from '../users/dto/rest/user-response.dto';
-import { BackupCodesStatusResponseDto } from './dto/rest/two-factor-response.dto';
+import {
+  BackupCodesStatusResponseDto,
+  TwoFactorEnabledResponseDto,
+} from './dto/rest/two-factor-response.dto';
 
 /**
  * Everything the controller needs to set cookies and shape the body.
@@ -22,6 +26,35 @@ export type TwoFactorAuthenticateResult = {
   deviceToken: string | null;
   warning: string | null;
 };
+
+/**
+ * What enabling two-step answered: the body, and the session's tokens when it
+ * was enabled through the sign-in challenge. The tokens are set as cookies,
+ * never put in the body.
+ */
+export type TwoFactorEnabledResult = {
+  body: TwoFactorEnabledResponseDto;
+  session: { accessToken: string; refreshToken: string } | null;
+};
+
+/** Splits an `ActivateTwoFactorResponse` into the body and the session. */
+export function toTwoFactorEnabledResult(
+  response: ActivateTwoFactorResponse,
+): TwoFactorEnabledResult {
+  const signedIn = !!response.accessToken && !!response.refreshToken;
+  return {
+    body: {
+      backupCodes: response.backupCodes,
+      user: signedIn && response.user ? toUserResponseDto(response.user) : null,
+    },
+    session: signedIn
+      ? {
+          accessToken: response.accessToken!,
+          refreshToken: response.refreshToken!,
+        }
+      : null,
+  };
+}
 
 /** Converts a `BackupCodesStatusResponse` off the wire into its REST DTO. */
 export function toBackupCodesStatusResponseDto(

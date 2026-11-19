@@ -4,9 +4,12 @@ import { TwoFactorAuthGrpcClient } from './two-factor-auth-grpc.client';
 import {
   toBackupCodesStatusResponseDto,
   toTwoFactorAuthenticateResult,
+  toTwoFactorEnabledResult,
   TwoFactorAuthenticateResult,
+  TwoFactorEnabledResult,
 } from './two-factor-auth.mapper';
 import {
+  ActivateTwoFactorDto,
   AuthenticateTwoFactorDto,
   DisableTwoFactorDto,
 } from './dto/rest/two-factor.dto';
@@ -28,12 +31,30 @@ export class TwoFactorAuthService {
     return this.twoFactorGrpcClient.generateTwoFactor(userId, origin);
   }
 
-  activate(
+  /**
+   * Enables two-step. With the sign-in challenge (`twoFactorToken`), the
+   * accepted code also signs the caller in: auth-service verifies the token
+   * again and answers the session.
+   */
+  async activate(
     userId: string,
-    code: string,
+    dto: ActivateTwoFactorDto,
+    twoFactorToken: string | undefined,
     origin: RequestOrigin,
-  ): Promise<BackupCodesResponseDto> {
-    return this.twoFactorGrpcClient.activateTwoFactor(userId, code, origin);
+  ): Promise<TwoFactorEnabledResult> {
+    return toTwoFactorEnabledResult(
+      await this.twoFactorGrpcClient.activateTwoFactor(
+        twoFactorToken
+          ? {
+              userId,
+              code: dto.code,
+              twoFactorToken,
+              deviceName: dto.deviceName,
+            }
+          : { userId, code: dto.code },
+        origin,
+      ),
+    );
   }
 
   async authenticate(

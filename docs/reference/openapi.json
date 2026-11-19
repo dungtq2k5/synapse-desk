@@ -3034,7 +3034,7 @@
                       "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
                     },
                     "data": {
-                      "$ref": "#/components/schemas/BackupCodesResponseDto"
+                      "$ref": "#/components/schemas/TwoFactorEnabledResponseDto"
                     }
                   }
                 }
@@ -69489,7 +69489,7 @@
         },
         "required": ["otpauthUri", "qrCodeDataUrl"]
       },
-      "BackupCodesResponseDto": {
+      "TwoFactorEnabledResponseDto": {
         "type": "object",
         "properties": {
           "backupCodes": {
@@ -69498,9 +69498,19 @@
             "items": {
               "type": "string"
             }
+          },
+          "user": {
+            "nullable": true,
+            "description": "`null` when enabled from a session: nobody new is signed in.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserResponseDto"
+              }
+            ]
           }
         },
-        "required": ["backupCodes"]
+        "required": ["backupCodes", "user"]
       },
       "ActivateTwoFactorDto": {
         "type": "object",
@@ -69509,6 +69519,11 @@
             "type": "string",
             "minLength": 6,
             "maxLength": 6
+          },
+          "deviceName": {
+            "type": "string",
+            "description": "The session's device label, used only when enabling through the sign-in\nchallenge signs the caller in.",
+            "maxLength": 100
           }
         },
         "required": ["code"]
@@ -69563,6 +69578,19 @@
           }
         },
         "required": ["password", "code"]
+      },
+      "BackupCodesResponseDto": {
+        "type": "object",
+        "properties": {
+          "backupCodes": {
+            "description": "Shown once. Only hashes are stored.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["backupCodes"]
       },
       "RegenerateBackupCodesDto": {
         "type": "object",

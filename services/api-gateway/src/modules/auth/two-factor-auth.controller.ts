@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import {
+  isFullJwtPayload,
   RequestContext,
   RequestOrigin,
   TwoFactorJwtPayload,
@@ -41,6 +42,7 @@ import {
   BackupCodesStatusResponseDto,
   GenerateTwoFactorResponseDto,
   TwoFactorAuthenticatedResponseDto,
+  TwoFactorEnabledResponseDto,
 } from './dto/rest/two-factor-response.dto';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { Throttle } from '@nestjs/throttler';
@@ -105,17 +107,18 @@ export class TwoFactorAuthController {
   /**
    * Confirms the authenticator works, enables 2FA, returns the backup codes.
    *
-   * A caller who arrived on a challenge token is still NOT signed in
-   * afterwards: they finish by calling `POST /auth/2fa/authenticate` with the
-   * same challenge cookie and their first code, which is the one path that
-   * mints a session. Issuing tokens here instead would give enrolment a second
-   * session-minting door to keep correct.
+   * A caller who arrived on the sign-in challenge is signed in by it: the
+   * accepted code is the proof `POST /auth/2fa/authenticate` would ask for
+   * again. The raw challenge goes to auth-service, which verifies it and
+   * mints the session; the challenge cookie is cleared and the session
+   * cookies set, as `authenticate` does, and `user` names who signed in. From
+   * a session, `user` is `null` and no cookie changes.
    */
   @ApiOperation({
     summary:
       'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
   })
-  @ApiWrappedResponse(BackupCodesResponseDto)
+  @ApiWrappedResponse(TwoFactorEnabledResponseDto)
   @ApiFilterErrors(['400', '401'])
   @Post('enable')
   @HttpCode(HttpStatus.OK)
@@ -123,13 +126,33 @@ export class TwoFactorAuthController {
   async activate(
     @CurrentEnrollee() enrollee: EnrolleeContext,
     @Body() activateTwoFactorDto: ActivateTwoFactorDto,
-  ): Promise<BackupCodesResponseDto> {
-    // The only time these are ever readable. Only hashes are stored.
-    return this.twoFactorAuthService.activate(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<TwoFactorEnabledResponseDto> {
+    // The guard tries the full session first, as here: a caller holding both
+    // a session and a stale challenge enables from the session.
+    const twoFactorToken = isFullJwtPayload(request.user)
+      ? undefined
+      : this.jwtCookieService.read2faToken(request);
+
+    // The only time the codes are ever readable. Only hashes are stored.
+    const { body, session } = await this.twoFactorAuthService.activate(
       enrollee.sub,
-      activateTwoFactorDto.code,
+      activateTwoFactorDto,
+      twoFactorToken,
       enrollee,
     );
+
+    if (session) {
+      // As `authenticate`: the challenge is spent before the session is set.
+      this.jwtCookieService.clear2faTokenCookie(response);
+      this.jwtCookieService.setAccessTokenCookie(response, session.accessToken);
+      this.jwtCookieService.setRefreshTokenCookie(
+        response,
+        session.refreshToken,
+      );
+    }
+    return body;
   }
 
   /**

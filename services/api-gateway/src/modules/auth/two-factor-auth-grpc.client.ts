@@ -1,6 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  ActivateTwoFactorRequest,
   ActivateTwoFactorResponse,
   AuthenticateTwoFactorRequest,
   AuthenticateTwoFactorResponse,
@@ -47,13 +48,12 @@ export class TwoFactorAuthGrpcClient
   }
 
   activateTwoFactor(
-    userId: string,
-    code: string,
+    request: ActivateTwoFactorRequest,
     origin: RequestOrigin,
   ): Promise<ActivateTwoFactorResponse> {
     return this.call(
       (metadata) =>
-        this.twoFactorGrpcService.activateTwoFactor({ userId, code }, metadata),
+        this.twoFactorGrpcService.activateTwoFactor(request, metadata),
       origin,
     );
   }

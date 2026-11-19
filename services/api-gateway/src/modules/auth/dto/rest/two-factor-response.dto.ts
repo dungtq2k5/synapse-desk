@@ -43,6 +43,18 @@ export class BackupCodesResponseDto {
   readonly backupCodes!: string[];
 }
 
+/**
+ * What enabling two-step answers: the backup codes, shown once, and the user it
+ * signed in when it was enabled through the sign-in challenge (the session
+ * cookies are set with it).
+ */
+export class TwoFactorEnabledResponseDto {
+  /** Shown once. Only hashes are stored. */
+  readonly backupCodes!: string[];
+  /** `null` when enabled from a session: nobody new is signed in. */
+  readonly user!: UserResponseDto | null;
+}
+
 export class BackupCodesStatusResponseDto {
   readonly remaining!: number;
   readonly used!: number;

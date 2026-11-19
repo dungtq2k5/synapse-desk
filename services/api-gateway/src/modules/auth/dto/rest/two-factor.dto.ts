@@ -16,6 +16,15 @@ export class ActivateTwoFactorDto {
   @IsString()
   @Length(TOTP_CODE_LENGTH, TOTP_CODE_LENGTH)
   readonly code!: string;
+
+  /**
+   * The session's device label, used only when enabling through the sign-in
+   * challenge signs the caller in.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_DEVICE_NAME_LENGTH)
+  readonly deviceName?: string;
 }
 
 /**
