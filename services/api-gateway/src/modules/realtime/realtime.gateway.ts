@@ -62,6 +62,7 @@ import {
   TYPING_TTL_MS,
   WS_EVENT_LIMITS,
 } from './realtime.config';
+import { RevokedSessionsService } from '../../common/redis/revoked-sessions.service';
 
 /**
  * The gateway's real-time surface.
@@ -99,6 +100,7 @@ export class RealtimeGateway
     private readonly aiStreams: AiStreamService,
     private readonly presence: PresenceService,
     private readonly metrics: MetricsRegistry,
+    private readonly revokedSessions: RevokedSessionsService,
   ) {
     this.ACCESS_COOKIE_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
@@ -130,6 +132,11 @@ export class RealtimeGateway
       }
 
       const payload = this.verifyHandshake(client);
+      // A signed-out device's socket is refused at the door; one already
+      // connected is dropped by `RevokedSocketSweep`.
+      if (await this.revokedSessions.isRevoked(payload.sid)) {
+        throw new WsException('Session revoked');
+      }
       // `client.data` is typed `any` by socket.io — this is the one write to
       // it, and `requireUser()` below is the one read, so the unsafety is
       // contained to two lines rather than spread across every handler.
@@ -200,11 +207,7 @@ export class RealtimeGateway
    * HARD disconnect: an unauthenticated socket left open is a socket that will
    * try again on the next frame, and every attempt costs a verification.
    */
-  private refuse(
-    client: Socket,
-    code: ConnectionRefusedCode,
-    message: string,
-  ): void {
+  refuse(client: Socket, code: ConnectionRefusedCode, message: string): void {
     client.emit(REALTIME_EVENTS.connectionRefused, {
       success: false,
       message,

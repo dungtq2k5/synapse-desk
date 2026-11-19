@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { RedisService } from './redis.service';
+import { RevokedSessionsService } from './revoked-sessions.service';
 
 /**
  * The shared Redis connection, for the modules that ask for it.
@@ -11,7 +12,7 @@ import { RedisService } from './redis.service';
  * list stays an honest statement of what a module talks to.
  */
 @Module({
-  providers: [RedisService],
-  exports: [RedisService],
+  providers: [RedisService, RevokedSessionsService],
+  exports: [RedisService, RevokedSessionsService],
 })
 export class RedisModule {}

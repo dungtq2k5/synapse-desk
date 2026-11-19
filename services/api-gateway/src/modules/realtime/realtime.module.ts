@@ -10,6 +10,7 @@ import { TicketAccessService } from './ticket-access.service';
 import { AiStreamService } from './ai-stream.service';
 import { PresenceService } from './presence.service';
 import { WsThrottlerService } from './ws-throttler.service';
+import { RevokedSocketSweep } from './revoked-socket.sweep';
 
 /**
  * Imports AuthModule for `JwtService` — the handshake verifies the SAME
@@ -44,6 +45,8 @@ import { WsThrottlerService } from './ws-throttler.service';
     // "online forever"; an expiring key needs no cleanup at all.
     PresenceService,
     WsThrottlerService,
+    // Drops a connected socket whose session was revoked since its handshake.
+    RevokedSocketSweep,
   ],
   exports: [RealtimeGateway],
 })

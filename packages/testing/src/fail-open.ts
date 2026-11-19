@@ -24,6 +24,9 @@ export const FAIL_OPEN_LINES = [
   // The organization-status cache.
   'Status cache unavailable',
   'Could not invalidate cached status',
+  // Revoked sessions: a signed-out device keeps working.
+  'Revoked-session check unavailable',
+  'Revoked-session sweep unavailable',
 ] as const;
 
 /** The fail-open lines in some log output, each as logged. */

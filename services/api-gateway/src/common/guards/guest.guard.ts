@@ -7,7 +7,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
+import type { MaybeJwtPayload } from '@synapsedesk/contracts';
 import { requestOf } from '../utils/execution-request.util';
+import { RevokedSessionsService } from '../redis/revoked-sessions.service';
 
 /**
  * Blocks `/auth/login` and `/auth/register` for callers who already hold a live
@@ -38,12 +40,13 @@ export class GuestGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly revokedSessions: RevokedSessionsService,
   ) {
     this.JWT_ACCESS_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
   }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     // `requestOf`, not `switchToHttp()`. This guard runs on
     // GraphQL too, where `switchToHttp()` returns an empty object and the read
     // below throws. The property that matters is that both transports are
@@ -53,10 +56,11 @@ export class GuestGuard implements CanActivate {
     const token = request.cookies?.[this.JWT_ACCESS_NAME] as string | undefined;
     if (!token) return true;
 
+    let payload: MaybeJwtPayload;
     try {
       // Cryptographic validation, not mere presence — an expired or tampered
       // token must not block the login form.
-      this.jwtService.verify(token);
+      payload = this.jwtService.verify<MaybeJwtPayload>(token);
     } catch {
       // Expired, tampered, or signed by a retired key: let the request through
       // so the route can overwrite the cookie with a fresh one.
@@ -66,6 +70,9 @@ export class GuestGuard implements CanActivate {
       // re-thrown by type — one refactor away from silently never firing.
       return true;
     }
+    // A revoked session isn't signed in: its device must be able to sign in
+    // again.
+    if (await this.revokedSessions.isRevoked(payload.sid)) return true;
 
     throw new BadRequestException(
       'You are already logged in with an active session.',

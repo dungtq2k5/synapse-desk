@@ -5,10 +5,14 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { readFileSync } from 'node:fs';
 import { JwtPayload, MaybeJwtPayload } from '@synapsedesk/contracts';
+import { RevokedSessionsService } from '../common/redis/revoked-sessions.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly revokedSessions: RevokedSessionsService,
+  ) {
     // Resolved before super() — the previous version read it inside the
     // extractor via `this.configService`, which is not available until after
     // super() returns.
@@ -40,7 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: MaybeJwtPayload): JwtPayload {
+  async validate(payload: MaybeJwtPayload): Promise<JwtPayload> {
     // Rejects a 2FA CHALLENGE token presented as an access token. Redundant
     // today -- the two token types are signed by separate key pairs, so a
     // challenge token fails verification above and never reaches here -- but
@@ -50,6 +54,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException(
         'Two-factor challenge is not complete; finish it before using this token',
       );
+    }
+
+    // A signed-out device stops at once rather than when its token expires:
+    // its next call is a 401, its refresh fails (the family is gone), and the
+    // client lands on sign-in.
+    if (await this.revokedSessions.isRevoked(payload.sid)) {
+      throw new UnauthorizedException();
     }
 
     // Passport attaches this to req.user

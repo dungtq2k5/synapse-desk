@@ -24,10 +24,14 @@ import { Jwt2faGuard } from '../../common/guards/jwt-2fa.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { GuestGuard } from '../../common/guards/guest.guard';
 import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolment.guard';
+import { RedisModule } from '../../common/redis/redis.module';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    // For `RevokedSessionsService`: the strategy and `GuestGuard` read which
+    // session families auth-service revoked.
+    RedisModule,
     // GuestGuard verifies the access token locally, so the gateway needs the
     // PUBLIC half of the RS256 pair. It never signs anything — only
     // auth-service holds the private key.
@@ -75,10 +79,11 @@ import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolmen
   // can inject the same AUTH_GRPC_CLIENT rather than opening a second connection
   // to one peer.
   //
-  // JwtModule is re-exported because a guard applied with `@UseGuards(Class)` is
-  // instantiated by the module that declares the CONTROLLER, not by the module
-  // that provides the guard — so `JwtService` has to be resolvable in the
-  // importing module's injector. Exporting GuestGuard alone is not enough, and
+  // JwtModule and RedisModule are re-exported because a guard applied with
+  // `@UseGuards(Class)` is instantiated by the module that declares the
+  // CONTROLLER, not by the module that provides the guard — so `JwtService` and
+  // `RevokedSessionsService` have to be resolvable in the importing module's
+  // injector. Exporting GuestGuard alone is not enough, and
   // the failure is a boot-time UnknownDependenciesException naming the importing
   // module rather than this one.
   exports: [
@@ -89,6 +94,7 @@ import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolmen
     ClientsModule,
     JwtModule,
     PassportModule,
+    RedisModule,
   ],
 })
 export class AuthModule {}
