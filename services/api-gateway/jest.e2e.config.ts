@@ -33,6 +33,7 @@ const config: Config = {
   testRegex: String.raw`\.e2e-spec\.ts$`,
   testPathIgnorePatterns: ['/node_modules/'],
   testTimeout: 30_000,
+  setupFilesAfterEnv: ['<rootDir>/test/fail-open.setup.ts'],
 };
 
 export default config;

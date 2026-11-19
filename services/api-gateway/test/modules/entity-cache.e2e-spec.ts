@@ -16,6 +16,7 @@ import {
   entityScope,
 } from '../../src/common/config/cache.config';
 import { createUserSummaryLoader } from '../../src/common/graphql/loaders/user-summary.loader';
+import { allowFailOpen } from '../utils/fail-open';
 
 /**
  * The GraphQL entity cache.
@@ -262,6 +263,8 @@ describe('The entity cache (e2e)', () => {
 
   describe('test 5 — Redis down, the query still succeeds', () => {
     it('**the loader falls through to the RPC**', async () => {
+      // The outage is the point: every cache line it logs is staged.
+      allowFailOpen('Cache ');
       // Fail open, at the layer where failing closed would take out every edge
       // in the schema at once.
       const dead = new Redis('redis://127.0.0.1:6399', {

@@ -15,6 +15,7 @@ import { CacheService } from '../../src/common/cache/cache.service';
 import { entityScope } from '../../src/common/config/cache.config';
 import { RedisService } from '../../src/common/redis/redis.service';
 import { compareAlphabetically } from '@synapsedesk/core';
+import { allowFailOpen } from '../utils/fail-open';
 
 /**
  * The shared cache, against a REAL Redis.
@@ -91,6 +92,8 @@ describe('The shared cache (e2e)', () => {
 
   describe('A cache fails OPEN', () => {
     it('**an unreachable Redis still answers, from the origin**', async () => {
+      // The outage is the point: every cache line it logs is staged.
+      allowFailOpen('Cache ');
       // A cache outage must make the product slow, not down. Against a port
       // nothing is listening on, so the failure is a real connection refusal
       // rather than a stubbed rejection — the two take different paths through

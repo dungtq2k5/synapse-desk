@@ -31,6 +31,7 @@ import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
 import { rowFor } from './pending';
+import { allowFailOpen } from './fail-open';
 
 describe('the tenant lifecycle gate', () => {
   let gateway: Gateway;
@@ -382,6 +383,8 @@ describe('the tenant lifecycle gate', () => {
   rowFor('Ops')(
     '**a cached value that cannot be read is a miss, not an error — the gate asks and carries on**',
     async () => {
+      // The unreadable value is the point: the line it logs is staged.
+      allowFailOpen('Status cache unavailable');
       tenantIs(OrgStatus.ACTIVE);
       await redis.set(await cacheKey(), 'not json at all', 'EX', 30);
 

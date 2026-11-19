@@ -44,6 +44,7 @@ import type { WsResponse } from '../../src/common/interfaces/ws-response.interfa
 import type { ErrorResponse } from '../../src/common/interfaces/http-response.interface';
 import { RealtimeGateway } from '../../src/modules/realtime/realtime.gateway';
 import { PresenceService } from '../../src/modules/realtime/presence.service';
+import { WS_EVENT_LIMITS } from '../../src/modules/realtime/realtime.config';
 
 /**
  * The real-time relay, end to end: a NATS publish in, a WebSocket frame out.
@@ -613,6 +614,21 @@ describe('the real-time relay (e2e)', () => {
       for (const call of fx.stubs.message.createMessage.mock.calls) {
         expect(call[0]).toMatchObject({ clientMessageId });
       }
+    });
+
+    it('**past its limit, a send is refused** and never reaches ticket-service', async () => {
+      // Against the real Redis storage: the limit is only as good as the
+      // store's write, and a refused write fails open.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { limit } = WS_EVENT_LIMITS[CLIENT_EVENTS.messageSend];
+
+      for (let sent = 0; sent < limit; sent++) {
+        expect(await sendFrom(author)).toMatchObject({ success: true });
+      }
+      const over = await sendFrom(author);
+
+      expect(over).toMatchObject({ success: false });
+      expect(fx.stubs.message.createMessage).toHaveBeenCalledTimes(limit);
     });
 
     it('7. a MISSING `clientMessageId` is refused', async () => {
