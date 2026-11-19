@@ -16,6 +16,8 @@ import { plainToInstance } from 'class-transformer';
 import {
   CLIENT_EVENTS,
   ClientEvent,
+  CONNECTION_REFUSED_CODES,
+  type ConnectionRefusedCode,
   deptRoom,
   isFullJwtPayload,
   JwtPayload,
@@ -36,6 +38,7 @@ import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsThrottlerService } from './ws-throttler.service';
 import {
   WsAck,
+  WsRefusal,
   WsResponse,
 } from '../../common/interfaces/ws-response.interface';
 import { socketStore } from './socket-store';
@@ -48,6 +51,7 @@ import { PresenceUpdateDto } from './dto/presence-update.dto';
 import { MessageSendDto } from './dto/message-send.dto';
 import {
   ConnectionReadyPayloadDto,
+  ConnectionRefusedPayloadDto,
   PresencePayloadDto,
   TicketJoinedPayloadDto,
   TypingPayloadDto,
@@ -115,8 +119,13 @@ export class RealtimeGateway
       if (
         !(await this.wsThrottler.allowHandshake(client, RealtimeGateway.name))
       ) {
-        // Already disconnected inside the service; returning here avoids
-        // running auth on a socket that is going away.
+        // Refused before auth runs: a socket that is going away costs no
+        // verification.
+        this.refuse(
+          client,
+          CONNECTION_REFUSED_CODES.rateLimited,
+          'Too many connections from this address',
+        );
         return;
       }
 
@@ -174,11 +183,34 @@ export class RealtimeGateway
       this.logger.warn(
         `Refused socket ${client.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      // HARD disconnect. An unauthenticated socket left open is a socket that
-      // will try again on the next frame, and every attempt costs a
-      // verification.
-      client.disconnect(true);
+      this.refuse(
+        client,
+        CONNECTION_REFUSED_CODES.unauthenticated,
+        'Sign in again',
+      );
     }
+  }
+
+  /**
+   * Tells the socket why, then drops it. A disconnect alone is
+   * `io server disconnect` whatever the cause, which socket.io never retries,
+   * so the code is what lets a client choose between refreshing its session
+   * and waiting.
+   *
+   * HARD disconnect: an unauthenticated socket left open is a socket that will
+   * try again on the next frame, and every attempt costs a verification.
+   */
+  private refuse(
+    client: Socket,
+    code: ConnectionRefusedCode,
+    message: string,
+  ): void {
+    client.emit(REALTIME_EVENTS.connectionRefused, {
+      success: false,
+      message,
+      data: { code },
+    } satisfies WsRefusal<ConnectionRefusedPayloadDto>);
+    client.disconnect(true);
   }
 
   /**

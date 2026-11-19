@@ -34,7 +34,7 @@ export class WsThrottlerService {
   }
 
   /**
-   * Returns false and hangs up if this address is flooding.
+   * Returns false if this address is flooding; the caller refuses the socket.
    *
    * Keyed on IP, unlike the HTTP tier's per-account keying, and that difference
    * is forced: at handshake time nothing has been verified yet — the cookie is
@@ -68,10 +68,7 @@ export class WsThrottlerService {
         this.logger.warn(
           `Handshake flood blocked on [${gatewayName}] from ${ip} (${totalHits} hits)`,
         );
-        // `true` closes the underlying connection rather than just the
-        // Socket.IO session — an attacker who ignores the disconnect frame
-        // still loses the socket.
-        client.disconnect(true);
+        // The caller refuses the socket, telling it why first.
         return false;
       }
 

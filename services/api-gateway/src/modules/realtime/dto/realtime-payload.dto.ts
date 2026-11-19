@@ -1,3 +1,4 @@
+import type { ConnectionRefusedCode } from '@synapsedesk/contracts';
 /**
  * @file The `data` half of every SERVER→CLIENT frame this gateway builds itself.
  *
@@ -31,6 +32,11 @@ export class ConnectionReadyPayloadDto {
   userId!: string;
   /** `null` for a platform account, which belongs to no tenant. */
   organizationId!: string | null;
+}
+
+/** `connection:refused` — why the socket is about to be disconnected. */
+export class ConnectionRefusedPayloadDto {
+  code!: ConnectionRefusedCode;
 }
 
 /** `ticket:joined` — confirms an authorized `ticket:join`. */

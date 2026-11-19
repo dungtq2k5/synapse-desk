@@ -31,3 +31,13 @@ export interface WsResponse<T = unknown> {
  * parser rather than three.
  */
 export type WsAck<T = unknown> = WsResponse<T> | ErrorResponse;
+
+/**
+ * A frame the server sends as it refuses something, such as
+ * `connection:refused`: the `WsResponse` shape with `success: false`.
+ */
+export interface WsRefusal<T = unknown> {
+  success: false;
+  message: string;
+  data: T;
+}
