@@ -1,7 +1,6 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
-  orgRoom,
   REALTIME_EVENTS,
   TICKET_PATTERNS,
   TicketEventOf,
@@ -11,6 +10,7 @@ import {
 } from '@synapsedesk/contracts';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
 import { RealtimeGateway } from './realtime.gateway';
+import { orgAgentsRoom } from './agents';
 
 /**
  * The translation layer: NATS in, WebSocket out.
@@ -24,9 +24,10 @@ import { RealtimeGateway } from './realtime.gateway';
  * **Room choice is the only judgement here, and it is a privacy decision.**
  * `ticket:{id}` membership is authorized (see `TicketAccessService`), so
  * anything sent there is safe. `org:{id}` is joined by every member of a tenant
- * with no further check, so only facts a whole tenant may see go there — which
- * is why `ticket:created` carries the event and not the ticket body, and why
- * `message:new` never goes to the org room.
+ * with no further check, so nothing about a ticket goes there: an end user must
+ * not learn of a colleague's ticket, which REST would never show them. The
+ * queue events go to `org:{id}:agents` instead, joined only by agents
+ * (`isAgent`), and `message:new` never leaves the ticket's rooms.
  */
 @Controller()
 export class TicketEventsConsumer {
@@ -39,10 +40,14 @@ export class TicketEventsConsumer {
     @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.created>,
   ): void {
     this.relay(event.pattern, () => {
-      // Tenant-wide: a new ticket appearing in the queue is what an agent's
-      // dashboard is watching for, and nobody has joined its ticket room yet.
+      // The tenant's agents, whose queue it joins, and its author; nobody has
+      // joined its ticket room yet. One relay, so an agent who wrote the
+      // ticket gets it once.
       this.gateway
-        .relayToRoom(orgRoom(event.organizationId))
+        .relayToRooms([
+          orgAgentsRoom(event.organizationId),
+          userRoom(event.authorId),
+        ])
         .emit(REALTIME_EVENTS.ticketCreated, event);
     });
   }
@@ -123,10 +128,11 @@ export class TicketEventsConsumer {
       this.gateway
         .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
-      // Also tenant-wide: an escalation is a queue event that a tier-2 agent
-      // watching the dashboard must see without having opened the ticket.
+      // Also the tenant's agents: an escalation is a queue event that a tier-2
+      // agent watching the dashboard must see without having opened the
+      // ticket.
       this.gateway
-        .relayToRoom(orgRoom(event.organizationId))
+        .relayToRoom(orgAgentsRoom(event.organizationId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
     });
   }

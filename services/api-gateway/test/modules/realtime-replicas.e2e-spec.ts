@@ -67,12 +67,16 @@ describe('Realtime across two gateway replicas (e2e)', () => {
 
   const settle = () => new Promise((resolve) => setTimeout(resolve, WINDOW_MS));
 
-  /** A member of the org and the department, as `user:{sub}`. */
+  /**
+   * An agent in the org and the department, as `user:{sub}`: an agent, since
+   * `ticket:created` reaches only the tenant's agents and the author.
+   */
   const member = (fx: RealtimeFixture, sub = faker.string.uuid()) =>
     fx.connectClient({
       sub,
       organizationId,
       departmentIds: [departmentId],
+      permissionCodes: ['ticket.read.all'],
     });
 
   const ticketCreated = () => ({
@@ -130,7 +134,7 @@ describe('Realtime across two gateway replicas (e2e)', () => {
       b = await bootstrapRealtimeTest();
     }, 30_000);
 
-    it('**`ticket.created` reaches a client on EACH replica once** (`org:`)', async () => {
+    it('**`ticket.created` reaches a client on EACH replica once** (`org:{id}:agents`)', async () => {
       const onA = await member(a);
       const onB = await member(b!);
       const seenOnA = counter(onA, REALTIME_EVENTS.ticketCreated);

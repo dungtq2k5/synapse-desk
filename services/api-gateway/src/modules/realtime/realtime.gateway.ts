@@ -63,6 +63,7 @@ import {
   WS_EVENT_LIMITS,
 } from './realtime.config';
 import { RevokedSessionsService } from '../../common/redis/revoked-sessions.service';
+import { isAgent, orgAgentsRoom } from './agents';
 
 /**
  * The gateway's real-time surface.
@@ -145,7 +146,14 @@ export class RealtimeGateway
 
       await client.join(userRoom(payload.sub));
       if (payload.organizationId) {
-        await client.join(orgRoom(payload.organizationId));
+        await client.join(
+          isAgent(payload)
+            ? [
+                orgRoom(payload.organizationId),
+                orgAgentsRoom(payload.organizationId),
+              ]
+            : orgRoom(payload.organizationId),
+        );
       }
 
       // **The department rooms, from the token**.
@@ -326,15 +334,15 @@ export class RealtimeGateway
 
     await client.join(ticketRoom(id));
 
-    // **The agent-only half**. Joined only by a socket that holds
-    // `ticket.read.all` at THIS moment, which is what makes the internal-note
+    // **The agent-only half**. Joined only by a socket whose caller is an
+    // agent (`isAgent`) at THIS moment, which is what makes the internal-note
     // fan-out a single room emit rather than a per-socket permission read on
     // every message.
     //
     // Read from the verified token, not re-fetched: the permission set is a JWT
     // claim, and the whole design accepts that a revocation lands on the next
     // join.
-    if (payload.permissionCodes.includes('ticket.read.all')) {
+    if (isAgent(payload)) {
       await client.join(ticketInternalRoom(id));
     }
 

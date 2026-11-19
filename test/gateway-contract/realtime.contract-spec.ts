@@ -5,8 +5,8 @@
  * once whatever the relay does, which is why 965 in-process tests never saw
  * gap 36 and why this row exists: the property is "one frame per client,
  * however many gateways run", and it only has an expression with more than one
- * of them, so this is the row that catches a relay that broadcasts
- * cluster-wide.
+ * of them. The Java gateway inherits the same rule, so this is the row that
+ * will catch a Java relay that broadcasts cluster-wide.
  *
  * The cache rows use the peer RECORDING rather than a header: nothing on the
  * wire marks a cached read (the `x-cache` extension is in the OpenAPI
@@ -37,6 +37,9 @@ describe('realtime across replicas, and the cache', () => {
   const ORGANIZATION = '55555555-5555-4555-8555-555555555555';
   const ALICE = '66666666-6666-4666-8666-666666666666';
   const BOB = '77777777-7777-4777-8777-777777777777';
+  const CAROL = '99999999-9999-4999-8999-999999999999';
+  /** An agent by ticket-service's definition; `role.read` alone is an end user. */
+  const AGENT = ['ticket.read.all'];
   const WINDOW_MS = 1_000;
 
   let peers: Peers;
@@ -45,14 +48,18 @@ describe('realtime across replicas, and the cache', () => {
   let nats: NatsConnection;
   const sockets: Socket[] = [];
 
-  const token = (sub: string) =>
+  const token = (
+    sub: string,
+    permissionCodes = ['role.read'],
+    isSuperAdmin = false,
+  ) =>
     sign(
       {
         sub,
         organizationId: ORGANIZATION,
-        isSuperAdmin: false,
+        isSuperAdmin,
         departmentIds: [],
-        permissionCodes: ['role.read'],
+        permissionCodes,
         isEmailVerified: true,
       },
       TEST_KEYS.access(),
@@ -60,13 +67,18 @@ describe('realtime across replicas, and the cache', () => {
     );
 
   /** A connected client, as a browser connects: websocket, cookie, `/ws`. */
-  const connectClient = async (gateway: Gateway, sub: string) => {
-    const socket = io(`${gateway.baseUrl}${REALTIME_SOCKET.namespace}`, {
+  const connectClient = async (
+    gateway: Gateway,
+    sub: string,
+    permissionCodes?: string[],
+    isSuperAdmin?: boolean,
+  ) => {
+    const socket = io(`${gateway.wsUrl}${REALTIME_SOCKET.namespace}`, {
       transports: ['websocket'],
       reconnection: false,
       forceNew: true,
       extraHeaders: {
-        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(sub)}`,
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(sub, permissionCodes, isSuperAdmin)}`,
       },
     });
     sockets.push(socket);
@@ -98,6 +110,30 @@ describe('realtime across replicas, and the cache', () => {
 
   const settle = () => new Promise((resolve) => setTimeout(resolve, WINDOW_MS));
 
+  /**
+   * `ticket.created` as a Nest `ClientProxy` publishes it: the `{pattern,
+   * data}` envelope. A raw publish of the event itself reaches the handler as
+   * `undefined` — the rule `nats.config.ts` states.
+   */
+  const publishCreated = async (authorId: string) => {
+    const event = {
+      pattern: TICKET_PATTERNS.created,
+      organizationId: ORGANIZATION,
+      ticketId: '88888888-8888-4888-8888-888888888888',
+      occurredAt: new Date().toISOString(),
+      ticketNumber: 42,
+      authorId,
+      source: 1,
+      title: 'Printer is on fire',
+    };
+    nats.publish(
+      TICKET_PATTERNS.created,
+      JSONCodec().encode({ pattern: TICKET_PATTERNS.created, data: event }),
+    );
+    await nats.flush();
+    await settle();
+  };
+
   beforeAll(async () => {
     const { redisUrl, natsUrl } = readRunState();
     peers = await startPeers();
@@ -123,30 +159,13 @@ describe('realtime across replicas, and the cache', () => {
   rowFor('Tickets')(
     '**a relayed `ticket.*` event reaches a client on EACH replica exactly once**',
     async () => {
-      const onFirst = await connectClient(first, ALICE);
-      const onSecond = await connectClient(second, BOB);
+      // Both agents; ALICE also wrote it, and is in both rooms it goes to.
+      const onFirst = await connectClient(first, ALICE, AGENT);
+      const onSecond = await connectClient(second, BOB, AGENT);
       const seenFirst = counter(onFirst, REALTIME_EVENTS.ticketCreated);
       const seenSecond = counter(onSecond, REALTIME_EVENTS.ticketCreated);
 
-      // Published as a Nest `ClientProxy` publishes: the `{pattern, data}`
-      // envelope. A raw publish of the event itself reaches the handler as
-      // `undefined` — the rule `nats.config.ts` states.
-      const event = {
-        pattern: TICKET_PATTERNS.created,
-        organizationId: ORGANIZATION,
-        ticketId: '88888888-8888-4888-8888-888888888888',
-        occurredAt: new Date().toISOString(),
-        ticketNumber: 42,
-        authorId: ALICE,
-        source: 1,
-        title: 'Printer is on fire',
-      };
-      nats.publish(
-        TICKET_PATTERNS.created,
-        JSONCodec().encode({ pattern: TICKET_PATTERNS.created, data: event }),
-      );
-      await nats.flush();
-      await settle();
+      await publishCreated(ALICE);
 
       expect([seenFirst(), seenSecond()]).toEqual([1, 1]);
     },
@@ -180,6 +199,45 @@ describe('realtime across replicas, and the cache', () => {
         count: 3,
         countedAt: '2026-10-24T10:00:00.123456Z',
       });
+    },
+  );
+
+  rowFor('Tickets')(
+    '**`ticket:created` reaches the agents and the author, never a colleague**',
+    async () => {
+      const author = await connectClient(first, CAROL);
+      const colleague = await connectClient(second, BOB);
+      const agent = await connectClient(second, ALICE, AGENT);
+      const seen = [author, colleague, agent].map((socket) =>
+        counter(socket, REALTIME_EVENTS.ticketCreated),
+      );
+
+      await publishCreated(CAROL);
+
+      expect(seen.map((frames) => frames())).toEqual([1, 0, 1]);
+    },
+  );
+
+  rowFor('Tickets')(
+    "**a Super Admin's socket gets no `ticket:created`**: they reach a tenant only through the platform API",
+    async () => {
+      // A Super Admin's token names no tenant (the database ties the two), so
+      // this one names it, and holds an agent's permission, to put the
+      // decision on the agent predicate alone.
+      const superAdmin = await connectClient(
+        first,
+        '77777777-7777-4777-8777-777777777777',
+        AGENT,
+        true,
+      );
+      const agent = await connectClient(second, ALICE, AGENT);
+      const seen = [superAdmin, agent].map((socket) =>
+        counter(socket, REALTIME_EVENTS.ticketCreated),
+      );
+
+      await publishCreated(CAROL);
+
+      expect(seen.map((frames) => frames())).toEqual([0, 1]);
     },
   );
 

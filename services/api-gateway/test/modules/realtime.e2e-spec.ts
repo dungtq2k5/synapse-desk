@@ -2104,9 +2104,13 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('6b. a client in ANOTHER tenant receives nothing tenant-wide', async () => {
-      const insider = await fx.connectClient({ organizationId });
+      const insider = await fx.connectClient({
+        organizationId,
+        permissionCodes: ['ticket.read.all'],
+      });
       const outsider = await fx.connectClient({
         organizationId: faker.string.uuid(),
+        permissionCodes: ['ticket.read.all'],
       });
 
       const delivered = waitForEvent(insider, REALTIME_EVENTS.ticketCreated);
@@ -2124,6 +2128,39 @@ describe('the real-time relay (e2e)', () => {
       });
 
       await expect(delivered).resolves.toBeDefined();
+      await expect(silence).resolves.toBe(true);
+    });
+
+    it('6c. a new ticket reaches its author and the agents, never a colleague who is not an agent', async () => {
+      // `org:{id}` is joined by every member; a colleague must not learn of a
+      // ticket that REST would never show them.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const agent = await fx.connectClient({
+        organizationId,
+        permissionCodes: ['ticket.message.moderate'],
+      });
+      const colleague = await fx.connectClient({
+        organizationId,
+        permissionCodes: [],
+      });
+
+      const toAuthor = waitForEvent(author, REALTIME_EVENTS.ticketCreated);
+      const toAgent = waitForEvent(agent, REALTIME_EVENTS.ticketCreated);
+      const silence = expectNoEvent(colleague, REALTIME_EVENTS.ticketCreated);
+
+      await fx.publish({
+        pattern: TICKET_PATTERNS.created,
+        organizationId,
+        ticketId: faker.string.uuid(),
+        occurredAt: new Date().toISOString(),
+        ticketNumber: 43,
+        authorId,
+        source: TicketSource.WEB,
+        title: 'A colleague’s ticket',
+      });
+
+      await expect(toAuthor).resolves.toBeDefined();
+      await expect(toAgent).resolves.toBeDefined();
       await expect(silence).resolves.toBe(true);
     });
 
