@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { BeforeApplicationShutdown, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
@@ -28,6 +28,7 @@ import {
   REALTIME_SOCKET,
   RealtimeRoom,
   RequestContext,
+  TicketViewersPayload,
   ticketInternalRoom,
   ticketRoom,
   userRoom,
@@ -64,6 +65,8 @@ import {
 } from './realtime.config';
 import { RevokedSessionsService } from '../../common/redis/revoked-sessions.service';
 import { isAgent, orgAgentsRoom } from './agents';
+import { TicketViewers } from './ticket-viewers.service';
+import { TicketReferences } from '../tickets/ticket-references.service';
 
 /**
  * The gateway's real-time surface.
@@ -82,11 +85,19 @@ import { isAgent, orgAgentsRoom } from './agents';
  */
 @SecureGateway(REALTIME_SOCKET.namespace)
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, BeforeApplicationShutdown
 {
   // A NAMESPACE, not the root `Server`: Nest injects `/ws`, whose `sockets` is
   // the map of THIS process's own sockets.
   @WebSocketServer() server!: Namespace;
+
+  /**
+   * Set once the application starts shutting down. The adapter's Redis is
+   * closing then, so a `ticket:viewers` broadcast would fail inside the adapter,
+   * where no caller can catch it. The departing sockets' entries lapse on their
+   * own (`TicketViewers.TTL_MS`).
+   */
+  private closing = false;
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly ACCESS_COOKIE_NAME: string;
@@ -102,6 +113,8 @@ export class RealtimeGateway
     private readonly presence: PresenceService,
     private readonly metrics: MetricsRegistry,
     private readonly revokedSessions: RevokedSessionsService,
+    private readonly viewers: TicketViewers,
+    private readonly references: TicketReferences,
   ) {
     this.ACCESS_COOKIE_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
@@ -237,7 +250,7 @@ export class RealtimeGateway
    * gateway lives on `client.data` and dies with the connection. Streams are
    * the exception because they hold something OUTSIDE the process.
    */
-  handleDisconnect(client: Socket): void {
+  async handleDisconnect(client: Socket): Promise<void> {
     this.aiStreams.cancelAll(client);
 
     // Only for sockets that were counted. `handleConnection` increments after
@@ -245,7 +258,24 @@ export class RealtimeGateway
     // negative under a handshake flood — and a gauge that goes negative is one
     // nobody trusts again.
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (client.data.user) this.metrics.websocketConnections.dec();
+    const user = client.data.user as JwtPayload | undefined;
+    if (!user) return;
+    this.metrics.websocketConnections.dec();
+
+    // The tickets it was viewing lose a viewer.
+    if (this.closing) return;
+    let left: string[];
+    try {
+      left = await this.viewers.disconnect(client.id);
+    } catch (error) {
+      this.logger.warn(`Ticket viewers not cleared: ${formatErrorMsg(error)}`);
+      return;
+    }
+    for (const ticketId of left) {
+      await this.updateViewers(ticketId, user, client, () =>
+        Promise.resolve(true),
+      );
+    }
   }
 
   /**
@@ -344,6 +374,10 @@ export class RealtimeGateway
     // join.
     if (isAgent(payload)) {
       await client.join(ticketInternalRoom(id));
+      await this.updateViewers(id, payload, client, async () => {
+        await this.viewers.join(id, client.id, payload.sub);
+        return true;
+      });
     }
 
     client.emit(REALTIME_EVENTS.ticketJoined, {
@@ -360,7 +394,7 @@ export class RealtimeGateway
   ): Promise<void> {
     // No authorization check: leaving a room you are not in is a no-op, and
     // refusing it would only make a client's cleanup path conditional.
-    this.requireUser(client);
+    const payload = this.requireUser(client);
     await this.requireEventBudget(client, CLIENT_EVENTS.ticketLeave);
     const id = this.requireTicketId(ticketId);
 
@@ -369,6 +403,59 @@ export class RealtimeGateway
     // and making this conditional on the permission would leave an agent whose
     // permission was revoked mid-session still in the internal room.
     await client.leave(ticketInternalRoom(id));
+    await this.updateViewers(id, payload, client, () =>
+      this.viewers.leave(id, client.id),
+    );
+  }
+
+  beforeApplicationShutdown(): void {
+    this.closing = true;
+  }
+
+  /**
+   * Applies a change to a ticket's viewers and, when it changed something,
+   * sends every replica's agents in `ticket:{id}:internal` the new list as
+   * `ticket:viewers`, names from one `ListUsersByIds`. End users never join
+   * that room.
+   *
+   * Never fails the caller: who else is looking is the least of what this
+   * socket does, as presence is.
+   */
+  private async updateViewers(
+    ticketId: string,
+    payload: JwtPayload,
+    client: Socket,
+    change: () => Promise<boolean>,
+  ): Promise<void> {
+    try {
+      if (!(await change())) return;
+
+      const ids = await this.viewers.viewerIds(ticketId);
+      const names = await this.references.userNames(
+        this.requestContext(client, payload),
+        ids,
+      );
+      // Checked last, after the awaits: shutdown may have begun since.
+      if (this.closing) return;
+      this.broadcastToRoom(ticketInternalRoom(ticketId)).emit(
+        REALTIME_EVENTS.ticketViewers,
+        {
+          success: true,
+          message: 'Viewers changed',
+          data: {
+            ticketId,
+            viewers: ids.map((id) => ({
+              id,
+              fullName: names.get(id)?.fullName ?? null,
+            })),
+          },
+        } satisfies WsResponse<TicketViewersPayload>,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Ticket viewers not updated for ${ticketId}: ${formatErrorMsg(error)}`,
+      );
+    }
   }
 
   /**

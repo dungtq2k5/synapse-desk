@@ -124,6 +124,17 @@ export class TicketReferences {
     return messages;
   }
 
+  /**
+   * These users' names, in one batched lookup; an id that names nobody, or a
+   * failed lookup, is absent from the map.
+   */
+  userNames(
+    context: RequestContext,
+    ids: string[],
+  ): Promise<Map<string, UserReferenceResponseDto>> {
+    return this.users(this.loaders(context).users, ids);
+  }
+
   private loaders(context: RequestContext) {
     return createLoadersFor(() => context, {
       auth: this.auth,

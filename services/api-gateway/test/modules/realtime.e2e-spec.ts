@@ -14,6 +14,7 @@ import {
   ticketMessageGroupKey,
   TicketSource,
   TicketStatus,
+  type TicketViewersPayload,
 } from '@synapsedesk/contracts';
 import {
   ACCESS_COOKIE,
@@ -243,6 +244,52 @@ describe('the real-time relay (e2e)', () => {
   });
 
   // ------------------------------------------------------------ ticket:join
+
+  describe('ticket:viewers', () => {
+    const VIEWERS = () => `ticket-viewers:${ticketId}`;
+
+    /** An agent's socket in the ticket, and the lists it receives. */
+    const agentIn = async (sub: string) => {
+      const socket = await fx.connectClient({
+        sub,
+        organizationId,
+        permissionCodes: ['ticket.read.all'],
+      });
+      const lists: string[][] = [];
+      socket.on(
+        REALTIME_EVENTS.ticketViewers,
+        (frame: { data: TicketViewersPayload }) =>
+          lists.push(frame.data.viewers.map((viewer) => viewer.id)),
+      );
+      socket.emit(CLIENT_EVENTS.ticketJoin, ticketId);
+      await waitForEvent(socket, REALTIME_EVENTS.ticketJoined);
+      return lists;
+    };
+
+    // Other rows' agents share this ticket; each row starts from none.
+    beforeEach(() => fx.redis.del(VIEWERS()));
+
+    it('**an agent in two tabs is one viewer**', async () => {
+      const agent = faker.string.uuid();
+
+      const lists = await agentIn(agent);
+      await agentIn(agent);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(lists.at(-1)).toEqual([agent]);
+    });
+
+    it("**a dead replica's viewer lapses**: an entry past its score is dropped at the next read", async () => {
+      // As a replica that stopped re-scoring leaves it.
+      await fx.redis.zadd(VIEWERS(), Date.now() - 1, 'ghost|dead-socket');
+      const agent = faker.string.uuid();
+
+      const lists = await agentIn(agent);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(lists.at(-1)).toEqual([agent]);
+    });
+  });
 
   describe('5. ticket:join re-authorization', () => {
     it('ADMITS the ticket author', async () => {

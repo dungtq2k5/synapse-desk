@@ -11,6 +11,7 @@ import { AiStreamService } from './ai-stream.service';
 import { PresenceService } from './presence.service';
 import { WsThrottlerService } from './ws-throttler.service';
 import { RevokedSocketSweep } from './revoked-socket.sweep';
+import { TicketViewers } from './ticket-viewers.service';
 
 /**
  * Imports AuthModule for `JwtService` — the handshake verifies the SAME
@@ -47,6 +48,8 @@ import { RevokedSocketSweep } from './revoked-socket.sweep';
     WsThrottlerService,
     // Drops a connected socket whose session was revoked since its handshake.
     RevokedSocketSweep,
+    // Who else is viewing a ticket, across replicas (`ticket:viewers`).
+    TicketViewers,
   ],
   exports: [RealtimeGateway],
 })
