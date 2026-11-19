@@ -5,7 +5,11 @@ import {
   type IncomingMessage,
   type Server,
 } from 'node:http';
+import { existsSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
+import { join } from 'node:path';
+import { parse } from 'dotenv';
+import { REPO_ROOT } from '../system/services';
 
 /** Where the browser goes: one origin, as in the cluster. */
 export const INGRESS_PORT = 5173;
@@ -14,7 +18,24 @@ export const WEB_URL = `http://localhost:${INGRESS_PORT}`;
 /** The built web app (`next start`), behind the ingress. */
 export const WEB_PORT = 5174;
 const GATEWAY_PORT = 3000;
-const REALTIME_PORT = 3001;
+const REALTIME_PORT = realtimePort();
+
+/**
+ * Where the gateway serves Socket.IO: its `WS_PORT` when it declares one (a
+ * separate realtime server), else its HTTP port. Read as the gateway reads its
+ * settings, `.env` before `.env.example`, so the ingress follows the gateway
+ * the stack actually starts.
+ */
+function realtimePort(): number {
+  const dir = join(REPO_ROOT, 'services/api-gateway');
+  for (const file of ['.env', '.env.example']) {
+    const path = join(dir, file);
+    if (!existsSync(path)) continue;
+    const port = parse(readFileSync(path)).WS_PORT;
+    if (port) return Number(port);
+  }
+  return GATEWAY_PORT;
+}
 
 /**
  * The cluster's Ingress split in miniature (`k8s/ingress.yaml`): `/api` and
