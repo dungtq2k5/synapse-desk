@@ -3,6 +3,8 @@ import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { defer } from 'rxjs';
 import type { RedisService } from '../redis/redis.service';
+import type { CacheService } from '../cache/cache.service';
+import { CACHE_SCOPES } from '../config/cache.config';
 import { OrganizationStatusService } from './organization-status.service';
 
 /** The four commands the status cache issues, in memory. */
@@ -44,11 +46,14 @@ describe('OrganizationStatusService', () => {
           }),
       }),
     } as unknown as ClientGrpc;
-    const service = new OrganizationStatusService(client, {
-      client: new FakeRedis(),
-    } as unknown as RedisService);
+    const cache = { invalidateScope: jest.fn().mockResolvedValue(0) };
+    const service = new OrganizationStatusService(
+      client,
+      { client: new FakeRedis() } as unknown as RedisService,
+      cache as unknown as CacheService,
+    );
     service.onModuleInit();
-    return { service, calls: () => calls };
+    return { service, calls: () => calls, cache };
   };
 
   it('caches a decision: two reads, one question', async () => {
@@ -85,5 +90,18 @@ describe('OrganizationStatusService', () => {
       OrgStatus.FROZEN,
     ]);
     expect(calls()).toBe(2);
+  });
+
+  it("**invalidating also evicts the organization's cached `GET /organizations/current`**", async () => {
+    const { service, cache } = serviceWith(() =>
+      Promise.resolve(OrgStatus.ACTIVE),
+    );
+
+    await service.invalidate(ORGANIZATION);
+
+    expect(cache.invalidateScope).toHaveBeenCalledWith(
+      ORGANIZATION,
+      CACHE_SCOPES.organizations,
+    );
   });
 });

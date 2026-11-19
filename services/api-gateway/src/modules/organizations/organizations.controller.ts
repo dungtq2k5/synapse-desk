@@ -41,6 +41,7 @@ import {
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
 import { InboundAddressResponseDto } from './dto/rest/inbound-address-response.dto';
+import { OrganizationStatusService } from '../../common/organization-status/organization-status.service';
 
 /**
  * The caller's OWN tenant (api-endpoints-plan).
@@ -57,7 +58,10 @@ import { InboundAddressResponseDto } from './dto/rest/inbound-address-response.d
 @Controller('organizations/current')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class OrganizationsController {
-  constructor(private readonly organizations: OrganizationsService) {}
+  constructor(
+    private readonly organizations: OrganizationsService,
+    private readonly organizationStatus: OrganizationStatusService,
+  ) {}
 
   /**
    * NO permission requirement, unlike everything else here.
@@ -258,10 +262,15 @@ export class OrganizationsController {
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
   @ResponseMessage('Onboarding complete')
-  completeOnboarding(
+  async completeOnboarding(
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationResponseDto> {
-    return this.organizations.completeOnboarding(context);
+    const organization = await this.organizations.completeOnboarding(context);
+    // The lifecycle gate reads the new status at once, not after its TTL.
+    if (context.organizationId) {
+      await this.organizationStatus.invalidate(context.organizationId);
+    }
+    return organization;
   }
 
   /**
@@ -291,6 +300,10 @@ export class OrganizationsController {
       deleteOrganizationDto,
       context,
     );
+    // Frozen now: the lifecycle gate refuses at once, not after its TTL.
+    if (context.organizationId) {
+      await this.organizationStatus.invalidate(context.organizationId);
+    }
 
     response.locals.warning =
       'This workspace is frozen pending review. Contact support to cancel.';

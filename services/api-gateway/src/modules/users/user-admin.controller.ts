@@ -291,6 +291,9 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Set departments' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  // Replaces the user's memberships, which `GET /departments` counts
+  // (`memberCount`) and caches for five minutes.
+  @InvalidateCache(CACHE_SCOPES.departments)
   @Put(':id/departments')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.member.assign')

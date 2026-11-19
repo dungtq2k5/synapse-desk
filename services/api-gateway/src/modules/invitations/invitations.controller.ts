@@ -56,6 +56,8 @@ import {
   ApiWrappedResponse,
   Paginated,
 } from '../../common/decorators/api-response.decorator';
+import { CacheService } from '../../common/cache/cache.service';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
 
 /**
  * Invitations (api-endpoints-plan).
@@ -72,6 +74,7 @@ export class InvitationsController {
   constructor(
     private readonly invitations: InvitationsService,
     private readonly jwtCookieService: JwtCookieService,
+    private readonly cache: CacheService,
   ) {}
 
   /**
@@ -230,13 +233,11 @@ export class InvitationsController {
         'again. Your invitation still works.").',
     },
   })
-  // **No `@InvalidateCache`, and it would not work here.** Acceptance grants
-  // roles, which moves `roles.user_assigned` — a field `GET /roles` caches. But
-  // `CacheInvalidationInterceptor` derives the tenant from the request context
-  // and returns early without one, and this route is unauthenticated by design.
-  // The decorator would read as handled and evict nothing; the staleness is
-  // covered by the 5-minute TTL instead, the same trade that class already
-  // accepts for a platform Super Admin writing into a tenant.
+  // **Evicts by hand, not with `@InvalidateCache`.** Acceptance grants roles
+  // and departments, which move `GET /roles`' `userAssigned` and
+  // `GET /departments`' `memberCount`. The decorator takes the tenant from the
+  // caller, and this route has none (it's unauthenticated by design), so the
+  // tenant is the one auth-service accepted the user into.
   @Post('accept')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)
@@ -246,6 +247,11 @@ export class InvitationsController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponseDto> {
     const result = await this.invitations.accept(acceptInvitationDto, origin);
+    const tenant = result.user.organizationId;
+    if (tenant) {
+      await this.cache.invalidateScope(tenant, CACHE_SCOPES.roles);
+      await this.cache.invalidateScope(tenant, CACHE_SCOPES.departments);
+    }
 
     this.jwtCookieService.setAccessTokenCookie(response, result.accessToken);
     this.jwtCookieService.setRefreshTokenCookie(response, result.refreshToken);

@@ -10,6 +10,8 @@ import {
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/contracts';
+import { CacheService } from '../cache/cache.service';
+import { CACHE_SCOPES } from '../config/cache.config';
 
 /** What the gate needs to decide, and nothing else. */
 export type OrganizationState = {
@@ -63,6 +65,7 @@ export class OrganizationStatusService
   constructor(
     @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
     redis: RedisService,
+    private readonly cache: CacheService,
   ) {
     super();
     // The SHARED connection. This service opened its own, with its
@@ -117,13 +120,22 @@ export class OrganizationStatusService
   }
 
   /**
-   * Drops the cached decision immediately.
+   * Drops both of the organization's cached reads: its lifecycle status, and
+   * its own `GET /organizations/current` (the `organizations` scope).
    *
-   * Called by the platform status endpoints. Without it a freeze would not take
-   * effect for up to the TTL, which is exactly the wrong direction for the one
-   * action an operator takes when something is going wrong right now.
+   * Called by every write that changes the organization's lifecycle: the
+   * platform's four writes and the tenant's own delete and onboarding. Without
+   * it a freeze would not take effect for up to the TTL, which is exactly the
+   * wrong direction for the one action an operator takes when something is
+   * going wrong right now. One call clears both, so a new write cannot clear
+   * one and miss the other.
    */
   async invalidate(organizationId: string): Promise<void> {
+    // Fails open on its own, with its own line.
+    await this.cache.invalidateScope(
+      organizationId,
+      CACHE_SCOPES.organizations,
+    );
     try {
       // The generation first: a status being read right now is then stored
       // where no read looks. The delete is what an instance still on keys

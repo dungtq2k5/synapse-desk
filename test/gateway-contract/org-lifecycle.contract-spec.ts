@@ -463,6 +463,136 @@ describe('the tenant lifecycle gate', () => {
     },
   );
 
+  /** The tenant's cached `GET /organizations/current`, seeded directly. */
+  const ORGANIZATION_READ = `cache:${ORGANIZATION}|organizations|`;
+
+  rowFor('Platform')(
+    "**a platform write also evicts the organization's cached `GET /organizations/current`** — the tenant reads its new name at once",
+    async () => {
+      await redis.set(ORGANIZATION_READ, '{}');
+      peers.auth.on('PlatformService/UpdateOrganization').reply({
+        organization: {
+          id: ORGANIZATION,
+          name: 'Acme Renamed',
+          slug: 'acme',
+          status: 'ORG_STATUS_ACTIVE',
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          maxAgentSeats: 5,
+          maxStorageBytes: '1000000',
+          monthlyAiTokenBudget: '1000000',
+          billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        userCount: 3,
+        pendingInvitationCount: 0,
+        departmentCount: 1,
+      });
+
+      const changed = await session().request(
+        'PATCH',
+        `${API}/platform/organizations/${ORGANIZATION}`,
+        { body: { name: 'Acme Renamed' }, headers: superAdminHeaders() },
+      );
+
+      expect(changed.status).toBe(200);
+      expect(await redis.exists(ORGANIZATION_READ)).toBe(0);
+    },
+  );
+
+  rowFor('Platform')(
+    "**a billing-cycle reset evicts the organization's cached `GET /organizations/current`**, which shows the cycle's start",
+    async () => {
+      await redis.set(ORGANIZATION_READ, '{}');
+      peers.auth.on('PlatformService/ResetBillingCycle').reply({
+        organization: {
+          id: ORGANIZATION,
+          name: 'Acme',
+          slug: 'acme',
+          status: 'ORG_STATUS_ACTIVE',
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          maxAgentSeats: 5,
+          maxStorageBytes: '1000000',
+          monthlyAiTokenBudget: '1000000',
+          billingCycleStart: { seconds: 1_756_771_200, nanos: 0 },
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        userCount: 3,
+        pendingInvitationCount: 0,
+        departmentCount: 1,
+      });
+
+      const reset = await session().post(
+        `${API}/platform/organizations/${ORGANIZATION}/billing-cycle/reset`,
+        { reason: 'Outage credit' },
+        superAdminHeaders(),
+      );
+
+      expect(reset.status).toBe(200);
+      expect(await redis.exists(ORGANIZATION_READ)).toBe(0);
+    },
+  );
+
+  rowFor('Organizations')(
+    "**the tenant's own delete drops the cached decision at once** — a frozen workspace does not pass the gate for thirty seconds",
+    async () => {
+      tenantIs(OrgStatus.ACTIVE);
+      await ROUTES.READ.send();
+      expect(await redis.exists(await cacheKey())).toBe(1);
+      peers.auth
+        .on('OrganizationService/DeleteOrganization')
+        .reply({ revokedSessionCount: 1 });
+
+      const deleted = await session().request(
+        'DELETE',
+        `${API}/organizations/current`,
+        {
+          body: { reason: 'Closing the workspace' },
+          headers: headers(['organization.delete']),
+        },
+      );
+
+      expect(deleted.status).toBe(200);
+      expect(await redis.exists(await cacheKey())).toBe(0);
+    },
+  );
+
+  rowFor('Organizations')(
+    '**completing onboarding drops the cached decision at once** — a tenant that just finished is not refused for thirty seconds',
+    async () => {
+      tenantIs(OrgStatus.PENDING_ONBOARDING);
+      await ROUTES.READ.send();
+      expect(await redis.exists(await cacheKey())).toBe(1);
+      peers.auth.on('OrganizationService/CompleteOnboarding').reply({
+        id: ORGANIZATION,
+        name: 'Acme',
+        slug: 'acme',
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+        enforceTwoFactor: false,
+        allowedEmailDomains: [],
+        maxAgentSeats: 5,
+        maxStorageBytes: '1000000',
+        monthlyAiTokenBudget: '1000000',
+        aiModelTier: 'AI_MODEL_TIER_FAST',
+        billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
+
+      const completed = await session().post(
+        `${API}/organizations/current/onboarding/complete`,
+        undefined,
+        headers(['organization.update']),
+      );
+
+      expect(completed.status).toBe(200);
+      expect(await redis.exists(await cacheKey())).toBe(0);
+    },
+  );
+
   // ------------------------------------------------------------------ GraphQL
 
   const departmentsQuery = () =>

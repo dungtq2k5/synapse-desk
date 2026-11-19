@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { CacheModule } from '../../common/cache/cache.module';
 import { InvitationsController } from './invitations.controller';
 import { InvitationsGrpcClient } from './invitations-grpc.client';
 import { InvitationsService } from './invitations.service';
@@ -13,7 +14,7 @@ import { InvitationsService } from './invitations.service';
  * rate limit. `@nestjs/throttler` is not installed, so it does not yet.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, CacheModule],
   controllers: [InvitationsController],
   providers: [InvitationsGrpcClient, InvitationsService],
 })

@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { AuthModule } from '../../modules/auth/auth.module';
 import { RedisModule } from '../redis/redis.module';
 import { OrganizationStatusService } from './organization-status.service';
+import { CacheModule } from '../cache/cache.module';
 
 /**
  * `@Global` because the lifecycle interceptor is registered with APP_INTERCEPTOR
@@ -13,7 +14,7 @@ import { OrganizationStatusService } from './organization-status.service';
  */
 @Global()
 @Module({
-  imports: [AuthModule, RedisModule],
+  imports: [AuthModule, RedisModule, CacheModule],
   providers: [OrganizationStatusService],
   exports: [OrganizationStatusService],
 })

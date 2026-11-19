@@ -197,12 +197,19 @@ export class PlatformController {
   @ResponseMessage(
     'Billing cycle reset — this desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget',
   )
-  resetBillingCycle(
+  async resetBillingCycle(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ResetBillingCycleDto,
   ): Promise<PlatformOrganizationResponseDto> {
-    return this.platform.resetBillingCycle(id, dto.reason, context);
+    const organization = await this.platform.resetBillingCycle(
+      id,
+      dto.reason,
+      context,
+    );
+    // The tenant's cached read shows `billingCycleStart`.
+    await this.organizationStatus.invalidate(id);
+    return organization;
   }
 
   /** The irreversible half that `DELETE /organizations/current` only requests. */

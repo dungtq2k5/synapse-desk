@@ -1,3 +1,4 @@
+import { InvalidateCache } from '../../common/decorators/invalidate-cache.decorator';
 import { Cacheable } from '../../common/decorators/cacheable.decorator';
 import { CACHE_SCOPES } from '../../common/config/cache.config';
 import {
@@ -79,6 +80,9 @@ export class DocumentsController {
   })
   @ApiWrappedResponse(Paginated(DocumentResponseDto))
   @ApiFilterErrors(['401'])
+  // Every write here evicts it (`@InvalidateCache`), so the writer's next read
+  // shows the write; the worker's status changes evict it through NATS
+  // (`CacheInvalidationConsumer`).
   @Cacheable({
     scope: CACHE_SCOPES.documents,
     ttlSeconds: 60,
@@ -158,6 +162,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Dismiss a quality flag' })
   @ApiWrappedResponse(DocumentFlagResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post('flags/:flagId/dismiss')
   @RequirePermission('document.update')
   @HttpCode(HttpStatus.OK)
@@ -184,6 +189,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Mark a quality flag fixed' })
   @ApiWrappedResponse(DocumentFlagResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post('flags/:flagId/fixed')
   @RequirePermission('document.update')
   @HttpCode(HttpStatus.OK)
@@ -205,6 +211,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Mark a quality flag replaced' })
   @ApiWrappedResponse(DocumentFlagResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post('flags/:flagId/replaced')
   @RequirePermission('document.update')
   @HttpCode(HttpStatus.OK)
@@ -233,6 +240,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Delete a quality flag' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Delete('flags/:flagId')
   @RequirePermission('document.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -266,6 +274,7 @@ export class DocumentsController {
         'missing one.',
     },
   })
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post('presign')
   @RequirePermission('document.create')
   @HttpCode(HttpStatus.OK)
@@ -285,6 +294,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Confirm' })
   @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post('confirm')
   @RequirePermission('document.create')
   @ResponseMessage('Document uploaded')
@@ -311,6 +321,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Patch(':id')
   @RequirePermission('document.update')
   @ResponseMessage('Document updated')
@@ -325,6 +336,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Delete(':id')
   @RequirePermission('document.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -338,6 +350,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Restore' })
   @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post(':id/restore')
   @RequirePermission('document.delete')
   @HttpCode(HttpStatus.OK)
@@ -363,6 +376,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Reindex' })
   @ApiWrappedResponse(IngestionJobResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post(':id/reindex')
   @RequirePermission('document.reindex')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -391,6 +405,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Replace the file' })
   @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404', '409'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Post(':id/replace')
   @RequirePermission('document.update')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -457,6 +472,7 @@ export class DocumentsController {
   @ApiOperation({ summary: 'Set departments' })
   @ApiWrappedResponse(DocumentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.documents)
   @Put(':id/departments')
   @RequirePermission('document.share')
   @ResponseMessage('Document scoping updated')
