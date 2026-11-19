@@ -51,6 +51,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       // URLs are internal object paths resolved per request. Until when the
       // caller may delete them goes with them.
       restOnly: ['attachments', 'openingFilesDeletableUntil'],
+      edges: ['author', 'assignee', 'department'],
     },
     {
       name: 'TicketMessage',
@@ -71,6 +72,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       // telling a refusal from an answer is something any client reading a
       // thread needs.
       restOnly: ['attachments', 'excludedFromAiContext'],
+      edges: ['sender'],
     },
     {
       name: 'Citation',

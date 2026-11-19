@@ -45,6 +45,8 @@ export function toMessageResponseDto(
     id: message.id,
     ticketId: message.ticketId,
     senderId: message.senderId ?? null,
+    // Named by `TicketReferences` on the REST routes; null until then.
+    sender: null,
     content: message.content,
     isAiGenerated: message.isAiGenerated,
     isInternalNote: message.isInternalNote,

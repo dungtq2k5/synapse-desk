@@ -1,5 +1,9 @@
 import { AttachmentResponseDto } from './message-response.dto';
 import {
+  DepartmentReferenceResponseDto,
+  UserReferenceResponseDto,
+} from '../../../../common/dto/rest/reference-response.dto';
+import {
   TicketPriority,
   TicketSource,
   TicketStatus,
@@ -25,6 +29,26 @@ export class TicketResponseDto {
   description!: string;
   currentAssigneeId!: string | null;
   currentDepartmentId!: string | null;
+  /**
+   * Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id
+   * names nobody (a deleted user or department). A client shows "Unknown"
+   * for it.
+   */
+  author!: UserReferenceResponseDto | null;
+  /**
+   * Who holds the ticket, resolved from `currentAssigneeId`. Null when the
+   * ticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id
+   * names nobody (a deleted user or department). A client shows "Unknown"
+   * for it.
+   */
+  assignee!: UserReferenceResponseDto | null;
+  /**
+   * The department the ticket is in, resolved from `currentDepartmentId`. Null
+   * when it is in none, or when it could not be resolved: auth-service did not answer, or the id
+   * names nobody (a deleted user or department). A client shows "Unknown"
+   * for it.
+   */
+  department!: DepartmentReferenceResponseDto | null;
   escalatedAt!: Date | null;
   resolvedAt!: Date | null;
   /**

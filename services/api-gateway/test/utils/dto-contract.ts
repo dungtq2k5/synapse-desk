@@ -42,11 +42,15 @@ export type DtoContract = {
   restOnly?: readonly string[];
   /**
    * Fields the schema serves and REST does not — resolved edges, almost always.
-   *
-   * `Ticket.assignee` is a cross-service resolution the REST response
-   * deliberately does not perform, exposing `currentAssigneeId` instead.
    */
   gqlOnly?: readonly string[];
+  /**
+   * Fields both serve: REST inline on the DTO, the schema as a resolved edge
+   * (`@ResolveField`), which this class comparison cannot see. A ticket's
+   * `author` is one: REST names it on the response, the schema resolves
+   * `Ticket.author`.
+   */
+  edges?: readonly string[];
 };
 
 /**
@@ -86,7 +90,10 @@ export function compareContract(contract: DtoContract): {
   const rest = declaredFields(restSource, contract.restClass);
   const gql = declaredFields(gqlSource, contract.gqlClass);
 
-  const restOnly = new Set(contract.restOnly ?? []);
+  const restOnly = new Set([
+    ...(contract.restOnly ?? []),
+    ...(contract.edges ?? []),
+  ]);
   const gqlOnly = new Set(contract.gqlOnly ?? []);
 
   return {

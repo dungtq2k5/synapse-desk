@@ -110,8 +110,21 @@ export function createLoaders(
   // **A THUNK, not a value, and this is a bug fix** — see the note above.
   // Resolved on first batch, which happens during execution, by which time the
   // guards have run and `request.user` exists.
-  const context = () => callerOf(request) ?? ANONYMOUS;
+  return createLoadersFor(() => callerOf(request) ?? ANONYMOUS, clients);
+}
 
+/**
+ * The same loaders for a caller already resolved, as a REST handler holds it
+ * (`@CurrentUser()`): `TicketReferences` names a response's people and
+ * departments through them. Fresh per call, like `createLoaders`, so their
+ * per-request cache never outlives the request.
+ *
+ * @example createLoadersFor(() => context, clients).users.loadMany(ids)
+ */
+export function createLoadersFor(
+  context: () => RequestContext,
+  clients: LoaderClients,
+): RequestLoaders {
   return {
     users: createUserSummaryLoader(clients.auth, context, clients.cache),
     departments: createDepartmentLoader(clients.auth, context, clients.cache),

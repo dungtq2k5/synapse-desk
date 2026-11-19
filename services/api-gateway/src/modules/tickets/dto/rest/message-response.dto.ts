@@ -1,4 +1,5 @@
 import { AnswerStatus } from '@synapsedesk/contracts';
+import { UserReferenceResponseDto } from '../../../../common/dto/rest/reference-response.dto';
 
 /**
  * One passage an AI answer cited.
@@ -48,6 +49,13 @@ export class MessageResponseDto {
   ticketId!: string;
   /** null for an AI-generated message — no user wrote it. */
   senderId!: string | null;
+  /**
+   * Who wrote the message, resolved from `senderId`. Always null for an
+   * AI-generated message: no user wrote it. For a human message, null when it could not be resolved: auth-service did not answer, or the id
+   * names nobody (a deleted user or department). A client shows "Unknown"
+   * for it.
+   */
+  sender!: UserReferenceResponseDto | null;
   content!: string;
   isAiGenerated!: boolean;
   isInternalNote!: boolean;

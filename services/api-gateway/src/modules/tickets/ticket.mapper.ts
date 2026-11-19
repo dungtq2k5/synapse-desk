@@ -53,6 +53,10 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     description: ticket.description,
     currentAssigneeId: ticket.currentAssigneeId ?? null,
     currentDepartmentId: ticket.currentDepartmentId ?? null,
+    // Named by `TicketReferences` on the REST routes; null until then.
+    author: null,
+    assignee: null,
+    department: null,
     escalatedAt: fromProtoTimestamp(ticket.escalatedAt) ?? null,
     resolvedAt: fromProtoTimestamp(ticket.resolvedAt) ?? null,
     unreadCount: ticket.unreadCount,

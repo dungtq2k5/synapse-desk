@@ -73001,6 +73001,34 @@
         },
         "required": ["reason", "from", "to"]
       },
+      "UserReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["id", "fullName", "avatarUrl"]
+      },
+      "DepartmentReferenceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"]
+      },
       "AttachmentResponseDto": {
         "type": "object",
         "properties": {
@@ -73097,6 +73125,36 @@
             "type": "string",
             "nullable": true
           },
+          "author": {
+            "nullable": true,
+            "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              }
+            ]
+          },
+          "assignee": {
+            "nullable": true,
+            "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the\nticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              }
+            ]
+          },
+          "department": {
+            "nullable": true,
+            "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null\nwhen it is in none, or when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepartmentReferenceResponseDto"
+              }
+            ]
+          },
           "escalatedAt": {
             "format": "date-time",
             "type": "string",
@@ -73154,6 +73212,9 @@
           "description",
           "currentAssigneeId",
           "currentDepartmentId",
+          "author",
+          "assignee",
+          "department",
           "escalatedAt",
           "resolvedAt",
           "unreadCount",
@@ -73216,6 +73277,36 @@
           "currentDepartmentId": {
             "type": "string",
             "nullable": true
+          },
+          "author": {
+            "nullable": true,
+            "description": "Who raised the ticket, resolved from `authorId`. Null when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              }
+            ]
+          },
+          "assignee": {
+            "nullable": true,
+            "description": "Who holds the ticket, resolved from `currentAssigneeId`. Null when the\nticket is unassigned, or when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              }
+            ]
+          },
+          "department": {
+            "nullable": true,
+            "description": "The department the ticket is in, resolved from `currentDepartmentId`. Null\nwhen it is in none, or when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepartmentReferenceResponseDto"
+              }
+            ]
           },
           "escalatedAt": {
             "format": "date-time",
@@ -73281,6 +73372,9 @@
           "description",
           "currentAssigneeId",
           "currentDepartmentId",
+          "author",
+          "assignee",
+          "department",
           "escalatedAt",
           "resolvedAt",
           "unreadCount",
@@ -73864,6 +73958,16 @@
             "nullable": true,
             "description": "null for an AI-generated message — no user wrote it."
           },
+          "sender": {
+            "nullable": true,
+            "description": "Who wrote the message, resolved from `senderId`. Always null for an\nAI-generated message: no user wrote it. For a human message, null when it could not be resolved: auth-service did not answer, or the id\nnames nobody (a deleted user or department). A client shows \"Unknown\"\nfor it.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserReferenceResponseDto"
+              }
+            ]
+          },
           "content": {
             "type": "string"
           },
@@ -73940,6 +74044,7 @@
           "id",
           "ticketId",
           "senderId",
+          "sender",
           "content",
           "isAiGenerated",
           "isInternalNote",

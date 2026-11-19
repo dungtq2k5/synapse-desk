@@ -46,6 +46,7 @@ import {
   ApiWrappedResponse,
   Paginated,
 } from '../../common/decorators/api-response.decorator';
+import { TicketReferences } from '../tickets/ticket-references.service';
 
 /**
  * Self-service chat — a THIN WRAPPER, and nothing else.
@@ -72,6 +73,7 @@ export class ChatController {
   constructor(
     private readonly tickets: TicketsService,
     private readonly messages: MessagesService,
+    private readonly references: TicketReferences,
   ) {}
 
   /**
@@ -120,7 +122,7 @@ export class ChatController {
         `No answer asked for conversation ${ticket.id}: ${formatErrorMsg(error)}`,
       );
     }
-    return ticket;
+    return this.references.fillTicket(context, ticket);
   }
 
   /**
@@ -140,15 +142,17 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListTicketsQueryDto,
   ): Promise<PaginationResponseDto<TicketResponseDto>> {
-    return this.tickets.list(
-      {
-        ...query,
-        source: TicketSource.CHAT,
-        authorId: context.sub,
-        includeDeleted: false,
-      },
-      context,
-    );
+    return this.tickets
+      .list(
+        {
+          ...query,
+          source: TicketSource.CHAT,
+          authorId: context.sub,
+          includeDeleted: false,
+        },
+        context,
+      )
+      .then((page) => this.references.fillTicketPage(context, page));
   }
 
   @ApiOperation({ summary: 'Get one own conversation (the ticket)' })
@@ -159,7 +163,9 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.tickets.get(id, context);
+    return this.tickets
+      .get(id, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({ summary: 'List the thread, with citations per AI message' })
@@ -171,7 +177,9 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListMessagesQueryDto,
   ): Promise<PaginationResponseDto<MessageResponseDto>> {
-    return this.messages.list(id, query, context);
+    return this.messages
+      .list(id, query, context)
+      .then((page) => this.references.fillMessagePage(context, page));
   }
 
   /**
@@ -196,19 +204,24 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateMessageDto,
   ): Promise<CreateMessageResponseDto> {
-    return this.messages.create(
-      id,
-      {
-        content: dto.content,
-        isInternalNote: false,
-        invokeAi: dto.invokeAi,
-        // Forwarded rather than dropped. This is the surface a
-        // customer asks a question from, so it is the surface where the
-        // screenshot and the question arrive together.
-        attachments: dto.attachments,
-      },
-      context,
-    );
+    return this.messages
+      .create(
+        id,
+        {
+          content: dto.content,
+          isInternalNote: false,
+          invokeAi: dto.invokeAi,
+          // Forwarded rather than dropped. This is the surface a
+          // customer asks a question from, so it is the surface where the
+          // screenshot and the question arrive together.
+          attachments: dto.attachments,
+        },
+        context,
+      )
+      .then(async (created) => {
+        await this.references.fillMessage(context, created.message);
+        return created;
+      });
   }
 
   /**
@@ -237,6 +250,8 @@ export class ChatController {
     // first divergence. If chat ever needs to say WHERE a hand-off came from,
     // that belongs on both routes as a caller-supplied reason, not on one of
     // them as a constant.
-    return this.tickets.escalate(id, {}, context);
+    return this.tickets
+      .escalate(id, {}, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 }

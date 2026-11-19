@@ -40,6 +40,7 @@ import {
   MessageResponseDto,
   PresignAttachmentResponseDto,
 } from './dto/rest/message-response.dto';
+import { TicketReferences } from './ticket-references.service';
 
 /**
  * The ticket thread (api-endpoints-plan §2.2).
@@ -62,7 +63,10 @@ import {
 @Controller('tickets/:ticketId/messages')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class MessagesController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(
+    private readonly messages: MessagesService,
+    private readonly references: TicketReferences,
+  ) {}
 
   @ApiOperation({
     summary: 'Chronological thread, cursor-paginated (?before=&limit=)',
@@ -75,7 +79,9 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Query() query: ListMessagesQueryDto,
   ): Promise<PaginationResponseDto<MessageResponseDto>> {
-    return this.messages.list(ticketId, query, context);
+    return this.messages
+      .list(ticketId, query, context)
+      .then((page) => this.references.fillMessagePage(context, page));
   }
 
   /**
@@ -112,7 +118,12 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Body() dto: CreateMessageDto,
   ): Promise<CreateMessageResponseDto> {
-    return this.messages.create(ticketId, dto, context);
+    return this.messages
+      .create(ticketId, dto, context)
+      .then(async (created) => {
+        await this.references.fillMessage(context, created.message);
+        return created;
+      });
   }
 
   @ApiOperation({
@@ -129,7 +140,9 @@ export class MessagesController {
     @Param('messageId', ParseUUIDPipe) messageId: string,
     @Body() dto: UpdateMessageDto,
   ): Promise<MessageResponseDto> {
-    return this.messages.update(ticketId, messageId, dto, context);
+    return this.messages
+      .update(ticketId, messageId, dto, context)
+      .then((message) => this.references.fillMessage(context, message));
   }
 
   /**
@@ -155,7 +168,9 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Param('messageId', ParseUUIDPipe) messageId: string,
   ): Promise<MessageResponseDto> {
-    return this.messages.redact(ticketId, messageId, context);
+    return this.messages
+      .redact(ticketId, messageId, context)
+      .then((message) => this.references.fillMessage(context, message));
   }
 
   // -------------------------------------------------------------- attachments

@@ -15,6 +15,9 @@ import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
 import { TicketsResolver } from './tickets.resolver';
 import { TicketMessagesResolver } from './ticket-messages.resolver';
+import { IngestionGrpcModule } from '../../common/grpc/ingestion-grpc.module';
+import { CacheModule } from '../../common/cache/cache.module';
+import { TicketReferences } from './ticket-references.service';
 
 /**
  * Imports AuthModule for `JwtAuthGuard` and the `JwtModule` it needs — a guard
@@ -28,7 +31,7 @@ import { TicketMessagesResolver } from './ticket-messages.resolver';
 @Module({
   // For `AnalyticsService`: the export lifecycle is shared across all three
   // export routes, and this module owns one of them.
-  imports: [AuthModule, AnalyticsModule],
+  imports: [AuthModule, AnalyticsModule, IngestionGrpcModule, CacheModule],
   controllers: [
     TicketsController,
     MessagesController,
@@ -46,10 +49,17 @@ import { TicketMessagesResolver } from './ticket-messages.resolver';
     AiService,
     TicketsResolver,
     TicketMessagesResolver,
+    TicketReferences,
   ],
   // `MessagesService` rather than `MessagesGrpcClient`: the realtime gateway and
   // the chat controller both write messages through the service, and the client
   // is now reachable only from inside it.
-  exports: [TicketsService, AssignmentsService, MessagesService, AiService],
+  exports: [
+    TicketsService,
+    AssignmentsService,
+    MessagesService,
+    AiService,
+    TicketReferences,
+  ],
 })
 export class TicketsModule {}

@@ -983,7 +983,8 @@ describe('The OpenAPI document', () => {
       const ajv = new Ajv({ strict: false, allErrors: true });
       addFormats(ajv);
       // Every component schema is registered so `$ref` resolves.
-      ajv.addSchema({ $id: 'openapi', components: doc.components }, 'openapi');
+      const components = nullableReferences(doc.components);
+      ajv.addSchema({ $id: 'openapi', components }, 'openapi');
 
       validate = (path, method, status, body) => {
         const responses = (
@@ -1000,8 +1001,8 @@ describe('The OpenAPI document', () => {
         if (!schema) return [`no documented ${status} for ${method} ${path}`];
 
         const check = ajv.compile({
-          ...schema,
-          components: doc.components,
+          ...(nullableReferences(schema) as object),
+          components,
         });
 
         return check(body)
@@ -1254,3 +1255,39 @@ describe('The OpenAPI document', () => {
     });
   });
 });
+
+/**
+ * A nullable reference, read as the document means it.
+ *
+ * OpenAPI 3.0 can't put `nullable` on a `$ref`, so a nullable object property
+ * is published as `nullable: true` beside `allOf: [$ref]`, which the generated
+ * client reads as `Reference | null`. Ajv applies 3.0.3's letter instead
+ * (`nullable` only widens a `type`), so the `allOf` still refuses `null`. Each
+ * such schema becomes `anyOf: [the reference, null]` before compiling; every
+ * other schema is unchanged.
+ *
+ * Remove it if the document moves to OpenAPI 3.1, which says
+ * `oneOf: [$ref, { type: 'null' }]` directly and needs no rewrite.
+ *
+ * @example nullableReferences({ nullable: true, allOf: [{ $ref }] }) // { anyOf: [{ allOf: [{ $ref }] }, { type: 'null' }] }
+ */
+function nullableReferences(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(nullableReferences);
+  if (typeof schema !== 'object' || schema === null) return schema;
+
+  const entries = Object.fromEntries(
+    Object.entries(schema).map(([key, value]) => [
+      key,
+      nullableReferences(value),
+    ]),
+  ) as Record<string, unknown>;
+  if (entries.nullable !== true || !Array.isArray(entries.allOf)) {
+    return entries;
+  }
+
+  const rest = { ...entries };
+  delete rest.nullable;
+  delete rest.type;
+  delete rest.allOf;
+  return { ...rest, anyOf: [{ allOf: entries.allOf }, { type: 'null' }] };
+}

@@ -65,6 +65,7 @@ import {
   ApiWrappedResponse,
   Paginated,
 } from '../../common/decorators/api-response.decorator';
+import { TicketReferences } from './ticket-references.service';
 
 /**
  * Tickets (`api-endpoints-plan.md - §2.1`).
@@ -91,6 +92,7 @@ export class TicketsController {
     private readonly assignments: AssignmentsService,
     private readonly ai: AiService,
     private readonly messages: MessagesService,
+    private readonly references: TicketReferences,
   ) {}
 
   @ApiOperation({ summary: 'Queue view' })
@@ -107,7 +109,9 @@ export class TicketsController {
     // end user their own ticket list.
     this.assertMayIncludeDeleted(context, query);
 
-    return this.tickets.list(query, context);
+    return this.tickets
+      .list(query, context)
+      .then((page) => this.references.fillTicketPage(context, page));
   }
 
   /**
@@ -128,7 +132,9 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('ticketNumber', ParseIntPipe) ticketNumber: number,
   ): Promise<TicketResponseDto> {
-    return this.tickets.getByNumber(ticketNumber, context);
+    return this.tickets
+      .getByNumber(ticketNumber, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({
@@ -142,7 +148,9 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.tickets.get(id, context);
+    return this.tickets
+      .get(id, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({ summary: 'Create' })
@@ -155,7 +163,9 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateTicketDto,
   ): Promise<CreateTicketResponseDto> {
-    return this.tickets.create(dto, context);
+    return this.tickets
+      .create(dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   /**
@@ -193,7 +203,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTicketDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.update(id, dto, context);
+    return this.tickets
+      .update(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   // ------------------------------------------------------------------------- The state machine. Five routes, one validator in the service.
@@ -323,7 +335,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangeTicketStatusDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.changeStatus(id, dto, context);
+    return this.tickets
+      .changeStatus(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   // The status transitions below are SEPARATE routes rather than one route with
@@ -356,7 +370,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.escalate(id, dto, context);
+    return this.tickets
+      .escalate(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({ summary: 'Resolve' })
@@ -371,7 +387,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.resolve(id, dto, context);
+    return this.tickets
+      .resolve(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({ summary: 'Reopen' })
@@ -386,7 +404,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.reopen(id, dto, context);
+    return this.tickets
+      .reopen(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   @ApiOperation({ summary: 'Close' })
@@ -401,7 +421,9 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.close(id, dto, context);
+    return this.tickets
+      .close(id, dto, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   /**
@@ -624,7 +646,9 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.tickets.restore(id, context);
+    return this.tickets
+      .restore(id, context)
+      .then((ticket) => this.references.fillTicket(context, ticket));
   }
 
   /**
