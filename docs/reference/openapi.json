@@ -20185,14 +20185,7 @@
         "parameters": [],
         "responses": {
           "204": {
-            "description": "Inbound mail is off. The address stops routing immediately.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Inbound mail is off. The address stops routing immediately."
           },
           "401": {
             "description": "No valid session cookie, or the session has expired.",
@@ -22479,14 +22472,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -25068,14 +25054,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -28612,14 +28591,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -37131,14 +37103,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -41161,14 +41126,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -45869,14 +45827,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -52652,14 +52603,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",
@@ -53223,14 +53167,7 @@
         },
         "responses": {
           "204": {
-            "description": "Success.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
+            "description": "Success."
           },
           "400": {
             "description": "Validation failed, or the request is malformed.",

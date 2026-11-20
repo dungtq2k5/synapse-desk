@@ -550,6 +550,27 @@ describe('The OpenAPI document', () => {
         : schema;
     };
 
+    it('**a 204 publishes no body**: the envelope never reaches the wire', () => {
+      const withBody = Object.entries(doc.paths).flatMap(([path, operations]) =>
+        Object.entries(
+          operations as Record<
+            string,
+            { responses?: Record<string, { content?: unknown }> }
+          >,
+        )
+          .filter(([, operation]) => operation?.responses?.['204']?.content)
+          .map(([method]) => `${method.toUpperCase()} ${path}`),
+      );
+      const all = Object.values(doc.paths).flatMap((operations) =>
+        Object.values(
+          operations as Record<string, { responses?: Record<string, unknown> }>,
+        ).filter((operation) => operation?.responses?.['204']),
+      );
+
+      expect(all.length).toBeGreaterThan(5);
+      expect(withBody).toEqual([]);
+    });
+
     it('1. **`data` is nested inside the envelope, not at the root**', () => {
       // The bug this whole section prevents. A handler returns
       // `TicketResponseDto`; `TransformInterceptor` wraps it, so the wire

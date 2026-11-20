@@ -337,8 +337,7 @@ describe('a write evicts the cached read it changes', () => {
         { headers: cookie(tenant, ['document.delete']) },
       );
 
-      // Not the status: Node answers 204, Java 200.
-      expect(response.status).toBeLessThan(300);
+      expect(response.status).toBe(204);
       await expectEvicted(tenant, 'documents');
     },
   );

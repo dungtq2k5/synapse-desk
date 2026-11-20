@@ -180,7 +180,7 @@ const PAGINATION_META: SchemaObject = {
  * ```ts
  * ＠ApiWrappedResponse(TicketResponseDto)            // data: { $ref: … }
  * ＠ApiWrappedResponse([TicketDto, DraftDto])        // data: { oneOf: [ … ] }
- * ＠ApiWrappedResponse()                             // data: null, for void
+ * ＠ApiWrappedResponse()                             // data: null, for void; no body at all on a 204
  * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })  // data: [ … ]
  * ```
  *
@@ -251,14 +251,33 @@ export function ApiWrappedResponse(
     key?: string | symbol,
     descriptor?: PropertyDescriptor,
   ): void => {
+    const status = options.status ?? answeredStatus(descriptor);
+    const description = options.description ?? 'Success.';
+
+    // A 204 has no body at all: the interceptor's envelope never reaches the
+    // wire, so documenting one would describe a body no client receives.
+    if (status === Number(HttpStatus.NO_CONTENT)) {
+      if (models.length > 0) {
+        throw new Error(
+          `${String(key)} answers 204, which carries no body, so it can't document a model`,
+        );
+      }
+      ApiResponse({ status, description })(
+        target,
+        key as string,
+        descriptor as PropertyDescriptor,
+      );
+      return;
+    }
+
     applyDecorators(
       // Required for a `$ref` to resolve when the model is not otherwise
       // reachable from a handler signature — the classic cause of a dangling
       // reference in a `oneOf`.
       ApiExtraModels(...models),
       ApiResponse({
-        status: options.status ?? answeredStatus(descriptor),
-        description: options.description ?? 'Success.',
+        status,
+        description,
         schema: {
           type: 'object',
           required: ['success', 'statusCode', 'message', 'data'],
