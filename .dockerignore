@@ -87,3 +87,8 @@ sonar-project.properties
 .mcp.json
 .sonar-config.json
 .playwright-mcp
+
+# Except the REST document, which the web's client is generated from.
+!docs/reference/openapi.json
+# Next.js build output: the image builds its own.
+**/.next

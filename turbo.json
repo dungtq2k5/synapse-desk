@@ -24,15 +24,34 @@
       ],
       "outputs": ["src/generated/**", "**/docs/reference/erd/**.md"]
     },
+    // The web's REST client, generated from the committed document into
+    // `src/generated` (gitignored). Keyed on the document, so a change to the
+    // published contract regenerates it, and the build after it fails if the
+    // change broke a caller.
+    "generate": {
+      "inputs": [
+        "orval.config.ts",
+        "scripts/**",
+        "$TURBO_ROOT$/docs/reference/openapi.json"
+      ],
+      "outputs": ["src/generated/**"]
+    },
     "build": {
-      // `db:generate` is this package's OWN (no `^`): a service compiles against
-      // the client it generates, not its dependencies'.
-      "dependsOn": ["^build", "db:generate"],
+      // `db:generate` and `generate` are this package's OWN (no `^`): a
+      // workspace compiles against the client it generates, not its
+      // dependencies'.
+      "dependsOn": ["^build", "db:generate", "generate"],
+      // A client app's build also reads its Next.js config, its design tokens
+      // and its public files: a changed `next.config.ts` was a cache hit that
+      // replayed the previous build.
       "inputs": [
         "src/**",
         "prisma/schema.prisma",
         "tsconfig*.json",
-        "nest-cli.json"
+        "nest-cli.json",
+        "next.config.ts",
+        "design-tokens/**",
+        "public/**"
       ],
       // The build info with the output it describes. A library's
       // `tsconfig.build.tsbuildinfo` sits BESIDE `dist/`, so a cache hit used
@@ -40,12 +59,31 @@
       // next real `tsc --incremental` then matched source against it and
       // emitted nothing for the files it believed current. Measured: edit,
       // build, revert (hit), edit again (miss) left the edit out of `dist/`.
-      "outputs": ["dist/**", "*.tsbuildinfo"]
+      // `.next/` is a client app's output, less its own cache.
+      "outputs": ["dist/**", "*.tsbuildinfo", ".next/**", "!.next/cache/**"],
+      // The web's coverage build (source maps, for the e2e suite's coverage):
+      // passed through, and part of the hash, so a cached plain build is never
+      // replayed for a coverage run or the reverse. `GIT_SHA` is the web's build
+      // id, inlined into the client bundle.
+      "env": ["WEB_COVERAGE", "GIT_SHA"]
+    },
+    // The clients' own typecheck (the root program doesn't include apps/):
+    // against their dependencies' built packages and their generated tokens.
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "src/**",
+        "tsconfig*.json",
+        "next.config.ts",
+        "design-tokens/**"
+      ]
     },
     "lint": {
       // No "dependsOn": ["^build"] — eslint's type-aware rules read each
       // package's tsconfig and TypeScript SOURCE, never a built dist/, so
-      // compiling dependencies first is pure wasted work.
+      // compiling dependencies first is pure wasted work. The package's own
+      // generated client is source, so it comes first.
+      "dependsOn": ["generate"],
       "inputs": ["src/**", "tsconfig*.json", "eslint.config.mjs"]
     },
     "dev": {

@@ -1,0 +1,7 @@
+# Next.js output and its generated types.
+.next/
+next-env.d.ts
+# Generated from design-tokens/ by `npm run tokens`.
+src/styles/tokens.css
+# Local overrides of .env.example.
+.env*.local

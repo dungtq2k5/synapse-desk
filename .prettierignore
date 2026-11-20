@@ -31,3 +31,8 @@ secrets/
 *.key
 *.pem
 .env*
+
+# Next.js build output, and the CSS generated from the design tokens.
+.next/
+apps/web/src/styles/tokens.css
+apps/web/next-env.d.ts

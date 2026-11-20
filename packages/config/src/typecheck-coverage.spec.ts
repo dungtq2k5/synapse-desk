@@ -30,6 +30,9 @@ describe('every TypeScript directory is inside a typecheck', () => {
    * it the moment the directory it names stops holding TypeScript.
    */
   const OUTSIDE_ROOT_PROGRAM: Readonly<Record<string, string>> = {
+    apps:
+      'each client has its own tsconfig (Next.js sets its compiler options), ' +
+      "and is typechecked by its workspace's own `typecheck` task",
     'jest.config.base.ts':
       "tooling config, excluded by the root tsconfig's own header: jest " +
       'evaluates it as ESM with an explicit .ts import extension, which tsc ' +

@@ -121,6 +121,10 @@ jobs:
       # the build, so its turbo build is a cache hit; no stack, the gateway is
       # created and never started.
       - run: npm run openapi:check
+      # The production web build: each route's first-load JavaScript within its
+      # budget (apps/web/bundle-budgets.json), and no secret in the client
+      # bundle. A route that grows past its budget fails here with the number.
+      - run: npm run check:web-build
 
   # -------------------------------------------------------------- contract
   #
@@ -188,6 +192,215 @@ jobs:
       - run: npm run images:check
         env:
           IMAGE_CACHE: gha
+
+  # ---------------------------------------------------------------- e2e-web
+  #
+  # The web client in Chromium over the whole system: `test/system`'s setup
+  # (the stores reset, every service built and started, the demo seeded), the
+  # built web app, and the rows in `test/e2e-web`. On a runner every store is
+  # this job's own compose stack, so the reset costs nothing.
+  #
+  # **No secret.** Stripe is the fake `test/system` starts, and the plans
+  # seed reads its catalog, so the suite runs offline as it does locally.
+  e2e-web:
+    name: e2e (web, Playwright)
+    runs-on: ubuntu-latest
+    # Measured on a runner (2026-10-23, 586 rows): about 14½ minutes before the
+    # first row, then about 4 seconds a row, 40 minutes for them all. The rows
+    # get 70 (`--global-timeout` below), the job 90 around them.
+    # ponytail: one runner; shard like `contract` (`--shard=k/n`, a coverage
+    # lcov per shard) once the rows near 70 minutes.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: npm run setup:py
+
+      # Every service reads its own `.env`, and docker-compose.yml the root's;
+      # all gitignored, so the examples stand in.
+      # auth-service refuses its published SUPER_ADMIN_PASSWORD outside tests,
+      # so this run makes one of its own, as a developer is told to. Hex alone
+      # has no uppercase letter or symbol; the prefix gives it every class
+      # PASSWORD_POLICY asks for. The Super Admin must use two-step, so the run
+      # also gives them a two-step secret (base32) the seed and the analytics
+      # journeys compute codes from.
+      - name: stack env
+        run: |
+          cp .env.example .env
+          for example in services/*/.env.example; do cp "$example" "${example%.example}"; done
+          sed -i "s/^SUPER_ADMIN_PASSWORD = .*/SUPER_ADMIN_PASSWORD = Aa1-$(openssl rand -hex 16)/" services/auth-service/.env
+          echo "SUPER_ADMIN_TOTP_SECRET = $(openssl rand 20 | base32 | tr -d '=')" >> services/auth-service/.env
+      - name: credentials
+        run: |
+          npm run keys:generate -- --force
+          npm run keys:service-account
+      - name: start the stack
+        run: docker compose up -d --wait
+      # `db:apply` runs each service's BUILT `schema-apply.js`, so the four
+      # schema services build first (turbo runs `db:generate` before each).
+      - name: build the schema services
+        run: >-
+          ./node_modules/.bin/turbo run build
+          --filter=@synapsedesk/auth-service...
+          --filter=@synapsedesk/ticket-service...
+          --filter=@synapsedesk/notification-service...
+          --filter=@synapsedesk/ingestion-service...
+      # This runner's own dev databases, created and given their schema the
+      # way production does (`db:apply`).
+      - name: databases
+        run: npm run db:reset -- --dev-only
+      # The lockfile's Playwright, never `npx`: npx can fetch a package on
+      # demand and run its install scripts.
+      - run: ./node_modules/.bin/playwright install --with-deps chromium
+      # The harness imports the workspace libraries' `dist` as it loads, before
+      # its setup builds anything.
+      - run: npm run build:libs
+      # The screen rows render in the official Playwright image at the
+      # lockfile's version (test/e2e-web/browser-server.ts): pulled here so the
+      # suite's own time doesn't include it.
+      - name: the Playwright image the screens render in
+        run: docker pull "mcr.microsoft.com/playwright:v$(node -p "require('@playwright/test/package.json').version")-noble"
+
+      - name: e2e-web
+        env:
+          SYSTEM_LOG_DIR: ${{ github.workspace }}/e2e-web-logs
+        # Playwright's own limit, under the job's: a run that hits it stops
+        # cleanly and still prints each failure, writes results.xml and keeps
+        # the traces. The job's limit kills it before any of that.
+        run: npm run test:e2e:web -- --global-timeout=4200000
+
+      # The screens rows that passed only on their retry, in the job summary
+      # and as warnings: one that's flaky run after run is a fault to find,
+      # not noise to live with.
+      - name: flaky rows
+        if: ${{ !cancelled() && hashFiles('test/e2e-web/results.json') != '' }}
+        run: |
+          flaky=$(jq -r '
+            [.suites[] | recurse(.suites[]?) | .specs[]? as $spec
+              | $spec.tests[] | select(.status == "flaky")
+              | "\(.projectName) › \($spec.file):\($spec.line) › \($spec.title)"]
+            | .[]' test/e2e-web/results.json)
+          if [ -z "$flaky" ]; then
+            echo "No flaky rows." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Flaky rows (passed only on their retry)"
+            echo
+            printf '%s\n' "$flaky" | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$flaky" | while IFS= read -r row; do
+            echo "::warning title=Flaky row::$row"
+          done
+
+      # test-results holds each failed screenshot's -actual, -expected and
+      # -diff images beside the trace.
+      # Canceled too: a run stopped by hand or by a limit leaves the same
+      # evidence.
+      - name: upload the report, traces, screenshot diffs and service logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-web
+          path: |
+            test/e2e-web/test-results/
+            test/e2e-web/results.xml
+            test/e2e-web/results.json
+            e2e-web-logs/
+          if-no-files-found: warn
+
+  # ------------------------------------------------------------- web-vitals
+  #
+  # Core Web Vitals on the main screens, on the plain production build: the
+  # same stack setup as e2e-web, then the `vitals` project alone. Gated per
+  # screen (LCP ≤ 1 s, CLS ≤ 0.1, INP ≤ 200 ms), and reported in the summary
+  # and an artifact.
+  web-vitals:
+    name: web vitals
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: npm run setup:py
+
+      # Every service reads its own `.env`, and docker-compose.yml the root's;
+      # all gitignored, so the examples stand in.
+      # auth-service refuses its published SUPER_ADMIN_PASSWORD outside tests,
+      # so this run makes one of its own, as a developer is told to. Hex alone
+      # has no uppercase letter or symbol; the prefix gives it every class
+      # PASSWORD_POLICY asks for. The Super Admin must use two-step, so the run
+      # also gives them a two-step secret (base32) the seed and the analytics
+      # journeys compute codes from.
+      - name: stack env
+        run: |
+          cp .env.example .env
+          for example in services/*/.env.example; do cp "$example" "${example%.example}"; done
+          sed -i "s/^SUPER_ADMIN_PASSWORD = .*/SUPER_ADMIN_PASSWORD = Aa1-$(openssl rand -hex 16)/" services/auth-service/.env
+          echo "SUPER_ADMIN_TOTP_SECRET = $(openssl rand 20 | base32 | tr -d '=')" >> services/auth-service/.env
+      - name: credentials
+        run: |
+          npm run keys:generate -- --force
+          npm run keys:service-account
+      - name: start the stack
+        run: docker compose up -d --wait
+      # `db:apply` runs each service's BUILT `schema-apply.js`, so the four
+      # schema services build first (turbo runs `db:generate` before each).
+      - name: build the schema services
+        run: >-
+          ./node_modules/.bin/turbo run build
+          --filter=@synapsedesk/auth-service...
+          --filter=@synapsedesk/ticket-service...
+          --filter=@synapsedesk/notification-service...
+          --filter=@synapsedesk/ingestion-service...
+      # This runner's own dev databases, created and given their schema the
+      # way production does (`db:apply`).
+      - name: databases
+        run: npm run db:reset -- --dev-only
+      # The lockfile's Playwright, never `npx`: npx can fetch a package on
+      # demand and run its install scripts.
+      - run: ./node_modules/.bin/playwright install --with-deps chromium
+      # The harness imports the workspace libraries' `dist` as it loads, before
+      # its setup builds anything.
+      - run: npm run build:libs
+      # The vitals project, on the production build.
+      # Reported, not gated: the numbers are this job's summary and artifact.
+      - name: web vitals
+        env:
+          SYSTEM_LOG_DIR: ${{ github.workspace }}/web-vitals-logs
+        run: ./node_modules/.bin/playwright test -c test/e2e-web --project=vitals
+      - name: the numbers
+        if: ${{ !cancelled() && hashFiles('test/e2e-web/test-results/web-vitals.json') != '' }}
+        run: |
+          {
+            echo "### Core Web Vitals (median of three; LCP, INP in ms)"
+            echo
+            echo "| screen | width | LCP | CLS | INP |"
+            echo "| :--- | ---: | ---: | ---: | ---: |"
+            jq -r '.[] | "| \(.screen) | \(.width) | \(.lcp) | \(.cls) | \(.inp) |"' test/e2e-web/test-results/web-vitals.json
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: web-vitals
+          path: |
+            test/e2e-web/test-results/web-vitals.json
+            web-vitals-logs/
+          if-no-files-found: warn
 
   # ------------------------------------------------------------------ unit
   #

@@ -1,0 +1,6 @@
+{
+  "//": "Makes `test/` its own CommonJS module scope, for the reason `scripts/package.json` gives: the repository root declares `type: module`, so a runner that loads these harnesses natively (Playwright does) would treat them as ESM, where `__dirname` doesn't exist and an import of a CommonJS `dist` gets no named exports through its `export *` chain. The mechanism is the ABSENCE of a `type` field. Jest is unaffected: ts-jest compiles to CommonJS either way.",
+  "name": "@synapsedesk/test",
+  "private": true,
+  "license": "AGPL-3.0-only"
+}

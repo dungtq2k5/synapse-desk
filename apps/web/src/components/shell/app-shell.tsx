@@ -1,0 +1,249 @@
+'use client';
+
+import { useOrganizationsControllerGetV1 } from '@synapsedesk/api-client';
+import {
+  BookOpenIcon,
+  ChartColumnIcon,
+  InboxIcon,
+  MessageCircleIcon,
+  SettingsIcon,
+  TicketIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, type ReactNode } from 'react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar';
+import { NotificationsLive } from '@/components/notifications/store';
+import { ConsoleShell } from '@/components/platform/console-shell';
+import { RealtimeProvider } from '@/components/realtime/realtime-provider';
+import { useViewer } from '@/hooks/use-viewer';
+import { SupportEmailContext } from '@/lib/support';
+import {
+  FrozenPage,
+  useOrganizationStatus,
+  useOrganizationStatusRefusals,
+} from './organization-status';
+import { TwoStepWarning } from './two-step-warning';
+import { UserMenu } from './user-menu';
+
+type Item = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  /** The paths it's the current item for. */
+  active: (pathname: string) => boolean;
+};
+
+const ASK: Item = {
+  label: 'Ask',
+  href: '/ask',
+  icon: MessageCircleIcon,
+  active: (path) => path.startsWith('/ask'),
+};
+const KNOWLEDGE: Item = {
+  label: 'Knowledge',
+  href: '/knowledge',
+  icon: BookOpenIcon,
+  active: (path) => path.startsWith('/knowledge'),
+};
+
+const ANALYTICS: Item = {
+  label: 'Analytics',
+  href: '/analytics',
+  icon: ChartColumnIcon,
+  active: (path) => path.startsWith('/analytics'),
+};
+
+const SETTINGS: Item = {
+  label: 'Settings',
+  href: '/settings',
+  icon: SettingsIcon,
+  active: (path) => path.startsWith('/settings'),
+};
+
+/** Holding any of these shows Settings: each reads one of its sections. */
+const SETTINGS_READ = [
+  'organization.read',
+  'user.read',
+  'department.read',
+  'role.read',
+  'audit.read',
+] as const;
+
+/** The sidebar's items by role. An end user's tickets are their requests. */
+const ITEMS = {
+  agent: [
+    {
+      label: 'Tickets',
+      href: '/tickets',
+      icon: TicketIcon,
+      active: (path) => path.startsWith('/tickets'),
+    },
+    KNOWLEDGE,
+    ASK,
+  ],
+  requester: [
+    ASK,
+    {
+      label: 'My requests',
+      href: '/requests',
+      icon: InboxIcon,
+      active: (path) =>
+        path.startsWith('/requests') || path.startsWith('/tickets'),
+    },
+    KNOWLEDGE,
+  ],
+} satisfies Record<string, Item[]>;
+
+/**
+ * The signed-in frame: the sidebar (a Sheet on phones), and the page beside
+ * it. The items depend on who is looking: an agent's queue comes first, an
+ * end user's Ask.
+ */
+export function AppShell({
+  children,
+  supportEmail = '',
+}: {
+  children: ReactNode;
+  /** The web server's `SUPPORT_EMAIL`, for the frozen page's mail link. */
+  supportEmail?: string;
+}) {
+  const { isSuperAdmin } = useViewer();
+  return (
+    <SupportEmailContext value={supportEmail}>
+      {isSuperAdmin ? (
+        <SuperAdminAccount>{children}</SuperAdminAccount>
+      ) : (
+        <Shell>{children}</Shell>
+      )}
+    </SupportEmailContext>
+  );
+}
+
+/** The app's pages a Super Admin has: their own account, in the console. */
+const ACCOUNT_PATHS = ['/profile', '/security'];
+
+/**
+ * A Super Admin outside the console: their account pages wear the
+ * console's frame; any organization's page sends them to the console.
+ */
+function SuperAdminAccount({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const account = ACCOUNT_PATHS.some((path) => pathname.startsWith(path));
+  useEffect(() => {
+    if (!account) router.replace('/platform');
+  }, [account, router]);
+  return account ? <ConsoleShell>{children}</ConsoleShell> : null;
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  useOrganizationStatusRefusals();
+  const frozen = useOrganizationStatus() === 'FROZEN';
+  const pathname = usePathname();
+  const { isAgent, can } = useViewer();
+  const items = [
+    ...ITEMS[isAgent ? 'agent' : 'requester'],
+    ...(can('analytics.read') ? [ANALYTICS] : []),
+    ...(SETTINGS_READ.some(can) ? [SETTINGS] : []),
+  ];
+  const organization = useOrganizationsControllerGetV1({
+    query: { retry: false },
+  });
+
+  if (frozen) return <FrozenPage />;
+
+  return (
+    <RealtimeProvider>
+      <NotificationsLive />
+      <SidebarProvider>
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-md bg-background px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        >
+          Skip to content
+        </a>
+        <Sidebar variant="sidebar" collapsible="offcanvas">
+          <SidebarHeader>
+            <div className="flex items-center gap-3 px-2 py-1.5">
+              <Image
+                src="/mark-light.svg"
+                alt=""
+                width={32}
+                height={32}
+                unoptimized
+                className="size-8 rounded-md dark:hidden"
+              />
+              <Image
+                src="/mark-dark.svg"
+                alt=""
+                width={32}
+                height={32}
+                unoptimized
+                className="hidden size-8 rounded-md dark:block"
+              />
+              <span className="grid text-sm leading-tight">
+                <span className="truncate font-semibold">
+                  {organization.data?.data?.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  SynapseDesk
+                </span>
+              </span>
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <nav aria-label="Main">
+              <SidebarGroup>
+                {/* Muted, but not shadcn's 70% foreground, which fails AA contrast. */}
+                <SidebarGroupLabel className="text-muted-foreground">
+                  Support
+                </SidebarGroupLabel>
+                <SidebarMenu>
+                  {items.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={item.active(pathname)}
+                      >
+                        <Link href={item.href}>
+                          <item.icon />
+                          {item.label}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            </nav>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <UserMenu />
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+          <TwoStepWarning />
+          {children}
+        </SidebarInset>
+      </SidebarProvider>
+    </RealtimeProvider>
+  );
+}

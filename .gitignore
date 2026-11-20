@@ -97,3 +97,10 @@ graphify-out/
 
 # The test stack's own Firebase-emulator key (test/system/providers.ts).
 test/system/.firebase/
+
+# Playwright: traces, screenshots and the CI report of a run, and the web
+# suite's coverage when it collects it.
+test/e2e-web/test-results/
+test/e2e-web/playwright-report/
+test/e2e-web/results.xml
+coverage-e2e/

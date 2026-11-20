@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2023",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noEmit": true,
+    // Siblings as built packages, as packages/contracts explains: Playwright
+    // loads what it imports itself, and a source path reaches Nest's
+    // parameter decorators, which its transform doesn't compile.
+    "paths": {}
+  },
+  "include": ["**/*.ts"]
+}

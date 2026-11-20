@@ -101,6 +101,10 @@ const FIRST_BOOT_ONLY = new Map([
 
 /** Carries a credential. Goes to a Secret, with the value blanked. */
 const SECRET = new Set([
+  // Firebase's web API key is public (the browser receives it), but it's named
+  // like a credential, and the manifest guard reads credentials by name. A
+  // Secret holds it rather than an exemption in that guard.
+  'FIREBASE_API_KEY',
   'DATABASE_URL',
   'INGESTION_DATABASE_URL',
   'REDIS_URL',
@@ -127,6 +131,9 @@ const SITE_SPECIFIC = new Set([
   'SUPPORT_EMAIL',
   'FIREBASE_STORAGE_BUCKET',
   'SUPER_ADMIN_EMAIL',
+  // The Firebase project's web app config, for Google sign-in.
+  'FIREBASE_AUTH_DOMAIN',
+  'FIREBASE_PROJECT_ID',
 ]);
 
 /**
@@ -139,6 +146,14 @@ const EXCLUDED = new Map([
   [
     'FIREBASE_STORAGE_EMULATOR_HOST',
     'production uses real Firebase Storage; setting this points the SDK at an emulator that is not there',
+  ],
+  [
+    'FIREBASE_STORAGE_EMULATOR_URL',
+    "production stores photos in Firebase Storage; setting this points the browser's uploads at an emulator that is not there",
+  ],
+  [
+    'FIREBASE_AUTH_EMULATOR_URL',
+    'production signs in with real Google; setting this sends the browser to an emulator that is not there',
   ],
   [
     'FIREBASE_AUTH_EMULATOR_HOST',
@@ -218,8 +233,9 @@ const CLUSTER = {
   },
   // The web's renderer calls the gateway's Service, never the Ingress: the
   // browser's own address is what it forwards, and the Ingress would append
-  // the pod's.
-  web: { GATEWAY_URL: 'http://api-gateway:3000' },
+  // the pod's. Plain HTTP inside the cluster: the Service has no TLS, and
+  // `api-gateway-ingress` admits only `web` and the controller to its port.
+  web: { GATEWAY_URL: 'http://api-gateway:3000' }, // NOSONAR: in-cluster Service, no TLS listener
   'notification-service': {
     // notification-service's Joi schema refuses `true` outside development
     // (`webhook-private-targets.spec.ts` pins it). Setting it explicitly is
