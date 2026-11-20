@@ -2778,6 +2778,9 @@
         "security": [
           {
             "access-cookie": []
+          },
+          {
+            "mfa-cookie": []
           }
         ],
         "summary": "Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL",
@@ -3028,6 +3031,9 @@
         "security": [
           {
             "access-cookie": []
+          },
+          {
+            "mfa-cookie": []
           }
         ],
         "summary": "Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes",

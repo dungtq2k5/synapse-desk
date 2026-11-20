@@ -92,6 +92,10 @@ export class TwoFactorAuthController {
   @ApiOperation({
     summary:
       'Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL',
+    // Either way in, the session or the sign-in challenge: two entries in
+    // `security` mean OR. Set here, as `authenticate` explains, because
+    // `@ApiCookieAuth` appends to the controller's.
+    security: [{ [AUTH_SCHEMES.access]: [] }, { [AUTH_SCHEMES.mfa]: [] }],
   })
   @ApiWrappedResponse(GenerateTwoFactorResponseDto)
   @ApiFilterErrors(['401'])
@@ -117,6 +121,8 @@ export class TwoFactorAuthController {
   @ApiOperation({
     summary:
       'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
+    // Either way in, as `setup`.
+    security: [{ [AUTH_SCHEMES.access]: [] }, { [AUTH_SCHEMES.mfa]: [] }],
   })
   @ApiWrappedResponse(TwoFactorEnabledResponseDto)
   @ApiFilterErrors(['400', '401'])
