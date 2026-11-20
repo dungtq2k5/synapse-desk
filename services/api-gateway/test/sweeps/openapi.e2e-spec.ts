@@ -537,11 +537,18 @@ describe('The OpenAPI document', () => {
           >
         | undefined;
 
+    /** The response's schema, through the `$ref` of a named envelope. */
     const schemaOf = (
       responses: ReturnType<typeof success>,
       status: string,
-    ): SchemaObject | undefined =>
-      responses?.[status]?.content?.['application/json']?.schema;
+    ): SchemaObject | undefined => {
+      const schema = responses?.[status]?.content?.['application/json']?.schema;
+      const ref = (schema as { $ref?: string } | undefined)?.$ref;
+      const name = ref?.split('/').at(-1);
+      return name
+        ? (doc.components?.schemas?.[name] as SchemaObject | undefined)
+        : schema;
+    };
 
     it('1. **`data` is nested inside the envelope, not at the root**', () => {
       // The bug this whole section prevents. A handler returns
@@ -556,6 +563,11 @@ describe('The OpenAPI document', () => {
         Object.keys(body?.properties ?? {}).sort(compareAlphabetically),
       ).toEqual(['data', 'message', 'statusCode', 'success', 'warning']);
       expect(body?.properties?.data).toHaveProperty('$ref');
+      // Named as the Java gateway names it, so a generated client has one type.
+      expect(
+        success('/api/v1/tickets/{id}')?.['200']?.content?.['application/json']
+          ?.schema,
+      ).toEqual({ $ref: '#/components/schemas/ApiResponseTicketResponseDto' });
     });
 
     it('2. **a `@Post` that returns 201 documents 201, not 200**', () => {
