@@ -384,7 +384,7 @@ export function NewRoleDialog({
     try {
       const created = await rolesControllerCreateV1({
         name: trimmed,
-        description: description.trim() || null,
+        description: description.trim() || undefined,
         permissionCodes:
           roles.find((role) => role.id === start)?.permissionCodes ?? [],
       });

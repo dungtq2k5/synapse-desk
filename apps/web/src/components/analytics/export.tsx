@@ -121,7 +121,12 @@ function ExportDialog({
     const departmentId = department === ALL ? null : department;
     try {
       const answer = await create.mutateAsync({
-        data: { kind, from: range.from, to: range.to, departmentId },
+        data: {
+          kind,
+          from: range.from,
+          to: range.to,
+          departmentId: departmentId ?? undefined,
+        },
       });
       const exportId = answer.data?.id;
       if (!exportId) return;
@@ -292,7 +297,7 @@ function ExportCard({
           kind: requested.kind,
           from: requested.from,
           to: requested.to,
-          departmentId: requested.departmentId,
+          departmentId: requested.departmentId ?? undefined,
         },
       });
       if (answer.data?.id) onRetried({ ...requested, id: answer.data.id });

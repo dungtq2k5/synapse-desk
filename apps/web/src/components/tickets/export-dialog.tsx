@@ -275,7 +275,7 @@ function ExportForm({
       const answer = await ticketsControllerCreateExportV1({
         from,
         to,
-        departmentId: department,
+        departmentId: department ?? undefined,
       });
       if (!answer.data) throw new Error('No export');
       onStarted({ id: answer.data.id, from, to, departmentId: department });

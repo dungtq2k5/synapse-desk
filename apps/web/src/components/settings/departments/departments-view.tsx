@@ -419,7 +419,12 @@ export function DepartmentDialog({
     };
     try {
       if (department) await departmentsControllerUpdateV1(department.id, body);
-      else await departmentsControllerCreateV1(body);
+      // A new department has no description to clear.
+      else
+        await departmentsControllerCreateV1({
+          ...body,
+          description: body.description ?? undefined,
+        });
       void refresh();
       onOpenChange(false);
     } catch (error) {

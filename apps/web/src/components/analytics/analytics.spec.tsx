@@ -573,7 +573,6 @@ describe('Export', () => {
       kind: 'AGENT_DAILY',
       from: FROM,
       to: TO,
-      departmentId: null,
     });
     const open_ = jest.spyOn(window, 'open').mockReturnValue(null);
     await user().click(screen.getByRole('button', { name: 'Download CSV' }));

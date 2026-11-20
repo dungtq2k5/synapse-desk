@@ -226,7 +226,6 @@ describe('export', () => {
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
       from: '2026-10-01',
       to: '2026-10-18',
-      filters: null,
     });
     expect(JSON.parse(localStorage.getItem(STORED) ?? '{}')).toMatchObject({
       id: 'x1',

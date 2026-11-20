@@ -36,14 +36,18 @@ const CALL: Record<
     reason: string | null,
   ) => Promise<ApiResponseTicketResponseDto>
 > = {
-  resolve: (id, _to, reason) => ticketsControllerResolveV1(id, { reason }),
-  close: (id, _to, reason) => ticketsControllerCloseV1(id, { reason }),
-  reopen: (id, _to, reason) => ticketsControllerReopenV1(id, { reason }),
-  escalate: (id, _to, reason) => ticketsControllerEscalateV1(id, { reason }),
+  resolve: (id, _to, reason) =>
+    ticketsControllerResolveV1(id, { reason: reason ?? undefined }),
+  close: (id, _to, reason) =>
+    ticketsControllerCloseV1(id, { reason: reason ?? undefined }),
+  reopen: (id, _to, reason) =>
+    ticketsControllerReopenV1(id, { reason: reason ?? undefined }),
+  escalate: (id, _to, reason) =>
+    ticketsControllerEscalateV1(id, { reason: reason ?? undefined }),
   status: (id, to, reason) =>
     ticketsControllerChangeStatusV1(id, {
       status: to,
-      reason,
+      reason: reason ?? undefined,
     }),
 };
 
