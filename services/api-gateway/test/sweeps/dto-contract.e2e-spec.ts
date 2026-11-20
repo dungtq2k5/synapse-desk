@@ -290,7 +290,6 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     CreateMessageResponseDto: 'a write RESULT, not an entity',
     CreateTicketResponseDto: 'a write RESULT, not an entity',
     PresignAttachmentResponseDto: 'a short-lived credential, never a query',
-    DownloadAttachmentResponseDto: 'a short-lived credential, never a query',
     BulkTicketStatusResponseDto: 'a write RESULT, not an entity',
     BulkTicketPriorityResponseDto: 'a write RESULT, not an entity',
     MarkTicketReadResponseDto: 'a write RESULT, not an entity',

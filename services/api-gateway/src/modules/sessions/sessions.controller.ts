@@ -28,6 +28,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
+import { RevokedCountResponseDto } from './dto/rest/session-response.dto';
 
 /**
  * The caller's own device sessions (`api-endpoints-plan.md`).
@@ -97,7 +98,7 @@ export class SessionsController {
     summary:
       'Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation',
   })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(RevokedCountResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
@@ -107,7 +108,7 @@ export class SessionsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ revokedCount: number }> {
+  ): Promise<RevokedCountResponseDto> {
     const result = await this.sessions.revoke(
       id,
       this.jwtCookieService.readRefreshToken(request),

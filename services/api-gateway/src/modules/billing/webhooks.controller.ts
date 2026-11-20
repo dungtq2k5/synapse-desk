@@ -19,6 +19,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
+import { StripeWebhookAcknowledgementResponseDto } from './dto/rest/billing-response.dto';
 
 /**
  * `POST /webhooks/stripe` — and four global mechanisms it bypasses on purpose.
@@ -66,7 +67,7 @@ export class WebhooksController {
       'escalating retry storm. The only non-2xx is a signature failure.',
     security: [],
   })
-  @ApiWrappedResponse(undefined, {
+  @ApiWrappedResponse(StripeWebhookAcknowledgementResponseDto, {
     description: 'Event accepted. The body carries an acknowledgement only.',
   })
   // `throttled: false` mirrors the class's `@SkipThrottle()` — Stripe's retry
@@ -79,7 +80,7 @@ export class WebhooksController {
     @Req() request: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
     @CurrentOrigin() origin: RequestOrigin,
-  ): Promise<{ received: true; status: string }> {
+  ): Promise<StripeWebhookAcknowledgementResponseDto> {
     // **THE trap**. Stripe's signature is computed over the
     // exact bytes of the request, and a JSON body parser deserializes and
     // re-serializes them: different key order, different whitespace, and

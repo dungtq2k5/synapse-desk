@@ -137,3 +137,10 @@ export class PlanChangeResponseDto {
    */
   creditIssued!: boolean | null;
 }
+
+/** What a Stripe webhook delivery is answered with: an acknowledgement only. */
+export class StripeWebhookAcknowledgementResponseDto {
+  readonly received!: boolean;
+  /** What became of the event, for Stripe's delivery log. */
+  readonly status!: string;
+}

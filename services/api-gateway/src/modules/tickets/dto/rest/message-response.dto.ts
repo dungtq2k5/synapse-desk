@@ -132,9 +132,3 @@ export class PresignAttachmentResponseDto {
   objectPath!: string;
   expiresAt!: Date;
 }
-
-/** A short-lived signed URL for reading one attachment. */
-export class DownloadAttachmentResponseDto {
-  downloadUrl!: string;
-  expiresAt!: Date;
-}

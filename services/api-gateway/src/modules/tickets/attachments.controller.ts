@@ -18,8 +18,8 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
-import { DownloadAttachmentResponseDto } from './dto/rest/message-response.dto';
 import { MessagesService } from './messages.service';
+import { DownloadDocumentResponseDto } from '../documents/dto/rest/document-response.dto';
 
 /**
  * `/attachments/*` — a TOP-LEVEL prefix, not nested under its ticket.
@@ -54,13 +54,13 @@ export class AttachmentsController {
     summary:
       'Short-lived pre-signed Firebase Storage URL (302 or { url, expiresAt })',
   })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(DownloadDocumentResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/download')
   download(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<DownloadAttachmentResponseDto> {
+  ): Promise<DownloadDocumentResponseDto> {
     return this.messages.downloadAttachment(id, context);
   }
 

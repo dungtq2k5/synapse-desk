@@ -17,6 +17,6 @@ export class RevokeTrustResponseDto {
   readonly untrustedCount!: number;
 }
 
-export class RevokeCountResponseDto {
+export class RevokedCountResponseDto {
   readonly revokedCount!: number;
 }

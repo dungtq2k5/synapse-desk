@@ -194,7 +194,7 @@ export class MessagesController {
     summary:
       'Presign an upload for a message not yet created: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }',
   })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(PresignAttachmentResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post('attachments/upload-url')
   @HttpCode(HttpStatus.OK)
@@ -220,7 +220,7 @@ export class MessagesController {
     summary:
       'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
   })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(PresignAttachmentResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post(':messageId/attachments/upload-url')
   @HttpCode(HttpStatus.OK)

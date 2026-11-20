@@ -22,6 +22,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
+import { RevokedCountResponseDto } from './dto/rest/session-response.dto';
 
 /**
  * Administrative views of ANOTHER user's sessions.
@@ -59,7 +60,7 @@ export class UserSessionsController {
    * hear from us rather than infer.
    */
   @ApiOperation({ summary: 'Revoke' })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(RevokedCountResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete()
   @HttpCode(HttpStatus.OK)
@@ -68,7 +69,7 @@ export class UserSessionsController {
   revoke(
     @CurrentUser() context: RequestContext,
     @Param('userId', ParseUUIDPipe) userId: string,
-  ): Promise<{ revokedCount: number }> {
+  ): Promise<RevokedCountResponseDto> {
     return this.sessions.revokeForUser(userId, context);
   }
 }

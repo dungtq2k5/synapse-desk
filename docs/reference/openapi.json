@@ -4034,7 +4034,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseResendWebhookAcknowledgementResponseDto"
                 }
               }
             }
@@ -6754,7 +6754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseRevokedCountResponseDto"
                 }
               }
             }
@@ -7542,7 +7542,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseRevokedCountResponseDto"
                 }
               }
             }
@@ -44453,7 +44453,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponsePresignAttachmentResponseDto"
                 }
               }
             }
@@ -44763,7 +44763,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponsePresignAttachmentResponseDto"
                 }
               }
             }
@@ -45622,7 +45622,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseDownloadDocumentResponseDto"
                 }
               }
             }
@@ -62470,7 +62470,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseStripeWebhookAcknowledgementResponseDto"
                 }
               }
             }
@@ -63397,6 +63397,19 @@
         },
         "required": ["remaining", "used", "expiresAt"]
       },
+      "ResendWebhookAcknowledgementResponseDto": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "What became of the mail, for Resend's delivery log."
+          }
+        },
+        "required": ["received", "outcome"]
+      },
       "InvitationResponseDto": {
         "type": "object",
         "properties": {
@@ -63762,6 +63775,15 @@
           }
         },
         "required": ["untrustedCount"]
+      },
+      "RevokedCountResponseDto": {
+        "type": "object",
+        "properties": {
+          "revokedCount": {
+            "type": "number"
+          }
+        },
+        "required": ["revokedCount"]
       },
       "CurrentUserResponseDto": {
         "type": "object",
@@ -67327,9 +67349,9 @@
             "type": "string"
           },
           "uploadMethod": {
-            "type": "string",
             "description": "How to send the bytes to `uploadUrl`, with the declared `Content-Type`:\n`PUT` to a signed URL, or `POST` to the local Storage emulator.",
-            "enum": ["POST", "PUT"]
+            "enum": ["POST", "PUT"],
+            "type": "string"
           },
           "objectPath": {
             "type": "string"
@@ -70586,6 +70608,19 @@
         },
         "required": ["planId", "priceId"]
       },
+      "StripeWebhookAcknowledgementResponseDto": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "description": "What became of the event, for Stripe's delivery log."
+          }
+        },
+        "required": ["received", "status"]
+      },
       "LivenessResponseDto": {
         "type": "object",
         "properties": {
@@ -70989,6 +71024,32 @@
           }
         }
       },
+      "ApiResponseResendWebhookAcknowledgementResponseDto": {
+        "type": "object",
+        "required": ["success", "statusCode", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "number",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": "string",
+            "nullable": true,
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/ResendWebhookAcknowledgementResponseDto"
+          }
+        }
+      },
       "ApiResponseCreateInvitationsResponseDto": {
         "type": "object",
         "required": ["success", "statusCode", "message", "data"],
@@ -71215,6 +71276,32 @@
           },
           "data": {
             "$ref": "#/components/schemas/RevokeTrustResponseDto"
+          }
+        }
+      },
+      "ApiResponseRevokedCountResponseDto": {
+        "type": "object",
+        "required": ["success", "statusCode", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "number",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": "string",
+            "nullable": true,
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/RevokedCountResponseDto"
           }
         }
       },
@@ -74357,6 +74444,32 @@
           },
           "data": {
             "$ref": "#/components/schemas/PlanChangeResponseDto"
+          }
+        }
+      },
+      "ApiResponseStripeWebhookAcknowledgementResponseDto": {
+        "type": "object",
+        "required": ["success", "statusCode", "message", "data"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "statusCode": {
+            "type": "number",
+            "example": 200
+          },
+          "message": {
+            "type": "string",
+            "example": "OK"
+          },
+          "warning": {
+            "type": "string",
+            "nullable": true,
+            "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
+          },
+          "data": {
+            "$ref": "#/components/schemas/StripeWebhookAcknowledgementResponseDto"
           }
         }
       },

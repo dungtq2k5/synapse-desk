@@ -16,8 +16,8 @@ import {
 import {
   RESEND_SIGNATURE_HEADERS,
   ResendInboundService,
-  type ResendWebhookAck,
 } from './resend-inbound.service';
+import { ResendWebhookAcknowledgementResponseDto } from './dto/rest/inbound-email-response.dto';
 
 /**
  * `POST /webhooks/email/resend` — Resend's `email.received` webhook, the one
@@ -66,7 +66,7 @@ export class InboundEmailController {
       'answered only when fetching the mail failed in a way a retry can fix.',
     security: [],
   })
-  @ApiWrappedResponse(undefined, {
+  @ApiWrappedResponse(ResendWebhookAcknowledgementResponseDto, {
     description:
       'Accepted, or deliberately dropped. The body carries an acknowledgement ' +
       'and the outcome, never the message.',
@@ -79,7 +79,9 @@ export class InboundEmailController {
   })
   @Post('email/resend')
   @HttpCode(HttpStatus.OK)
-  resend(@Req() request: RawBodyRequest<Request>): Promise<ResendWebhookAck> {
+  resend(
+    @Req() request: RawBodyRequest<Request>,
+  ): Promise<ResendWebhookAcknowledgementResponseDto> {
     return this.resendInbound.handle({
       rawBody: request.rawBody,
       header: (name) => request.header(name),

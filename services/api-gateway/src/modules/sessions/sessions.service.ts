@@ -3,7 +3,7 @@ import { RequestContext } from '@synapsedesk/contracts';
 import { SessionsGrpcClient } from './sessions-grpc.client';
 import { toSessionResponseDtos } from './session.mapper';
 import {
-  RevokeCountResponseDto,
+  RevokedCountResponseDto,
   RevokeTrustResponseDto,
   SessionResponseDto,
 } from './dto/rest/session-response.dto';
@@ -67,7 +67,7 @@ export class SessionsService {
   revokeForUser(
     userId: string,
     context: RequestContext,
-  ): Promise<RevokeCountResponseDto> {
+  ): Promise<RevokedCountResponseDto> {
     return this.sessionsGrpcClient.revokeForUser(userId, context);
   }
 }

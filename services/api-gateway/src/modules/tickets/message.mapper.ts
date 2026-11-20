@@ -16,12 +16,12 @@ import { PaginationResponseDto } from '../../common/dto/rest/pagination-response
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import {
   CreateMessageResponseDto,
-  DownloadAttachmentResponseDto,
   PresignAttachmentResponseDto,
   AttachmentResponseDto,
   MessageResponseDto,
 } from './dto/rest/message-response.dto';
 import { toCitationResponseDto } from './citation.mapper';
+import { DownloadDocumentResponseDto } from '../documents/dto/rest/document-response.dto';
 
 export function toAttachmentResponseDto(
   attachment: AttachmentResponse,
@@ -126,9 +126,9 @@ export function toPresignAttachmentResponseDto(
  * @throws Error if `expiresAt` is missing — a signed URL with no expiry is a
  * contract violation, and defaulting it would hand the client a dead URL.
  */
-export function toDownloadAttachmentResponseDto(
+export function toDownloadDocumentResponseDto(
   response: DownloadAttachmentResponse,
-): DownloadAttachmentResponseDto {
+): DownloadDocumentResponseDto {
   return {
     downloadUrl: response.downloadUrl,
     expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),

@@ -12,7 +12,7 @@ import {
   toAttachmentResponseDto,
   toAttachmentResponseDtos,
   toCreateMessageResponseDto,
-  toDownloadAttachmentResponseDto,
+  toDownloadDocumentResponseDto,
   toMessagePageDto,
   toMessageResponseDto,
   toPresignAttachmentResponseDto,
@@ -20,7 +20,6 @@ import {
 import {
   AttachmentResponseDto,
   CreateMessageResponseDto,
-  DownloadAttachmentResponseDto,
   MessageResponseDto,
   PresignAttachmentResponseDto,
 } from './dto/rest/message-response.dto';
@@ -31,6 +30,7 @@ import {
   UpdateMessageDto,
   UploadAttachmentDto,
 } from './dto/rest/message.dto';
+import { DownloadDocumentResponseDto } from '../documents/dto/rest/document-response.dto';
 
 /** The gateway's message surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
@@ -246,8 +246,8 @@ export class MessagesService {
   async downloadAttachment(
     attachmentId: string,
     context: RequestContext,
-  ): Promise<DownloadAttachmentResponseDto> {
-    return toDownloadAttachmentResponseDto(
+  ): Promise<DownloadDocumentResponseDto> {
+    return toDownloadDocumentResponseDto(
       await this.messagesGrpcClient.downloadAttachment(attachmentId, context),
     );
   }
