@@ -1,7 +1,6 @@
 import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import {
   IsEnum,
-  IsISO8601,
   IsPhoneNumber,
   IsString,
   MaxLength,
@@ -18,6 +17,7 @@ import {
   OptionalNonNull,
   OptionalNullable,
 } from '../../../../common/decorators/optional.decorator';
+import { PublishedISO8601 } from '../../../../common/decorators/published-validators.decorator';
 
 // Declared field by field rather than `PickType(UserResponseDto, …)`. A request
 // class deriving from a RESPONSE class inherits that class's validators, which
@@ -39,6 +39,10 @@ export class UpdateUserDto {
   @NoEmoji()
   readonly fullName?: string;
 
+  /**
+   * Must be a valid phone number written with its international calling
+   * code, for example +14155552671. `null` clears it.
+   */
   @OptionalNullable()
   @IsPhoneNumber()
   readonly phoneNumber?: string | null;
@@ -49,7 +53,7 @@ export class UpdateUserDto {
 
   /** Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone. */
   @OptionalNullable()
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly dob?: string | null;
 }
 
@@ -79,6 +83,6 @@ export class UpdateOwnProfileDto {
 
   /** Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone. */
   @OptionalNullable()
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly dob?: string | null;
 }

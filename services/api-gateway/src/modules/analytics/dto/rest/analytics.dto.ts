@@ -1,15 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsISO8601,
-  IsObject,
-  IsUUID,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsObject, IsUUID, Max, Min } from 'class-validator';
 import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import {
   EXPORT_KINDS,
@@ -19,6 +10,10 @@ import {
   ExportKind,
 } from '@synapsedesk/contracts';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import {
+  PublishedISO8601,
+  PublishedMatches,
+} from '../../../../common/decorators/published-validators.decorator';
 
 /**
  * The shared analytics filter — api-endpoints-plan §4.
@@ -30,10 +25,10 @@ import { OptionalNonNull } from '../../../../common/decorators/optional.decorato
  * not compete with ticket creation.
  */
 export class AnalyticsRangeQueryDto {
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly from!: string;
 
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly to!: string;
 
   @OptionalNonNull()
@@ -86,10 +81,14 @@ export class CreateExportDto {
   @IsIn(EXPORT_KINDS)
   readonly kind!: ExportKind;
 
-  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'from must be a date (YYYY-MM-DD)',
+  })
   readonly from!: string;
 
-  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'to must be a date (YYYY-MM-DD)',
+  })
   readonly to!: string;
 
   @OptionalNonNull()

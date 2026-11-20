@@ -36,7 +36,6 @@ import {
   IsNotEmpty,
   IsString,
   IsUUID,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -66,6 +65,7 @@ import { lowerIfString, trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import { PublishedMatches } from '../../../../common/decorators/published-validators.decorator';
 
 export class ListPlatformOrganizationsQueryDto extends OmitType(
   SearchPaginationDto,
@@ -129,7 +129,7 @@ export class CreatePlatformOrganizationDto {
   @IsString()
   @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
-  @Matches(ORGANIZATION_SLUG_PATTERN)
+  @PublishedMatches(ORGANIZATION_SLUG_PATTERN)
   // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
   // class-transformer runs ahead of class-validator regardless of decorator
   // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
@@ -211,7 +211,7 @@ export class UpdatePlatformOrganizationDto {
   @IsString()
   @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
-  @Matches(ORGANIZATION_SLUG_PATTERN)
+  @PublishedMatches(ORGANIZATION_SLUG_PATTERN)
   // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
   // class-transformer runs ahead of class-validator regardless of decorator
   // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
@@ -410,7 +410,7 @@ export class CreatePlanPriceDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_STRIPE_ID_LENGTH)
-  @Matches(STRIPE_ID_PATTERN, {
+  @PublishedMatches(STRIPE_ID_PATTERN, {
     message: 'stripePriceId must be alphanumeric with _ or - separators',
   })
   // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
@@ -445,7 +445,7 @@ export class CreatePlanDto {
   // so the two Stripe ids in this file were validated to different depths — and
   // this one also accepted `''`, which is neither a product id nor a null.
   // Clearing is `clearStripeProductId`, never an empty string.
-  @Matches(STRIPE_ID_PATTERN, {
+  @PublishedMatches(STRIPE_ID_PATTERN, {
     message: 'stripeProductId must be alphanumeric with _ or - separators',
   })
   readonly stripeProductId?: string;
@@ -558,7 +558,7 @@ export class UpdatePlanDto {
   // so the two Stripe ids in this file were validated to different depths — and
   // this one also accepted `''`, which is neither a product id nor a null.
   // Clearing is `clearStripeProductId`, never an empty string.
-  @Matches(STRIPE_ID_PATTERN, {
+  @PublishedMatches(STRIPE_ID_PATTERN, {
     message: 'stripeProductId must be alphanumeric with _ or - separators',
   })
   readonly stripeProductId?: string;
@@ -649,7 +649,7 @@ export class UpdatePlanDto {
   @ArrayMaxSize(MAX_PLAN_PRICES)
   @IsString({ each: true })
   @MaxLength(MAX_STRIPE_ID_LENGTH, { each: true })
-  @Matches(STRIPE_ID_PATTERN, {
+  @PublishedMatches(STRIPE_ID_PATTERN, {
     each: true,
     message:
       'each removePrices entry must be alphanumeric with _ or - separators',
@@ -692,10 +692,14 @@ export class FinanceEventsQueryDto {
   //     EXPLICITLY in UTC. Handing it a `Date` moves that decision into
   //     class-transformer, where the string never appears and the UTC intent is
   //     invisible. The parse belongs where the timezone argument is written down.
-  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'from must be a date (YYYY-MM-DD)',
+  })
   readonly from!: string;
 
-  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'to must be a date (YYYY-MM-DD)',
+  })
   readonly to!: string;
 }
 

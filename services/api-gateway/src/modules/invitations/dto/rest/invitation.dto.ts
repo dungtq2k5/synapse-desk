@@ -8,7 +8,6 @@ import {
   IsEmail,
   IsIn,
   IsString,
-  IsStrongPassword,
   IsUUID,
   MaxLength,
   MinLength,
@@ -18,7 +17,6 @@ import {
   DEFAULT_SEARCH,
   INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
-  PASSWORD_POLICY,
   type InvitationSortableField,
 } from '@synapsedesk/contracts';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
@@ -29,6 +27,7 @@ import {
   MAX_PREVIEW_ID_LENGTH,
 } from '../../../../common/config/dto.config';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import { StrongPassword } from '../../../../common/decorators/published-validators.decorator';
 
 export class InviteUserDto {
   @IsEmail()
@@ -98,7 +97,7 @@ export class AcceptInvitationDto {
   readonly fullName!: string;
 
   @IsString()
-  @IsStrongPassword(PASSWORD_POLICY)
+  @StrongPassword()
   readonly password!: string;
 
   /**

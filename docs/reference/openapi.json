@@ -34738,6 +34738,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
             }
           },
@@ -34746,6 +34747,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
               "type": "string"
             }
           }
@@ -47793,6 +47795,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -47801,6 +47804,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48025,6 +48029,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48033,6 +48038,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48257,6 +48263,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48265,6 +48272,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48489,6 +48497,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48497,6 +48506,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48721,6 +48731,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48729,6 +48740,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48953,6 +48965,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -48961,6 +48974,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -49185,6 +49199,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -49193,6 +49208,7 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -49413,21 +49429,11 @@
         "operationId": "AnalyticsController_knowledgeGaps_v1",
         "parameters": [
           {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          },
-          {
             "name": "from",
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
             }
           },
@@ -49436,7 +49442,19 @@
             "required": true,
             "in": "query",
             "schema": {
+              "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$",
               "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
             }
           },
           {
@@ -62934,12 +62952,13 @@
       "RegisterDto": {
         "type": "object",
         "properties": {
+          "password": {
+            "type": "string",
+            "pattern": "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$"
+          },
           "email": {
             "type": "string",
             "format": "email"
-          },
-          "password": {
-            "type": "string"
           },
           "fullName": {
             "type": "string",
@@ -62947,7 +62966,7 @@
             "maxLength": 150
           }
         },
-        "required": ["email", "password", "fullName"]
+        "required": ["password", "email", "fullName"]
       },
       "UserResponseDto": {
         "type": "object",
@@ -63194,7 +63213,8 @@
             "minLength": 1
           },
           "newPassword": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$"
           }
         },
         "required": ["currentPassword", "newPassword"]
@@ -63241,7 +63261,8 @@
             "minLength": 1
           },
           "newPassword": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$"
           }
         },
         "required": ["token", "newPassword"]
@@ -63584,6 +63605,10 @@
       "AcceptInvitationDto": {
         "type": "object",
         "properties": {
+          "password": {
+            "type": "string",
+            "pattern": "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$"
+          },
           "token": {
             "type": "string"
           },
@@ -63591,16 +63616,13 @@
             "type": "string",
             "minLength": 1
           },
-          "password": {
-            "type": "string"
-          },
           "deviceName": {
             "type": "string",
             "description": "Labels the session this call creates, in the user's active-device list.\n\nOptional: the client sends what it can identify itself as, and a session\nwith no label is still a session.",
             "maxLength": 100
           }
         },
-        "required": ["token", "fullName", "password"]
+        "required": ["password", "token", "fullName"]
       },
       "InvitationPreviewRowResponseDto": {
         "type": "object",
@@ -63873,6 +63895,12 @@
       "UpdateOwnProfileDto": {
         "type": "object",
         "properties": {
+          "dob": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone.",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
           "fullName": {
             "type": "string",
             "minLength": 2,
@@ -63882,11 +63910,6 @@
             "type": "string",
             "nullable": true,
             "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
-          },
-          "dob": {
-            "type": "string",
-            "nullable": true,
-            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone."
           }
         }
       },
@@ -64038,6 +64061,12 @@
       "UpdateUserDto": {
         "type": "object",
         "properties": {
+          "dob": {
+            "type": "string",
+            "nullable": true,
+            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone.",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
           "fullName": {
             "type": "string",
             "minLength": 2,
@@ -64045,17 +64074,13 @@
           },
           "phoneNumber": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Must be a valid phone number written with its international calling\ncode, for example +14155552671. `null` clears it."
           },
           "gender": {
             "type": "string",
             "nullable": true,
             "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
-          },
-          "dob": {
-            "type": "string",
-            "nullable": true,
-            "description": "Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone."
           }
         }
       },
@@ -64079,7 +64104,8 @@
           },
           "lockedUntil": {
             "type": "string",
-            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller."
+            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.\n\nMust be a date in the future.",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           }
         },
         "required": ["reason"]
@@ -64172,7 +64198,8 @@
           "code": {
             "type": "string",
             "minLength": 4,
-            "maxLength": 10
+            "maxLength": 10,
+            "pattern": "^[+-]?([0-9]*[.])?[0-9]+$"
           }
         },
         "required": ["code"]
@@ -64182,7 +64209,7 @@
         "properties": {
           "phoneNumber": {
             "type": "string",
-            "description": "Becomes `otps.target`. `users.phone_number` is not touched until a code for\nthis exact number verifies, which is what lets one endpoint serve both\nfirst-time verification and change-of-number."
+            "description": "Becomes `otps.target`. `users.phone_number` is not touched until a code for\nthis exact number verifies, which is what lets one endpoint serve both\nfirst-time verification and change-of-number.\n\nMust be a valid phone number written with its international calling\ncode, for example +14155552671."
           }
         },
         "required": ["phoneNumber"]
@@ -64761,20 +64788,22 @@
       "UpdateOrganizationDto": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 255
-          },
           "slug": {
             "type": "string",
             "description": "Appears in URLs, so changing it breaks every existing link. Treated as a\nrename with consequences rather than a cosmetic edit — the service rejects\na collision with 409 rather than silently suffixing it.",
             "minLength": 2,
-            "maxLength": 100
+            "maxLength": 100,
+            "pattern": "^[a-z0-9-]+$"
           },
           "domain": {
             "type": "string",
             "description": "Empty string clears it. Globally unique across tenants.",
+            "maxLength": 255,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
             "maxLength": 255
           }
         }
@@ -65618,6 +65647,12 @@
       "CreatePlatformOrganizationDto": {
         "type": "object",
         "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "pattern": "^[a-z0-9-]+$"
+          },
           "allowedEmailDomains": {
             "default": [],
             "type": "array",
@@ -65629,11 +65664,6 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 255
-          },
-          "slug": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 100
           },
           "domain": {
             "type": "string",
@@ -65662,7 +65692,7 @@
             "minimum": 0
           }
         },
-        "required": ["name", "slug", "adminEmail", "adminFullName"]
+        "required": ["slug", "name", "adminEmail", "adminFullName"]
       },
       "PlatformOrganizationUsageResponseDto": {
         "type": "object",
@@ -65764,15 +65794,16 @@
       "UpdatePlatformOrganizationDto": {
         "type": "object",
         "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "pattern": "^[a-z0-9-]+$"
+          },
           "name": {
             "type": "string",
             "minLength": 2,
             "maxLength": 255
-          },
-          "slug": {
-            "type": "string",
-            "minLength": 2,
-            "maxLength": 100
           },
           "domain": {
             "type": "string",
@@ -66274,7 +66305,8 @@
           "stripePriceId": {
             "type": "string",
             "maxLength": 255,
-            "minLength": 1
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$"
           },
           "interval": {
             "type": "string",
@@ -66286,6 +66318,11 @@
       "CreatePlanDto": {
         "type": "object",
         "properties": {
+          "stripeProductId": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
           "isActive": {
             "type": "boolean",
             "default": true
@@ -66301,10 +66338,6 @@
             "type": "string",
             "minLength": 2,
             "maxLength": 100
-          },
-          "stripeProductId": {
-            "type": "string",
-            "maxLength": 255
           },
           "maxAgentSeats": {
             "type": "number",
@@ -66359,6 +66392,11 @@
       "UpdatePlanDto": {
         "type": "object",
         "properties": {
+          "stripeProductId": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
           "addPrices": {
             "description": "Prices to put on the plan, in create's shape: each is read from Stripe\nand must be of the plan's Stripe product. Absent or `[]`, none.",
             "type": "array",
@@ -66366,14 +66404,19 @@
               "$ref": "#/components/schemas/CreatePlanPriceDto"
             }
           },
+          "removePrices": {
+            "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
           "name": {
             "type": "string",
             "minLength": 2,
             "maxLength": 100
-          },
-          "stripeProductId": {
-            "type": "string",
-            "maxLength": 255
           },
           "clearStripeProductId": {
             "type": "boolean"
@@ -66417,14 +66460,6 @@
           },
           "isActive": {
             "type": "boolean"
-          },
-          "removePrices": {
-            "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
-            "type": "array",
-            "items": {
-              "type": "string",
-              "maxLength": 255
-            }
           }
         }
       },
@@ -66805,17 +66840,19 @@
       "BackfillJobDto": {
         "type": "object",
         "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
           "reason": {
             "type": "string",
             "description": "**Mandatory.** A backfill rewrites numbers somebody may already have acted\non, and \"why\" is the only part of that a reader cannot reconstruct\nafterwards from the rows themselves.",
             "maxLength": 500,
             "minLength": 1
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
           },
           "organizationId": {
             "type": "string",
@@ -66823,7 +66860,7 @@
             "format": "uuid"
           }
         },
-        "required": ["reason", "from", "to"]
+        "required": ["from", "to", "reason"]
       },
       "UserReferenceResponseDto": {
         "type": "object",
@@ -67401,16 +67438,18 @@
       "CreateTicketExportDto": {
         "type": "object",
         "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
+          },
           "filters": {
             "type": "object",
             "additionalProperties": true,
             "description": "`status`, `priority`, `assigneeId` — refused per kind at the service."
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
           },
           "departmentId": {
             "type": "string",
@@ -68853,6 +68892,14 @@
       "CreateExportDto": {
         "type": "object",
         "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
           "filters": {
             "type": "object",
             "additionalProperties": true,
@@ -68862,18 +68909,12 @@
             "type": "string",
             "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY"]
           },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
-          },
           "departmentId": {
             "type": "string",
             "format": "uuid"
           }
         },
-        "required": ["kind", "from", "to"]
+        "required": ["from", "to", "kind"]
       },
       "StartConversationDto": {
         "type": "object",
@@ -69158,16 +69199,18 @@
       "CreateAuditLogExportDto": {
         "type": "object",
         "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
           "filters": {
             "type": "object",
             "additionalProperties": true,
             "description": "`action`, `resourceType`, `userId` — refused per kind at the service."
-          },
-          "from": {
-            "type": "string"
-          },
-          "to": {
-            "type": "string"
           }
         },
         "required": ["from", "to"]

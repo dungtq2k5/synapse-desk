@@ -1,20 +1,24 @@
 /**
- * @file **Constraints Node enforces that the published document does not describe.**
+ * @file **Constraints Node enforces that a regular expression or a sentence describes.**
  *
- * Node validates request fields with `class-validator` decorators, and the document
- * expresses only some of them (a `format`, a bound, an enum). A password's strength, a
- * phone number's shape, an OTP's digits, a date's ISO form, a slug's pattern are
- * enforced by Node and published nowhere, so a gateway implemented from the document
- * has none of them, and a client generated from it never learns they exist. Nothing
- * behind the gateway checks either: auth-service validates no password or phone.
+ * Node validates request fields with `class-validator` decorators. A password's
+ * strength, a phone number's shape, an OTP's digits, a date's ISO form and a slug's
+ * pattern are enforced by Node and by nothing behind it (auth-service validates no
+ * password or phone), so two things must hold for each: the gateway refuses a value
+ * that breaks it, and the document says so, as a `pattern`, a `format`, or a fixed
+ * sentence where no keyword can.
  *
  * **Found from the SOURCE, not the document.** A scan from the document outward finds
- * only the constraints it already has, which is the set that is empty here. The DTO
- * sources are scanned (`validator-scan.ts`, held to a hostile fixture and a floor), and
- * every decorator whose constraint the schema does not carry becomes a row: the field
- * set to a value that breaks it must be refused, with 400, naming the field, before any
- * peer is called. Each row first requires the SAME request with a VALID value to reach
- * the peer, so a refusal for another reason cannot satisfy it.
+ * only the constraints it already has. The DTO sources are scanned (`validator-scan.ts`,
+ * held to a hostile fixture and a floor), and every such decorator becomes:
+ *
+ * - **a row:** the field set to a value that breaks it must be refused, with 400, naming
+ *   the field, before any peer is called. Each row first requires the SAME request with
+ *   a VALID value to reach the peer, so a refusal for another reason cannot satisfy it;
+ * - **a check that the document publishes it.**
+ *
+ * The publishing decorators (`StrongPassword`, `PublishedMatches`, `PublishedISO8601`,
+ * `PublishedNumberString`) are read as the validators they apply.
  *
  * **A stated limit.** A row pins the FIELD, not the validator: it requires the refusal to
  * name the field, and each invalid sample is chosen to break only the validator under
@@ -28,10 +32,6 @@
  * allow 5 a minute, so every row acts as its own fresh subject ({@link freshSubject}).
  * A PUBLIC route is throttled per address, which a row cannot vary: its rows send two
  * requests each and rely on the suite not spending that budget elsewhere.
- *
- * Porting a constraint closes the behaviour gap; PUBLISHING it closes the document
- * gap. They are separate changes, and this file holds only the first: when a row goes
- * green the document may still describe nothing.
  */
 
 import { type Gateway, startGateway } from './gateway';
@@ -57,13 +57,20 @@ type Sample = { valid: string | string[]; invalid: string | string[] };
 const ISO_VALID = '2026-01-01T00:00:00.000Z';
 
 /** A value that satisfies the constraint and one that breaks it, by validator. */
-const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
+const KINDS: Record<
+  string,
+  { sample: Sample; expressedBy?: string[]; sentence?: string }
+> = {
   // Long enough, so only the character classes are broken: a short value would also fail a
   // length check, and a port that kept only that check would still pass.
   IsStrongPassword: {
     sample: { valid: 'Str0ng!Passw0rd', invalid: 'alllowercaseletters' },
+    expressedBy: ['pattern'],
   },
-  IsPhoneNumber: { sample: { valid: '+14155552671', invalid: 'abc' } },
+  IsPhoneNumber: {
+    sample: { valid: '+14155552671', invalid: 'abc' },
+    sentence: 'Must be a valid phone number',
+  },
   // A code carries a length range too (4 to 10), so the bad value is the right length.
   IsNumberString: {
     sample: { valid: '123456', invalid: 'abcdef' },
@@ -74,10 +81,11 @@ const KINDS: Record<string, { sample: Sample; expressedBy?: string[] }> = {
       valid: '2999-01-01T00:00:00.000Z',
       invalid: '2000-01-01T00:00:00.000Z',
     },
+    sentence: 'Must be a date in the future.',
   },
   IsISO8601: {
     sample: { valid: ISO_VALID, invalid: 'not-a-date' },
-    expressedBy: ['format'],
+    expressedBy: ['format', 'pattern'],
   },
   IsDate: {
     sample: { valid: ISO_VALID, invalid: 'not-a-date' },
@@ -99,36 +107,63 @@ const MATCHES: Record<string, Sample> = {
   to: { valid: '2026-01-31', invalid: '2026-01-31T00:00:00Z' },
 };
 
+/** The publishing decorators, read as the validators they apply. */
+const ALIASES: Record<string, string> = {
+  StrongPassword: 'IsStrongPassword',
+  PublishedMatches: 'Matches',
+  PublishedISO8601: 'IsISO8601',
+  PublishedNumberString: 'IsNumberString',
+};
+const kindOf = (decorator: string) => ALIASES[decorator] ?? decorator;
+
 type Unpublished = { schema: string; property: string; kind: string };
 
-type Found = Unpublished & { role: 'body' | 'response' | 'other' };
+type Found = Unpublished & {
+  role: 'body' | 'response' | 'other';
+  published: boolean;
+};
 
 const requests = jsonRequests();
+
+/** Whether the published schema carries the rule: its keyword, or its sentence. */
+function isPublished(schema: string, property: string, kind: string): boolean {
+  const published = schemaProperty(schema, property);
+  if (!published) return false;
+  const { expressedBy = [], sentence } = KINDS[kind];
+  const { description } = published as { description?: string };
+
+  return (
+    // An array's rule is its items' (`removePrices`, each id matched).
+    expressedBy.some(
+      (keyword) =>
+        keyword in published ||
+        keyword in ((published as { items?: object }).items ?? {}),
+    ) ||
+    (sentence !== undefined && (description ?? '').includes(sentence))
+  );
+}
 const reachedFromARequest = (schema: string) =>
   requests.some((request) => pathsTo(request.schema, schema).length > 0);
 
 /**
- * Every decorated property whose constraint the published schema does not carry, and
- * what its class is: a request BODY (reachable from a request), a RESPONSE (a schema no
- * request reaches, whose validators nothing runs), or OTHER (no component schema at
- * all: a query-string DTO or the inbound-mail DTO, whose fields these rows do not send).
+ * Every property carrying one of these validators, whether the published schema says
+ * so, and what its class is: a request BODY (reachable from a request), a RESPONSE (a
+ * schema no request reaches, whose validators nothing runs), or OTHER (no component
+ * schema at all: a query-string DTO or the inbound-mail DTO, whose fields these rows do
+ * not send).
  */
 const found: Found[] = scanDtoDirectory(
   join(REPO_ROOT, 'services/api-gateway/src/modules'),
 ).flatMap((dto) =>
   dto.properties.flatMap((property) =>
     property.decorators
-      .filter((decorator) => decorator in KINDS)
-      .filter((decorator) => {
-        const published = schemaProperty(dto.name, property.name);
-        const keywords = KINDS[decorator].expressedBy ?? [];
-
-        return !(published && keywords.some((keyword) => keyword in published));
-      })
+      .map(kindOf)
+      .filter((kind) => kind in KINDS)
       .map((kind) => ({
         schema: dto.name,
         property: property.name,
         kind,
+        published: isPublished(dto.name, property.name, kind),
         role: reachedFromARequest(dto.name)
           ? 'body'
           : hasSchema(dto.name)
@@ -137,6 +172,7 @@ const found: Found[] = scanDtoDirectory(
       })),
   ),
 );
+/** The constrained request-body fields: each gets a row, and must be published. */
 const unpublished = found.filter((item) => item.role === 'body');
 
 /**
@@ -216,6 +252,14 @@ describe('the scan itself', () => {
       'InboundEmailDto.messageId (Matches)',
       'InboundEmailDto.receivedAt (IsISO8601)',
     ]);
+  });
+
+  it('**finds every constrained body field published**: a `pattern`, a `format`, or its sentence', () => {
+    expect(
+      unpublished
+        .filter((u) => !u.published)
+        .map((u) => `${u.schema}.${u.property} (${u.kind})`),
+    ).toEqual([]);
   });
 
   it('has a sample for every unpublished field, so none is silently uncovered', () => {

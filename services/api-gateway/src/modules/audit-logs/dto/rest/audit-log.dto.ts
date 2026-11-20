@@ -1,10 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsObject, IsUUID, Matches } from 'class-validator';
+import { IsIn, IsObject, IsUUID } from 'class-validator';
 import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import { PublishedMatches } from '../../../../common/decorators/published-validators.decorator';
 
 // **No `searchTerm`, and that is the change.**
 //
@@ -57,10 +58,14 @@ export class ListAuditLogsQueryDto extends PaginationDto {
  * alone holds the line.
  */
 export class CreateAuditLogExportDto {
-  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'from must be a date (YYYY-MM-DD)',
+  })
   readonly from!: string;
 
-  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
+  @PublishedMatches(ISO_DATE_PATTERN, {
+    message: 'to must be a date (YYYY-MM-DD)',
+  })
   readonly to!: string;
 
   /** `action`, `resourceType`, `userId` — refused per kind at the service. */

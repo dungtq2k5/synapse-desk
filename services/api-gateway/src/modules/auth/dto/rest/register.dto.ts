@@ -7,17 +7,16 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
-  IsStrongPassword,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { PASSWORD_POLICY } from '@synapsedesk/contracts';
+import { StrongPassword } from '../../../../common/decorators/published-validators.decorator';
 
 export class RegisterDto {
   @IsEmail()
   readonly email!: string;
 
-  @IsStrongPassword(PASSWORD_POLICY)
+  @StrongPassword()
   readonly password!: string;
 
   @IsNotEmpty()

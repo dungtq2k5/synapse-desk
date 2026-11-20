@@ -17,7 +17,6 @@ import {
   IsInt,
   IsNotEmpty,
   IsString,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -33,6 +32,7 @@ import {
   OptionalNonNull,
   OptionalNullable,
 } from '../../../../common/decorators/optional.decorator';
+import { PublishedMatches } from '../../../../common/decorators/published-validators.decorator';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`
@@ -58,7 +58,7 @@ export class UpdateOrganizationDto {
   @IsString()
   @MinLength(2)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
-  @Matches(ORGANIZATION_SLUG_PATTERN)
+  @PublishedMatches(ORGANIZATION_SLUG_PATTERN)
   // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
   // class-transformer runs ahead of class-validator regardless of decorator
   // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
@@ -75,7 +75,7 @@ export class UpdateOrganizationDto {
   @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
-  @Matches(ORGANIZATION_DOMAIN_PATTERN)
+  @PublishedMatches(ORGANIZATION_DOMAIN_PATTERN)
   // Lowercased first, same reason as `slug`: auth-service already does it, so
   // refusing `ACME.COM` would break a request that used to work.
   @Transform(lowerIfString)

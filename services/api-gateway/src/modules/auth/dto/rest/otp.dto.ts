@@ -2,14 +2,18 @@ import {
   MAX_OTP_CODE_LENGTH,
   MIN_OTP_CODE_LENGTH,
 } from '../../../../common/config/dto.config';
-import { IsIn, IsNumberString, IsPhoneNumber, Length } from 'class-validator';
+import { IsIn, IsPhoneNumber, Length } from 'class-validator';
 import { OTP_PURPOSES, OtpPurpose } from '@synapsedesk/contracts';
+import { PublishedNumberString } from '../../../../common/decorators/published-validators.decorator';
 
 export class RequestPhoneVerificationDto {
   /**
    * Becomes `otps.target`. `users.phone_number` is not touched until a code for
    * this exact number verifies, which is what lets one endpoint serve both
    * first-time verification and change-of-number.
+   *
+   * Must be a valid phone number written with its international calling
+   * code, for example +14155552671.
    */
   @IsPhoneNumber()
   readonly phoneNumber!: string;
@@ -21,7 +25,7 @@ export class VerifyOtpDto {
   //
   // A RANGE, not a fixed length: auth-service generates `OTP_LENGTH` digits and
   // that is an env var, so the gateway cannot know the exact length here.
-  @IsNumberString()
+  @PublishedNumberString()
   @Length(MIN_OTP_CODE_LENGTH, MAX_OTP_CODE_LENGTH)
   readonly code!: string;
 }

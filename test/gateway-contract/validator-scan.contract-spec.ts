@@ -136,12 +136,12 @@ describe('the real DTO sources', () => {
   });
 
   it.each([
-    'IsStrongPassword',
+    'StrongPassword',
     'IsPhoneNumber',
-    'IsNumberString',
+    'PublishedNumberString',
     'IsFutureDate',
-    'IsISO8601',
-    'Matches',
+    'PublishedISO8601',
+    'PublishedMatches',
     'IsEmail',
     'IsUUID',
   ])('still finds %s somewhere', (decorator) => {

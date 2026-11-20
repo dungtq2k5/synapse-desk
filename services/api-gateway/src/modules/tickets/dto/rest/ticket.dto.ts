@@ -8,7 +8,6 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsISO8601,
   IsObject,
   IsString,
   IsUUID,
@@ -35,6 +34,7 @@ import { SearchPaginationDto } from '../../../../common/dto/rest/search-paginati
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { NewAttachmentDto } from './message.dto';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import { PublishedISO8601 } from '../../../../common/decorators/published-validators.decorator';
 
 export class CreateTicketDto {
   @IsString()
@@ -279,10 +279,10 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
  * the refusal can name the count.
  */
 export class CreateTicketExportDto {
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly from!: string;
 
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly to!: string;
 
   @OptionalNonNull()

@@ -4,7 +4,6 @@ import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
-  IsISO8601,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -29,6 +28,7 @@ import { SearchPaginationDto } from '../../../../common/dto/rest/search-paginati
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { IsFutureDate } from '../../../../common/decorators/is-future-date.decorator';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import { PublishedISO8601 } from '../../../../common/decorators/published-validators.decorator';
 
 export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
@@ -125,9 +125,11 @@ export class LockUserDto {
    * legal, and incomprehensible to the admin who set it and the user who got
    * the email. Validated here and re-checked in auth-service, because the
    * gateway is not the only possible caller.
+   *
+   * Must be a date in the future.
    */
   @OptionalNonNull()
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   @IsFutureDate()
   readonly lockedUntil?: string;
 }

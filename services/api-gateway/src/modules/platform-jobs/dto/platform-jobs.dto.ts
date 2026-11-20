@@ -1,13 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MAX_ADMIN_REASON_LENGTH } from '../../../common/config/dto.config';
-import {
-  IsISO8601,
-  IsNotEmpty,
-  IsString,
-  IsUUID,
-  MaxLength,
-} from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
 import { OptionalNonNull } from '../../../common/decorators/optional.decorator';
+import { PublishedISO8601 } from '../../../common/decorators/published-validators.decorator';
 
 /**
  * A run by hand. It does work across every organization, so it says why, as
@@ -29,10 +24,10 @@ export class RunJobDto {
  * which is the property that makes re-running a correction possible at all.
  */
 export class BackfillJobDto {
-  @IsISO8601({ strict: true }, { message: 'from must be YYYY-MM-DD' })
+  @PublishedISO8601({ strict: true }, { message: 'from must be YYYY-MM-DD' })
   from!: string;
 
-  @IsISO8601({ strict: true }, { message: 'to must be YYYY-MM-DD' })
+  @PublishedISO8601({ strict: true }, { message: 'to must be YYYY-MM-DD' })
   to!: string;
 
   /**

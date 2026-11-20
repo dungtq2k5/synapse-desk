@@ -7,10 +7,8 @@ import {
   IsEmail,
   IsIn,
   IsInt,
-  IsISO8601,
   IsObject,
   IsString,
-  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -34,6 +32,10 @@ import {
 } from '../../../../common/config/dto.config';
 import { IsPresentButNullable } from '../../../../common/decorators/is-nullable.decorator';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import {
+  PublishedISO8601,
+  PublishedMatches,
+} from '../../../../common/decorators/published-validators.decorator';
 
 /**
  * One object already in storage, ready to bind to the message.
@@ -118,7 +120,7 @@ export class InboundEmailDto {
    */
   @OptionalNonNull()
   @IsString()
-  @Matches(PRINTABLE_ASCII, {
+  @PublishedMatches(PRINTABLE_ASCII, {
     message: 'messageId must be printable ASCII (RFC 5322 msg-id)',
   })
   @MaxLength(MAX_MESSAGE_ID_LENGTH)
@@ -267,6 +269,6 @@ export class InboundEmailDto {
    * message, so it is not guaranteed stable across Resend's redeliveries —
    * which are precisely the retries the key exists to collapse.
    */
-  @IsISO8601({ strict: true })
+  @PublishedISO8601({ strict: true })
   readonly receivedAt!: string;
 }

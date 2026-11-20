@@ -1,12 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsString,
-  IsStrongPassword,
-  MaxLength,
-} from 'class-validator';
-import { PASSWORD_POLICY } from '@synapsedesk/contracts';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { MAX_RESET_TOKEN_LENGTH } from '../../../../common/config/dto.config';
+import { StrongPassword } from '../../../../common/decorators/published-validators.decorator';
 
 export class ResetPasswordDto {
   @IsNotEmpty()
@@ -26,7 +21,7 @@ export class ResetPasswordDto {
   readonly token!: string;
 
   @IsString()
-  @IsStrongPassword(PASSWORD_POLICY)
+  @StrongPassword()
   readonly newPassword!: string;
 }
 
@@ -51,6 +46,6 @@ export class ChangePasswordDto {
   // Same strength rule as the reset flow. Applying a weaker one here would let
   // a user downgrade a password that the reset form would have rejected.
   @IsString()
-  @IsStrongPassword(PASSWORD_POLICY)
+  @StrongPassword()
   readonly newPassword!: string;
 }
