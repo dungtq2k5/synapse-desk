@@ -523,7 +523,10 @@ export class CreatePlanDto {
   // wire at all, so the `?` buys nothing and costs every layer below a branch
   // on `undefined` — a plan created with no prices is the assigned-only plan,
   // which is a legitimate row rather than a missing one.
-  @IsOptional()
+  //
+  // An explicit `null` reads as absent, as on every optional request field;
+  // it would otherwise replace the default and reach `.map`.
+  @Transform(({ value }: { value: unknown }) => value ?? [])
   @IsArray()
   @ArrayMaxSize(MAX_PLAN_PRICES)
   @ValidateNested({ each: true })

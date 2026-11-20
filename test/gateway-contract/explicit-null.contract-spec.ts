@@ -1,9 +1,8 @@
 /**
  * @file **An explicit `null` for an OPTIONAL request field**, on every JSON route.
  *
- * Measured on Node: of the optional fields a minimal request can reach, `null` is
- * accepted on all but two (those two are Node's own 500s, listed below). It means
- * ABSENT on most and a specific instruction on eleven. A document that says
+ * Of the optional fields a minimal request can reach, `null` is accepted on every
+ * one. It means ABSENT on most and a specific instruction on eleven. A document that says
  * "optional, not nullable" understates this, and a gateway that answers 500 to a
  * `null` the other one accepts breaks a client that serializes its model with
  * explicit nulls, which is common.
@@ -105,15 +104,6 @@ const UNREACHABLE: Record<string, string> = {
     'has no peer: it writes a log line (client-errors.contract-spec.ts covers it)',
 };
 
-/**
- * The gateway answers 500 to an explicit `null` here. A defect (known gaps), not a
- * behaviour to keep, so these are named rather than asserted either way.
- */
-const ANSWERS_500 = new Set([
-  'PATCH /api/v1/webhook-endpoints/{id} eventTypes',
-  'POST /api/v1/platform/plans prices',
-]);
-
 type Field = {
   method: string;
   path: string;
@@ -181,7 +171,6 @@ describe('an explicit null for an optional request field', () => {
 
   const isGeneric = (field: Field) =>
     !(field.key in MEANINGS) &&
-    !ANSWERS_500.has(field.key) &&
     !(`${field.method} ${field.path}` in UNREACHABLE);
 
   rowFor('Ops').each(fields.filter(isGeneric).map((f) => [f.key] as const))(
