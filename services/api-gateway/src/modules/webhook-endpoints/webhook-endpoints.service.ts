@@ -70,7 +70,8 @@ export class WebhookEndpointsService {
         {
           endpointId: id,
           url: dto.url,
-          description: dto.description,
+          // `null` clears it: the service stores the empty string as none.
+          description: dto.description === null ? '' : dto.description,
           // The wrapper is how "leave them" and "replace them" stay different
           // on a proto3 wire that cannot tell an empty repeated from an absent
           // one.

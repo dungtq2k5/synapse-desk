@@ -22,7 +22,10 @@ import {
   MAX_WEBHOOK_URL_LENGTH,
   WEBHOOK_DELIVERY_LIMIT,
 } from '@synapsedesk/nest-common';
-import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 
 /**
  * The endpoint's writable fields.
@@ -61,10 +64,10 @@ export class UpdateWebhookEndpointDto {
   @MaxLength(MAX_WEBHOOK_URL_LENGTH)
   readonly url?: string;
 
-  @OptionalNonNull()
+  @OptionalNullable()
   @IsString()
   @MaxLength(MAX_WEBHOOK_DESCRIPTION_LENGTH)
-  readonly description?: string;
+  readonly description?: string | null;
 
   /** Absent means "leave them"; an empty array is refused, same as create. */
   @OptionalNonNull()

@@ -61,7 +61,12 @@ export class RolesService {
   ): Promise<RoleResponseDto> {
     return toRoleResponseDto(
       await this.rolesGrpcClient.update(
-        { id, name: dto.name, description: dto.description },
+        // `null` clears it: the service stores the empty string as no description.
+        {
+          id,
+          name: dto.name,
+          description: dto.description === null ? '' : dto.description,
+        },
         context,
       ),
     );

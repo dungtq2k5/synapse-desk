@@ -29,7 +29,10 @@ import {
   MIN_DEPARTMENT_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
 import { trimIfString } from '@synapsedesk/core';
-import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 
 export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
@@ -105,11 +108,11 @@ export class UpdateDepartmentDto {
   @NoEmoji()
   readonly name?: string;
 
-  @OptionalNonNull()
+  @OptionalNullable()
   @IsString()
   @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
-  readonly description?: string;
+  readonly description?: string | null;
 }
 
 export class AddDepartmentMembersDto {

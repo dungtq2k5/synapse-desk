@@ -59,6 +59,18 @@ const MEANINGS: Record<
     reason: 'clears the gender',
     asks: { gender: 0 },
   },
+  'PATCH /api/v1/departments/{id} description': {
+    reason: 'clears the description',
+    asks: { description: '' },
+  },
+  'PATCH /api/v1/roles/{id} description': {
+    reason: 'clears the description',
+    asks: { description: '' },
+  },
+  'PATCH /api/v1/webhook-endpoints/{id} description': {
+    reason: 'clears the description',
+    asks: { description: '' },
+  },
   'PATCH /api/v1/organizations/current/settings allowedEmailDomains': {
     reason: 'replaces the allowed domains with none',
     asks: { replaceAllowedEmailDomains: true },

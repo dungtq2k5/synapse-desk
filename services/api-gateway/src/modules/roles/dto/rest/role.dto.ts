@@ -29,7 +29,10 @@ import {
   MAX_ROLE_NAME_LENGTH,
   MIN_ROLE_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
-import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 
 // `OmitType` then re-declare `sortBy`, so the allowlist, the type and the
 // default are ONE decision. Inheriting the base's plain `sortBy: string` would
@@ -98,11 +101,11 @@ export class UpdateRoleDto {
   @NoEmoji()
   readonly name?: string;
 
-  @OptionalNonNull()
+  @OptionalNullable()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
-  readonly description?: string;
+  readonly description?: string | null;
 }
 
 /** REPLACE semantics — the submitted set becomes the role's permissions. */

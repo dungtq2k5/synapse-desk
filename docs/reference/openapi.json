@@ -64285,6 +64285,7 @@
         "properties": {
           "description": {
             "type": "string",
+            "nullable": true,
             "maxLength": 2000,
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
@@ -64513,6 +64514,7 @@
         "properties": {
           "description": {
             "type": "string",
+            "nullable": true,
             "maxLength": 2000,
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
@@ -69852,6 +69854,7 @@
           },
           "description": {
             "type": "string",
+            "nullable": true,
             "maxLength": 500
           },
           "eventTypes": {

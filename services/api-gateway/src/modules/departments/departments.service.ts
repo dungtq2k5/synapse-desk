@@ -69,7 +69,12 @@ export class DepartmentsService {
       // Passed through as-is: an absent key stays absent on the wire, which is
       // what carries "leave unchanged" to the service.
       await this.departmentsGrpcClient.update(
-        { id, name: dto.name, description: dto.description },
+        // `null` clears it: the service stores the empty string as no description.
+        {
+          id,
+          name: dto.name,
+          description: dto.description === null ? '' : dto.description,
+        },
         context,
       ),
     );
