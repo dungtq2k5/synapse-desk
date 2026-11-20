@@ -4,7 +4,6 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -17,6 +16,7 @@ import {
 import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class SubmitFeedbackDto {
   /** A thumb: `1` for up, `-1` for down. */
@@ -42,7 +42,7 @@ export class SubmitFeedbackDto {
   @IsIn(FEEDBACK_RATINGS)
   readonly rating!: FeedbackRating;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_MESSAGE_CONTENT_LENGTH)
@@ -56,7 +56,7 @@ export class SubmitFeedbackDto {
    * "assessed and wrong". Collapsing the two would make every un-assessed reply
    * look like a citation failure in the quality report.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   readonly citationAccurate?: boolean;
@@ -71,22 +71,22 @@ export class ListFeedbackQueryDto extends SearchPaginationDto {
     enum: FEEDBACK_RATINGS,
     description: 'Only this thumb: `1` for up, `-1` for down.',
   })
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
   @IsIn(FEEDBACK_RATINGS)
   readonly rating?: FeedbackRating;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   readonly citationAccurate?: boolean;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Date)
   readonly from?: Date;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Date)
   readonly to?: Date;
 }

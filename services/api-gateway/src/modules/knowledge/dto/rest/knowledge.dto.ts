@@ -2,7 +2,6 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
   Max,
@@ -21,6 +20,7 @@ import {
   MAX_KNOWLEDGE_QUESTION_LENGTH,
   MAX_KNOWLEDGE_SEARCH_LIMIT,
 } from '../../../../common/config/dto.config';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * One question, and deliberately nothing else.
@@ -49,11 +49,11 @@ export class KnowledgeSearchDto {
   @Transform(trimIfString)
   query!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
-  // `@Min(0)`, not `@Min(1)`: the default below IS zero, and `@IsOptional()`
-  // only skips a value that is `undefined` or `null` -- so a floor of 1 would
+  // `@Min(0)`, not `@Min(1)`: the default below IS zero, and `@OptionalNonNull()`
+  // only skips a value that is `undefined` -- so a floor of 1 would
   // reject every request that simply omits the field.
   @Min(0)
   @Max(MAX_KNOWLEDGE_SEARCH_LIMIT)
@@ -68,7 +68,7 @@ export class KnowledgeSearchDto {
    * retrieval or at rerank, and those are different problems with different
    * fixes.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @ToBoolean()
   @IsBoolean()
   @ApiPropertyOptional()
@@ -101,14 +101,14 @@ export class ListKnowledgeArticlesQueryDto extends SearchPaginationDto {
  * this codebase already have, and this one declines to be the sixth.
  */
 export class KnowledgeArticleBlocksQueryDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Type(() => Number)
   @ApiPropertyOptional()
   readonly page: number = DEFAULT_SEARCH.PAGE;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(DEFAULT_SEARCH.MIN_LIMIT)
   @Max(DEFAULT_SEARCH.MAX_LIMIT)
@@ -121,7 +121,7 @@ export class KnowledgeArticleBlocksQueryDto {
    * of blocks that holds it, whatever `page` says, and `passageIndex` marks it.
    * A passage not in this article is a 404, as the article itself would be.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   @ApiPropertyOptional({ format: 'uuid' })
   readonly passage?: string;

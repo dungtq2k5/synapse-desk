@@ -8,7 +8,6 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -30,6 +29,7 @@ import {
   MAX_ROLE_NAME_LENGTH,
   MIN_ROLE_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 // `OmitType` then re-declare `sortBy`, so the allowlist, the type and the
 // default are ONE decision. Inheriting the base's plain `sortBy: string` would
@@ -38,7 +38,7 @@ import {
 export class ListRolesQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(ROLE_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
@@ -54,7 +54,7 @@ export class ListRolesQueryDto extends OmitType(SearchPaginationDto, [
    * silently widening a list is the riskier default, and the role editor knows
    * which view it wants.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -82,7 +82,7 @@ export class CreateRoleDto extends PermissionCodesDto {
   @NoEmoji()
   readonly name!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
@@ -90,7 +90,7 @@ export class CreateRoleDto extends PermissionCodesDto {
 }
 
 export class UpdateRoleDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_ROLE_NAME_LENGTH)
   @MaxLength(MAX_ROLE_NAME_LENGTH)
@@ -98,7 +98,7 @@ export class UpdateRoleDto {
   @NoEmoji()
   readonly name?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })

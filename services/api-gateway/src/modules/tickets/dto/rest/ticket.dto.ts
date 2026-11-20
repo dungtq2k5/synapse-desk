@@ -10,7 +10,6 @@ import {
   IsIn,
   IsISO8601,
   IsObject,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -35,6 +34,7 @@ import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { NewAttachmentDto } from './message.dto';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class CreateTicketDto {
   @IsString()
@@ -50,11 +50,11 @@ export class CreateTicketDto {
   @ApiProperty({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketPriority))
   readonly priority?: TicketPriority;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketSource))
   readonly source?: TicketSource;
 
@@ -68,7 +68,7 @@ export class CreateTicketDto {
    * checked against auth-service before the insert — there is no foreign key
    * that could do it, since `users` lives in another database.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly authorId?: string;
 
@@ -78,7 +78,7 @@ export class CreateTicketDto {
    * confirm comes back in `skippedAttachments`; the ticket is created
    * regardless.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
@@ -96,14 +96,14 @@ export class CreateTicketDto {
  * ignore, which is what tells a client to use the right endpoint.
  */
 export class UpdateTicketDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_TICKET_TITLE_LENGTH)
   @MaxLength(MAX_TICKET_TITLE_LENGTH)
   @Transform(trimIfString)
   readonly title?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_TICKET_DESCRIPTION_LENGTH)
@@ -111,7 +111,7 @@ export class UpdateTicketDto {
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketPriority))
   readonly priority?: TicketPriority;
 }
@@ -120,7 +120,7 @@ export class ChangeTicketStatusDto {
   @IsIn(Object.values(TicketStatus))
   readonly status!: TicketStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_STATUS_CHANGE_REASON_LENGTH)
   @Transform(trimIfString)
@@ -147,7 +147,7 @@ export class TicketStatusActionDto {
    * follow. Not a message to the customer — `POST /tickets/:id/messages` is
    * that.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_STATUS_CHANGE_REASON_LENGTH)
   @Transform(trimIfString)
@@ -171,7 +171,7 @@ export class TicketStatusActionDto {
  * mark the future read.
  */
 export class MarkTicketReadDto {
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Date)
   @IsDate()
   @ApiPropertyOptional()
@@ -191,7 +191,7 @@ export class BulkTicketStatusDto {
   @IsIn(Object.values(TicketStatus))
   readonly status!: TicketStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_STATUS_CHANGE_REASON_LENGTH)
   @Transform(trimIfString)
@@ -222,38 +222,38 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   /** Which column the list is ordered by. Defaults to the search default. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(TICKET_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
-  // `required` from TYPESCRIPT optionality, not from `@IsOptional()`. A field
+  // `required` from TYPESCRIPT optionality, not from `@OptionalNonNull()`. A field
   // declared `sortBy: T = default` is non-optional to the compiler even though
   // the validator lets a caller omit it, so the spec would demand it and a
   // generated client would refuse to send a request without one.
   @ApiPropertyOptional()
   readonly sortBy: TicketSortableField = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketStatus))
   readonly status?: TicketStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketPriority))
   readonly priority?: TicketPriority;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketSource))
   readonly source?: TicketSource;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly assigneeId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly departmentId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly authorId?: string;
 
@@ -263,7 +263,7 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
    * tickets, which is exactly the history someone would delete a ticket to
    * remove.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -285,12 +285,12 @@ export class CreateTicketExportDto {
   @IsISO8601({ strict: true })
   readonly to!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly departmentId?: string;
 
   /** `status`, `priority`, `assigneeId` — refused per kind at the service. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsObject()
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   readonly filters?: Record<string, string>;

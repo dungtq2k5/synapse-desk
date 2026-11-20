@@ -38,7 +38,8 @@ export function toPageQuery<
     // all since the split, so a resolver on `PageArgsGqlDto` has nothing to
     // forward — which is the point. `undefined` here is the same value the
     // field carried when a caller omitted it, so services are unchanged.
-    searchTerm: 'searchTerm' in args ? args.searchTerm : undefined,
+    searchTerm:
+      'searchTerm' in args ? (args.searchTerm ?? undefined) : undefined,
     sortBy,
 
     // Annotated, NOT `satisfies`: `'DESC' satisfies SortOrder` widens to

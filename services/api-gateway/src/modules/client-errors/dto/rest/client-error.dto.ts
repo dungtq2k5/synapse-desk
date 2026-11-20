@@ -5,7 +5,8 @@ import {
   CLIENT_ERROR_PATH_MAX,
   type ClientErrorKind,
 } from '@synapsedesk/contracts';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsString, MaxLength } from 'class-validator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /** `POST /client-errors`: one browser error. The log keeps nothing else. */
 export class ReportClientErrorDto {
@@ -17,7 +18,7 @@ export class ReportClientErrorDto {
   readonly message!: string;
 
   /** Kept truncated. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   readonly stack?: string;
 
@@ -27,7 +28,7 @@ export class ReportClientErrorDto {
   readonly path!: string;
 
   /** The web build that reported it (`GIT_SHA`). */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(CLIENT_ERROR_BUILD_ID_MAX)
   readonly buildId?: string;

@@ -2,12 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
 } from 'class-validator';
 import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/dto.config';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class LoginDto {
   @IsEmail()
@@ -44,7 +44,7 @@ export class LoginDto {
    * `{"ipAddress": "10.0.0.1"}` to poison the audit trail and evade IP-based
    * lockout. The gateway derives it from the transport.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;
@@ -62,7 +62,7 @@ export class LoginWithTenantDto {
   @IsUUID()
   readonly organizationId!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;

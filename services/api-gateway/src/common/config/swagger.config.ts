@@ -1,5 +1,4 @@
 import { namedEnvelopes } from './named-envelopes';
-import { nullableRequestFields } from './nullable-request-fields';
 import { Logger, type INestApplication } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import {
@@ -140,9 +139,7 @@ export function buildOpenApiDocument(
     // treat it as one and send it where an access token belongs.
     .build();
 
-  return namedEnvelopes(
-    nullableRequestFields(SwaggerModule.createDocument(app, config)),
-  );
+  return namedEnvelopes(SwaggerModule.createDocument(app, config));
 }
 
 /**

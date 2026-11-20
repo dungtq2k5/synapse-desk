@@ -1,6 +1,10 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsString, Min } from 'class-validator';
 import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../decorators/optional.decorator';
 
 /**
  * The pagination arguments every list query takes.
@@ -18,14 +22,18 @@ import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
  */
 @ArgsType()
 export class PageArgsGqlDto {
+  // Non-null with a default in the schema (`Int! = …`): GraphQL itself
+  // refuses a `null`, so the value is always a number.
   @Field(() => Int, { defaultValue: DEFAULT_SEARCH.PAGE })
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   readonly page: number = DEFAULT_SEARCH.PAGE;
 
+  // Non-null with a default in the schema (`Int! = …`): GraphQL itself
+  // refuses a `null`, so the value is always a number.
   @Field(() => Int, { defaultValue: DEFAULT_SEARCH.LIMIT })
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   // No `@Max`: `toPageQuery` CLAMPS this to `MAX_PAGE_SIZE` rather than
@@ -54,7 +62,7 @@ export class PageArgsGqlDto {
 @ArgsType()
 export class SearchPageArgsGqlDto extends PageArgsGqlDto {
   @Field(() => String, { nullable: true })
-  @IsOptional()
+  @OptionalNullable()
   @IsString()
-  readonly searchTerm?: string;
+  readonly searchTerm?: string | null;
 }

@@ -4,7 +4,6 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -16,6 +15,7 @@ import {
   MAX_MESSAGE_CONTENT_LENGTH,
 } from '@synapsedesk/contracts';
 import { NewAttachmentDto } from '../../tickets/dto/rest/message.dto';
+import { OptionalNonNull } from '../../../common/decorators/optional.decorator';
 
 /**
  * The `message:send` payload.
@@ -52,11 +52,11 @@ export class MessageSendDto {
    * the same: silent coercion hides a client bug, where a refusal reports it.
    * ticket-service makes the final call, and this field only carries the ask.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly isInternalNote?: boolean;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly invokeAi?: boolean;
 
@@ -72,7 +72,7 @@ export class MessageSendDto {
    * — a socket frame reaches no ValidationPipe unless the handler wires one, so
    * an unvalidated array would reach an RPC as whatever the client sent.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })

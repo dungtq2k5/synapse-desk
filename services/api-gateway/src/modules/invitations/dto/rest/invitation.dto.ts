@@ -7,7 +7,6 @@ import {
   IsArray,
   IsEmail,
   IsIn,
-  IsOptional,
   IsString,
   IsStrongPassword,
   IsUUID,
@@ -29,6 +28,7 @@ import {
   MAX_INVITATIONS_PER_BATCH,
   MAX_PREVIEW_ID_LENGTH,
 } from '../../../../common/config/dto.config';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class InviteUserDto {
   @IsEmail()
@@ -38,19 +38,19 @@ export class InviteUserDto {
    * PROPOSALS, resolved at redemption rather than now. A role deleted during
    * the 7-day window is skipped and reported, never fatal.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsUUID('all', { each: true })
   @ApiPropertyOptional()
   readonly roleIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsUUID('all', { each: true })
   @ApiPropertyOptional()
   readonly departmentIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly primaryDepartmentId?: string;
 }
@@ -74,11 +74,11 @@ export class CreateInvitationsDto {
 export class ListInvitationsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(InvitationStatus))
   readonly status?: InvitationStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(INVITATION_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
@@ -107,7 +107,7 @@ export class AcceptInvitationDto {
    * Optional: the client sends what it can identify itself as, and a session
    * with no label is still a session.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   // Deliberately WITHOUT `@NoEmoji`: an emoji here is cosmetic, since unlike
@@ -142,21 +142,21 @@ export class PreviewInviteUserDto {
   @MaxLength(MAX_EMAIL_ADDRESS_LENGTH)
   readonly email!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsString({ each: true })
   @MaxLength(MAX_PREVIEW_ID_LENGTH, { each: true })
   @ApiPropertyOptional()
   readonly roleIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsString({ each: true })
   @MaxLength(MAX_PREVIEW_ID_LENGTH, { each: true })
   @ApiPropertyOptional()
   readonly departmentIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_PREVIEW_ID_LENGTH)
   readonly primaryDepartmentId?: string;

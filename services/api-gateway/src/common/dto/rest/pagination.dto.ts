@@ -1,11 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   SORT_ORDER_OPTIONS,
   type SortOrder,
 } from '@synapsedesk/contracts';
+import { OptionalNonNull } from '../../decorators/optional.decorator';
 
 /**
  * Pagination and sorting, with NO search term.
@@ -55,7 +56,7 @@ import {
  * edit in place, and not another record here.
  */
 export class PaginationDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Type(() => Number)
@@ -63,14 +64,14 @@ export class PaginationDto {
   //
   // Optional in the API and, without this, REQUIRED in the docs.
   // The plugin derives `required` from TYPESCRIPT optionality, not from
-  // `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+  // `@OptionalNonNull()`. A field declared `page: number = 1` is non-optional to the
   // compiler even though the validator lets a caller omit it, so the generated
   // spec demanded it — and a generated client would refuse to send a request
   // without one.
   @ApiPropertyOptional()
   readonly page: number = DEFAULT_SEARCH.PAGE;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(DEFAULT_SEARCH.MIN_LIMIT)
   @Max(DEFAULT_SEARCH.MAX_LIMIT)
@@ -88,12 +89,12 @@ export class PaginationDto {
    * makes the endpoint fail on a request with NO query parameters at all —
    * i.e. every default call from the UI.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @ApiPropertyOptional()
   readonly sortBy: string = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(SORT_ORDER_OPTIONS)
   @ApiPropertyOptional()

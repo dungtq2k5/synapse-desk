@@ -1,5 +1,6 @@
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsUUID } from 'class-validator';
 import { ReassignmentReason } from '@synapsedesk/contracts';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class AssignTicketDto {
   @IsUUID('4')
@@ -21,7 +22,7 @@ export class AssignTicketDto {
    * Why it moved. Absent means the service decides from context: `INITIAL` for
    * a first assignment, `MANUAL` for any later one.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(ReassignmentReason))
   readonly reason?: ReassignmentReason;
 }

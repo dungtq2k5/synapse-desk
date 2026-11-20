@@ -6,11 +6,11 @@ import {
 import {
   IsBoolean,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Length,
   MaxLength,
 } from 'class-validator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ActivateTwoFactorDto {
   @IsString()
@@ -21,7 +21,7 @@ export class ActivateTwoFactorDto {
    * The session's device label, used only when enabling through the sign-in
    * challenge signs the caller in.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;
@@ -33,12 +33,12 @@ export class ActivateTwoFactorDto {
  * clear the challenge.
  */
 export class AuthenticateTwoFactorDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @Length(TOTP_CODE_LENGTH, TOTP_CODE_LENGTH)
   readonly code?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsNotEmpty()
   // Length is deliberately NOT checked here. It would be safe to (a code's
@@ -54,12 +54,12 @@ export class AuthenticateTwoFactorDto {
   readonly backupCode?: string;
 
   /** Skip the code on this device for a while. Ignored for a Super Admin. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ApiPropertyOptional()
   readonly rememberDevice: boolean = false;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;

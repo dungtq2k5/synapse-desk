@@ -63115,8 +63115,7 @@
           "deviceName": {
             "type": "string",
             "description": "Display label for the \"your active sessions\" screen (\"Chrome on macOS\").\n\nIts destination is `device_sessions.device_name`, written when the session\nrow is created — which is why it looks unused in `login()`. Being\nclient-supplied, it must never influence a security decision: device trust\nis proven with the separate `deviceToken` cookie, a secret the server\nissued.\n\n`@MaxLength(100)` mirrors `device_sessions.device_name VarChar(100)`;\nwithout it an oversized value is a Postgres error on insert rather than a\n400 at the edge.\n\nOptional rather than nullable: absent means \"the client did not label this\ndevice\", which is what the proto's `optional string` expects.\n\n**There is deliberately no `ipAddress` field.** A body field is whatever\nthe client says it is, so accepting one would let an attacker post\n`{\"ipAddress\": \"10.0.0.1\"}` to poison the audit trail and evade IP-based\nlockout. The gateway derives it from the transport.",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["password", "email"]
@@ -63130,8 +63129,7 @@
           },
           "deviceName": {
             "type": "string",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["organizationId"]
@@ -63146,8 +63144,7 @@
           },
           "deviceName": {
             "type": "string",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["idToken"]
@@ -63166,8 +63163,7 @@
         "properties": {
           "allDevices": {
             "type": "boolean",
-            "description": "Log out of all devices.",
-            "nullable": true
+            "description": "Log out of all devices."
           }
         }
       },
@@ -63296,8 +63292,7 @@
           "deviceName": {
             "type": "string",
             "description": "The session's device label, used only when enabling through the sign-in\nchallenge signs the caller in.",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["code"]
@@ -63320,25 +63315,21 @@
         "properties": {
           "backupCode": {
             "type": "string",
-            "minLength": 1,
-            "nullable": true
+            "minLength": 1
           },
           "rememberDevice": {
             "type": "boolean",
             "description": "Skip the code on this device for a while. Ignored for a Super Admin.",
-            "default": false,
-            "nullable": true
+            "default": false
           },
           "code": {
             "type": "string",
             "minLength": 6,
-            "maxLength": 6,
-            "nullable": true
+            "maxLength": 6
           },
           "deviceName": {
             "type": "string",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         }
       },
@@ -63517,8 +63508,7 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "departmentIds": {
             "default": [],
@@ -63526,8 +63516,7 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "email": {
             "type": "string",
@@ -63535,8 +63524,7 @@
           },
           "primaryDepartmentId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["email"]
@@ -63609,8 +63597,7 @@
           "deviceName": {
             "type": "string",
             "description": "Labels the session this call creates, in the user's active-device list.\n\nOptional: the client sends what it can identify itself as, and a session\nwith no label is still a session.",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["token", "fullName", "password"]
@@ -63681,8 +63668,7 @@
             "items": {
               "type": "string",
               "maxLength": 64
-            },
-            "nullable": true
+            }
           },
           "departmentIds": {
             "default": [],
@@ -63690,8 +63676,7 @@
             "items": {
               "type": "string",
               "maxLength": 64
-            },
-            "nullable": true
+            }
           },
           "email": {
             "type": "string",
@@ -63699,8 +63684,7 @@
           },
           "primaryDepartmentId": {
             "type": "string",
-            "maxLength": 64,
-            "nullable": true
+            "maxLength": 64
           }
         },
         "required": ["email"]
@@ -63892,13 +63876,12 @@
           "fullName": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 150,
-            "nullable": true
+            "maxLength": 150
           },
           "gender": {
             "type": "string",
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"],
-            "nullable": true
+            "nullable": true,
+            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
           },
           "dob": {
             "type": "string",
@@ -64026,8 +64009,7 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "departmentIds": {
             "default": [],
@@ -64035,8 +64017,7 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "email": {
             "type": "string",
@@ -64049,8 +64030,7 @@
           },
           "primaryDepartmentId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["email", "fullName"]
@@ -64061,8 +64041,7 @@
           "fullName": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 150,
-            "nullable": true
+            "maxLength": 150
           },
           "phoneNumber": {
             "type": "string",
@@ -64070,8 +64049,8 @@
           },
           "gender": {
             "type": "string",
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"],
-            "nullable": true
+            "nullable": true,
+            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
           },
           "dob": {
             "type": "string",
@@ -64100,8 +64079,7 @@
           },
           "lockedUntil": {
             "type": "string",
-            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.",
-            "nullable": true
+            "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller."
           }
         },
         "required": ["reason"]
@@ -64292,8 +64270,7 @@
           "description": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "name": {
             "type": "string",
@@ -64309,14 +64286,12 @@
           "description": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "name": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         }
       },
@@ -64360,8 +64335,7 @@
           "isPrimary": {
             "type": "boolean",
             "description": "Makes THIS department primary for every user in the batch. A user has at\nmost one primary, so setting it here demotes whichever they had.",
-            "default": false,
-            "nullable": true
+            "default": false
           },
           "userIds": {
             "minItems": 1,
@@ -64472,8 +64446,7 @@
           "description": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "name": {
             "type": "string",
@@ -64541,14 +64514,12 @@
           "description": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "name": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         }
       },
@@ -64791,21 +64762,18 @@
           "name": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "slug": {
             "type": "string",
             "description": "Appears in URLs, so changing it breaks every existing link. Treated as a\nrename with consequences rather than a cosmetic edit — the service rejects\na collision with 409 rather than silently suffixing it.",
             "minLength": 2,
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           },
           "domain": {
             "type": "string",
             "description": "Empty string clears it. Globally unique across tenants.",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           }
         }
       },
@@ -64861,16 +64829,15 @@
         "type": "object",
         "properties": {
           "enforceTwoFactor": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           },
           "allowedEmailDomains": {
+            "nullable": true,
             "description": "REPLACE semantics when present, untouched when absent.\n\nThe gateway can tell the two apart (`undefined` vs `[]`) but protobuf\ncannot, which is why the client sets an explicit replace flag on the wire.",
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "nullable": true
+            }
           },
           "maxDocumentBytesOverride": {
             "type": "number",
@@ -65276,8 +65243,7 @@
         "properties": {
           "comment": {
             "type": "string",
-            "maxLength": 2000,
-            "nullable": true
+            "maxLength": 2000
           }
         }
       },
@@ -65308,8 +65274,7 @@
           "replaceDocumentId": {
             "type": "string",
             "description": "The document this upload will replace, for a replace's presign. It isn't\ncharged against the document limit, and its pending file (which the\nreplace supersedes) leaves the storage total. Requires\n`document.update`; an id the caller can't update answers 404, like a\nmissing document.",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           },
           "contentType": {
             "type": "string",
@@ -65340,8 +65305,7 @@
           "isOrganizationWide": {
             "type": "boolean",
             "description": "Defaults TRUE, matching RDM Table 17.\n\nThe permissive default is deliberate and worth stating: a knowledge base\nwhose documents defaulted to invisible would look broken to everyone who\ndid not also configure departments, and the failure mode of the other\ndefault — a document nobody can find — is a support ticket rather than a\ndisclosure. Restricting is then an explicit act.",
-            "default": true,
-            "nullable": true
+            "default": true
           },
           "departmentIds": {
             "default": [],
@@ -65349,8 +65313,7 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "ocrLanguages": {
             "type": "array",
@@ -65359,8 +65322,7 @@
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
-            },
-            "nullable": true
+            }
           },
           "objectPath": {
             "type": "string",
@@ -65375,8 +65337,7 @@
           },
           "fileName": {
             "type": "string",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           }
         },
         "required": ["objectPath", "title"]
@@ -65387,12 +65348,10 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "isOrganizationWide": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           }
         }
       },
@@ -65486,8 +65445,7 @@
             "items": {
               "type": "string",
               "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
-            },
-            "nullable": true
+            }
           },
           "objectPath": {
             "type": "string",
@@ -65663,8 +65621,7 @@
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "nullable": true
+            }
           },
           "name": {
             "type": "string",
@@ -65678,8 +65635,7 @@
           },
           "domain": {
             "type": "string",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "adminEmail": {
             "type": "string",
@@ -65692,19 +65648,16 @@
           },
           "maxAgentSeats": {
             "type": "number",
-            "minimum": 1,
-            "nullable": true
+            "minimum": 1
           },
           "maxStorageBytes": {
             "type": "number",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           },
           "monthlyAiTokenBudget": {
             "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           }
         },
         "required": ["name", "slug", "adminEmail", "adminFullName"]
@@ -65812,40 +65765,33 @@
           "name": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "slug": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           },
           "domain": {
             "type": "string",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "maxAgentSeats": {
             "type": "number",
-            "minimum": 1,
-            "nullable": true
+            "minimum": 1
           },
           "maxStorageBytes": {
             "type": "number",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           },
           "monthlyAiTokenBudget": {
             "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           },
           "entitlementsPinned": {
             "type": "boolean",
-            "description": "Keep these limits when Stripe's events arrive (true), or let the next one\nwrite the plan's grants back (false). Absent leaves the pin as it is.",
-            "nullable": true
+            "description": "Keep these limits when Stripe's events arrive (true), or let the next one\nwrite the plan's grants back (false). Absent leaves the pin as it is."
           }
         }
       },
@@ -66082,8 +66028,7 @@
           "reason": {
             "type": "string",
             "description": "Recorded in the audit log, with who assigned it. Required to assign; a\ndry run may leave it out.",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         },
         "required": ["planId"]
@@ -66094,8 +66039,7 @@
           "reason": {
             "type": "string",
             "description": "Recorded in the audit log, with who released it. Required to release; a\ndry run may leave it out.",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         }
       },
@@ -66140,8 +66084,7 @@
           "description": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "name": {
             "type": "string",
@@ -66343,16 +66286,14 @@
         "properties": {
           "isActive": {
             "type": "boolean",
-            "default": true,
-            "nullable": true
+            "default": true
           },
           "prices": {
             "default": [],
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CreatePlanPriceDto"
-            },
-            "nullable": true
+            }
           },
           "name": {
             "type": "string",
@@ -66361,8 +66302,7 @@
           },
           "stripeProductId": {
             "type": "string",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "maxAgentSeats": {
             "type": "number",
@@ -66422,72 +66362,59 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CreatePlanPriceDto"
-            },
-            "nullable": true
+            }
           },
           "name": {
             "type": "string",
             "minLength": 2,
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           },
           "stripeProductId": {
             "type": "string",
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "clearStripeProductId": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           },
           "maxAgentSeats": {
             "type": "number",
-            "minimum": 1,
-            "nullable": true
+            "minimum": 1
           },
           "maxStorageBytes": {
             "type": "number",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           },
           "monthlyAiTokenBudget": {
             "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
-            "minimum": 0,
-            "nullable": true
+            "minimum": 0
           },
           "aiModelTier": {
             "type": "string",
-            "enum": ["FAST", "QUALITY"],
-            "nullable": true
+            "enum": ["FAST", "QUALITY"]
           },
           "maxDocumentBytes": {
             "type": "number",
             "minimum": 1,
-            "maximum": 104857600,
-            "nullable": true
+            "maximum": 104857600
           },
           "maxAttachmentBytes": {
             "type": "number",
             "minimum": 1,
-            "maximum": 10485760,
-            "nullable": true
+            "maximum": 10485760
           },
           "maxDocumentUploads": {
             "type": "number",
             "minimum": 1,
-            "maximum": 100000,
-            "nullable": true
+            "maximum": 100000
           },
           "maxAnalyticsRangeDays": {
             "type": "number",
             "minimum": 1,
-            "maximum": 400,
-            "nullable": true
+            "maximum": 400
           },
           "isActive": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           },
           "removePrices": {
             "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
@@ -66495,8 +66422,7 @@
             "items": {
               "type": "string",
               "maxLength": 255
-            },
-            "nullable": true
+            }
           }
         }
       },
@@ -66892,8 +66818,7 @@
           "organizationId": {
             "type": "string",
             "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does.",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["reason", "from", "to"]
@@ -67315,8 +67240,7 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NewAttachmentDto"
-            },
-            "nullable": true
+            }
           },
           "title": {
             "type": "string",
@@ -67325,19 +67249,16 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
-            "nullable": true
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "source": {
             "type": "string",
-            "enum": ["API", "CHAT", "EMAIL", "WEB"],
-            "nullable": true
+            "enum": ["API", "CHAT", "EMAIL", "WEB"]
           },
           "authorId": {
             "type": "string",
             "description": "Raising a ticket on behalf of an end user. Only an agent may (a super\nadmin, or a holder of `ticket.read.all` or `ticket.message.moderate`);\nanyone else naming someone other than themselves gets a 403.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database.",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["description", "title"]
@@ -67405,19 +67326,16 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 20000,
-            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
-            "nullable": true
+            "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS."
           },
           "title": {
             "type": "string",
             "minLength": 3,
-            "maxLength": 255,
-            "nullable": true
+            "maxLength": 255
           },
           "priority": {
             "type": "string",
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
-            "nullable": true
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           }
         }
       },
@@ -67484,8 +67402,7 @@
           "filters": {
             "type": "object",
             "additionalProperties": true,
-            "description": "`status`, `priority`, `assigneeId` — refused per kind at the service.",
-            "nullable": true
+            "description": "`status`, `priority`, `assigneeId` — refused per kind at the service."
           },
           "from": {
             "type": "string"
@@ -67495,8 +67412,7 @@
           },
           "departmentId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["from", "to"]
@@ -67591,8 +67507,7 @@
           },
           "reason": {
             "type": "string",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         },
         "required": ["ticketIds", "status"]
@@ -67613,8 +67528,7 @@
           },
           "reason": {
             "type": "string",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         },
         "required": ["status"]
@@ -67625,8 +67539,7 @@
           "reason": {
             "type": "string",
             "description": "Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves.",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         }
       },
@@ -67733,8 +67646,7 @@
               "SELF_ASSIGNED",
               "UNAVAILABLE"
             ],
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         },
         "required": ["assigneeId", "departmentId"]
@@ -67764,8 +67676,7 @@
         "properties": {
           "readAt": {
             "format": "date-time",
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         }
       },
@@ -68000,14 +67911,12 @@
           "isInternalNote": {
             "type": "boolean",
             "description": "Agent-only, enforced in ticket-service rather than by a route permission:\nthe route itself must stay open to end users, who post ordinary replies\nthrough it.",
-            "default": false,
-            "nullable": true
+            "default": false
           },
           "invokeAi": {
             "type": "boolean",
             "description": "Ask for an AI draft after this message lands.\n\nTwo writes, never one: the draft can fail without losing what the human\ntyped. Today it always fails — `rag-service` does not exist — and the\ncaller's own message still commits, which is exactly the behaviour that\nhas to survive Domain C shipping.",
-            "default": false,
-            "nullable": true
+            "default": false
           },
           "attachments": {
             "description": "Objects already uploaded, bound to this message as it is created\n\n\n**This is the ordering that makes a first-turn attachment readable.**\nPresign then confirm-against-a-message meant the row could only exist after\nthe message did, while `invokeAi` runs during the create — so the very\nscreenshot the question was about arrived a moment too late to be seen.\n\nA path that fails its confirm comes back in `skippedAttachments` and the\nmessage is still created, and that is why that is the only safe outcome.",
@@ -68015,14 +67924,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NewAttachmentDto"
-            },
-            "nullable": true
+            }
           },
           "generatedFromId": {
             "type": "string",
             "description": "The `ai_generations` row this reply came from — `AiDraftResponseDto`'s\n`generationId`, handed back.\n\nSend it when posting an AI-drafted reply so the draft is recorded ACCEPTED\nor EDITED rather than DISCARDED. Absent for an ordinary reply.",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["content"]
@@ -68160,8 +68067,7 @@
             "type": "string",
             "description": "An optional steer from the agent — \"shorter\", \"offer the refund\".\n\nAbsent means \"draft from the thread alone\", which is the ordinary case.\nBounded because this is user text that reaches a model prompt: an unbounded\nfield here is an unbounded token bill, quite apart from what someone could\ntry to write into it.",
             "minLength": 1,
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           }
         }
       },
@@ -68948,8 +68854,7 @@
           "filters": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Per-kind predicates the three kinds do not share.\n\nValidated at the SERVICE against `EXPORT_FILTER_KEYS`, not here: the\nallowed keys differ per kind, and a DTO cannot see which kind it carries\nwithout splitting into three. An unknown key is refused rather than stored\nand ignored — a filter the caller believes applied and that silently did\nnot is the failure this shape is most exposed to.",
-            "nullable": true
+            "description": "Per-kind predicates the three kinds do not share.\n\nValidated at the SERVICE against `EXPORT_FILTER_KEYS`, not here: the\nallowed keys differ per kind, and a DTO cannot see which kind it carries\nwithout splitting into three. An unknown key is refused rather than stored\nand ignored — a filter the caller believes applied and that silently did\nnot is the failure this shape is most exposed to."
           },
           "kind": {
             "type": "string",
@@ -68963,8 +68868,7 @@
           },
           "departmentId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         },
         "required": ["kind", "from", "to"]
@@ -68978,8 +68882,7 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NewAttachmentDto"
-            },
-            "nullable": true
+            }
           },
           "title": {
             "type": "string",
@@ -68994,8 +68897,7 @@
           },
           "priority": {
             "type": "string",
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
-            "nullable": true
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           }
         },
         "required": ["title", "message"]
@@ -69072,13 +68974,11 @@
           "feedbackText": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 20000,
-            "nullable": true
+            "maxLength": 20000
           },
           "citationAccurate": {
             "type": "boolean",
-            "description": "Whether the citations the model gave were accurate.\n\nTri-state on purpose — absent means \"not assessed\", which is different from\n\"assessed and wrong\". Collapsing the two would make every un-assessed reply\nlook like a citation failure in the quality report.",
-            "nullable": true
+            "description": "Whether the citations the model gave were accurate.\n\nTri-state on purpose — absent means \"not assessed\", which is different from\n\"assessed and wrong\". Collapsing the two would make every un-assessed reply\nlook like a citation failure in the quality report."
           }
         },
         "required": ["rating"]
@@ -69096,8 +68996,7 @@
           },
           "stack": {
             "type": "string",
-            "description": "Kept truncated.",
-            "nullable": true
+            "description": "Kept truncated."
           },
           "path": {
             "type": "string",
@@ -69107,8 +69006,7 @@
           "buildId": {
             "type": "string",
             "description": "The web build that reported it (`GIT_SHA`).",
-            "maxLength": 64,
-            "nullable": true
+            "maxLength": 64
           }
         },
         "required": ["kind", "message", "path"]
@@ -69261,8 +69159,7 @@
           "filters": {
             "type": "object",
             "additionalProperties": true,
-            "description": "`action`, `resourceType`, `userId` — refused per kind at the service.",
-            "nullable": true
+            "description": "`action`, `resourceType`, `userId` — refused per kind at the service."
           },
           "from": {
             "type": "string"
@@ -69693,13 +69590,11 @@
             "enum": ["EMAIL", "IN_APP", "PUSH", "SMS"]
           },
           "isEnabled": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           },
           "digest": {
             "type": "string",
-            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"],
-            "nullable": true
+            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
           }
         },
         "required": ["type", "channel"]
@@ -69748,8 +69643,7 @@
           },
           "deviceName": {
             "type": "string",
-            "maxLength": 100,
-            "nullable": true
+            "maxLength": 100
           }
         },
         "required": ["token", "platform"]
@@ -69780,18 +69674,15 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            },
-            "nullable": true
+            }
           },
           "resourceType": {
             "type": "string",
-            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"],
-            "nullable": true
+            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
           },
           "resourceId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           }
         }
       },
@@ -69926,8 +69817,7 @@
           },
           "description": {
             "type": "string",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           },
           "eventTypes": {
             "type": "array",
@@ -69958,13 +69848,11 @@
           "url": {
             "type": "string",
             "maxLength": 2000,
-            "format": "uri",
-            "nullable": true
+            "format": "uri"
           },
           "description": {
             "type": "string",
-            "maxLength": 500,
-            "nullable": true
+            "maxLength": 500
           },
           "eventTypes": {
             "type": "array",
@@ -69984,12 +69872,10 @@
                 "ticket.status_changed",
                 "webhook.endpoint_disabled"
               ]
-            },
-            "nullable": true
+            }
           },
           "isActive": {
-            "type": "boolean",
-            "nullable": true
+            "type": "boolean"
           }
         }
       },
@@ -70298,14 +70184,12 @@
             "type": "number",
             "default": 0,
             "minimum": 0,
-            "maximum": 50,
-            "nullable": true
+            "maximum": 50
           },
           "skipRerank": {
             "type": "boolean",
             "description": "Returns what the RETRIEVER found, before the reranker had an opinion.\n\nA diagnostic rather than a performance switch: a Knowledge Manager asking\n\"why isn't this document coming back\" needs to know whether it lost at\nretrieval or at rerank, and those are different problems with different\nfixes.",
-            "default": false,
-            "nullable": true
+            "default": false
           },
           "query": {
             "type": "string",

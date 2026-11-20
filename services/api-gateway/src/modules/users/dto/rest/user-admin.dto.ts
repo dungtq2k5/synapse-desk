@@ -9,7 +9,6 @@ import {
   IsEmail,
   IsIn,
   IsNotEmpty,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -29,11 +28,12 @@ import {
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { IsFutureDate } from '../../../../common/decorators/is-future-date.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(USER_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
@@ -42,21 +42,21 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   @ApiPropertyOptional()
   readonly sortBy: UserSortableField = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly departmentId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly roleId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   readonly isLocked?: boolean;
 
   /** Requires `user.delete`, checked in the controller. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -81,19 +81,19 @@ export class CreateUserDto {
   @NoEmoji()
   readonly fullName!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsUUID('all', { each: true })
   @ApiPropertyOptional()
   readonly roleIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsUUID('all', { each: true })
   @ApiPropertyOptional()
   readonly departmentIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly primaryDepartmentId?: string;
 }
@@ -126,7 +126,7 @@ export class LockUserDto {
    * the email. Validated here and re-checked in auth-service, because the
    * gateway is not the only possible caller.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsISO8601({ strict: true })
   @IsFutureDate()
   readonly lockedUntil?: string;

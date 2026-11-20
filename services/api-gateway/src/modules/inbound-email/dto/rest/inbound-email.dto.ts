@@ -9,7 +9,6 @@ import {
   IsInt,
   IsISO8601,
   IsObject,
-  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -34,6 +33,7 @@ import {
   PRINTABLE_ASCII,
 } from '../../../../common/config/dto.config';
 import { IsPresentButNullable } from '../../../../common/decorators/is-nullable.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * One object already in storage, ready to bind to the message.
@@ -116,7 +116,7 @@ export class InboundEmailDto {
    * receiving side synthesizes one from `from + subject + date`: weaker, and
    * better than a retry storm creating one ticket per attempt.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @Matches(PRINTABLE_ASCII, {
     message: 'messageId must be printable ASCII (RFC 5322 msg-id)',
@@ -141,7 +141,7 @@ export class InboundEmailDto {
   readonly from!: string;
 
   /** The `From` display name, when the client sent one. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_FULL_NAME_LENGTH)
   readonly fromName?: string;
@@ -166,18 +166,18 @@ export class InboundEmailDto {
    * reading half a customer's message with nothing saying so is worse than a long
    * one.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly bodyTruncated: boolean = false;
 
   /** `In-Reply-To`, for the threading fallback. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_MESSAGE_ID_LENGTH)
   readonly inReplyTo?: string;
 
   /** `References`, oldest first — the same fallback, one hop wider. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsString({ each: true })
   @MaxLength(MAX_MESSAGE_ID_LENGTH, { each: true })
@@ -193,7 +193,7 @@ export class InboundEmailDto {
    * header block: a full copy is unbounded attacker-controlled data with one
    * use.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsObject()
   readonly headers?: Record<string, string>;
 
@@ -206,7 +206,7 @@ export class InboundEmailDto {
    * Carried so the ticket can say what was omitted. *"Attachments silently
    * vanish"* is something a customer discovers before you do.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @IsString({ each: true })
   @ApiPropertyOptional()
@@ -216,7 +216,7 @@ export class InboundEmailDto {
    * Eligible attachments still held by Resend, ingested by `accept` once
    * routing has produced a ticket.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_PRESENTED_ATTACHMENTS)
   @ValidateNested({ each: true })
@@ -236,7 +236,7 @@ export class InboundEmailDto {
    * to: `createTicket` writes a ticket row and no message, so there is no
    * `message_attachments` parent.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
@@ -255,7 +255,7 @@ export class InboundEmailDto {
    * Not parsed or normalised: it is hashed, and two deliveries of one message
    * carry byte-identical headers. Optional because a sender can omit it.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DATE_HEADER_LENGTH)
   readonly date?: string;

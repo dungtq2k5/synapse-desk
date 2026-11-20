@@ -16,7 +16,6 @@ import {
   IsBoolean,
   IsInt,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
   Max,
@@ -30,6 +29,10 @@ import {
   MAX_DOCUMENT_BYTES,
 } from '@synapsedesk/contracts';
 import { lowerIfString, trimIfString } from '@synapsedesk/core';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`
@@ -38,7 +41,7 @@ import { lowerIfString, trimIfString } from '@synapsedesk/core';
  * behind `/platform/*`.
  */
 export class UpdateOrganizationDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(2)
   @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
@@ -51,7 +54,7 @@ export class UpdateOrganizationDto {
    * rename with consequences rather than a cosmetic edit — the service rejects
    * a collision with 409 rather than silently suffixing it.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(2)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
@@ -69,7 +72,7 @@ export class UpdateOrganizationDto {
   readonly slug?: string;
 
   /** Empty string clears it. Globally unique across tenants. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
   @Matches(ORGANIZATION_DOMAIN_PATTERN)
@@ -87,7 +90,7 @@ export class UpdateOrganizationDto {
  * a preference — it is an access-control list with a friendlier name.
  */
 export class UpdateOrganizationSettingsDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @Type(() => Boolean)
   readonly enforceTwoFactor?: boolean;
@@ -98,7 +101,7 @@ export class UpdateOrganizationSettingsDto {
    * The gateway can tell the two apart (`undefined` vs `[]`) but protobuf
    * cannot, which is why the client sets an explicit replace flag on the wire.
    */
-  @IsOptional()
+  @OptionalNullable()
   @IsArray()
   @ArrayMaxSize(MAX_ALLOWED_EMAIL_DOMAINS)
   @IsString({ each: true })
@@ -115,7 +118,7 @@ export class UpdateOrganizationSettingsDto {
   // A pattern here would turn that considered warning into a 400. Matching is
   // exact at both readers, so a malformed entry cannot over-match — it simply
   // never matches anything.
-  readonly allowedEmailDomains?: string[];
+  readonly allowedEmailDomains?: string[] | null;
 
   /**
    * The largest document this workspace will accept, at or below the platform
@@ -127,7 +130,7 @@ export class UpdateOrganizationSettingsDto {
   // `=== null` off the instance. `@IsNullable` is for RESPONSE DTOs — it skips
   // only `undefined`, so `null` reaches `@IsInt()` and 400s.
   // `@IsPresentButNullable` has the opposite half of the problem.
-  @IsOptional()
+  @OptionalNullable()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -139,7 +142,7 @@ export class UpdateOrganizationSettingsDto {
   readonly maxDocumentBytesOverride?: number | null;
 
   /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
-  @IsOptional()
+  @OptionalNullable()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -147,7 +150,7 @@ export class UpdateOrganizationSettingsDto {
   readonly maxAttachmentBytesOverride?: number | null;
 
   /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
-  @IsOptional()
+  @OptionalNullable()
   @Type(() => Number)
   @IsInt()
   @Min(1)

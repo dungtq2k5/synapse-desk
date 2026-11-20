@@ -4,7 +4,6 @@ import {
   ArrayMaxSize,
   IsArray,
   IsIn,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -18,6 +17,7 @@ import {
 } from '@synapsedesk/contracts';
 import { trimIfString } from '@synapsedesk/core';
 import { NewAttachmentDto } from '../../../tickets/dto/rest/message.dto';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * Starting a conversation.
@@ -48,7 +48,7 @@ export class StartConversationDto {
   @Transform(trimIfString)
   readonly message!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(TicketPriority))
   readonly priority?: TicketPriority;
 
@@ -58,7 +58,7 @@ export class StartConversationDto {
    * asked for, so the answer reads them. A path that fails its confirm comes
    * back in `skippedAttachments`; the conversation starts regardless.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })

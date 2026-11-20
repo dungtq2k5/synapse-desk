@@ -1,7 +1,8 @@
 import { MAX_DRAFT_INSTRUCTION_LENGTH } from '../../../../common/config/dto.config';
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 import { trimIfString } from '@synapsedesk/core';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class GenerateDraftDto {
   /**
@@ -12,7 +13,7 @@ export class GenerateDraftDto {
    * field here is an unbounded token bill, quite apart from what someone could
    * try to write into it.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_DRAFT_INSTRUCTION_LENGTH)

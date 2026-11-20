@@ -6,7 +6,6 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
   Max,
@@ -48,6 +47,7 @@ import {
   MAX_DOCUMENT_DEPARTMENTS,
   MAX_UPLOAD_FILE_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class PresignDocumentDto {
   /** The document's MIME type. Must be one the parser accepts. */
@@ -75,7 +75,7 @@ export class PresignDocumentDto {
    * `document.update`; an id the caller can't update answers 404, like a
    * missing document.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   @ApiPropertyOptional()
   readonly replaceDocumentId?: string;
@@ -106,20 +106,19 @@ export class ConfirmDocumentDto {
    * default — a document nobody can find — is a support ticket rather than a
    * disclosure. Restricting is then an explicit act.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
-  @ToBoolean()
   @ApiPropertyOptional()
   readonly isOrganizationWide: boolean = true;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_DOCUMENT_DEPARTMENTS)
   @IsUUID('4', { each: true })
   @ApiPropertyOptional()
   readonly departmentIds: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_UPLOAD_FILE_NAME_LENGTH)
   @Transform(trimIfString)
@@ -131,7 +130,7 @@ export class ConfirmDocumentDto {
    * An advanced field: leave it empty unless the upload is known to be scanned.
    * `[]` and absent are the same thing, and the parser falls back to `eng`.
    */
-  @IsOptional()
+  @OptionalNonNull()
   // **Lower-cased and de-duplicated before validation**, order preserved.
   //
   // Case: BCP 47 defines language tags as case-insensitive and merely
@@ -195,7 +194,7 @@ export class ReplaceDocumentDto {
    * be here to change. Absent means `[]`, which is the `eng` fallback — the
    * same meaning it has on confirm.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @Transform(normalizeStringArray)
   @IsArray()
   @ArrayMaxSize(MAX_OCR_LANGUAGES)
@@ -212,16 +211,15 @@ export class ReplaceDocumentDto {
 }
 
 export class UpdateDocumentDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_DOCUMENT_TITLE_LENGTH)
   @Transform(trimIfString)
   readonly title?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
-  @ToBoolean()
   readonly isOrganizationWide?: boolean;
 }
 
@@ -240,22 +238,22 @@ export class SetDocumentDepartmentsDto {
 }
 
 export class ListDocumentsQueryDto extends SearchPaginationDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(DOCUMENT_STATUSES)
   readonly status?: DocumentStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly departmentId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(DOCUMENT_FILE_TYPES)
   // The stored values are lowercase, so `?fileType=PDF` would otherwise 400 on
   // a filter the caller spelled reasonably. `@IsIn` still owns the SET.
   @Transform(lowerIfString)
   readonly fileType?: DocumentFileType;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -272,7 +270,7 @@ export class ListDocumentsQueryDto extends SearchPaginationDto {
  * two shapes.
  */
 export class ResolveDocumentFlagDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   // `@MaxLength` measures what this produced. Transformation is a separate
   // pass — `plainToInstance` before the validators, whatever order the
@@ -305,7 +303,7 @@ export class ListDocumentFlagsQueryDto extends PaginationDto {
   // 400.
   override sortBy: string = 'detectedAt';
 
-  @IsOptional()
+  @OptionalNonNull()
   // A single `?type=UNCITED` arrives as a string, not an array. Normalising
   // here rather than in the client keeps `@IsIn` meaningful for both shapes.
   @Transform(
@@ -317,18 +315,18 @@ export class ListDocumentFlagsQueryDto extends PaginationDto {
   @ApiPropertyOptional()
   readonly type: DocumentFlagType[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
   readonly includeResolved: boolean = false;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(DOCUMENT_FLAG_SEVERITIES)
   @ApiPropertyOptional()
   readonly severity?: DocumentFlagSeverity;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   @ApiPropertyOptional()
   readonly documentId?: string;

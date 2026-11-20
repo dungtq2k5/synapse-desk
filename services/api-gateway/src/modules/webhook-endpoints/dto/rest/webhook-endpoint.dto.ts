@@ -6,7 +6,6 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
-  IsOptional,
   IsString,
   IsUrl,
   Max,
@@ -23,6 +22,7 @@ import {
   MAX_WEBHOOK_URL_LENGTH,
   WEBHOOK_DELIVERY_LIMIT,
 } from '@synapsedesk/nest-common';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * The endpoint's writable fields.
@@ -39,7 +39,7 @@ export class CreateWebhookEndpointDto {
   @MaxLength(MAX_WEBHOOK_URL_LENGTH)
   readonly url!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_WEBHOOK_DESCRIPTION_LENGTH)
   readonly description?: string;
@@ -56,31 +56,31 @@ export class CreateWebhookEndpointDto {
 }
 
 export class UpdateWebhookEndpointDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsUrl({ protocols: ['https'], require_protocol: true })
   @MaxLength(MAX_WEBHOOK_URL_LENGTH)
   readonly url?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_WEBHOOK_DESCRIPTION_LENGTH)
   readonly description?: string;
 
   /** Absent means "leave them"; an empty array is refused, same as create. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(NOTIFICATION_TYPE_VALUES.length)
   @IsIn(NOTIFICATION_TYPE_VALUES, { each: true })
   readonly eventTypes?: NotificationType[];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly isActive?: boolean;
 }
 
 export class ListWebhookDeliveriesQueryDto {
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
   @Min(1)

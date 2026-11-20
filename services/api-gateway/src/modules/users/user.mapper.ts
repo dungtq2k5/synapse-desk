@@ -140,12 +140,13 @@ export function toUserResponseGqlDto(source: {
  * Builds the profile half of an `UpdateUser` request, shared by the own-profile
  * and admin routes.
  *
- * A `null` field becomes the empty string, which the service reads as "clear
- * it"; an absent field stays absent, which it reads as "leave unchanged".
+ * A `null` clears: `dob` becomes the empty string and `gender` unspecified,
+ * which the service reads as "clear it"; an absent field stays absent, which
+ * it reads as "leave unchanged".
  */
 export function toProfileFields(dto: {
   fullName?: string;
-  gender?: string;
+  gender?: string | null;
   dob?: string | null;
 }) {
   return {

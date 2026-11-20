@@ -79,8 +79,8 @@ export class IngestionJobsResolver {
     return await this.jobs.list(
       {
         ...toPageQuery(args),
-        status: args.status,
-        documentId: args.documentId,
+        status: args.status ?? undefined,
+        documentId: args.documentId ?? undefined,
       },
       context,
     );

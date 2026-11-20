@@ -1,24 +1,21 @@
 /**
  * @file **An explicit `null` for an OPTIONAL request field**, on every JSON route.
  *
- * Of the optional fields a minimal request can reach, `null` is accepted on every
- * one. It means ABSENT on most and a specific instruction on eleven. A document that says
- * "optional, not nullable" understates this, and a gateway that answers 500 to a
- * `null` the other one accepts breaks a client that serializes its model with
- * explicit nulls, which is common.
+ * Refused, unless the field says what `null` means. A `null` is ambiguous ("clear
+ * it", or "leave it"), and a gateway that guesses gets one of them silently wrong:
+ * the client clears a value, the request succeeds, and nothing changed. So every
+ * optional field answers a `null` with a 400 naming the field ("`<field>` can't be
+ * null; leave it out instead"), before asking any peer, except the few that
+ * declare a meaning for it.
  *
- * **Two kinds of row, because the two kinds of answer are different contracts.**
- * "`null` is the same as absent" is a RULE, so one generated row per field holds it:
- * the request, and what the gateway then asks its peer, must be identical with the
- * field absent and with it `null`. "`null` means clear this value" is a per-field
- * contract that only an explicit row can hold, and a gateway that reads it as absent
- * fails SILENTLY (the client clears a date of birth and nothing happens), so each of
- * those eleven has its own row naming what the peer must be asked.
+ * **Two kinds of row.** The refusal is a RULE, so one generated row per field holds
+ * it. A meaning is a per-field contract, so each has its own row naming what the
+ * peer must be asked.
  *
  * **Generated from the document.** The minimal valid body comes from
  * `request-bodies.ts`, so a new optional field gets a row without anyone remembering.
  * Each row first requires the BASELINE (field absent) to be accepted and to reach the
- * peer: otherwise it would compare two refusals and pass.
+ * peer: otherwise the 400 could be for some other reason.
  */
 
 import { type Gateway, startGateway } from './gateway';
@@ -54,6 +51,10 @@ const MEANINGS: Record<
     reason: 'clears the date of birth',
     asks: { dob: '' },
   },
+  'PATCH /api/v1/users/{id} phoneNumber': {
+    reason: 'clears the phone number',
+    asks: { phoneNumber: '' },
+  },
   'PATCH /api/v1/users/{id} gender': {
     reason: 'clears the gender',
     asks: { gender: 0 },
@@ -75,18 +76,6 @@ const MEANINGS: Record<
       reason: 'clears the override',
       asks: { clearMaxAttachmentsPerMessageOverride: true },
     },
-  'POST /api/v1/documents/confirm isOrganizationWide': {
-    reason: 'is false, not the default of true',
-    asks: { isOrganizationWide: false },
-  },
-  'POST /api/v1/platform/plans isActive': {
-    reason: 'is false, not the default of true',
-    asks: { isActive: false },
-  },
-  'PATCH /api/v1/platform/plans/{id} aiModelTier': {
-    reason: 'clears the tier',
-    asks: { aiModelTier: 0 },
-  },
 };
 
 /**
@@ -174,7 +163,7 @@ describe('an explicit null for an optional request field', () => {
     !(`${field.method} ${field.path}` in UNREACHABLE);
 
   rowFor('Ops').each(fields.filter(isGeneric).map((f) => [f.key] as const))(
-    '**`%s` treats an explicit `null` as absent: the same status, and the peer is asked the same**',
+    '**`%s` refuses an explicit `null` with a 400 naming the field, before asking any peer**',
     async (key) => {
       const field = fields.find((f) => f.key === key)!;
       const { absent, withNull } = bodies(field);
@@ -182,7 +171,7 @@ describe('an explicit null for an optional request field', () => {
       const subject = freshSubject();
 
       const before = await send(field, absent, subject);
-      // The row compares two ACCEPTED requests, or it would pass on two refusals.
+      // The baseline is accepted, or the 400 below could be for another reason.
       if (before.asked.length === 0) {
         throw new Error(
           `${key}: the baseline (field absent) never reached the peer: ${before.status} ${JSON.stringify(before.error)}`,
@@ -191,10 +180,11 @@ describe('an explicit null for an optional request field', () => {
 
       const after = await send(field, withNull, subject);
 
-      expect({ status: after.status, asked: after.asked }).toEqual({
-        status: before.status,
-        asked: before.asked,
-      });
+      expect(after.status).toBe(400);
+      expect(after.asked).toEqual([]);
+      expect(JSON.stringify(after.error)).toContain(
+        `${field.field.join('.')} can't be null; leave it out instead`,
+      );
     },
   );
 

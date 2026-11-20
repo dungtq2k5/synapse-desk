@@ -34,7 +34,6 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
-  IsOptional,
   IsString,
   IsUUID,
   Matches,
@@ -66,12 +65,13 @@ import {
 import { lowerIfString, trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ListPlatformOrganizationsQueryDto extends OmitType(
   SearchPaginationDto,
   ['sortBy'] as const,
 ) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(ORGANIZATION_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
@@ -80,11 +80,11 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   @ApiPropertyOptional()
   readonly sortBy: OrganizationSortableField = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(OrgStatus))
   readonly status?: OrgStatus;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -94,17 +94,17 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
 export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(USER_SORTABLE_FIELDS)
   @ApiPropertyOptional()
   readonly sortBy: UserSortableField = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly organizationId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -142,13 +142,13 @@ export class CreatePlatformOrganizationDto {
   @Transform(trimIfString)
   readonly slug!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
   @Transform(trimIfString)
   readonly domain?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ALLOWED_EMAIL_DOMAINS)
   @IsString({ each: true })
@@ -164,7 +164,7 @@ export class CreatePlatformOrganizationDto {
   @Transform(trimIfString)
   readonly adminFullName!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AGENT_SEATS)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -173,7 +173,7 @@ export class CreatePlatformOrganizationDto {
   // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxAgentSeats?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_STORAGE_BYTES)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -187,7 +187,7 @@ export class CreatePlatformOrganizationDto {
    * $1.00), charged by what each AI request costs. Not tokens, whatever the
    * name says.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -199,7 +199,7 @@ export class CreatePlatformOrganizationDto {
 
 /** Everything the tenant-facing PATCH allows, PLUS quotas. */
 export class UpdatePlatformOrganizationDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
   @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
@@ -207,7 +207,7 @@ export class UpdatePlatformOrganizationDto {
   @NoEmoji()
   readonly name?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
@@ -224,13 +224,13 @@ export class UpdatePlatformOrganizationDto {
   @Transform(trimIfString)
   readonly slug?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
   @Transform(trimIfString)
   readonly domain?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AGENT_SEATS)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -239,7 +239,7 @@ export class UpdatePlatformOrganizationDto {
   // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxAgentSeats?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_STORAGE_BYTES)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -253,7 +253,7 @@ export class UpdatePlatformOrganizationDto {
    * $1.00), charged by what each AI request costs. Not tokens, whatever the
    * name says.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
   // The `?` is load-bearing: this maps to an `optional` proto field, where
@@ -266,7 +266,7 @@ export class UpdatePlatformOrganizationDto {
    * Keep these limits when Stripe's events arrive (true), or let the next one
    * write the plan's grants back (false). Absent leaves the pin as it is.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly entitlementsPinned?: boolean;
 }
@@ -283,7 +283,7 @@ export class AssignPlanDto {
    * Recorded in the audit log, with who assigned it. Required to assign; a
    * dry run may leave it out.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ADMIN_REASON_LENGTH)
   readonly reason?: string;
@@ -295,7 +295,7 @@ export class ReleasePlanDto {
    * Recorded in the audit log, with who released it. Required to release; a
    * dry run may leave it out.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ADMIN_REASON_LENGTH)
   readonly reason?: string;
@@ -362,7 +362,7 @@ export class CreateGlobalRoleDto {
   @NoEmoji()
   readonly name!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
@@ -377,13 +377,13 @@ export class CreateGlobalRoleDto {
 export class ListPlansQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(PLAN_SORTABLE_FIELDS)
   @ApiPropertyOptional({ enum: PLAN_SORTABLE_FIELDS })
   readonly sortBy: PlanSortableField = DEFAULT_SEARCH.SORT_BY;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -393,7 +393,7 @@ export class ListPlansQueryDto extends OmitType(SearchPaginationDto, [
   // query DTOs in this file were already written this way.
   readonly includeInactive: boolean = false;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -438,7 +438,7 @@ export class CreatePlanDto {
   // Optional because a plan with NO Stripe product is legal and useful: the
   // negotiated enterprise agreement, assigned directly and invisible to
   // self-service.
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_STRIPE_ID_LENGTH)
   // The same rule `stripePriceId` above already carries. It was missing here,
@@ -450,7 +450,7 @@ export class CreatePlanDto {
   })
   readonly stripeProductId?: string;
 
-  // Every grant REQUIRED, with no `@IsOptional()` anywhere below. A plan states
+  // Every grant REQUIRED, with no `@OptionalNonNull()` anywhere below. A plan states
   // every limit it grants, with no blanks — a plan that does not differentiate
   // on a dimension states the platform ceiling explicitly, which is a decision
   // recorded rather than inferred.
@@ -511,7 +511,7 @@ export class CreatePlanDto {
   //
   // No `@ToBoolean()`: this is a JSON body, where `true` arrives as a boolean.
   // The transform exists for QUERY STRINGS, where everything is text.
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   // The rule this file already states at `sortBy`: the plugin derives
   // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
@@ -523,10 +523,7 @@ export class CreatePlanDto {
   // wire at all, so the `?` buys nothing and costs every layer below a branch
   // on `undefined` — a plan created with no prices is the assigned-only plan,
   // which is a legitimate row rather than a missing one.
-  //
-  // An explicit `null` reads as absent, as on every optional request field;
-  // it would otherwise replace the default and reach `.map`.
-  @Transform(({ value }: { value: unknown }) => value ?? [])
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_PLAN_PRICES)
   @ValidateNested({ each: true })
@@ -545,7 +542,7 @@ export class CreatePlanDto {
  * message uses plain scalars and answers the same question the other way.
  */
 export class UpdatePlanDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsNotEmpty()
   @NoEmoji()
@@ -554,7 +551,7 @@ export class UpdatePlanDto {
   @Transform(trimIfString)
   readonly name?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_STRIPE_ID_LENGTH)
   // The same rule `stripePriceId` above already carries. It was missing here,
@@ -574,16 +571,16 @@ export class UpdatePlanDto {
   // No `@ToBoolean()` and no default, for the same two reasons as the rest of
   // this class: it is a JSON body, and a default here would clear the product
   // id on every PATCH that did not mention it.
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly clearStripeProductId?: boolean;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AGENT_SEATS)
   readonly maxAgentSeats?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_STORAGE_BYTES)
   readonly maxStorageBytes?: number;
@@ -593,41 +590,41 @@ export class UpdatePlanDto {
    * $1.00), charged by what each AI request costs. Not tokens, whatever the
    * name says.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(MIN_AI_TOKEN_BUDGET)
   readonly monthlyAiTokenBudget?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(AI_MODEL_TIERS)
   readonly aiModelTier?: AiModelTier;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Max(MAX_DOCUMENT_BYTES)
   readonly maxDocumentBytes?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Max(MAX_ATTACHMENT_BYTES)
   readonly maxAttachmentBytes?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Max(MAX_DOCUMENTS_PER_TENANT)
   readonly maxDocumentUploads?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   @Max(MAX_ANALYTICS_RANGE_DAYS)
   readonly maxAnalyticsRangeDays?: number;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly isActive?: boolean;
 
@@ -635,7 +632,7 @@ export class UpdatePlanDto {
    * Prices to put on the plan, in create's shape: each is read from Stripe
    * and must be of the plan's Stripe product. Absent or `[]`, none.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_PLAN_PRICES)
   @ValidateNested({ each: true })
@@ -647,7 +644,7 @@ export class UpdatePlanDto {
    * Stripe price ids to take off the plan. Refused while an organization's
    * live subscription is on one. Absent or `[]`, none.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_PLAN_PRICES)
   @IsString({ each: true })
@@ -664,7 +661,7 @@ export class ApplyPlanQueryDto {
   // Defaults to FALSE, so an apply is what an unqualified POST does and a dry
   // run is asked for. The opposite default would make the destructive call the
   // one you get by forgetting a parameter.
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()

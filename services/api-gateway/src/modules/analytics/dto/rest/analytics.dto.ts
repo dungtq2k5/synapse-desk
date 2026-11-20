@@ -5,7 +5,6 @@ import {
   IsInt,
   IsISO8601,
   IsObject,
-  IsOptional,
   IsUUID,
   Matches,
   Max,
@@ -19,6 +18,7 @@ import {
   AnalyticsGranularity,
   ExportKind,
 } from '@synapsedesk/contracts';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * The shared analytics filter — api-endpoints-plan §4.
@@ -36,18 +36,18 @@ export class AnalyticsRangeQueryDto {
   @IsISO8601({ strict: true })
   readonly to!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly departmentId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(ANALYTICS_GRANULARITIES)
   readonly granularity?: AnalyticsGranularity;
 }
 
 /** Knowledge gaps and document lists take a size rather than a page. */
 export class AnalyticsTopNQueryDto extends AnalyticsRangeQueryDto {
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
   @Min(ANALYTICS_TOP_N.MIN)
@@ -64,7 +64,7 @@ export class AnalyticsTopNQueryDto extends AnalyticsRangeQueryDto {
  * more about the range than about the corpus.
  */
 export class DocumentAnalyticsQueryDto {
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
   @Min(ANALYTICS_TOP_N.MIN)
@@ -92,7 +92,7 @@ export class CreateExportDto {
   @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
   readonly to!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly departmentId?: string;
 
@@ -105,7 +105,7 @@ export class CreateExportDto {
    * and ignored — a filter the caller believes applied and that silently did
    * not is the failure this shape is most exposed to.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsObject()
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   readonly filters?: Record<string, string>;

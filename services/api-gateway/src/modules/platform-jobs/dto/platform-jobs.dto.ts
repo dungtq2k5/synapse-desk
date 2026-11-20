@@ -3,11 +3,11 @@ import { MAX_ADMIN_REASON_LENGTH } from '../../../common/config/dto.config';
 import {
   IsISO8601,
   IsNotEmpty,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
 } from 'class-validator';
+import { OptionalNonNull } from '../../../common/decorators/optional.decorator';
 
 /**
  * A run by hand. It does work across every organization, so it says why, as
@@ -55,7 +55,7 @@ export class BackfillJobDto {
    * One organization only. Absent, every tenant with activity in the range,
    * as the schedule does.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   organizationId?: string;
 }

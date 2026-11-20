@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsObject, IsOptional, IsUUID, Matches } from 'class-validator';
+import { IsIn, IsObject, IsUUID, Matches } from 'class-validator';
 import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@synapsedesk/contracts';
 import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 // **No `searchTerm`, and that is the change.**
 //
@@ -20,30 +21,30 @@ export class ListAuditLogsQueryDto extends PaginationDto {
   // proto's UNSPECIFIED, which the service reads as "no filter" -- so
   // `?action=SOME_FUTURE_ACTION` would return EVERYTHING and read as a match.
   // 400 is the honest answer to a filter this build cannot apply.
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(AuditAction))
   readonly action?: AuditAction;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly userId?: string;
 
   // Case-sensitive on purpose. A blanket upper-casing transform across the 44
   // `@IsIn` fields would break the ones whose vocabularies are lower-case —
   // `OCR_LANGUAGES` (`en`, `vi`) and `DOCUMENT_FILE_TYPES` (`pdf`, `txt`).
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(AuditResourceType))
   readonly resourceType?: AuditResourceType;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly resourceId?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Date)
   readonly from?: Date;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Date)
   readonly to?: Date;
 }
@@ -63,7 +64,7 @@ export class CreateAuditLogExportDto {
   readonly to!: string;
 
   /** `action`, `resourceType`, `userId` — refused per kind at the service. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsObject()
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   readonly filters?: Record<string, string>;

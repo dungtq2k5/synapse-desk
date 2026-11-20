@@ -7,7 +7,6 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -30,11 +29,12 @@ import {
   MIN_DEPARTMENT_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
 import { trimIfString } from '@synapsedesk/core';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(DEPARTMENT_SORTABLE_FIELDS)
   // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
@@ -48,7 +48,7 @@ export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
    * controller enforces. Without that gate any member could enumerate deleted
    * departments, which is organizational history they have no claim to.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -68,7 +68,7 @@ export class ListDepartmentMembersQueryDto extends OmitType(
   SearchPaginationDto,
   ['sortBy'] as const,
 ) {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @IsIn(DEPARTMENT_MEMBER_SORTABLE_FIELDS)
   @ApiPropertyOptional()
@@ -83,7 +83,7 @@ export class CreateDepartmentDto {
   @NoEmoji()
   readonly name!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
@@ -97,7 +97,7 @@ export class CreateDepartmentDto {
  * also the allowlist of what may be changed.
  */
 export class UpdateDepartmentDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_DEPARTMENT_NAME_LENGTH)
   @MaxLength(MAX_DEPARTMENT_NAME_LENGTH)
@@ -105,7 +105,7 @@ export class UpdateDepartmentDto {
   @NoEmoji()
   readonly name?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
   @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
@@ -123,7 +123,7 @@ export class AddDepartmentMembersDto {
    * Makes THIS department primary for every user in the batch. A user has at
    * most one primary, so setting it here demotes whichever they had.
    */
-  @IsOptional()
+  @OptionalNonNull()
   // `@ToBoolean()`, NOT `@Type(() => Boolean)`: the latter resolves the STRING
   // `'false'` to `true`, so a caller opting out would silently opt in.
   @ToBoolean()

@@ -203,7 +203,8 @@ export class UsersService {
         {
           id,
           ...toProfileFields(dto),
-          phoneNumber: dto.phoneNumber ?? undefined,
+          // `null` clears it: the service reads the empty string that way.
+          phoneNumber: dto.phoneNumber === null ? '' : dto.phoneNumber,
         },
         context,
       ),

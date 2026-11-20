@@ -14,7 +14,6 @@ import {
   IsEnum,
   IsIn,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
   Max,
@@ -32,6 +31,7 @@ import {
   type NotificationType,
 } from '@synapsedesk/contracts';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 /**
  * The feed query — CURSOR-paginated, so no `page`.
@@ -42,28 +42,28 @@ import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
  * the head shifts rows under the reader.
  */
 export class ListNotificationsQueryDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(NOTIFICATION_TYPE_VALUES)
   readonly type?: NotificationType;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
   readonly unreadOnly: boolean = false;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
   readonly includeArchived: boolean = false;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_FEED_CURSOR_LENGTH)
   readonly cursor?: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -80,18 +80,18 @@ export class ListNotificationsQueryDto {
  * a custom validator that would be harder to read than the check it replaces.
  */
 export class MarkManyReadDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_BULK_NOTIFICATION_IDS)
   @IsUUID('4', { each: true })
   @ApiPropertyOptional()
   readonly ids: string[] = [];
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(NotificationResourceType))
   readonly resourceType?: NotificationResourceType;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID('4')
   readonly resourceId?: string;
 }
@@ -116,11 +116,11 @@ export class UpdatePreferenceDto {
   // The decision stands on the narrower ground: a body field that is already
   // the right type needs no transform, and adding one would quietly accept the
   // STRING `"true"` on a route whose contract says boolean.
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly isEnabled?: boolean;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsIn(Object.values(DigestMode))
   readonly digest?: DigestMode;
 }
@@ -140,7 +140,7 @@ export class RegisterDeviceDto {
   @IsEnum(DevicePlatform)
   platform!: DevicePlatform;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   deviceName?: string;

@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/dto.config';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class GoogleSignInDto {
   /**
@@ -20,7 +21,7 @@ export class GoogleSignInDto {
   @ApiProperty({ minLength: 1 })
   readonly idToken!: string;
 
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;

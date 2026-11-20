@@ -1,8 +1,9 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean } from 'class-validator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class LogoutDto {
   /** Log out of all devices. */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   readonly allDevices?: boolean;
 }

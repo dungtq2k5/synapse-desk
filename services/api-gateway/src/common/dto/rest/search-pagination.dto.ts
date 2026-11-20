@@ -1,6 +1,7 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationDto } from './pagination.dto';
+import { OptionalNonNull } from '../../decorators/optional.decorator';
 
 /**
  * `PaginationDto` plus a free-text search term.
@@ -22,7 +23,7 @@ export class SearchPaginationDto extends PaginationDto {
   // from `searchTerm?: string`. The whole point of this row is that what
   // Swagger advertises is what the route does, so the one field that claim is
   // about should not depend on an inference.
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @ApiPropertyOptional()
   readonly searchTerm?: string;

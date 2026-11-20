@@ -28,7 +28,7 @@ export function AtMostOneNonLatinScript(validationOptions?: ValidationOptions) {
       validator: {
         validate(value: unknown): boolean {
           // Not an array, or absent, is somebody else's complaint —
-          // `@IsArray()` and `@IsOptional()` already say it better.
+          // `@IsArray()` and `@OptionalNonNull()` already say it better.
           if (!Array.isArray(value)) return true;
 
           const nonLatin = value.filter((code) =>

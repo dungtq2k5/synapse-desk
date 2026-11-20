@@ -73,11 +73,11 @@ export class WebhookEndpointsService {
           description: dto.description,
           // The wrapper is how "leave them" and "replace them" stay different
           // on a proto3 wire that cannot tell an empty repeated from an absent
-          // one. An explicit `null` leaves them too, as on every optional
-          // request field.
-          eventTypes: dto.eventTypes
-            ? { values: dto.eventTypes.map(toProtoNotificationType) }
-            : undefined,
+          // one.
+          eventTypes:
+            dto.eventTypes === undefined
+              ? undefined
+              : { values: dto.eventTypes.map(toProtoNotificationType) },
           isActive: dto.isActive,
         },
         context,

@@ -195,6 +195,35 @@ describe('the GraphQL limits and guards', () => {
     });
   });
 
+  describe('Arguments', () => {
+    it('**an argument sent as `null` is unset**, as the schema publishes it: the peer is asked as if it were left out', async () => {
+      peers.ticket.on('TicketService/ListTickets').always({
+        items: [],
+        meta: page(0),
+      });
+      const ask = async (args: string) => {
+        const response = await new Session(
+          gateway.baseUrl,
+        ).post<GraphqlResponse>(
+          '/graphql',
+          { query: `{ tickets${args} { items { id } } }` },
+          headers(['ticket.read.all']),
+        );
+        expect(response.body.errors).toBeUndefined();
+        expect(response.status).toBe(200);
+      };
+
+      await ask('');
+      // Every nullable argument; `first` and `page` are `Int!` with a default.
+      await ask(
+        '(sortBy: null, status: null, priority: null, source: null, assigneeId: null, departmentId: null, authorId: null)',
+      );
+
+      const [omitted, nulls] = peers.ticket.calls('TicketService/ListTickets');
+      expect(nulls.request).toEqual(omitted.request);
+    });
+  });
+
   describe('Depth', () => {
     it('**a query within the depth limit succeeds**', async () => {
       peers.ticket.on('TicketService/ListTickets').reply({

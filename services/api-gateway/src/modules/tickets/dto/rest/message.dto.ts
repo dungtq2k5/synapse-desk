@@ -7,7 +7,6 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
   Max,
@@ -28,6 +27,7 @@ import {
 import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ListMessagesQueryDto extends SearchPaginationDto {}
 
@@ -44,7 +44,7 @@ export class CreateMessageDto {
    * the route itself must stay open to end users, who post ordinary replies
    * through it.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -58,7 +58,7 @@ export class CreateMessageDto {
    * caller's own message still commits, which is exactly the behaviour that
    * has to survive Domain C shipping.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsBoolean()
   @ToBoolean()
   @ApiPropertyOptional()
@@ -76,7 +76,7 @@ export class CreateMessageDto {
    * A path that fails its confirm comes back in `skippedAttachments` and the
    * message is still created, and that is why that is the only safe outcome.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
@@ -91,7 +91,7 @@ export class CreateMessageDto {
    * Send it when posting an AI-drafted reply so the draft is recorded ACCEPTED
    * or EDITED rather than DISCARDED. Absent for an ordinary reply.
    */
-  @IsOptional()
+  @OptionalNonNull()
   @IsUUID()
   readonly generatedFromId?: string;
 }

@@ -1,5 +1,5 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
-import { IsIn, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
+import { IsIn, IsInt, IsUUID, Min } from 'class-validator';
 import {
   DEFAULT_SEARCH,
   TICKET_SORTABLE_FIELDS,
@@ -9,6 +9,10 @@ import {
   type TicketSortableField,
 } from '@synapsedesk/contracts';
 import { MAX_PAGE_SIZE } from '../../../../common/config/graphql-limits.config';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 import '../../../../common/graphql/enums';
 
 /**
@@ -27,8 +31,10 @@ import '../../../../common/graphql/enums';
  */
 @ArgsType()
 export class TicketsArgsGqlDto {
+  // Non-null with a default in the schema (`Int! = …`): GraphQL itself
+  // refuses a `null`, so the value is always a number.
   @Field(() => Int, { defaultValue: DEFAULT_SEARCH.PAGE })
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   page: number = DEFAULT_SEARCH.PAGE;
@@ -46,26 +52,28 @@ export class TicketsArgsGqlDto {
    * the clamp into the rejection it is meant to replace. The clamp lives in the
    * resolver.
    */
+  // Non-null with a default in the schema (`Int! = …`): GraphQL itself
+  // refuses a `null`, so the value is always a number.
   @Field(() => Int, { defaultValue: DEFAULT_SEARCH.LIMIT })
-  @IsOptional()
+  @OptionalNonNull()
   @IsInt()
   @Min(1)
   first: number = DEFAULT_SEARCH.LIMIT;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field(() => String, { nullable: true })
+  @OptionalNullable()
   @IsIn(TICKET_SORTABLE_FIELDS)
-  sortBy?: TicketSortableField;
+  sortBy?: TicketSortableField | null;
 
   @Field(() => TicketStatus, { nullable: true })
-  @IsOptional()
+  @OptionalNullable()
   @IsIn(Object.values(TicketStatus))
-  status?: TicketStatus;
+  status?: TicketStatus | null;
 
   @Field(() => TicketPriority, { nullable: true })
-  @IsOptional()
+  @OptionalNullable()
   @IsIn(Object.values(TicketPriority))
-  priority?: TicketPriority;
+  priority?: TicketPriority | null;
 
   /**
    * How the ticket arrived.
@@ -85,24 +93,24 @@ export class TicketsArgsGqlDto {
       'How the ticket arrived. `CHAT` alone is the tenant-wide chat queue for ' +
       'a caller who can see it — pair it with `authorId` for "my conversations".',
   })
-  @IsOptional()
+  @OptionalNullable()
   @IsIn(Object.values(TicketSource))
-  source?: TicketSource;
+  source?: TicketSource | null;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field(() => String, { nullable: true })
+  @OptionalNullable()
   @IsUUID('4')
-  assigneeId?: string;
+  assigneeId?: string | null;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field(() => String, { nullable: true })
+  @OptionalNullable()
   @IsUUID('4')
-  departmentId?: string;
+  departmentId?: string | null;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field(() => String, { nullable: true })
+  @OptionalNullable()
   @IsUUID('4')
-  authorId?: string;
+  authorId?: string | null;
 
   /**
    * Deliberately ABSENT: `includeDeleted`.

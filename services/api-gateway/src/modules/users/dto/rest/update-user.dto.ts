@@ -2,7 +2,6 @@ import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import {
   IsEnum,
   IsISO8601,
-  IsOptional,
   IsPhoneNumber,
   IsString,
   MaxLength,
@@ -11,11 +10,14 @@ import {
 import { Transform } from 'class-transformer';
 import { Gender } from '@synapsedesk/contracts';
 import { trimIfString } from '@synapsedesk/core';
-import { IsNullable } from '../../../../common/decorators/is-nullable.decorator';
 import {
   MAX_FULL_NAME_LENGTH,
   MIN_FULL_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
+import {
+  OptionalNonNull,
+  OptionalNullable,
+} from '../../../../common/decorators/optional.decorator';
 
 // Declared field by field rather than `PickType(UserResponseDto, …)`. A request
 // class deriving from a RESPONSE class inherits that class's validators, which
@@ -29,7 +31,7 @@ import {
 // caller and deletes the one it replaces. Accepting a string here skips both.
 /** The fields an administrator may change on another user. */
 export class UpdateUserDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_FULL_NAME_LENGTH)
   @MaxLength(MAX_FULL_NAME_LENGTH)
@@ -37,18 +39,16 @@ export class UpdateUserDto {
   @NoEmoji()
   readonly fullName?: string;
 
-  @IsOptional()
-  @IsNullable()
+  @OptionalNullable()
   @IsPhoneNumber()
   readonly phoneNumber?: string | null;
 
-  @IsOptional()
+  @OptionalNullable()
   @IsEnum(Gender)
-  readonly gender?: Gender;
+  readonly gender?: Gender | null;
 
   /** Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone. */
-  @IsOptional()
-  @IsNullable()
+  @OptionalNullable()
   @IsISO8601({ strict: true })
   readonly dob?: string | null;
 }
@@ -65,7 +65,7 @@ export class UpdateUserDto {
  * automatically — so keeping this class narrow IS the enforcement.
  */
 export class UpdateOwnProfileDto {
-  @IsOptional()
+  @OptionalNonNull()
   @IsString()
   @MinLength(MIN_FULL_NAME_LENGTH)
   @MaxLength(MAX_FULL_NAME_LENGTH)
@@ -73,13 +73,12 @@ export class UpdateOwnProfileDto {
   @NoEmoji()
   readonly fullName?: string;
 
-  @IsOptional()
+  @OptionalNullable()
   @IsEnum(Gender)
-  readonly gender?: Gender;
+  readonly gender?: Gender | null;
 
   /** Date of birth as ISO `YYYY-MM-DD` — a calendar date, no time, no zone. */
-  @IsOptional()
-  @IsNullable()
+  @OptionalNullable()
   @IsISO8601({ strict: true })
   readonly dob?: string | null;
 }

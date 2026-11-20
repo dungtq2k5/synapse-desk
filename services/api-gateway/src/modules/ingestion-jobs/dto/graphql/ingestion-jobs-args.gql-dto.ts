@@ -1,7 +1,8 @@
 import { ArgsType, Field } from '@nestjs/graphql';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsUUID } from 'class-validator';
 import { IngestionJobStatus } from '@synapsedesk/contracts';
 import { PageArgsGqlDto } from '../../../../common/dto/graphql/page-args.gql-dto';
+import { OptionalNullable } from '../../../../common/decorators/optional.decorator';
 import '../../../../common/graphql/enums';
 
 /**
@@ -28,12 +29,12 @@ import '../../../../common/graphql/enums';
 @ArgsType()
 export class IngestionJobsArgsGqlDto extends PageArgsGqlDto {
   @Field(() => IngestionJobStatus, { nullable: true })
-  @IsOptional()
+  @OptionalNullable()
   @IsIn(Object.values(IngestionJobStatus))
-  status?: IngestionJobStatus;
+  status?: IngestionJobStatus | null;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field(() => String, { nullable: true })
+  @OptionalNullable()
   @IsUUID('4')
-  documentId?: string;
+  documentId?: string | null;
 }
