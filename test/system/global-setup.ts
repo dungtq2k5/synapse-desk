@@ -27,7 +27,7 @@ import {
   startStack,
   stopStack,
 } from './stack';
-import { assertSeeded, isSeeded } from './seeded';
+import { assertManifestMatches, assertSeeded, isSeeded } from './seeded';
 import { resetStores } from './stores';
 import { startFakeStripe, stopFakeStripe, useFakeStripe } from './fake-stripe';
 
@@ -125,13 +125,16 @@ export default async function globalSetup(): Promise<void> {
  * the seed has nothing to derive from until something has booted.
  */
 async function ensureSeeded(): Promise<void> {
-  if (await isSeeded()) return;
+  if (!(await isSeeded())) {
+    await runWhileServing('npm', ['run', 'plans:seed:apply']);
+    await runWhileServing('npm', ['run', 'seed:demo:apply']);
 
-  await runWhileServing('npm', ['run', 'plans:seed:apply']);
-  await runWhileServing('npm', ['run', 'seed:demo:apply']);
-
-  // A post-condition rather than a pre-condition: the seeders above either
-  // wrote the dataset or failed loudly, and this turns "they ran" into "it is
-  // there".
-  await assertSeeded();
+    // A post-condition rather than a pre-condition: the seeders above either
+    // wrote the dataset or failed loudly, and this turns "they ran" into "it
+    // is there".
+    await assertSeeded();
+  }
+  // Seeded or not by this run, the manifest the rows read must describe this
+  // database.
+  await assertManifestMatches();
 }
