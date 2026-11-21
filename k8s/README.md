@@ -1,6 +1,6 @@
 # `k8s/` — the manifests
 
-Seven Deployments, seven Services, one Ingress, two StatefulSets and one NetworkPolicy. The decisions behind them are [ADR 0043](../docs/decisions/0043-the-cluster-shape.md); this file is what you need to apply them.
+Eight Deployments, eight Services, one Ingress, two StatefulSets and three NetworkPolicies. The decisions behind them are [ADR 0043](../docs/decisions/0043-the-cluster-shape.md); this file is what you need to apply them.
 
 ## Layout
 
@@ -8,8 +8,8 @@ Seven Deployments, seven Services, one Ingress, two StatefulSets and one Network
 k8s/
   services/          Deployment + Service, one file per service
   infrastructure/    NATS and Qdrant StatefulSets (ADR 0043 keeps these in-cluster)
-  policy/            NetworkPolicy — known gap #26's egress control
-  ingress.yaml       the one Ingress; api-gateway only
+  policy/            NetworkPolicy: the two egress controls, and who may reach the gateway's HTTP port
+  ingress.yaml       the one Ingress, `synapsedesk`: /api, /graphql, /socket.io to the gateway, the rest to web
   generated/         ConfigMaps and Secret SKELETONS — do not edit
 ```
 
@@ -131,7 +131,7 @@ Getting this backwards is how a schema and its history stop agreeing — and not
 
 **2. The gateway Secret carries two more values, and neither is the sending key.** `RESEND_WEBHOOK_SECRET` is what `scripts/provision-resend.mjs` printed when it created the webhook (readable back with `--print-secret`); `RESEND_GATEWAY_API_KEY` is the key the gateway fetches inbound mail with — separate from notification-service's `RESEND_API_KEY` by name and by scope. `RESEND_WEBHOOK_URL` in the root `.env` must be the real Ingress host plus `/api/v1/webhooks/email/resend` before the webhook is created, because the webhook holds a URL.
 
-**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`resend-inbound.service.ts`), and the controller carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail. Nothing to add.
+**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the Ingress's `/api` rule. It authenticates with the Standard Webhooks signature rather than a JWT (`resend-inbound.service.ts`), and the controller carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail. Nothing to add.
 
 **4. Attachments make storage-service an egress pod.** It fetches each inbound attachment from a signed URL Resend chose, so `policy/storage-egress.yaml` constrains it the way notification's policy constrains webhooks — same `except` list, asserted identical by `manifest-contract.spec.ts`. Its `REPLACE_ME` CIDR is the managed Redis; `PendingUploadStore` lives there, so fill it before the first apply (the `REPLACE_ME` bullet above says what happens if you do not).
 

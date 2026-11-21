@@ -73,6 +73,11 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 | A gateway guard / interceptor / decorator | `services/api-gateway/src/common/<kind>/` |
 | A REST request/response shape | `services/api-gateway/src/modules/<mod>/dto/rest/` |
 | A GraphQL request/response shape | `services/api-gateway/src/modules/<mod>/dto/graphql/` — **independent of the REST DTO** (§12.2) |
+| A screen, component or web helper | `apps/web/src/` |
+
+### 2.3 The web is authored on `main`
+
+`apps/web`, `packages/api-client` and `test/e2e-web` change on `main`, against the Node gateway, and reach `main-java` only by merge. `main-java` never changes them on its own. A web change that only the Java gateway needs means that gateway answers differently from the published document, so the fix goes in the gateway, not into a second copy of the web. The generated client isn't tracked; each branch generates it from its own `docs/reference/openapi.json`.
 
 ---
 
@@ -192,12 +197,14 @@ Four things can bound one operation: a **platform ceiling** (a code constant), t
 - One class per direction: `dto/rest/create-user.dto.ts`, `dto/rest/user-response.dto.ts`. **No shared base class, no `dto/base/`** (§12.2).
 - The global `ValidationPipe` runs `whitelist: true, forbidNonWhitelisted: true, transform: true`. An undeclared body field is a **400**, so a DTO missing a field silently rejects valid traffic.
 - Primitives from query/param need `@Type(() => Number)` — everything arrives as a string.
-- **`@IsNullable()` ≠ `@IsOptional()`.** `@IsNullable()` permits an explicit `null` while still requiring the key; `@IsOptional()` permits the key to be absent. Response DTOs use the former (§6.5).
+- **An optional request field is `@OptionalNonNull()` or `@OptionalNullable()`, never `@IsOptional()`.** `@OptionalNonNull()` leaves an absent field alone and answers an explicit `null` with a 400 naming the field ("`<path>` can't be null; leave it out instead"). `@OptionalNullable()` is only for a field where `null` has its own meaning, such as "clear it", and that field is typed `| null`, so every use has to handle it. An absent field takes its default; a `null` never overwrites one. `request-null.spec.ts` refuses an `IsOptional` import in the gateway's `src` and holds each field's `| null` type to its decorator. GraphQL arguments are the exception the protocol makes: an optional argument is nullable in GraphQL, so they're `@OptionalNullable()` and map `null` to unset.
+- **`@IsNullable()`** permits an explicit `null` while still requiring the key. Response DTOs use it (§6.5).
+- **A validator publishes its rule.** Use `StrongPassword()`, `PublishedMatches()`, `PublishedISO8601()` and `PublishedNumberString()` (`common/decorators/published-validators.decorator.ts`), which validate and write the OpenAPI `pattern` together. A rule no keyword can express carries a fixed sentence in its description. `published-validators.spec.ts` refuses the bare `class-validator` forms in a request DTO.
 - List endpoints **MUST** extend `SearchPaginationDto` (`common/dto/rest/search-pagination.dto.ts`, defaults from `DEFAULT_SEARCH`) and return `PaginationResponseDto<T>`.
 
 #### `?` on a request field, and when to replace it with a default
 
-A `?` costs every layer below a branch on `undefined`. Prefer a real default plus an explicit **`@ApiPropertyOptional()`** — the Swagger plugin derives `required` from **TypeScript** optionality, not from `@IsOptional()`, so dropping the `?` without the decorator documents the field as required and a generated client refuses to send the request without it.
+A `?` costs every layer below a branch on `undefined`. Prefer a real default plus an explicit **`@ApiPropertyOptional()`** — the Swagger plugin derives `required` from **TypeScript** optionality, not from the validator, so dropping the `?` without the decorator documents the field as required and a generated client refuses to send the request without it.
 
 **Three cases where the `?` is load-bearing and MUST stay:**
 
@@ -213,7 +220,7 @@ Where absent and empty are indistinguishable on the wire — every `repeated` fi
 
 **A constant spread into a `create` MUST be typed to the shape it is spread INTO, not the shape it came from.** Object literals get excess-property checks; **spreads do not**. So `{ ...SOME_CONSTANT }` passed to a Prisma `create` is unchecked for extra fields, it compiles, and the failure surfaces at the database rather than at the compiler. Measured: spreading a nine-field entitlement constant — one field of which is a PLAN's label with no column on `organizations` — into an organization create broke 359 tests at runtime with a clean build. Derive the narrower shape (`Omit<…>`) and `satisfies` it, so a field added to the wider type still has to be answered on both paths.
 
-**A default is VALIDATED, so it must satisfy the field's own bounds.** `@IsOptional()` skips only `undefined` and `null`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
+**A default is VALIDATED, so it must satisfy the field's own bounds.** `@OptionalNonNull()` skips only `undefined`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
 
 ### 5.3 Guard matrix
 

@@ -10,9 +10,17 @@ The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 - **Asynchronous IPC:** NATS. Domain events go over core NATS (at most once) and are reconciled from state where it exists ([ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md)); JetStream carries only what has no state to reconcile from: audit records and notifications.
 - **Background Processing:** BullMQ (Redis) for heavy job execution (file uploads, parsing queues).
 
-## **2. Frontend Layer**
+## **2. Frontend Layer** (`apps/web`)
 
-**None on this branch.** The web client (Next.js 16, React 19) lives on `main-java`, with the Java gateway it talks to; its stack is in that branch's copy of this document.
+| Technology | Role / Purpose | Why Selected |
+| :--- | :--- | :--- |
+| **Next.js 16** (App Router) | The web client and its server | The server only renders: it forwards the browser's cookies, never refreshes or sets a token, and fetches every user request with `no-store`. |
+| **React 19** | User interface | Server components where nothing reacts to input, client components where something does. |
+| **Tailwind CSS 4** + **shadcn/ui** (Radix) | Styling and components | Components live in `apps/web`, not a shared package. Colors, type and spacing come from the Figma design tokens through **Style Dictionary**, as CSS variables, light and dark. |
+| **TanStack Query** | Server state | Every REST call goes through the generated `@synapsedesk/api-client`; GraphQL only where a screen needs it. |
+| **Lucide** | Icons | One consistent SVG set. |
+| **Hand-drawn SVG charts** | Analytics | No chart library: the charts are small and drawn to the design. |
+| **Playwright** | End-to-end and visual tests | Every screen at 1440 and 390 px in both modes, compared with its baseline, plus axe accessibility checks and a Web Vitals budget (LCP under 1 s). |
 
 ## **3. Backend Core Tier (TypeScript / Node.js)**
 
