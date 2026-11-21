@@ -29,7 +29,8 @@ function variable(page: Page): Locator[] {
 
 /**
  * Checks a state the row has driven the page into, then draws it: axe in light
- * and dark, then a baseline at each width in each scheme. The page is resized
+ * and dark, failing once with both schemes' findings, then a baseline at each
+ * width in each scheme. The page is resized
  * and re-themed in place, so every variant is the same state.
  *
  * Axe fails on a `serious` or `critical` violation, color contrast included.
@@ -69,9 +70,21 @@ export async function look(
     expect(await titleFaults(page), `${name}: the document's <title>`).toEqual(
       [],
     );
+    // Axe in both schemes before anything fails, then one assertion with
+    // every finding: a failure in one scheme can't hide the other's.
+    const found: (Finding & { scheme: (typeof SCHEMES)[number] })[] = [];
     for (const scheme of SCHEMES) {
       await page.emulateMedia({ colorScheme: scheme });
-      await accessible(page, options.disabled ?? [], options.heldClock);
+      const inScheme = await findings(
+        page,
+        options.disabled ?? [],
+        options.heldClock,
+      );
+      found.push(...inScheme.map((finding) => ({ scheme, ...finding })));
+    }
+    expect(found, `${name}: axe, light and dark`).toEqual([]);
+    for (const scheme of SCHEMES) {
+      await page.emulateMedia({ colorScheme: scheme });
       for (const { name: width, ...size } of WIDTHS.filter(
         ({ name: each }) => !options.widths || options.widths.includes(each),
       )) {
@@ -182,15 +195,18 @@ async function settledBell(page: Page): Promise<void> {
 const CLOSING_LAYER =
   ':is([role="menu"], [role="dialog"], [role="alertdialog"], [role="listbox"])[data-state="closed"]';
 
+/** An axe violation, as a failure lists it. */
+type Finding = { id: string; help: string; targets: string[] };
+
 /**
- * No `serious` or `critical` axe violation on the page as it is now, once any
- * layer that is closing has gone.
+ * The `serious` and `critical` axe violations on the page as it is now, once
+ * any layer that is closing has gone.
  */
-export async function accessible(
+async function findings(
   page: Page,
-  disabled: string[] = [],
+  disabled: string[],
   heldClock = false,
-): Promise<void> {
+): Promise<Finding[]> {
   await expect(page.locator(CLOSING_LAYER)).toHaveCount(0);
   const run = new AxeBuilder({ page }).disableRules(disabled).analyze();
   // Axe waits on the page's timers, so a paused clock would hang it: move it
@@ -206,15 +222,13 @@ export async function accessible(
     await page.clock.runFor(1).catch(() => undefined);
   }
   const { violations } = await run;
-  expect(
-    violations
-      .filter(({ impact }) => impact === 'serious' || impact === 'critical')
-      .map(({ id, help, nodes }) => ({
-        id,
-        help,
-        targets: nodes.map((node) => node.target.join(' ')),
-      })),
-  ).toEqual([]);
+  return violations
+    .filter(({ impact }) => impact === 'serious' || impact === 'critical')
+    .map(({ id, help, nodes }) => ({
+      id,
+      help,
+      targets: nodes.map((node) => node.target.join(' ')),
+    }));
 }
 
 /**

@@ -11,6 +11,7 @@
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient as AuthPrisma } from '../../services/auth-service/src/generated/prisma/client';
+import { manifest } from './seeded-actor';
 import { REPO_ROOT } from './services';
 
 /**
@@ -25,8 +26,8 @@ const RECIPE = [
   'npm run test:system                           # seeds on top of the wipe, after the stack is up',
 ].join('\n  ');
 
-/** Tenant count, or 0 — the one question both callers below ask. */
-async function tenantCount(): Promise<number> {
+/** A client on auth's dev database, the one the seeder writes. */
+function authPrisma(): AuthPrisma {
   const parsed = config({
     path: `${REPO_ROOT}/services/auth-service/.env`,
     processEnv: {},
@@ -37,9 +38,12 @@ async function tenantCount(): Promise<number> {
     throw new Error('No DATABASE_URL in services/auth-service/.env');
   }
 
-  const prisma = new AuthPrisma({
-    adapter: new PrismaPg({ connectionString }),
-  });
+  return new AuthPrisma({ adapter: new PrismaPg({ connectionString }) });
+}
+
+/** Tenant count, or 0 — the one question both callers below ask. */
+async function tenantCount(): Promise<number> {
+  const prisma = authPrisma();
 
   try {
     // **Tenants, not "any row".** The seeder's whole product is a tenant with
@@ -65,4 +69,37 @@ export async function assertSeeded(): Promise<void> {
     'The dev databases hold no tenants, so the journey has nothing to assert against.\n' +
       `Run:\n  ${RECIPE}`,
   );
+}
+
+/**
+ * Every tenant the manifest names is in the database. The manifest is a file
+ * beside the checkout and the database is the machine's, so the two can come
+ * from different seeds: a manifest copied between machines, or a database
+ * reseeded from another checkout. Rows then find no users in the tenant they
+ * were told to use.
+ */
+export async function assertManifestMatches(): Promise<void> {
+  const tenants = manifest().tenants;
+  const prisma = authPrisma();
+
+  try {
+    const found = await prisma.organization.findMany({
+      // Deleted ones too: the seeder soft-deletes some tenants on purpose.
+      where: { id: { in: tenants.map((t) => t.organizationId) } },
+      select: { id: true },
+    });
+    const present = new Set(found.map((o) => o.id));
+    const missing = tenants.filter((t) => !present.has(t.organizationId));
+
+    if (missing.length > 0) {
+      throw new Error(
+        'The seed manifest is from another database; reseed or copy it.\n' +
+          `.demo-seed/manifest.json names ${missing.length} of its ${tenants.length} ` +
+          `organizations that the dev database doesn't hold: ` +
+          missing.map((t) => `${t.slug} (${t.organizationId})`).join(', '),
+      );
+    }
+  } finally {
+    await prisma.$disconnect();
+  }
 }
