@@ -688,6 +688,22 @@ describe('Outbound webhooks (e2e)', () => {
     expect(JSON.stringify(listed.items)).not.toContain('whsec_');
   });
 
+  it('8d. **an empty description on update clears it**: stored as null, read back as none', async () => {
+    const created = await endpointAt();
+    await admin.update(
+      { endpointId: created.id, description: 'Front desk' },
+      context,
+    );
+
+    await admin.update({ endpointId: created.id, description: '' }, context);
+
+    const row = await fx.prisma.webhookEndpoint.findUniqueOrThrow({
+      where: { id: created.id },
+    });
+    expect(row.description).toBeNull();
+    expect((await admin.get(created.id, context)).description).toBeUndefined();
+  });
+
   it('**8c. create, update, rotate and delete each record one entry, and no secret reaches the metadata**', async () => {
     const record = jest
       .spyOn(fx.moduleRef.get(AuditPublisher), 'record')

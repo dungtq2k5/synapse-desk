@@ -16,7 +16,7 @@ import jakarta.validation.constraints.NotNull;
  * as possibly null). It is not redundant: removing it changes the published
  * contract.
  */
-public record ResendWebhookAcknowledgementDto(
+public record ResendWebhookAcknowledgementResponseDto(
   @NotNull boolean received,
   @NotNull String outcome
 ) {}

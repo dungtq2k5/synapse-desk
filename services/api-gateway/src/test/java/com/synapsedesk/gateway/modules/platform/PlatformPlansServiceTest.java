@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
-import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
@@ -74,12 +73,7 @@ class PlatformPlansServiceTest {
     when(stub.withInterceptors(any())).thenReturn(stub);
     when(usageStub.withDeadlineAfter(anyLong(), any())).thenReturn(usageStub);
     when(usageStub.withInterceptors(any())).thenReturn(usageStub);
-    service = new PlatformPlansService(
-      stub,
-      usageStub,
-      superAdminCheck,
-      new RawJsonBody(tools.jackson.databind.json.JsonMapper.builder().build())
-    );
+    service = new PlatformPlansService(stub, usageStub, superAdminCheck);
   }
 
   @Test

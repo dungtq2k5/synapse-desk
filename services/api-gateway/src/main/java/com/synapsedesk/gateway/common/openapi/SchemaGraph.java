@@ -107,6 +107,28 @@ final class SchemaGraph {
     return property;
   }
 
+  /** {@link #nullable}'s inverse: the schema without null, from any of its forms. */
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  static Schema nonNullable(Schema property) {
+    List<Schema> oneOf = property.getOneOf();
+    if (oneOf != null && oneOf.size() == 2) {
+      for (int i = 0; i < 2; i++) {
+        Schema candidate = oneOf.get(i);
+        if (
+          candidate.get$ref() == null &&
+          candidate.getTypes() != null &&
+          candidate.getTypes().equals(Set.of("null"))
+        ) {
+          return oneOf.get(1 - i);
+        }
+      }
+    }
+    if (property.getTypes() != null) property.getTypes().remove("null");
+    if (property.getEnum() != null) property.getEnum().remove(null);
+
+    return property;
+  }
+
   private static void collect(Content content, Set<String> into) {
     if (content != null) {
       content.values().forEach(media -> refs(media.getSchema(), into));

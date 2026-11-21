@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.common.config.SharedEnvironment;
 import com.synapsedesk.gateway.common.web.ApiResponse;
-import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountDto;
+import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountResponseDto;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -233,8 +233,8 @@ class CacheServiceIT {
    * than assumed. Measured the hard way on `RolesController.list`: {@code
    * wrap(key, ttl, ApiResponse.class, ...)} compiles — {@code Class<T>}
    * accepts the raw type — but a HIT then deserializes `data` as an
-   * untyped {@code LinkedHashMap}, not a {@link RevokedCountDto}, because
-   * `Class<ApiResponse>` erases the `<RevokedCountDto>` argument before
+   * untyped {@code LinkedHashMap}, not a {@link RevokedCountResponseDto}, because
+   * `Class<ApiResponse>` erases the `<RevokedCountResponseDto>` argument before
    * Jackson ever sees it. No mocked unit test catches this: a mock's
    * `wrap`/`wrapTyped` stub just invokes the supplier and returns whatever
    * it built, never round-tripping through JSON at all. Only a real Redis
@@ -247,29 +247,29 @@ class CacheServiceIT {
       "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
 
     try {
-      ApiResponse<RevokedCountDto> written = ApiResponse.of(
+      ApiResponse<RevokedCountResponseDto> written = ApiResponse.of(
         200,
         "OK",
-        new RevokedCountDto(3)
+        new RevokedCountResponseDto(3)
       );
       cache.wrapTyped(
         key,
         30,
-        new TypeReference<ApiResponse<RevokedCountDto>>() {},
+        new TypeReference<ApiResponse<RevokedCountResponseDto>>() {},
         () -> written
       );
 
-      ApiResponse<RevokedCountDto> hit = cache.wrapTyped(
+      ApiResponse<RevokedCountResponseDto> hit = cache.wrapTyped(
         key,
         30,
-        new TypeReference<ApiResponse<RevokedCountDto>>() {},
+        new TypeReference<ApiResponse<RevokedCountResponseDto>>() {},
         () -> {
           throw new AssertionError("a hit must not fall through to produce()");
         }
       );
 
       // The assertion that actually fails on the bug: `data()` typed as
-      // `RevokedCountDto` and its field readable directly, not a map needing
+      // `RevokedCountResponseDto` and its field readable directly, not a map needing
       // `.get("revokedCount")`.
       assertThat(hit.data().revokedCount()).isEqualTo(3);
     } finally {

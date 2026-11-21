@@ -212,6 +212,11 @@ public class CacheService {
       }
     } catch (RuntimeException cacheReadFailed) {
       // Fails open: a cache outage makes the product slow, never down.
+      LOG.warn(
+        "Cache read failed for {}: {}",
+        key,
+        cacheReadFailed.getMessage()
+      );
     }
 
     T value = produce.get();
@@ -226,6 +231,11 @@ public class CacheService {
         );
     } catch (RuntimeException cacheWriteFailed) {
       // Same fail-open rule on the write side.
+      LOG.warn(
+        "Cache write failed for {}: {}",
+        key,
+        cacheWriteFailed.getMessage()
+      );
     }
 
     return value;
@@ -266,6 +276,11 @@ public class CacheService {
       }
     } catch (RuntimeException cacheReadFailed) {
       // Fails open: a cache outage makes the product slow, never down.
+      LOG.warn(
+        "Cache read failed for {}: {}",
+        key,
+        cacheReadFailed.getMessage()
+      );
     }
 
     T value = produce.get();
@@ -280,6 +295,11 @@ public class CacheService {
         );
     } catch (RuntimeException cacheWriteFailed) {
       // Same fail-open rule on the write side.
+      LOG.warn(
+        "Cache write failed for {}: {}",
+        key,
+        cacheWriteFailed.getMessage()
+      );
     }
 
     return value;

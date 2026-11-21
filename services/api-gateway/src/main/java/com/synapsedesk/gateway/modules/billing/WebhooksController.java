@@ -11,7 +11,7 @@ import com.synapsedesk.gateway.common.throttle.SkipThrottle;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
-import com.synapsedesk.gateway.modules.billing.dto.rest.StripeWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.billing.dto.rest.StripeWebhookAcknowledgementResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,7 +43,7 @@ import synapsedesk.auth.BillingServiceGrpc;
  * except a signature failure, because Stripe retries any non-2xx — an
  * unmappable event is still 200.
  *
- * <p>{@link StripeWebhookAcknowledgementDto} names what the handler returns;
+ * <p>{@link StripeWebhookAcknowledgementResponseDto} names what the handler returns;
  * the published contract once borrowed an unrelated route's envelope for it.
  */
 @Tag(name = "Webhooks")
@@ -72,7 +72,7 @@ public class WebhooksController {
   @SkipThrottle
   @ApiErrors(value = { "400" }, throttled = false)
   public ResponseEntity<
-    ApiResponse<StripeWebhookAcknowledgementDto>
+    ApiResponse<StripeWebhookAcknowledgementResponseDto>
   > webhooksControllerStripeV1(
     @RequestHeader(
       value = "stripe-signature",
@@ -108,7 +108,7 @@ public class WebhooksController {
       ApiResponse.of(
         200,
         "OK",
-        new StripeWebhookAcknowledgementDto(true, response.getStatus())
+        new StripeWebhookAcknowledgementResponseDto(true, response.getStatus())
       )
     );
   }

@@ -7,7 +7,6 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
-import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ObjectSchema;
@@ -17,13 +16,18 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * The rule: in a schema only requests reach, an optional property accepts null and a
- * required one does not; and no parameter in the URL accepts null. No test names a field,
- * because the customizer does not.
+ * The rule: in a schema only requests reach, an optional property accepts null exactly
+ * when its setter declares what null means, and a required one is left alone; and no
+ * parameter in the URL accepts null. The declarations are read from the real DTOs, so
+ * the tests name one: {@code UpdateDepartmentDto}, whose {@code description} clears.
  */
 class RequestNullabilityOpenApiCustomizerTest {
 
@@ -78,51 +82,103 @@ class RequestNullabilityOpenApiCustomizerTest {
     return (Schema<?>) owner.getProperties().get(name);
   }
 
+  /** A string property as springdoc publishes an optional {@code @Nullable} one. */
+  private static StringSchema nullableString() {
+    StringSchema schema = new StringSchema();
+    schema.addType("null");
+
+    return schema;
+  }
+
   @Test
-  void anOptionalPropertyBecomesNullableAndARequiredOneDoesNot() {
-    ObjectSchema in = named("In");
-    in.addProperty("always", new StringSchema());
-    in.addProperty("maybe", new StringSchema());
+  void anOptionalPropertyIsNullableOnlyWhereItsSetterDeclaresAMeaning() {
+    ObjectSchema in = named("UpdateDepartmentDto");
+    in.addProperty("description", new StringSchema());
+    in.addProperty("name", nullableString());
+    in.addProperty("always", nullableString());
     in.setRequired(List.of("always"));
 
-    customizer.customise(document("In", "Out", List.of(), in, named("Out")));
+    customizer.customise(
+      document("UpdateDepartmentDto", "Out", List.of(), in, named("Out"))
+    );
 
-    assertThat(property(in, "maybe").getTypes()).containsExactlyInAnyOrder(
+    assertThat(
+      property(in, "description").getTypes()
+    ).containsExactlyInAnyOrder("string", "null");
+    assertThat(property(in, "name").getTypes()).containsExactly("string");
+    assertThat(property(in, "always").getTypes()).containsExactlyInAnyOrder(
       "string",
       "null"
     );
-    assertThat(property(in, "always").getTypes()).containsExactly("string");
     assertThat(in.getRequired()).containsExactly("always");
   }
 
   @Test
-  void anOptionalListAndAnOptionalReferenceAreNullableToo() {
+  void anOptionalReferenceAndEnumLoseTheirNull() {
     ObjectSchema in = named("In");
-    ArraySchema list = new ArraySchema();
-    list.setItems(new StringSchema());
-    in.addProperty("list", list);
-    in.addProperty("nested", ref("Other"));
+    Schema<?> nullType = new Schema<>();
+    nullType.addType("null");
+    in.addProperty(
+      "nested",
+      new Schema<>().addOneOfItem(ref("Other")).addOneOfItem(nullType)
+    );
+    StringSchema kind = nullableString();
+    kind.setEnum(new ArrayList<>(Arrays.asList("A", null)));
+    in.addProperty("kind", kind);
 
     customizer.customise(
       document("In", "Out", List.of(), in, named("Other"), named("Out"))
     );
 
-    assertThat(property(in, "list").getTypes()).contains("null");
-    assertThat(property(in, "nested").getOneOf()).hasSize(2);
-    Schema<?> nullBranch = property(in, "nested").getOneOf().get(1);
-    assertThat(nullBranch.getTypes()).contains("null");
+    assertThat(property(in, "nested").get$ref()).endsWith("/Other");
+    assertThat(property(in, "kind").getTypes()).containsExactly("string");
+    assertThat(
+      new ArrayList<Object>(property(in, "kind").getEnum())
+    ).containsExactly("A");
   }
 
   @Test
   void applyingTheRuleTwiceChangesNothingTheSecondTime() {
-    ObjectSchema in = named("In");
-    in.addProperty("maybe", new StringSchema());
-    OpenAPI document = document("In", "Out", List.of(), in, named("Out"));
+    ObjectSchema in = named("UpdateDepartmentDto");
+    in.addProperty("description", new StringSchema());
+    OpenAPI document = document(
+      "UpdateDepartmentDto",
+      "Out",
+      List.of(),
+      in,
+      named("Out")
+    );
 
     customizer.customise(document);
     customizer.customise(document);
 
-    assertThat(property(in, "maybe").getTypes()).hasSize(2);
+    assertThat(property(in, "description").getTypes()).hasSize(2);
+  }
+
+  /** The fields where null means something, as the explicit-null contract rows list them. */
+  @Test
+  void theDeclaredMeaningsAreTheTwelve() {
+    assertThat(RequestNullabilityOpenApiCustomizer.nullMeanings()).isEqualTo(
+      Map.of(
+        "UpdateOwnProfileDto",
+        Set.of("dob", "gender"),
+        "UpdateUserDto",
+        Set.of("dob", "gender", "phoneNumber"),
+        "UpdateDepartmentDto",
+        Set.of("description"),
+        "UpdateRoleDto",
+        Set.of("description"),
+        "UpdateWebhookEndpointDto",
+        Set.of("description"),
+        "UpdateOrganizationSettingsDto",
+        Set.of(
+          "allowedEmailDomains",
+          "maxDocumentBytesOverride",
+          "maxAttachmentBytesOverride",
+          "maxAttachmentsPerMessageOverride"
+        )
+      )
+    );
   }
 
   @Test

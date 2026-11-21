@@ -8,6 +8,7 @@
  * rather than failing the response. An AI message has no `sender`: no user wrote it.
  */
 import { status as GrpcStatus } from '@grpc/grpc-js';
+import Redis from 'ioredis';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -20,6 +21,7 @@ import { rowFor } from './pending';
 describe('REST responses carry names', () => {
   let gateway: Gateway;
   let peers: Peers;
+  let redis: Redis;
 
   const TICKET = '11111111-1111-4111-8111-111111111111';
   const ORGANIZATION = 'cccccccc-0000-4000-8000-cccccccccccc';
@@ -90,14 +92,20 @@ describe('REST responses carry names', () => {
       REDIS_URL: redisUrl,
       NATS_URL: natsUrl,
     });
+    redis = new Redis(redisUrl);
   }, 90_000);
 
   afterAll(async () => {
+    redis?.disconnect();
     await gateway.stop();
     await peers.stop();
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Names a gateway cached in an earlier row (or spec) would answer without
+    // the lookup a row asserts on, and survive the failure a row stages.
+    const cached = await redis.keys(`*${ORGANIZATION}|entity:*`);
+    if (cached.length > 0) await redis.del(...cached);
     peers.reset();
     peers.auth.on('OrganizationService/GetOrganizationStatus').always({
       status: toProtoOrgStatus(OrgStatus.ACTIVE),

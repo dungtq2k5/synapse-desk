@@ -19,7 +19,7 @@ import com.synapsedesk.gateway.modules.inboundemail.ResendInboundClient.Result;
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.AttachmentList;
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.AttachmentSource;
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.Email;
-import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementResponseDto;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.validation.Validation;
@@ -141,7 +141,7 @@ class ResendInboundServiceTest {
     );
   }
 
-  private ResendWebhookAcknowledgementDto deliver(String body) {
+  private ResendWebhookAcknowledgementResponseDto deliver(String body) {
     return service.handle(
       body.getBytes(StandardCharsets.UTF_8),
       sign(body, now(), SECRET)::get
@@ -327,7 +327,7 @@ class ResendInboundServiceTest {
     var ack = deliver(event("email.delivered"));
 
     assertThat(ack).isEqualTo(
-      new ResendWebhookAcknowledgementDto(true, "ignored_event")
+      new ResendWebhookAcknowledgementResponseDto(true, "ignored_event")
     );
     assertThat(counted())
       .containsOnlyKeys("ignored_event")
@@ -379,7 +379,7 @@ class ResendInboundServiceTest {
     var ack = deliver(event("email.received"));
 
     assertThat(ack).isEqualTo(
-      new ResendWebhookAcknowledgementDto(true, "fetch_failed")
+      new ResendWebhookAcknowledgementResponseDto(true, "fetch_failed")
     );
     assertThat(counted())
       .containsOnlyKeys("fetch_failed")
@@ -411,7 +411,7 @@ class ResendInboundServiceTest {
     var ack = deliver(event("email.received"));
 
     assertThat(ack).isEqualTo(
-      new ResendWebhookAcknowledgementDto(true, "invalid_payload")
+      new ResendWebhookAcknowledgementResponseDto(true, "invalid_payload")
     );
     assertThat(counted())
       .containsOnlyKeys("invalid_payload")
@@ -442,7 +442,7 @@ class ResendInboundServiceTest {
     var ack = deliver(event("email.received"));
 
     assertThat(ack).isEqualTo(
-      new ResendWebhookAcknowledgementDto(true, outcome.wire())
+      new ResendWebhookAcknowledgementResponseDto(true, outcome.wire())
     );
     assertThat(counted())
       .containsOnlyKeys(outcome.wire())

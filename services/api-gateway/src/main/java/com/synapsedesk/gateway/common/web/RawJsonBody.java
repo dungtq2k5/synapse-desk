@@ -16,9 +16,9 @@ import tools.jackson.databind.ObjectMapper;
  * for every route that carries one ({@link JsonBodyFilter}), so this reads that copy
  * and never the stream.
  *
- * <p>For a field that is merely optional, with null meaning absent, none of this is
- * needed: {@code ExplicitNullJsonCustomizer} makes the DTO read it that way. Reach for
- * this only where a literal {@code null} has a meaning of its own.
+ * <p>Only a field that declares a meaning for {@code null} ({@code @JsonSetter(nulls =
+ * Nulls.SET)}) gets this far with one: any other optional field's {@code null} is a 400
+ * at binding ({@code StrictRequestBodyConverter}).
  */
 @Component
 public class RawJsonBody {

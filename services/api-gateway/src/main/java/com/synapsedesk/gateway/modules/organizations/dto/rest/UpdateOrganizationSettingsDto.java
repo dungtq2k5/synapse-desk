@@ -1,6 +1,8 @@
 package com.synapsedesk.gateway.modules.organizations.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
@@ -75,6 +77,7 @@ public class UpdateOrganizationSettingsDto {
   }
 
   @JsonProperty("allowedEmailDomains")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   public void setAllowedEmailDomains(List<String> allowedEmailDomains) {
     this.allowedEmailDomains = allowedEmailDomains;
   }
@@ -101,6 +104,7 @@ public class UpdateOrganizationSettingsDto {
   }
 
   @JsonProperty("maxDocumentBytesOverride")
+  @JsonSetter(nulls = Nulls.SET)
   public void setMaxDocumentBytesOverride(
     @Nullable BigDecimal maxDocumentBytesOverride
   ) {
@@ -129,6 +133,7 @@ public class UpdateOrganizationSettingsDto {
   }
 
   @JsonProperty("maxAttachmentBytesOverride")
+  @JsonSetter(nulls = Nulls.SET)
   public void setMaxAttachmentBytesOverride(
     @Nullable BigDecimal maxAttachmentBytesOverride
   ) {
@@ -157,6 +162,7 @@ public class UpdateOrganizationSettingsDto {
   }
 
   @JsonProperty("maxAttachmentsPerMessageOverride")
+  @JsonSetter(nulls = Nulls.SET)
   public void setMaxAttachmentsPerMessageOverride(
     @Nullable BigDecimal maxAttachmentsPerMessageOverride
   ) {

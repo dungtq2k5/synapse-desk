@@ -246,6 +246,28 @@ describe('Roles & Permissions (e2e)', () => {
       ).toBeNull();
     });
 
+    it('**an empty description on update clears it**: stored as null, read back as none', async () => {
+      const mine = await seedTenantWithUser(fx.prisma);
+      const role = await roles.createRole(
+        {
+          name: 'Tier 2 Lead',
+          description: 'Escalations',
+          permissionCodes: [],
+        },
+        superuser(mine),
+      );
+
+      await roles.updateRole({ id: role.id, description: '' }, superuser(mine));
+
+      const row = await fx.prisma.role.findUniqueOrThrow({
+        where: { id: role.id },
+      });
+      expect(row.description).toBeNull();
+      expect(
+        (await roles.getRole({ id: role.id }, superuser(mine))).description,
+      ).toBeUndefined();
+    });
+
     it("another tenant's role is 404 for every operation", async () => {
       const mine = await seedTenantWithUser(fx.prisma);
       const theirs = await seedForeignTenant(fx.prisma);

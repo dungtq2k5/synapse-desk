@@ -252,4 +252,93 @@ describe('a write evicts the cached read it changes', () => {
       await expectEvicted(tenant, 'departments');
     },
   );
+
+  rowFor('User Admin')(
+    "**setting a user's departments evicts the cached department list, which counts its members**",
+    async () => {
+      const tenant = 'cccccccc-1111-4111-8111-000000000006';
+      await seed(tenant, 'departments');
+      peers.auth.on('UserService/SetUserDepartments').reply({
+        user: wireUser(tenant),
+        roleIds: [],
+        roleNames: [],
+        departmentIds: ['55555555-5555-4555-8555-555555555555'],
+      });
+
+      const response = await new Session(gateway.baseUrl).request(
+        'PUT',
+        `${API}/users/${USER}/departments`,
+        {
+          body: {
+            departments: [
+              {
+                departmentId: '55555555-5555-4555-8555-555555555555',
+                isPrimary: true,
+              },
+            ],
+          },
+          headers: cookie(tenant, ['department.member.assign']),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expectEvicted(tenant, 'departments');
+    },
+  );
+
+  const DOCUMENT = 'cccccccc-5555-4555-8555-cccccccccccc';
+  const wireDocument = (tenant: string) => ({
+    id: DOCUMENT,
+    organizationId: tenant,
+    createdById: USER,
+    title: 'Refund policy',
+    fileUrl: 'documents/refund-policy.pdf',
+    fileType: 1, // DOCUMENT_FILE_TYPE_PDF
+    fileSizeBytes: 2048,
+    isOrganizationWide: true,
+    status: 1, // DOCUMENT_STATUS_PENDING
+    departmentIds: [],
+    chunkCount: 0,
+    createdAt: AT,
+    updatedAt: AT,
+    ocrLanguages: [],
+  });
+
+  rowFor('Documents')(
+    '**confirming an upload evicts the cached document list**, so the uploader sees it at once',
+    async () => {
+      const tenant = 'cccccccc-1111-4111-8111-000000000007';
+      await seed(tenant, 'documents');
+      peers.ingestion
+        .on('DocumentService/ConfirmDocument')
+        .reply(wireDocument(tenant));
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/confirm`,
+        { objectPath: 'pending/documents/abc123', title: 'Refund policy' },
+        cookie(tenant, ['document.create']),
+      );
+
+      expect(response.status).toBe(201);
+      await expectEvicted(tenant, 'documents');
+    },
+  );
+
+  rowFor('Documents')(
+    '**deleting a document evicts the cached document list**',
+    async () => {
+      const tenant = 'cccccccc-1111-4111-8111-000000000008';
+      await seed(tenant, 'documents');
+      peers.ingestion.on('DocumentService/DeleteDocument').reply({});
+
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/documents/${DOCUMENT}`,
+        { headers: cookie(tenant, ['document.delete']) },
+      );
+
+      expect(response.status).toBe(204);
+      await expectEvicted(tenant, 'documents');
+    },
+  );
 });

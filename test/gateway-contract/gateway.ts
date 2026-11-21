@@ -47,6 +47,27 @@ export type Gateway = {
 };
 
 const READY_TIMEOUT_MS = 60_000;
+
+/**
+ * Every gateway this test file started, with how much of its output
+ * {@link unreadOutput} has handed out.
+ */
+const started: { gateway: Gateway; read: number }[] = [];
+
+/**
+ * What the file's gateways have printed since the last call, stopped ones
+ * included: the fail-open guard (`fail-open.setup.ts`) reads it after each row.
+ */
+export function unreadOutput(): string {
+  return started
+    .map((entry) => {
+      const output = entry.gateway.output();
+      const fresh = output.slice(entry.read);
+      entry.read = output.length;
+      return fresh;
+    })
+    .join('\n');
+}
 const LAUNCH_ATTEMPTS = 3;
 
 /**
@@ -269,6 +290,7 @@ export async function startGateway(
       output: () => output.join(''),
       stop: () => stop(child),
     };
+    started.push({ gateway, read: 0 });
 
     try {
       await waitUntilReady(baseUrl, child, output);

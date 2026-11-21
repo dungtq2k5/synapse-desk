@@ -652,7 +652,7 @@ function ExportDialog({
       const created = await auditLogsControllerCreateExportV1({
         from,
         to,
-        filters: Object.keys(kept).length > 0 ? { ...kept } : null,
+        filters: Object.keys(kept).length > 0 ? { ...kept } : undefined,
       });
       onRequested({
         id: created.data.id,

@@ -16,7 +16,7 @@ import jakarta.validation.constraints.NotNull;
  * as possibly null). It is not redundant: removing it changes the published
  * contract.
  */
-public record StripeWebhookAcknowledgementDto(
+public record StripeWebhookAcknowledgementResponseDto(
   @NotNull boolean received,
   @NotNull String status
 ) {}

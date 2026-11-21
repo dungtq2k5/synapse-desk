@@ -2,7 +2,9 @@ package com.synapsedesk.gateway.modules.webhookendpoints.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.net.URI;
@@ -113,6 +115,7 @@ public class UpdateWebhookEndpointDto {
   }
 
   @JsonProperty("description")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   public void setDescription(@Nullable String description) {
     this.description = description;
   }

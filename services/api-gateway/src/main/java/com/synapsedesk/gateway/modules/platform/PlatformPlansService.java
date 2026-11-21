@@ -6,7 +6,6 @@ import com.synapsedesk.gateway.common.grpc.CallerMetadata;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
-import com.synapsedesk.gateway.common.web.RawJsonBody;
 import com.synapsedesk.gateway.modules.platform.dto.rest.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.AssignPlanDto;
 import com.synapsedesk.gateway.modules.platform.dto.rest.CreatePlanDto;
@@ -99,18 +98,15 @@ public class PlatformPlansService {
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
   private final IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub;
   private final SuperAdminCheck superAdminCheck;
-  private final RawJsonBody rawBody;
 
   public PlatformPlansService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
     IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub,
-    SuperAdminCheck superAdminCheck,
-    RawJsonBody rawBody
+    SuperAdminCheck superAdminCheck
   ) {
     this.stub = stub;
     this.usageStub = usageStub;
     this.superAdminCheck = superAdminCheck;
-    this.rawBody = rawBody;
   }
 
   public ResponseEntity<
@@ -253,9 +249,6 @@ public class PlatformPlansService {
     var aiModelTier = dto.getAiModelTier();
     if (aiModelTier != null) {
       wire.setAiModelTier(toProtoAiModelTier(aiModelTier.getValue()));
-    } else if (rawBody.isNull("aiModelTier")) {
-      // A literal `null` clears the tier; leaving it out leaves it alone.
-      wire.setAiModelTier(AiModelTier.AI_MODEL_TIER_UNSPECIFIED);
     }
     BigDecimal maxDocumentBytes = dto.getMaxDocumentBytes();
     if (maxDocumentBytes != null) {

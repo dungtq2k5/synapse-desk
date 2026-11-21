@@ -279,7 +279,11 @@ export function EndpointDialog({
         void refresh();
         onOpenChange(false);
       } else {
-        const created = await webhookEndpointsControllerCreateV1(body);
+        // A new endpoint has no description to clear.
+        const created = await webhookEndpointsControllerCreateV1({
+          ...body,
+          description: body.description ?? undefined,
+        });
         void refresh();
         onOpenChange(false);
         setSecret({

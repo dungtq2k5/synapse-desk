@@ -362,6 +362,29 @@ describe('Departments (e2e)', () => {
       );
     });
 
+    it('8c. **an empty description on update clears it**: stored as null, read back as none', async () => {
+      const mine = await seedTenantWithUser(fx.prisma);
+      const department = await createDepartment(fx.prisma, mine.org.id);
+      await departments.updateDepartment(
+        { id: department.id, description: 'Front line' },
+        ctx(mine),
+      );
+
+      await departments.updateDepartment(
+        { id: department.id, description: '' },
+        ctx(mine),
+      );
+
+      const row = await fx.prisma.department.findUniqueOrThrow({
+        where: { id: department.id },
+      });
+      expect(row.description).toBeNull();
+      expect(
+        (await departments.getDepartment({ id: department.id }, ctx(mine)))
+          .description,
+      ).toBeUndefined();
+    });
+
     it('8b. every write against a foreign department is 404 too', async () => {
       // A read-only tenant filter would leave update and delete wide open.
       const mine = await seedTenantWithUser(fx.prisma);

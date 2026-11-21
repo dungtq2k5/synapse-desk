@@ -583,8 +583,9 @@ function AiFeedback({
     try {
       const answer = await messageFeedbackControllerSubmitV1(messageId, {
         rating,
-        feedbackText: withDetails && text.trim() ? text.trim() : null,
-        citationAccurate: withDetails && sources ? sources === 'yes' : null,
+        feedbackText: withDetails && text.trim() ? text.trim() : undefined,
+        citationAccurate:
+          withDetails && sources ? sources === 'yes' : undefined,
       });
       queryClient.setQueryData(key, answer);
       setRating(null);

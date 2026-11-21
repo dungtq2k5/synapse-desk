@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
-import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementResponseDto;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,14 +60,14 @@ class InboundEmailControllerTest {
     byte[] body = "{\"type\":\"x\"}".getBytes(StandardCharsets.UTF_8);
     requestWithBody(body, java.util.Map.of("svix-id", "msg_1"));
     when(resendInbound.handle(any(), any())).thenReturn(
-      new ResendWebhookAcknowledgementDto(true, "ignored_event")
+      new ResendWebhookAcknowledgementResponseDto(true, "ignored_event")
     );
 
     var response = controller.inboundEmailControllerResendV1();
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody().data()).isEqualTo(
-      new ResendWebhookAcknowledgementDto(true, "ignored_event")
+      new ResendWebhookAcknowledgementResponseDto(true, "ignored_event")
     );
     org.mockito.ArgumentCaptor<byte[]> bytes =
       org.mockito.ArgumentCaptor.forClass(byte[].class);
@@ -87,7 +87,7 @@ class InboundEmailControllerTest {
     // The body filter lets a bodyless request through unwrapped.
     requestWithNoRawBody();
     when(resendInbound.handle(any(), any())).thenReturn(
-      new ResendWebhookAcknowledgementDto(true, "x")
+      new ResendWebhookAcknowledgementResponseDto(true, "x")
     );
 
     controller.inboundEmailControllerResendV1();
@@ -106,7 +106,7 @@ class InboundEmailControllerTest {
       new ServletRequestAttributes(request)
     );
     when(resendInbound.handle(any(), any())).thenReturn(
-      new ResendWebhookAcknowledgementDto(true, "x")
+      new ResendWebhookAcknowledgementResponseDto(true, "x")
     );
 
     controller.inboundEmailControllerResendV1();

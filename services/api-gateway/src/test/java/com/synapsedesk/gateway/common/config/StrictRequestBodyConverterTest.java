@@ -3,10 +3,15 @@ package com.synapsedesk.gateway.common.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,13 +21,15 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
+import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
  * A request body's JSON types must match the class exactly: nothing is converted.
  *
  * <p>So {@code "false"} is refused for a boolean rather than read as {@code true},
- * and {@code true} for a number rather than read as 1.
+ * and {@code true} for a number rather than read as 1. And an optional field refuses an
+ * explicit {@code null}, unless it declares what {@code null} means.
  */
 class StrictRequestBodyConverterTest {
 
@@ -35,6 +42,16 @@ class StrictRequestBodyConverterTest {
     public Boolean flag;
     public OffsetDateTime at;
     public URI url;
+    public List<String> tags = new ArrayList<>();
+
+    @NotNull
+    public String needed;
+
+    @JsonSetter(nulls = Nulls.AS_EMPTY)
+    public String cleared;
+
+    @JsonSetter(nulls = Nulls.SET)
+    public String unset;
   }
 
   private static final HttpMessageConverter<Object> STRICT = strict();
@@ -42,9 +59,10 @@ class StrictRequestBodyConverterTest {
   private static HttpMessageConverter<Object> strict() {
     HttpMessageConverters.ServerBuilder builder =
       HttpMessageConverters.forServer();
-    new StrictRequestBodyConverter(JsonMapper.builder().build()).customize(
-      builder
-    );
+    // The application's mapper, with its per-type rule a property's own must beat.
+    JsonMapper.Builder application = JsonMapper.builder();
+    new ExplicitNullJsonCustomizer().customize(application);
+    new StrictRequestBodyConverter(application.build()).customize(builder);
 
     // Custom converters come first. The builder types them `?`; this one reads
     // any object.
@@ -77,13 +95,37 @@ class StrictRequestBodyConverterTest {
     assertThat(fields.url).hasToString("https://example.com/a");
   }
 
-  @Test
-  void anExplicitNullIsStillNull() throws Exception {
-    Fields fields = read("{\"at\":null,\"url\":null,\"flag\":null}");
+  @ParameterizedTest
+  @ValueSource(
+    strings = { "text", "count", "amount", "flag", "at", "url", "tags" }
+  )
+  void anOptionalFieldRefusesAnExplicitNull(String field) {
+    assertThatThrownBy(() -> read("{\"" + field + "\":null}"))
+      .isInstanceOf(HttpMessageNotReadableException.class)
+      .cause()
+      .isInstanceOfSatisfying(InvalidNullException.class, refused ->
+        assertThat(refused.getPath().getLast().getPropertyName()).isEqualTo(
+          field
+        )
+      );
+  }
 
-    assertThat(fields.at).isNull();
-    assertThat(fields.url).isNull();
-    assertThat(fields.flag).isNull();
+  @Test
+  void anOptionalFieldLeftOutKeepsItsDefault() throws Exception {
+    assertThat(read("{}").tags).isEmpty();
+  }
+
+  @Test
+  void aRequiredFieldsNullIsLeftToValidation() throws Exception {
+    assertThat(read("{\"needed\":null}").needed).isNull();
+  }
+
+  @Test
+  void aFieldThatDeclaresWhatNullMeansGetsIt() throws Exception {
+    Fields fields = read("{\"cleared\":null,\"unset\":null}");
+
+    assertThat(fields.cleared).isEmpty();
+    assertThat(fields.unset).isNull();
   }
 
   @ParameterizedTest

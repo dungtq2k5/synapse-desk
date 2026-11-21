@@ -2,7 +2,9 @@ package com.synapsedesk.gateway.modules.users.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.synapsedesk.gateway.common.validation.StrictIso8601;
 import jakarta.validation.constraints.*;
 import java.util.Objects;
@@ -95,6 +97,7 @@ public class UpdateOwnProfileDto {
   }
 
   @JsonProperty("gender")
+  @JsonSetter(nulls = Nulls.SET)
   public void setGender(@Nullable GenderEnum gender) {
     this.gender = gender;
   }
@@ -116,6 +119,7 @@ public class UpdateOwnProfileDto {
   }
 
   @JsonProperty("dob")
+  @JsonSetter(nulls = Nulls.SET)
   public void setDob(@Nullable String dob) {
     this.dob = dob;
   }

@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DatabindException;
+import tools.jackson.databind.exc.InvalidNullException;
 import tools.jackson.databind.exc.MismatchedInputException;
 import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.exc.ValueInstantiationException;
@@ -20,6 +21,7 @@ import tools.jackson.databind.exc.ValueInstantiationException;
  * ({@code java.lang.String}, {@code JsonToken.START_OBJECT}).
  *
  * @example {@code property extra should not exist}, {@code password must be a string},
+ *     {@code tags can't be null; leave it out instead},
  *     {@code priority must be one of LOW, MEDIUM, HIGH, URGENT}
  */
 final class BodyBindingMessage {
@@ -35,6 +37,10 @@ final class BodyBindingMessage {
 
     if (binding instanceof UnrecognizedPropertyException) {
       return "property " + path + " should not exist";
+    }
+    if (binding instanceof InvalidNullException) {
+      // An optional field sent as null (StrictRequestBodyConverter).
+      return path + " can't be null; leave it out instead";
     }
     String subject = path.isEmpty() ? "the request body" : path;
     if (

@@ -10,7 +10,7 @@ import com.synapsedesk.gateway.common.throttle.SkipThrottle;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
-import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementResponseDto;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * answers 200 for every outcome except a bad signature (401) and a fetch failure
  * a retry can fix (503), and counts every exit once.
  *
- * <p>{@link ResendWebhookAcknowledgementDto} names what the handler returns;
+ * <p>{@link ResendWebhookAcknowledgementResponseDto} names what the handler returns;
  * the published contract once borrowed an unrelated route's envelope for it.
  */
 @Tag(name = "Webhooks")
@@ -63,7 +63,7 @@ public class InboundEmailController {
   @SkipThrottle
   @ApiErrors(value = { "401", "503" }, throttled = false)
   public ResponseEntity<
-    ApiResponse<ResendWebhookAcknowledgementDto>
+    ApiResponse<ResendWebhookAcknowledgementResponseDto>
   > inboundEmailControllerResendV1() {
     HttpServletRequest request = CurrentRequest.request();
     byte[] rawBody =

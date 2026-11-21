@@ -50,12 +50,16 @@ describe('realtime across replicas, and the cache', () => {
   let nats: NatsConnection;
   const sockets: Socket[] = [];
 
-  const token = (sub: string, permissionCodes = ['role.read']) =>
+  const token = (
+    sub: string,
+    permissionCodes = ['role.read'],
+    isSuperAdmin = false,
+  ) =>
     sign(
       {
         sub,
         organizationId: ORGANIZATION,
-        isSuperAdmin: false,
+        isSuperAdmin,
         departmentIds: [],
         permissionCodes,
         isEmailVerified: true,
@@ -69,13 +73,14 @@ describe('realtime across replicas, and the cache', () => {
     gateway: Gateway,
     sub: string,
     permissionCodes?: string[],
+    isSuperAdmin?: boolean,
   ) => {
     const socket = io(`${gateway.wsUrl}${REALTIME_SOCKET.namespace}`, {
       transports: ['websocket'],
       reconnection: false,
       forceNew: true,
       extraHeaders: {
-        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(sub, permissionCodes)}`,
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(sub, permissionCodes, isSuperAdmin)}`,
       },
     });
     sockets.push(socket);
@@ -216,6 +221,29 @@ describe('realtime across replicas, and the cache', () => {
   );
 
   rowFor('Tickets')(
+    "**a Super Admin's socket gets no `ticket:created`**: they reach a tenant only through the platform API",
+    async () => {
+      // A Super Admin's token names no tenant (the database ties the two), so
+      // this one names it, and holds an agent's permission, to put the
+      // decision on the agent predicate alone.
+      const superAdmin = await connectClient(
+        first,
+        '77777777-7777-4777-8777-777777777777',
+        AGENT,
+        true,
+      );
+      const agent = await connectClient(second, ALICE, AGENT);
+      const seen = [superAdmin, agent].map((socket) =>
+        counter(socket, REALTIME_EVENTS.ticketCreated),
+      );
+
+      await publishCreated(CAROL);
+
+      expect(seen.map((frames) => frames())).toEqual([0, 1]);
+    },
+  );
+
+  rowFor('Tickets')(
     '**`ticket:viewers` names the agents in a ticket across replicas, never to an end user**',
     async () => {
       // A fresh ticket per run: the set lives in the run's Redis.
@@ -272,6 +300,8 @@ describe('realtime across replicas, and the cache', () => {
       await settle();
 
       expect(toAlice.at(-1)).toEqual([ALICE]);
+      // Still none: the list sent after she joined goes to the agents' room.
+      expect(toCarol).toEqual([]);
     },
   );
 

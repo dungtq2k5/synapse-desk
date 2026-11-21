@@ -32,6 +32,7 @@ import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
 import { rowFor } from './pending';
+import { allowFailOpen } from './fail-open';
 
 describe('the tenant lifecycle gate', () => {
   let gateway: Gateway;
@@ -384,6 +385,8 @@ describe('the tenant lifecycle gate', () => {
   rowFor('Ops')(
     '**a cached value that cannot be read is a miss, not an error — the gate asks and carries on**',
     async () => {
+      // The unreadable value is the point: the line it logs is staged.
+      allowFailOpen('Status cache unavailable');
       tenantIs(OrgStatus.ACTIVE);
       await redis.set(await cacheKey(), 'not json at all', 'EX', 30);
 
@@ -494,6 +497,79 @@ describe('the tenant lifecycle gate', () => {
     },
   );
 
+  /** The tenant's cached `GET /organizations/current`, seeded directly. */
+  const ORGANIZATION_READ = `cache:${ORGANIZATION}|organizations|`;
+
+  rowFor('Platform')(
+    "**a platform write also evicts the organization's cached `GET /organizations/current`** — the tenant reads its new name at once",
+    async () => {
+      await redis.set(ORGANIZATION_READ, '{}');
+      peers.auth.on('PlatformService/UpdateOrganization').reply({
+        organization: {
+          id: ORGANIZATION,
+          name: 'Acme Renamed',
+          slug: 'acme',
+          status: 'ORG_STATUS_ACTIVE',
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          maxAgentSeats: 5,
+          maxStorageBytes: '1000000',
+          monthlyAiTokenBudget: '1000000',
+          billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        userCount: 3,
+        pendingInvitationCount: 0,
+        departmentCount: 1,
+      });
+
+      const changed = await session().request(
+        'PATCH',
+        `${API}/platform/organizations/${ORGANIZATION}`,
+        { body: { name: 'Acme Renamed' }, headers: superAdminHeaders() },
+      );
+
+      expect(changed.status).toBe(200);
+      expect(await redis.exists(ORGANIZATION_READ)).toBe(0);
+    },
+  );
+
+  rowFor('Platform')(
+    "**a billing-cycle reset evicts the organization's cached `GET /organizations/current`**, which shows the cycle's start",
+    async () => {
+      await redis.set(ORGANIZATION_READ, '{}');
+      peers.auth.on('PlatformService/ResetBillingCycle').reply({
+        organization: {
+          id: ORGANIZATION,
+          name: 'Acme',
+          slug: 'acme',
+          status: 'ORG_STATUS_ACTIVE',
+          enforceTwoFactor: false,
+          allowedEmailDomains: [],
+          maxAgentSeats: 5,
+          maxStorageBytes: '1000000',
+          monthlyAiTokenBudget: '1000000',
+          billingCycleStart: { seconds: 1_756_771_200, nanos: 0 },
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        userCount: 3,
+        pendingInvitationCount: 0,
+        departmentCount: 1,
+      });
+
+      const reset = await session().post(
+        `${API}/platform/organizations/${ORGANIZATION}/billing-cycle/reset`,
+        { reason: 'Outage credit' },
+        superAdminHeaders(),
+      );
+
+      expect(reset.status).toBe(200);
+      expect(await redis.exists(ORGANIZATION_READ)).toBe(0);
+    },
+  );
+
   rowFor('Ops')(
     '**a tenant deleting its own organization is refused on its next request — the cached ACTIVE is dropped, not served for thirty seconds**',
     async () => {
@@ -521,6 +597,39 @@ describe('the tenant lifecycle gate', () => {
       expect(statusCalls()).toHaveLength(2);
       expect(next.status).toBe(403);
       expect(errorOf(next.body)).toBe(enveloped(REFUSAL.FROZEN));
+    },
+  );
+
+  rowFor('Organizations')(
+    '**completing onboarding drops the cached decision at once** — a tenant that just finished is not refused for thirty seconds',
+    async () => {
+      tenantIs(OrgStatus.PENDING_ONBOARDING);
+      await ROUTES.READ.send();
+      expect(await redis.exists(await cacheKey())).toBe(1);
+      peers.auth.on('OrganizationService/CompleteOnboarding').reply({
+        id: ORGANIZATION,
+        name: 'Acme',
+        slug: 'acme',
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+        enforceTwoFactor: false,
+        allowedEmailDomains: [],
+        maxAgentSeats: 5,
+        maxStorageBytes: '1000000',
+        monthlyAiTokenBudget: '1000000',
+        aiModelTier: 'AI_MODEL_TIER_FAST',
+        billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
+
+      const completed = await session().post(
+        `${API}/organizations/current/onboarding/complete`,
+        undefined,
+        headers(['organization.update']),
+      );
+
+      expect(completed.status).toBe(200);
+      expect(await redis.exists(await cacheKey())).toBe(0);
     },
   );
 

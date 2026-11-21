@@ -15,4 +15,4 @@ import jakarta.validation.constraints.NotNull;
  * as possibly null). It is not redundant: removing it changes the published
  * contract.
  */
-public record RevokedCountDto(@NotNull int revokedCount) {}
+public record RevokedCountResponseDto(@NotNull int revokedCount) {}

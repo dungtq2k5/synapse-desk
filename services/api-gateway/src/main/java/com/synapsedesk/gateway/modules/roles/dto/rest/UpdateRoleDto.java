@@ -1,6 +1,8 @@
 package com.synapsedesk.gateway.modules.roles.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.constraints.*;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +33,7 @@ public class UpdateRoleDto {
   }
 
   @JsonProperty("description")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   public void setDescription(@Nullable String description) {
     this.description = description;
   }

@@ -342,7 +342,7 @@ function ResolveForm({
     setError(null);
     setBusy(true);
     try {
-      await copy.call(flag.id, { comment: trimmed || null });
+      await copy.call(flag.id, { comment: trimmed || undefined });
       toast.success('Flag resolved.');
       void refresh();
       onDone();

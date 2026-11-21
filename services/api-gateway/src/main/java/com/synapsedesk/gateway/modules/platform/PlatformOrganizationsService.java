@@ -419,6 +419,8 @@ public class PlatformOrganizationsService {
         .build()
     );
 
+    // The cached GET /organizations/current shows the cycle's start.
+    statuses.invalidate(id);
     return ok200(
       toPlatformOrganizationResponseDto(response),
       "Billing cycle reset — this desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget"

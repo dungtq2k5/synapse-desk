@@ -249,7 +249,6 @@ describe('the list, New role and Delete', () => {
     );
     expect(calls.find((call) => call.method === 'POST')?.body).toEqual({
       name: 'Night shift',
-      description: null,
       permissionCodes: ['ticket.create'],
     });
   });

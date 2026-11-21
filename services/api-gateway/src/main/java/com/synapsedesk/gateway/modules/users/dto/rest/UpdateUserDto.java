@@ -2,7 +2,9 @@ package com.synapsedesk.gateway.modules.users.dto.rest;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.synapsedesk.gateway.common.validation.StrictIso8601;
 import com.synapsedesk.gateway.common.validation.ValidPhoneNumber;
 import jakarta.validation.constraints.*;
@@ -99,6 +101,7 @@ public class UpdateUserDto {
   }
 
   @JsonProperty("phoneNumber")
+  @JsonSetter(nulls = Nulls.SET)
   public void setPhoneNumber(@Nullable String phoneNumber) {
     this.phoneNumber = phoneNumber;
   }
@@ -119,6 +122,7 @@ public class UpdateUserDto {
   }
 
   @JsonProperty("gender")
+  @JsonSetter(nulls = Nulls.SET)
   public void setGender(@Nullable GenderEnum gender) {
     this.gender = gender;
   }
@@ -140,6 +144,7 @@ public class UpdateUserDto {
   }
 
   @JsonProperty("dob")
+  @JsonSetter(nulls = Nulls.SET)
   public void setDob(@Nullable String dob) {
     this.dob = dob;
   }

@@ -104,7 +104,7 @@ export function NotificationPreferences() {
       [key]: {
         ...change,
         source: 'EXPLICIT',
-      } as Partial<PreferenceResponseDto>,
+      },
     }));
     setSaving('saving');
     try {

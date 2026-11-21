@@ -10,7 +10,7 @@ import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.AttachmentLis
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.AttachmentSource;
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.Email;
 import com.synapsedesk.gateway.modules.inboundemail.ResendPayloads.Event;
-import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.inboundemail.dto.rest.ResendWebhookAcknowledgementResponseDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import java.time.Instant;
@@ -117,7 +117,7 @@ public class ResendInboundService {
    *     does not verify; 503 when fetching the mail failed in a way a later retry
    *     can fix
    */
-  public ResendWebhookAcknowledgementDto handle(
+  public ResendWebhookAcknowledgementResponseDto handle(
     byte[] rawBody,
     Function<String, String> header
   ) {
@@ -374,10 +374,10 @@ public class ResendInboundService {
     metrics.inboundEmail(outcome);
   }
 
-  private ResendWebhookAcknowledgementDto ok(String outcome) {
+  private ResendWebhookAcknowledgementResponseDto ok(String outcome) {
     count(outcome);
 
-    return new ResendWebhookAcknowledgementDto(true, outcome);
+    return new ResendWebhookAcknowledgementResponseDto(true, outcome);
   }
 
   private ResponseStatusException reject(String outcome) {

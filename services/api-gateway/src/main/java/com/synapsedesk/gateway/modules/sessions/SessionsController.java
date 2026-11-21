@@ -11,7 +11,7 @@ import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokeTrustResponseDto;
-import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountDto;
+import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountResponseDto;
 import com.synapsedesk.gateway.modules.sessions.dto.rest.SessionResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -165,7 +165,7 @@ public class SessionsController {
   )
   @ApiErrors({ "400", "401", "404" })
   public ResponseEntity<
-    ApiResponse<RevokedCountDto>
+    ApiResponse<RevokedCountResponseDto>
   > sessionsControllerRevokeV1(@PathVariable("id") String id) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
@@ -188,7 +188,7 @@ public class SessionsController {
       ApiResponse.of(
         200,
         "Session revoked",
-        new RevokedCountDto(response.getRevokedCount())
+        new RevokedCountResponseDto(response.getRevokedCount())
       )
     );
   }

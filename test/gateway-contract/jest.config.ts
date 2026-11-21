@@ -33,6 +33,7 @@ const config: Config = {
       '<rootDir>/../../packages/grpc-proto/src/$1',
   },
   globalSetup: '<rootDir>/global-setup.ts',
+  setupFilesAfterEnv: ['<rootDir>/fail-open.setup.ts'],
   globalTeardown: '<rootDir>/global-teardown.ts',
   maxWorkers: 1,
   testTimeout: 60_000,

@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import com.synapsedesk.gateway.common.web.CachedBodyRequest;
-import com.synapsedesk.gateway.modules.billing.dto.rest.StripeWebhookAcknowledgementDto;
+import com.synapsedesk.gateway.modules.billing.dto.rest.StripeWebhookAcknowledgementResponseDto;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -80,7 +80,7 @@ class WebhooksControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody().data()).isEqualTo(
-      new StripeWebhookAcknowledgementDto(true, "applied")
+      new StripeWebhookAcknowledgementResponseDto(true, "applied")
     );
 
     org.mockito.ArgumentCaptor<StripeWebhookRequest> captor =

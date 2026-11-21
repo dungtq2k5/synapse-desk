@@ -60,9 +60,14 @@ public record JwtPrincipal(
    * An agent by ticket-service's own definition: a holder of
    * {@code ticket.read.all} or {@code ticket.message.moderate}. It decides who
    * sees internal notes there, and who joins the agents-only rooms here.
+   *
+   * <p>Never a Super Admin: they reach a tenant's data only through the
+   * platform API, so they join neither the agents' room nor a ticket's
+   * internal room.
    */
   public boolean isAgent() {
     return (
+      !isSuperAdmin &&
       permissionCodes != null &&
       (permissionCodes.contains("ticket.read.all") ||
         permissionCodes.contains("ticket.message.moderate"))

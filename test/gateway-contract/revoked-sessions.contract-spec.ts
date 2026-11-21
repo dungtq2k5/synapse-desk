@@ -8,6 +8,7 @@
  * is a fake here, so the row writes the key as auth-service does.
  */
 
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import Redis from 'ioredis';
 import { io, type Socket } from 'socket.io-client';
 import { sign } from 'jsonwebtoken';
@@ -160,11 +161,17 @@ describe('revoked sessions', () => {
         extraHeaders: cookieFor(a),
       });
       sockets.push(socket);
+      // Refused at the door, not let in and dropped by the sweep later.
+      let admitted = false;
+      socket.once(REALTIME_EVENTS.connectionReady, () => {
+        admitted = true;
+      });
 
       await expect(refusal(socket)).resolves.toEqual([
         CONNECTION_REFUSED_CODES.unauthenticated,
         'io server disconnect',
       ]);
+      expect(admitted).toBe(false);
     },
   );
 
@@ -183,6 +190,29 @@ describe('revoked sessions', () => {
         CONNECTION_REFUSED_CODES.unauthenticated,
         'io server disconnect',
       ]);
+    },
+  );
+
+  rowFor('Auth')(
+    '**a revoked session is not signed in: its device reaches the sign-in form**',
+    async () => {
+      peers.auth
+        .on('AuthService/Login')
+        .fail(GrpcStatus.UNAUTHENTICATED, 'Invalid credentials');
+      const signIn = (sid: string) =>
+        new Session(gateway.baseUrl).post(
+          `${API}/auth/login`,
+          { email: 'ada@example.com', password: 'wrong' },
+          cookieFor(sid),
+        );
+      const live = family();
+      const revoked = family();
+      await redis.set(`${REVOKED_SESSION_KEY_PREFIX}${revoked}`, '1', 'EX', 60);
+
+      // A live session is turned away by the guest-only guard; a revoked one
+      // reaches the handler, which here refuses the wrong password.
+      expect((await signIn(live)).status).toBe(400);
+      expect((await signIn(revoked)).status).toBe(401);
     },
   );
 

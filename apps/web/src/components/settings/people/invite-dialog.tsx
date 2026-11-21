@@ -175,7 +175,7 @@ function InviteDialog({
       email,
       roleIds,
       departmentIds,
-      primaryDepartmentId: primary || null,
+      primaryDepartmentId: primary || undefined,
     }));
 
   const preview = async () => {

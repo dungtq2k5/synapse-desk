@@ -371,7 +371,7 @@ function Loaded({
                     (
                       await aiControllerGenerateDraftV1(
                         ticket.id,
-                        { instruction },
+                        { instruction: instruction ?? undefined },
                         { signal },
                       )
                     ).data

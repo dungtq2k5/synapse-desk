@@ -9,7 +9,7 @@ import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
-import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountDto;
+import com.synapsedesk.gateway.modules.sessions.dto.rest.RevokedCountResponseDto;
 import com.synapsedesk.gateway.modules.sessions.dto.rest.SessionResponseDto;
 import io.grpc.stub.MetadataUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,7 +36,7 @@ import synapsedesk.auth.SessionServiceGrpc;
  * auth-service is already paid for, so no new bean here.
  *
  * <p>`revoke`'s {@code data} is the {@code {revokedCount}} shape
- * {@link RevokedCountDto} names.
+ * {@link RevokedCountResponseDto} names.
  */
 @Tag(name = "User Sessions")
 @RestController
@@ -102,7 +102,7 @@ public class UserSessionsController {
   @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_SESSION_REVOKE)
   public ResponseEntity<
-    ApiResponse<RevokedCountDto>
+    ApiResponse<RevokedCountResponseDto>
   > userSessionsControllerRevokeV1(@PathVariable("userId") String userId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -116,7 +116,7 @@ public class UserSessionsController {
       ApiResponse.of(
         200,
         "Sessions revoked",
-        new RevokedCountDto(response.getRevokedCount())
+        new RevokedCountResponseDto(response.getRevokedCount())
       )
     );
   }

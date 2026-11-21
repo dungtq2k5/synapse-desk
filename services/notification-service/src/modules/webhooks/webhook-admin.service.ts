@@ -143,9 +143,10 @@ export class WebhookAdminService {
       where: { id: current.id },
       data: {
         ...(request.url === undefined ? {} : { url: request.url }),
+        // The empty string clears it, stored as no description at all.
         ...(request.description === undefined
           ? {}
-          : { description: request.description }),
+          : { description: request.description || null }),
         ...(eventTypes === undefined ? {} : { eventTypes }),
         ...(request.isActive === undefined
           ? {}

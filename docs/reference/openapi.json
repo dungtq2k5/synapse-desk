@@ -1699,7 +1699,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseStripeWebhookAcknowledgementDto"
+                  "$ref": "#/components/schemas/ApiResponseStripeWebhookAcknowledgementResponseDto"
                 }
               }
             }
@@ -1806,7 +1806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseResendWebhookAcknowledgementDto"
+                  "$ref": "#/components/schemas/ApiResponseResendWebhookAcknowledgementResponseDto"
                 }
               }
             }
@@ -46259,7 +46259,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseRevokedCountDto"
+                  "$ref": "#/components/schemas/ApiResponseRevokedCountResponseDto"
                 }
               }
             }
@@ -61573,7 +61573,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseRevokedCountDto"
+                  "$ref": "#/components/schemas/ApiResponseRevokedCountResponseDto"
                 }
               }
             }
@@ -63323,7 +63323,7 @@
         },
         "required": ["errorCode", "status", "waitingReason"]
       },
-      "ApiResponseStripeWebhookAcknowledgementDto": {
+      "ApiResponseStripeWebhookAcknowledgementResponseDto": {
         "type": "object",
         "properties": {
           "success": {
@@ -63343,12 +63343,12 @@
             "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
-            "$ref": "#/components/schemas/StripeWebhookAcknowledgementDto"
+            "$ref": "#/components/schemas/StripeWebhookAcknowledgementResponseDto"
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
-      "StripeWebhookAcknowledgementDto": {
+      "StripeWebhookAcknowledgementResponseDto": {
         "type": "object",
         "properties": {
           "received": {
@@ -63360,7 +63360,7 @@
         },
         "required": ["received", "status"]
       },
-      "ApiResponseResendWebhookAcknowledgementDto": {
+      "ApiResponseResendWebhookAcknowledgementResponseDto": {
         "type": "object",
         "properties": {
           "success": {
@@ -63380,12 +63380,12 @@
             "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
-            "$ref": "#/components/schemas/ResendWebhookAcknowledgementDto"
+            "$ref": "#/components/schemas/ResendWebhookAcknowledgementResponseDto"
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
-      "ResendWebhookAcknowledgementDto": {
+      "ResendWebhookAcknowledgementResponseDto": {
         "type": "object",
         "properties": {
           "received": {
@@ -63406,7 +63406,7 @@
             "maxLength": 2000
           },
           "description": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 500
           },
           "eventTypes": {
@@ -63584,7 +63584,7 @@
         "type": "object",
         "properties": {
           "roleIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -63592,7 +63592,7 @@
             }
           },
           "departmentIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -63609,7 +63609,7 @@
             "minLength": 2
           },
           "primaryDepartmentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid"
           }
         },
@@ -63650,7 +63650,7 @@
             "minLength": 1
           },
           "lockedUntil": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "date-time",
             "description": "When the lock should lapse.\n\n**Absent means INDEFINITE**, which is the existing product and the default\nan admin gets by not thinking about it.\n\n**A PAST date is rejected**, not accepted. The database would take\nit happily and the account would lock and unlock in the same instant —\nlegal, and incomprehensible to the admin who set it and the user who got\nthe email. Validated here and re-checked in auth-service, because the\ngateway is not the only possible caller.\n\nMust be a date in the future."
           }
@@ -63846,7 +63846,7 @@
         "type": "object",
         "properties": {
           "roleIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "PROPOSALS, resolved at redemption rather than now. A role deleted during\nthe 7-day window is skipped and reported, never fatal.",
             "items": {
@@ -63855,7 +63855,7 @@
             }
           },
           "departmentIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -63867,7 +63867,7 @@
             "format": "email"
           },
           "primaryDepartmentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid"
           }
         },
@@ -64034,7 +64034,7 @@
         "type": "object",
         "properties": {
           "roleIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -64042,7 +64042,7 @@
             }
           },
           "departmentIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -64054,7 +64054,7 @@
             "maxLength": 320
           },
           "primaryDepartmentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 64
           }
         },
@@ -64156,7 +64156,7 @@
             "pattern": "^(?=[\\s\\S]*[a-z])(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])(?=[\\s\\S]*[\\-#!$@£%^&*()_+|~=`{}\\[\\]:\";'<>?,./\\\\ ])[\\s\\S]{8,}$"
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Labels the session this call creates, in the user's active-device list.\n\nOptional: the client sends what it can identify itself as, and a session\nwith no label is still a session.",
             "maxLength": 100
           }
@@ -64215,20 +64215,20 @@
             "minLength": 3
           },
           "priority": {
-            "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+            "type": "string",
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "source": {
-            "type": ["string", "null"],
-            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
+            "type": "string",
+            "enum": ["API", "CHAT", "EMAIL", "WEB"]
           },
           "authorId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid",
             "description": "Raising a ticket on behalf of an end user. Only an agent may (a super\nadmin, or a holder of `ticket.read.all` or `ticket.message.moderate`);\nanyone else naming someone other than themselves gets a 403.\n\nAbsent means \"the caller\", which is the ordinary case and needs no\nvalidation because the id comes from a verified token. When present it is\nchecked against auth-service before the insert — there is no foreign key\nthat could do it, since `users` lives in another database."
           },
           "attachments": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "Files already uploaded through `POST /tickets/attachments/upload-url`,\nbound to the ticket's opening as it is created. A path that fails its\nconfirm comes back in `skippedAttachments`; the ticket is created\nregardless.",
             "items": {
@@ -64507,17 +64507,17 @@
             "minLength": 1
           },
           "isInternalNote": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": false,
             "description": "Agent-only, enforced in ticket-service rather than by a route permission:\nthe route itself must stay open to end users, who post ordinary replies\nthrough it."
           },
           "invokeAi": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": false,
             "description": "Ask for an AI draft after this message lands.\n\nTwo writes, never one: the draft can fail without losing what the human\ntyped. Today it always fails — `rag-service` does not exist — and the\ncaller's own message still commits, which is exactly the behaviour that\nhas to survive Domain C shipping."
           },
           "attachments": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "Objects already uploaded, bound to this message as it is created\n\n\n**This is the ordering that makes a first-turn attachment readable.**\nPresign then confirm-against-a-message meant the row could only exist after\nthe message did, while `invokeAi` runs during the create — so the very\nscreenshot the question was about arrived a moment too late to be seen.\n\nA path that fails its confirm comes back in `skippedAttachments` and the\nmessage is still created, and that is why that is the only safe outcome.",
             "items": {
@@ -64525,7 +64525,7 @@
             }
           },
           "generatedFromId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid",
             "description": "The `ai_generations` row this reply came from — `AiDraftResponseDto`'s\n`generationId`, handed back.\n\nSend it when posting an AI-drafted reply so the draft is recorded ACCEPTED\nor EDITED rather than DISCARDED. Absent for an ordinary reply."
           }
@@ -64988,7 +64988,7 @@
         "type": "object",
         "properties": {
           "instruction": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "An optional steer from the agent — \"shorter\", \"offer the refund\".\n\nAbsent means \"draft from the thread alone\", which is the ordinary case.\nBounded because this is user text that reaches a model prompt: an unbounded\nfield here is an unbounded token bill, quite apart from what someone could\ntry to write into it.",
             "maxLength": 500,
             "minLength": 1
@@ -65136,7 +65136,7 @@
             ]
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 500
           }
         },
@@ -65318,7 +65318,7 @@
         "type": "object",
         "properties": {
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves.",
             "maxLength": 500
           }
@@ -65337,7 +65337,7 @@
             "description": "Required, not inferred from the assignee's primary department.\n\nInferring it would put the ticket wherever that agent happens to sit, which\nis wrong the moment someone belongs to two teams — and it would make the\nqueue a ticket lands in depend on a fact about a PERSON rather than a\ndecision about the WORK. Both ids are validated against auth-service before\nanything is written."
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Why it moved. Absent means the service decides from context: `INITIAL` for\na first assignment, `MANUAL` for any later one.",
             "enum": [
               "DEPARTMENT_CHANGE",
@@ -65346,8 +65346,7 @@
               "LOAD_BALANCING",
               "MANUAL",
               "SELF_ASSIGNED",
-              "UNAVAILABLE",
-              null
+              "UNAVAILABLE"
             ]
           }
         },
@@ -65443,7 +65442,7 @@
         "type": "object",
         "properties": {
           "readAt": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "date-time"
           }
         }
@@ -65497,7 +65496,7 @@
         "type": "object",
         "properties": {
           "filters": {
-            "type": ["object", "null"],
+            "type": "object",
             "additionalProperties": {},
             "description": "`status`, `priority`, `assigneeId` — refused per kind at the service."
           },
@@ -65510,7 +65509,7 @@
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           },
           "departmentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid"
           }
         },
@@ -65614,7 +65613,7 @@
             ]
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 500
           }
         },
@@ -65740,7 +65739,7 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
@@ -65823,7 +65822,7 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
@@ -65891,11 +65890,11 @@
         "type": "object",
         "properties": {
           "isActive": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": true
           },
           "prices": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "$ref": "#/components/schemas/CreatePlanPriceDto"
@@ -65907,7 +65906,7 @@
             "minLength": 2
           },
           "stripeProductId": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "pattern": "^[A-Za-z0-9_-]+$"
           },
@@ -66259,7 +66258,7 @@
         "type": "object",
         "properties": {
           "allowedEmailDomains": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string"
@@ -66277,7 +66276,7 @@
             "minLength": 2
           },
           "domain": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255
           },
           "adminEmail": {
@@ -66290,15 +66289,15 @@
             "minLength": 2
           },
           "maxAgentSeats": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 1
           },
           "maxStorageBytes": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 0
           },
           "monthlyAiTokenBudget": {
-            "type": ["number", "null"],
+            "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
             "minimum": 0
           }
@@ -66625,7 +66624,7 @@
             "format": "uuid"
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Recorded in the audit log, with who assigned it. Required to assign; a\ndry run may leave it out.",
             "maxLength": 500
           }
@@ -66735,7 +66734,7 @@
             "pattern": "^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$"
           },
           "organizationId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid",
             "description": "One organization only. Absent, every tenant with activity in the range,\nas the schedule does."
           }
@@ -66849,7 +66848,7 @@
         "type": "object",
         "properties": {
           "ids": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -66857,11 +66856,11 @@
             }
           },
           "resourceType": {
-            "type": ["string", "null"],
-            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER", null]
+            "type": "string",
+            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
           },
           "resourceId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid"
           }
         }
@@ -66879,7 +66878,7 @@
             "enum": ["ANDROID", "IOS", "WEB"]
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100
           }
         },
@@ -66945,12 +66944,12 @@
             "enum": [-1, 1]
           },
           "feedbackText": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 20000,
             "minLength": 1
           },
           "citationAccurate": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "description": "Whether the citations the model gave were accurate.\n\nTri-state on purpose — absent means \"not assessed\", which is different from\n\"assessed and wrong\". Collapsing the two would make every un-assessed reply\nlook like a citation failure in the quality report."
           }
         },
@@ -67042,13 +67041,13 @@
         "type": "object",
         "properties": {
           "limit": {
-            "type": ["number", "null"],
+            "type": "number",
             "default": 0,
             "maximum": 50,
             "minimum": 0
           },
           "skipRerank": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": false,
             "description": "Returns what the RETRIEVER found, before the reranker had an opinion.\n\nA diagnostic rather than a performance switch: a Knowledge Manager asking\n\"why isn't this document coming back\" needs to know whether it lost at\nretrieval or at rerank, and those are different problems with different\nfixes."
           },
@@ -67315,7 +67314,7 @@
         "type": "object",
         "properties": {
           "ocrLanguages": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nRe-declared rather than inherited, and NOT carried over from the document\nbeing replaced: reading a scan in the wrong language is one of the main\nreasons to replace one, so the previous value is exactly what a caller may\nbe here to change. Absent means `[]`, which is the `eng` fallback — the\nsame meaning it has on confirm.",
             "items": {
@@ -67356,7 +67355,7 @@
             "minLength": 1
           },
           "replaceDocumentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid",
             "description": "The document this upload will replace, for a replace's presign. It isn't\ncharged against the document limit, and its pending file (which the\nreplace supersedes) leaves the storage total. Requires\n`document.update`; an id the caller can't update answers 404, like a\nmissing document."
           }
@@ -67413,7 +67412,7 @@
         "type": "object",
         "properties": {
           "comment": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 2000
           }
         }
@@ -67529,12 +67528,12 @@
         "type": "object",
         "properties": {
           "isOrganizationWide": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": true,
             "description": "Defaults TRUE, matching RDM Table 17.\n\nThe permissive default is deliberate and worth stating: a knowledge base\nwhose documents defaulted to invisible would look broken to everyone who\ndid not also configure departments, and the failure mode of the other\ndefault — a document nobody can find — is a support ticket rather than a\ndisclosure. Restricting is then an explicit act."
           },
           "departmentIds": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "items": {
               "type": "string",
@@ -67542,7 +67541,7 @@
             }
           },
           "ocrLanguages": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nAn advanced field: leave it empty unless the upload is known to be scanned.\n`[]` and absent are the same thing, and the parser falls back to `eng`.",
             "items": {
@@ -67562,7 +67561,7 @@
             "minLength": 1
           },
           "fileName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255
           }
         },
@@ -67572,7 +67571,7 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 2000
           },
@@ -67656,7 +67655,7 @@
         "type": "object",
         "properties": {
           "isPrimary": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": false,
             "description": "Makes THIS department primary for every user in the batch. A user has at\nmost one primary, so setting it here demotes whichever they had."
           },
@@ -67722,7 +67721,7 @@
             "maxLength": 1000
           },
           "stack": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Kept truncated."
           },
           "path": {
@@ -67731,7 +67730,7 @@
             "maxLength": 2000
           },
           "buildId": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The web build that reported it (`GIT_SHA`).",
             "maxLength": 64
           }
@@ -67753,11 +67752,11 @@
             "minLength": 1
           },
           "priority": {
-            "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+            "type": "string",
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "attachments": {
-            "type": ["array", "null"],
+            "type": "array",
             "default": [],
             "description": "The question's files, already uploaded through\n`POST /tickets/attachments/upload-url`. Bound before the first answer is\nasked for, so the answer reads them. A path that fails its confirm comes\nback in `skippedAttachments`; the conversation starts regardless.",
             "items": {
@@ -68149,7 +68148,7 @@
         "type": "object",
         "properties": {
           "allDevices": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "description": "Log out of all devices."
           }
         }
@@ -68234,7 +68233,7 @@
             "format": "email"
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Display label for the \"your active sessions\" screen (\"Chrome on macOS\").\n\nIts destination is `device_sessions.device_name`, written when the session\nrow is created — which is why it looks unused in `login()`. Being\nclient-supplied, it must never influence a security decision: device trust\nis proven with the separate `deviceToken` cookie, a secret the server\nissued.\n\n`@MaxLength(100)` mirrors `device_sessions.device_name VarChar(100)`;\nwithout it an oversized value is a Postgres error on insert rather than a\n400 at the edge.\n\nOptional rather than nullable: absent means \"the client did not label this\ndevice\", which is what the proto's `optional string` expects.\n\n**There is deliberately no `ipAddress` field.** A body field is whatever\nthe client says it is, so accepting one would let an attacker post\n`{\"ipAddress\": \"10.0.0.1\"}` to poison the audit trail and evade IP-based\nlockout. The gateway derives it from the transport.",
             "maxLength": 100
           }
@@ -68300,7 +68299,7 @@
             "format": "uuid"
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100
           }
         },
@@ -68315,7 +68314,7 @@
             "minLength": 1
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100
           }
         },
@@ -68367,7 +68366,7 @@
             "minLength": 6
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The new session's device label, used only when enabling through the sign-in challenge signs you in.",
             "maxLength": 100
           }
@@ -68475,21 +68474,21 @@
         "type": "object",
         "properties": {
           "backupCode": {
-            "type": ["string", "null"],
+            "type": "string",
             "minLength": 1
           },
           "rememberDevice": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "default": false,
             "description": "Skip the code on this device for a while. Ignored for a Super Admin."
           },
           "code": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 6,
             "minLength": 6
           },
           "deviceName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100
           }
         }
@@ -68535,7 +68534,7 @@
         "type": "object",
         "properties": {
           "filters": {
-            "type": ["object", "null"],
+            "type": "object",
             "additionalProperties": {},
             "description": "`action`, `resourceType`, `userId` — refused per kind at the service."
           },
@@ -68554,7 +68553,7 @@
         "type": "object",
         "properties": {
           "filters": {
-            "type": ["object", "null"],
+            "type": "object",
             "additionalProperties": {},
             "description": "Per-kind predicates the three kinds do not share.\n\nValidated at the SERVICE against `EXPORT_FILTER_KEYS`, not here: the\nallowed keys differ per kind, and a DTO cannot see which kind it carries\nwithout splitting into three. An unknown key is refused rather than stored\nand ignored — a filter the caller believes applied and that silently did\nnot is the failure this shape is most exposed to."
           },
@@ -68571,7 +68570,7 @@
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "departmentId": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uuid"
           }
         },
@@ -68581,7 +68580,7 @@
         "type": "object",
         "properties": {
           "url": {
-            "type": ["string", "null"],
+            "type": "string",
             "format": "uri",
             "maxLength": 2000
           },
@@ -68590,7 +68589,7 @@
             "maxLength": 500
           },
           "eventTypes": {
-            "type": ["array", "null"],
+            "type": "array",
             "description": "Absent means \"leave them\"; an empty array is refused, same as create.",
             "items": {
               "type": "string",
@@ -68610,7 +68609,7 @@
             "minItems": 1
           },
           "isActive": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           }
         }
       },
@@ -68643,7 +68642,7 @@
         "type": "object",
         "properties": {
           "fullName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 150,
             "minLength": 2
           },
@@ -68666,7 +68665,7 @@
         "type": "object",
         "properties": {
           "fullName": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 150,
             "minLength": 2
           },
@@ -68722,19 +68721,19 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Markdown is accepted and preserved unmodified — this field is never sanitized, escaped or transformed beyond trimming. Renderers MUST disable raw HTML: markdown permits inline HTML, none is stripped here, and a renderer that passes it through turns this field into stored XSS.",
             "maxLength": 20000,
             "minLength": 1
           },
           "title": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "minLength": 3
           },
           "priority": {
-            "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+            "type": "string",
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           }
         }
       },
@@ -68747,7 +68746,7 @@
             "maxLength": 2000
           },
           "name": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100,
             "minLength": 2
           }
@@ -68757,67 +68756,67 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100,
             "minLength": 2
           },
           "stripeProductId": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "pattern": "^[A-Za-z0-9_-]+$"
           },
           "clearStripeProductId": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           },
           "maxAgentSeats": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 1
           },
           "maxStorageBytes": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 0
           },
           "monthlyAiTokenBudget": {
-            "type": ["number", "null"],
+            "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
             "minimum": 0
           },
           "aiModelTier": {
-            "type": ["string", "null"],
-            "enum": ["FAST", "QUALITY", null]
+            "type": "string",
+            "enum": ["FAST", "QUALITY"]
           },
           "maxDocumentBytes": {
-            "type": ["number", "null"],
+            "type": "number",
             "maximum": 104857600,
             "minimum": 1
           },
           "maxAttachmentBytes": {
-            "type": ["number", "null"],
+            "type": "number",
             "maximum": 10485760,
             "minimum": 1
           },
           "maxDocumentUploads": {
-            "type": ["number", "null"],
+            "type": "number",
             "maximum": 100000,
             "minimum": 1
           },
           "maxAnalyticsRangeDays": {
-            "type": ["number", "null"],
+            "type": "number",
             "maximum": 400,
             "minimum": 1
           },
           "isActive": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           },
           "addPrices": {
-            "type": ["array", "null"],
+            "type": "array",
             "description": "Prices to put on the plan, in create's shape: each is read from Stripe\nand must be of the plan's Stripe product. Absent or `[]`, none.",
             "items": {
               "$ref": "#/components/schemas/CreatePlanPriceDto"
             }
           },
           "removePrices": {
-            "type": ["array", "null"],
+            "type": "array",
             "description": "Stripe price ids to take off the plan. Refused while an organization's\nlive subscription is on one. Absent or `[]`, none.",
             "items": {
               "type": "string",
@@ -68831,35 +68830,35 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "minLength": 2
           },
           "slug": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Trimmed and lowercased first, then lowercase letters, digits and hyphens only, so `ACME-Corp` is stored as `acme-corp`.",
             "maxLength": 100,
             "minLength": 2
           },
           "domain": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255
           },
           "maxAgentSeats": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 1
           },
           "maxStorageBytes": {
-            "type": ["number", "null"],
+            "type": "number",
             "minimum": 0
           },
           "monthlyAiTokenBudget": {
-            "type": ["number", "null"],
+            "type": "number",
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says.",
             "minimum": 0
           },
           "entitlementsPinned": {
-            "type": ["boolean", "null"],
+            "type": "boolean",
             "description": "Keep these limits when Stripe's events arrive (true), or let the next one\nwrite the plan's grants back (false). Absent leaves the pin as it is."
           }
         }
@@ -68868,19 +68867,19 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "minLength": 2
           },
           "slug": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Appears in URLs, so changing it breaks every existing link. Treated as a\nrename with consequences rather than a cosmetic edit — the service rejects\na collision with 409 rather than silently suffixing it.",
             "maxLength": 100,
             "minLength": 2,
             "pattern": "^[a-z0-9-]+$"
           },
           "domain": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Empty string clears it. Globally unique across tenants.",
             "maxLength": 255,
             "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
@@ -68891,7 +68890,7 @@
         "type": "object",
         "properties": {
           "enforceTwoFactor": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           },
           "allowedEmailDomains": {
             "type": ["array", "null"],
@@ -69014,11 +69013,11 @@
             "enum": ["EMAIL", "IN_APP", "PUSH", "SMS"]
           },
           "isEnabled": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           },
           "digest": {
-            "type": ["string", "null"],
-            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF", null]
+            "type": "string",
+            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
           }
         },
         "required": ["channel", "type"]
@@ -69094,12 +69093,12 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 255,
             "minLength": 1
           },
           "isOrganizationWide": {
-            "type": ["boolean", "null"]
+            "type": "boolean"
           }
         }
       },
@@ -69112,7 +69111,7 @@
             "maxLength": 2000
           },
           "name": {
-            "type": ["string", "null"],
+            "type": "string",
             "maxLength": 100,
             "minLength": 2
           }
@@ -73763,7 +73762,7 @@
         },
         "required": ["deleted"]
       },
-      "ApiResponseRevokedCountDto": {
+      "ApiResponseRevokedCountResponseDto": {
         "type": "object",
         "properties": {
           "success": {
@@ -73783,12 +73782,12 @@
             "description": "A non-fatal advisory about a request that otherwise succeeded — a degraded search, a partially-applied bulk operation. Null when there is nothing to say."
           },
           "data": {
-            "$ref": "#/components/schemas/RevokedCountDto"
+            "$ref": "#/components/schemas/RevokedCountResponseDto"
           }
         },
         "required": ["data", "message", "statusCode", "success", "warning"]
       },
-      "RevokedCountDto": {
+      "RevokedCountResponseDto": {
         "type": "object",
         "properties": {
           "revokedCount": {
@@ -73881,7 +73880,7 @@
         "type": "object",
         "properties": {
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Recorded in the audit log, with who released it. Required to release; a\ndry run may leave it out.",
             "maxLength": 500
           }

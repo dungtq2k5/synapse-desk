@@ -1,5 +1,8 @@
 package com.synapsedesk.gateway.common.config;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.time.temporal.Temporal;
 import java.util.List;
@@ -12,6 +15,7 @@ import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.JsonToken;
+import tools.jackson.databind.AnnotationIntrospector;
 import tools.jackson.databind.BeanDescription;
 import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.DeserializationContext;
@@ -19,8 +23,12 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.cfg.CoercionAction;
 import tools.jackson.databind.cfg.CoercionInputShape;
+import tools.jackson.databind.cfg.MapperConfig;
 import tools.jackson.databind.deser.ValueDeserializerModifier;
 import tools.jackson.databind.deser.std.DelegatingDeserializer;
+import tools.jackson.databind.introspect.Annotated;
+import tools.jackson.databind.introspect.AnnotatedMember;
+import tools.jackson.databind.introspect.NopAnnotationIntrospector;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.type.LogicalType;
@@ -36,6 +44,16 @@ import tools.jackson.databind.type.LogicalType;
  * a number, {@code 1} is not {@code true}, {@code 5.5} is not the integer 5, and
  * {@code 5} is not a date. A conversion is a guess about what the client meant, and a
  * wrong guess is written as data: {@code "false"} read as a boolean is {@code true}.
+ *
+ * <p><b>An optional field refuses an explicit {@code null}.</b> A {@code null} is
+ * ambiguous ("clear it", or "leave it"), so a field the request does not require
+ * ({@code @NotNull} absent) answers one with a 400 naming the field ("{@code tags}
+ * can't be null; leave it out instead"), and a default ({@code roleIds = new
+ * ArrayList<>()}) stays when the field is left out. A field where {@code null} means
+ * something declares it with {@code @JsonSetter(nulls = …)} on its setter, which this
+ * rule leaves alone: clearing a date of birth ({@code SET}, read with
+ * {@code RawJsonBody}), or a description ({@code AS_EMPTY}: the empty string the
+ * service stores as no description).
  *
  * <p><b>Request bodies only, and only the gateway's classes.</b> The application's
  * {@link JsonMapper} stays lenient, because it also reads what other systems send:
@@ -106,11 +124,39 @@ public class StrictRequestBodyConverter
       )
     );
     this.strict = builder
+      .annotationIntrospector(
+        AnnotationIntrospector.pair(
+          builder.annotationIntrospector(),
+          OPTIONAL_REFUSES_NULL
+        )
+      )
       .addModule(
         new SimpleModule().setDeserializerModifier(STRINGS_ONLY_WHERE_IGNORED)
       )
       .build();
   }
+
+  /**
+   * {@code Nulls.FAIL} for a gateway class's optional property. Paired behind the
+   * mapper's own introspector, so a property's {@code @JsonSetter} wins; and a
+   * property's setting wins over a per-type one ({@link ExplicitNullJsonCustomizer}).
+   * Jackson merges the getter's annotations into the setter, so {@code @NotNull} is
+   * seen wherever the generator put it.
+   */
+  private static final AnnotationIntrospector OPTIONAL_REFUSES_NULL =
+    new NopAnnotationIntrospector() {
+      @Override
+      public JsonSetter.Value findSetterInfo(
+        MapperConfig<?> config,
+        Annotated annotated
+      ) {
+        return annotated instanceof AnnotatedMember member &&
+          isOwn(member.getDeclaringClass()) &&
+          !member.hasAnnotation(NotNull.class)
+          ? JsonSetter.Value.forValueNulls(Nulls.FAIL)
+          : JsonSetter.Value.empty();
+      }
+    };
 
   /**
    * Jackson's readers for a URI and for a date consult no coercion rule: they take
