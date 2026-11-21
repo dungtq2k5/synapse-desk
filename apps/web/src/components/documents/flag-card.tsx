@@ -372,7 +372,7 @@ function ResolveForm({
               <Button
                 type="button"
                 variant="link"
-                className="h-auto p-0"
+                className="h-auto p-0 font-medium text-current underline"
                 onClick={() => {
                   onDone();
                   onReplaceFile();
@@ -383,7 +383,7 @@ function ResolveForm({
             ) : (
               <Link
                 href={`/knowledge/documents/${flag.documentId}?replace=1`}
-                className="text-primary underline-offset-4 hover:underline"
+                className="font-medium underline underline-offset-4"
               >
                 Replace the file
               </Link>
