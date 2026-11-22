@@ -9,7 +9,7 @@ import {
   ORGANIZATION_DOMAIN_PATTERN,
   ORGANIZATION_SLUG_PATTERN,
 } from '../../../../common/config/dto.config';
-import { Type, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -92,7 +92,6 @@ export class UpdateOrganizationDto {
 export class UpdateOrganizationSettingsDto {
   @OptionalNonNull()
   @IsBoolean()
-  @Type(() => Boolean)
   readonly enforceTwoFactor?: boolean;
 
   /**
@@ -131,7 +130,6 @@ export class UpdateOrganizationSettingsDto {
   // only `undefined`, so `null` reaches `@IsInt()` and 400s.
   // `@IsPresentButNullable` has the opposite half of the problem.
   @OptionalNullable()
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   // REFUSES rather than clamps. A value above the platform constant is a
@@ -143,7 +141,6 @@ export class UpdateOrganizationSettingsDto {
 
   /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
   @OptionalNullable()
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_ATTACHMENT_BYTES)
@@ -151,7 +148,6 @@ export class UpdateOrganizationSettingsDto {
 
   /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
   @OptionalNullable()
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_ATTACHMENTS_PER_MESSAGE)

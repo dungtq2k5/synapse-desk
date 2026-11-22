@@ -172,7 +172,7 @@ export class TicketsService {
   ): Promise<MarkTicketReadResponseDto> {
     const { lastReadAt } = await this.ticketsGrpcClient.markRead(
       id,
-      dto.readAt,
+      dto.readAt === undefined ? undefined : new Date(dto.readAt),
       context,
     );
 

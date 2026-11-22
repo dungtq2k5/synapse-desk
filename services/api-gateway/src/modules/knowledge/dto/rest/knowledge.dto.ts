@@ -12,7 +12,6 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { DEFAULT_SEARCH } from '@synapsedesk/contracts';
 import { trimIfString } from '@synapsedesk/core';
-import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import {
   DEFAULT_KNOWLEDGE_SEARCH_LIMIT,
@@ -50,7 +49,6 @@ export class KnowledgeSearchDto {
   query!: string;
 
   @OptionalNonNull()
-  @Type(() => Number)
   @IsInt()
   // `@Min(0)`, not `@Min(1)`: the default below IS zero, and `@OptionalNonNull()`
   // only skips a value that is `undefined` -- so a floor of 1 would
@@ -69,7 +67,6 @@ export class KnowledgeSearchDto {
    * fixes.
    */
   @OptionalNonNull()
-  @ToBoolean()
   @IsBoolean()
   @ApiPropertyOptional()
   skipRerank: boolean = false;

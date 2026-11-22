@@ -127,9 +127,8 @@ export class AddDepartmentMembersDto {
    * most one primary, so setting it here demotes whichever they had.
    */
   @OptionalNonNull()
-  // `@ToBoolean()`, NOT `@Type(() => Boolean)`: the latter resolves the STRING
-  // `'false'` to `true`, so a caller opting out would silently opt in.
-  @ToBoolean()
+  // No transform: a JSON body's boolean arrives as one, and anything else is a
+  // 400 rather than a value read into a boolean.
   @IsBoolean()
   @ApiPropertyOptional()
   readonly isPrimary: boolean = false;

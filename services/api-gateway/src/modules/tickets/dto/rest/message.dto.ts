@@ -26,7 +26,6 @@ import {
 } from '@synapsedesk/contracts';
 import { trimIfString } from '@synapsedesk/core';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
-import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
 
 export class ListMessagesQueryDto extends SearchPaginationDto {}
@@ -46,7 +45,6 @@ export class CreateMessageDto {
    */
   @OptionalNonNull()
   @IsBoolean()
-  @ToBoolean()
   @ApiPropertyOptional()
   readonly isInternalNote: boolean = false;
 
@@ -60,7 +58,6 @@ export class CreateMessageDto {
    */
   @OptionalNonNull()
   @IsBoolean()
-  @ToBoolean()
   @ApiPropertyOptional()
   readonly invokeAi: boolean = false;
 
@@ -179,7 +176,6 @@ export class UploadAttachmentDto {
    * earns its place: it turns "upload 2 GB, then be refused" into an immediate
    * refusal, and it documents the cap in the API contract.
    */
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_ATTACHMENT_BYTES)

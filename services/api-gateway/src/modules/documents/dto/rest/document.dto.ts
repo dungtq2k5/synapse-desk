@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -56,7 +56,6 @@ export class PresignDocumentDto {
   @IsIn(ALLOWED_DOCUMENT_MIME_TYPES)
   readonly contentType!: AllowedDocumentMimeType;
 
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_DOCUMENT_BYTES)

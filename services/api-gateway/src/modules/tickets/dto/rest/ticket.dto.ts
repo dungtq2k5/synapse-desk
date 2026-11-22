@@ -2,7 +2,6 @@ import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-cont
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
-  IsDate,
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
@@ -34,7 +33,10 @@ import { SearchPaginationDto } from '../../../../common/dto/rest/search-paginati
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { NewAttachmentDto } from './message.dto';
 import { OptionalNonNull } from '../../../../common/decorators/optional.decorator';
-import { PublishedISO8601 } from '../../../../common/decorators/published-validators.decorator';
+import {
+  PublishedDateTime,
+  PublishedISO8601,
+} from '../../../../common/decorators/published-validators.decorator';
 
 export class CreateTicketDto {
   @IsString()
@@ -172,10 +174,8 @@ export class TicketStatusActionDto {
  */
 export class MarkTicketReadDto {
   @OptionalNonNull()
-  @Type(() => Date)
-  @IsDate()
-  @ApiPropertyOptional()
-  readonly readAt?: Date;
+  @PublishedDateTime()
+  readonly readAt?: string;
 }
 
 export class BulkTicketStatusDto {

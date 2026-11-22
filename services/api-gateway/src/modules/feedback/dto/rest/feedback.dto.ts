@@ -37,7 +37,6 @@ export class SubmitFeedbackDto {
     enum: FEEDBACK_RATINGS,
     description: 'A thumb: `1` for up, `-1` for down.',
   })
-  @Type(() => Number)
   @IsInt()
   @IsIn(FEEDBACK_RATINGS)
   readonly rating!: FeedbackRating;
@@ -58,7 +57,6 @@ export class SubmitFeedbackDto {
    */
   @OptionalNonNull()
   @IsBoolean()
-  @ToBoolean()
   readonly citationAccurate?: boolean;
 }
 

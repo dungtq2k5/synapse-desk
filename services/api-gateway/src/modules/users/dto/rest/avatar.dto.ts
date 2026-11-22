@@ -1,5 +1,5 @@
 import { MAX_UPLOAD_FILE_NAME_LENGTH } from '../../../../common/config/dto.config';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsIn,
   IsInt,
@@ -30,7 +30,6 @@ export class PresignAvatarDto {
   @IsIn(AVATAR_MIME_TYPES)
   readonly contentType!: AvatarMimeType;
 
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(MAX_AVATAR_BYTES)

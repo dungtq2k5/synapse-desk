@@ -41,6 +41,15 @@ export const PASSWORD_PATTERN = [
 export const ISO8601_PATTERN =
   '^([\\+-]?\\d{4}(?!\\d{2}\\b))((-?)((0[1-9]|1[0-2])(\\3([12]\\d|0[1-9]|3[01]))?|W([0-4]\\d|5[0-3])(-?[1-7])?|(00[1-9]|0[1-9]\\d|[12]\\d{2}|3([0-5]\\d|6[1-6])))([T\\s]((([01]\\d|2[0-3])((:?)[0-5]\\d)?|24:?00)([\\.,]\\d+(?!:))?)?(\\17[0-5]\\d([\\.,]\\d+)?)?([zZ]|([\\+-])([01]\\d|2[0-3]):?([0-5]\\d)?)?)?)?$';
 
+/**
+ * An instant: an RFC 3339 date-time with seconds and an offset, what the
+ * document's `format: date-time` says. Unlike {@link ISO8601_PATTERN} it has no
+ * week or ordinal dates, which `new Date()` can't read, and no offset-less
+ * time, which it reads in the server's own time zone.
+ */
+export const DATE_TIME_PATTERN =
+  '^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$';
+
 /** validator.js's `isNumeric`, which `@IsNumberString()` matches against. */
 export const NUMBER_STRING_PATTERN = '^[+-]?([0-9]*[.])?[0-9]+$';
 
@@ -79,6 +88,28 @@ export function PublishedISO8601(
   return applyDecorators(
     IsISO8601(options, validationOptions),
     ApiProperty({ pattern: ISO8601_PATTERN }),
+  );
+}
+
+/**
+ * An instant as a string, published as {@link DATE_TIME_PATTERN}: the pattern,
+ * then `@IsISO8601({ strict: true })` for the calendar (no 30 February). The
+ * field stays a string; whoever reads it converts with `new Date(value)`,
+ * which is exact for this form.
+ *
+ * @example `@PublishedDateTime() readonly readAt?: string;`
+ */
+export function PublishedDateTime(): PropertyDecorator {
+  const message =
+    '$property must be a date-time with an offset, such as 2026-11-22T10:00:00Z';
+  return applyDecorators(
+    Matches(new RegExp(DATE_TIME_PATTERN), { message }),
+    IsISO8601({ strict: true }, { message }),
+    ApiProperty({
+      type: String,
+      format: 'date-time',
+      pattern: DATE_TIME_PATTERN,
+    }),
   );
 }
 

@@ -1,7 +1,9 @@
 /**
  * @file **A body that does not fit its declared shape is refused at the door**, on
- * every JSON route: a key the shape does not declare, and a number, a boolean or an
- * object where it declares a string.
+ * every JSON route: a key the shape does not declare, and any field sent as a JSON type
+ * other than the one it declares. A string field refuses a number, a boolean and an
+ * object; a number field a string and a boolean; a boolean field a string and a number;
+ * a date-time field a number and a boolean.
  *
  * Each is a 400 before any peer is asked: that is what distinguishes "refused at the
  * door" from "refused somewhere downstream", so every row asserts that NO peer was
@@ -9,9 +11,8 @@
  * implementation type, which would be a detail leaking to a caller. The rest of the
  * wording is the gateway's own and is not asserted.
  *
- * **Only what the gateway does uniformly.** A string where the shape declares a number,
- * a boolean or a date is NOT covered: the gateway decides that per field (a `@Type(() =>
- * Number)` accepts `"5"`, and turns `true` into `1`), so there is no one rule to hold.
+ * **One rule, so every field is covered.** Nothing converts a body field before it is
+ * checked: `"5"` is not a number and `"false"` is not a boolean.
  *
  * **Generated from the document**, from the minimal valid body `request-bodies.ts`
  * builds, so a new route or field gets rows without anyone remembering. Each row first
@@ -65,16 +66,30 @@ const UNKNOWN = 'zzUnknown';
 /** Text naming an implementation type rather than anything the caller sent. */
 const TYPE_NAME = /\bcom\.synapsedesk\.|\b[A-Z]\w*(Dto|Exception)\b/u;
 
+/** Which JSON type a field declares, or null for one these rows don't vary. */
+type Kind = 'string' | 'number' | 'boolean' | 'date-time';
+
 /**
- * A field read from a JSON string: a plain string of any format but a date, or a string
- * enum. The schema is `resolve`d, so an optional field's `null` is already set aside.
+ * The JSON type a field is read from. A string enum is a string; a date-time is a
+ * string in the document but a kind of its own here, since it refuses other strings by
+ * its format, not its type. The schema is `resolve`d, so an optional field's `null` is
+ * already set aside.
  */
-const isStringLike = (schema: Schema): boolean =>
-  schema.enum
-    ? schema.enum
-        .filter((value) => value !== null)
-        .every((value) => typeof value === 'string')
-    : schema.type === 'string' && schema.format !== 'date-time';
+function kindOf(schema: Schema): Kind | null {
+  if (schema.enum) {
+    return schema.enum
+      .filter((value) => value !== null)
+      .every((value) => typeof value === 'string')
+      ? 'string'
+      : null;
+  }
+  if (schema.type === 'string') {
+    return schema.format === 'date-time' ? 'date-time' : 'string';
+  }
+  if (schema.type === 'integer' || schema.type === 'number') return 'number';
+  if (schema.type === 'boolean') return 'boolean';
+  return null;
+}
 
 /** Every field of the minimal body (and every optional one beside them), with its schema. */
 function fieldsOf(raw: Schema, prefix: KeyPath = []): [KeyPath, Schema][] {
@@ -130,32 +145,62 @@ const unknownKeys: Case[] = routes.flatMap((request) => {
   });
 });
 
-const WRONG: [string, unknown][] = [
-  ['a number', 5],
-  ['a boolean', true],
-  ['an object', { a: 1 }],
-];
+/** For each kind of field, the wrong JSON values it refuses. */
+const WRONG: Record<Kind, [string, unknown][]> = {
+  string: [
+    ['a number', 5],
+    ['a boolean', true],
+    ['an object', { a: 1 }],
+  ],
+  number: [
+    ['a string', '5'],
+    ['a boolean', true],
+  ],
+  boolean: [
+    ['a string', 'false'],
+    ['a number', 1],
+  ],
+  'date-time': [
+    ['a number', 0],
+    ['a boolean', true],
+  ],
+};
 
-const wrongTypes: Case[] = routes.flatMap((request) => {
+const wrongTypes: (Case & { kind: Kind })[] = routes.flatMap((request) => {
   const route = `${request.method} ${request.path}`;
   const minimal = minimalValue(request.schema);
 
-  return fieldsOf(request.schema)
-    .filter(([, schema]) => isStringLike(schema))
-    .flatMap(([path]) =>
-      WRONG.map(([kind, value]) => {
-        const body = structuredClone(minimal);
-        setAt(body, path, value);
+  return fieldsOf(request.schema).flatMap(([path, schema]) => {
+    const kind = kindOf(schema);
+    if (kind === null) return [];
 
-        return {
-          key: `${route} ${path.join('.')} as ${kind}`,
-          route,
-          body,
-          field: String(path[path.length - 1]),
-        };
-      }),
-    );
+    return WRONG[kind].map(([what, value]) => {
+      const body = structuredClone(minimal);
+      setAt(body, path, value);
+
+      return {
+        key: `${route} ${path.join('.')} as ${what}`,
+        route,
+        body,
+        field: String(path[path.length - 1]),
+        kind,
+      };
+    });
+  });
 });
+
+/** A named case: one field of one route's minimal body set to `value`. */
+const named = (route: string, field: string, value: unknown): Case => {
+  const request = byRoute.get(route);
+  if (!request) throw new Error(`${route} is not a generated JSON route`);
+  const body = structuredClone(minimalValue(request.schema)) as Record<
+    string,
+    unknown
+  >;
+  body[field] = value;
+
+  return { key: `${route} ${field}`, route, body, field };
+};
 
 describe('a body that does not fit its declared shape', () => {
   let gateway: Gateway;
@@ -223,12 +268,57 @@ describe('a body that does not fit its declared shape', () => {
     },
   );
 
-  rowFor('Ops').each(wrongTypes.map((c) => [c.key] as const))(
-    '**`%s`, where the shape declares a string, is refused before any peer is asked**',
+  rowFor('Ops').each(wrongTypes.map((c) => [c.key, c.kind] as const))(
+    '**`%s`, where the shape declares a %s, is refused before any peer is asked**',
     async (key) => {
       await refusedAtTheDoor(wrongTypes.find((c) => c.key === key)!);
     },
   );
+
+  // The three a converting reader once stored: `true` as 1, `true` as the 1970
+  // epoch, and `"false"` as true.
+  rowFor('Ops')(
+    '**`true` as a document size is refused, not read as 1 byte**',
+    async () => {
+      await refusedAtTheDoor(
+        named('POST /api/v1/documents/presign', 'sizeBytes', true),
+      );
+    },
+  );
+
+  rowFor('Ops')(
+    '**`true` as `readAt` is refused, not read as the 1970 epoch**',
+    async () => {
+      await refusedAtTheDoor(
+        named('POST /api/v1/tickets/{id}/read', 'readAt', true),
+      );
+    },
+  );
+
+  rowFor('Ops')(
+    '**`"false"` for `enforceTwoFactor` is refused, not read as true**',
+    async () => {
+      await refusedAtTheDoor(
+        named(
+          'PATCH /api/v1/organizations/current/settings',
+          'enforceTwoFactor',
+          'false',
+        ),
+      );
+    },
+  );
+
+  // `readAt` is an instant: an RFC 3339 date-time with an offset. Each of these
+  // is ISO 8601, and none names one instant.
+  rowFor('Ops').each([
+    ['a date-time without an offset', '2026-11-22T10:00'],
+    ['a week date', '2026-W47-1'],
+    ['a date alone', '2026-11'],
+  ] as const)('**`readAt` as %s (`%s`) is refused**', async (_what, value) => {
+    await refusedAtTheDoor(
+      named('POST /api/v1/tickets/{id}/read', 'readAt', value),
+    );
+  });
 
   rowFor('Auth')(
     '**login refuses a key the shape does not declare, before auth-service is asked**',
