@@ -296,6 +296,15 @@ describe('a body that does not fit its declared shape', () => {
   );
 
   rowFor('Ops')(
+    '**`0` as `readAt` is refused, not read as the 1970 epoch**',
+    async () => {
+      await refusedAtTheDoor(
+        named('POST /api/v1/tickets/{id}/read', 'readAt', 0),
+      );
+    },
+  );
+
+  rowFor('Ops')(
     '**`"false"` for `enforceTwoFactor` is refused, not read as true**',
     async () => {
       await refusedAtTheDoor(
@@ -312,6 +321,7 @@ describe('a body that does not fit its declared shape', () => {
   // is ISO 8601, and none names one instant.
   rowFor('Ops').each([
     ['a date-time without an offset', '2026-11-22T10:00'],
+    ['a date-time without seconds', '2026-11-22T10:00Z'],
     ['a week date', '2026-W47-1'],
     ['a date alone', '2026-11'],
   ] as const)('**`readAt` as %s (`%s`) is refused**', async (_what, value) => {
