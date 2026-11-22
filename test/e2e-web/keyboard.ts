@@ -41,7 +41,7 @@ export async function tabTo(page: Page, target: Locator): Promise<void> {
       if (await atStop()) {
         for (let arrows = 0; inToolbar && arrows <= 20; arrows++) {
           if (await focused()) break;
-          await page.keyboard.press('ArrowRight');
+          await arrowRight(page);
         }
         if (!(await focused())) break;
         await expectFocusVisible(page);
@@ -53,6 +53,21 @@ export async function tabTo(page: Page, target: Locator): Promise<void> {
   throw new Error(
     `Not reachable by keyboard in ${MAX_PRESSES} presses either way: ${target.toString()}`,
   );
+}
+
+/**
+ * ArrowRight in a toolbar, returning once focus has moved. Radix's roving
+ * focus moves it in a `setTimeout` after the keydown, so a check made at once
+ * can see the old item, press again, and land one item too far.
+ */
+async function arrowRight(page: Page): Promise<void> {
+  const before = await page.evaluateHandle(() => document.activeElement);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(
+    (element) => document.activeElement !== element,
+    before,
+  );
+  await before.dispose();
 }
 
 /** Tabs to `target` and presses `key` on it (Enter by default). */
