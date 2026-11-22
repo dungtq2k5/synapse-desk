@@ -4,9 +4,14 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.constraints.NotNull;
 import java.net.URI;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.time.temporal.Temporal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.springframework.boot.http.converter.autoconfigure.ServerHttpMessageConvertersCustomizer;
 import org.springframework.core.ResolvableType;
 import org.springframework.http.MediaType;
@@ -174,24 +179,44 @@ public class StrictRequestBodyConverter
       ) {
         Class<?> type = description.getBeanClass();
 
-        return type == URI.class || Temporal.class.isAssignableFrom(type)
-          ? new StringOnly(deserializer)
-          : deserializer;
+        if (type == URI.class || Temporal.class.isAssignableFrom(type)) {
+          return new StringOnly(deserializer, INSTANTS.contains(type));
+        }
+        return deserializer;
       }
     };
 
-  /** Jackson's own reader, given only a JSON string. */
+  /** The types that hold an instant, read only from an RFC 3339 date-time. */
+  private static final Set<Class<?>> INSTANTS = Set.of(
+    OffsetDateTime.class,
+    ZonedDateTime.class,
+    Instant.class
+  );
+
+  /**
+   * An RFC 3339 date-time with seconds and an offset, what the document's
+   * {@code format: date-time} says. Jackson's own reader also takes a time without
+   * seconds and a lowercase {@code t} or {@code z}, which this refuses.
+   */
+  static final Pattern DATE_TIME = Pattern.compile(
+    "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$"
+  );
+
+  /** Jackson's own reader, given only a JSON string; an instant's in its one form. */
   private static final class StringOnly extends DelegatingDeserializer {
 
-    StringOnly(ValueDeserializer<?> delegatee) {
+    private final boolean instant;
+
+    StringOnly(ValueDeserializer<?> delegatee, boolean instant) {
       super(delegatee);
+      this.instant = instant;
     }
 
     @Override
     protected ValueDeserializer<?> newDelegatingInstance(
       ValueDeserializer<?> delegatee
     ) {
-      return new StringOnly(delegatee);
+      return new StringOnly(delegatee, instant);
     }
 
     @Override
@@ -201,6 +226,13 @@ public class StrictRequestBodyConverter
     ) {
       if (!parser.hasToken(JsonToken.VALUE_STRING)) {
         return context.handleUnexpectedToken(handledType(), parser);
+      }
+      if (instant && !DATE_TIME.matcher(parser.getString()).matches()) {
+        return context.handleWeirdStringValue(
+          handledType(),
+          parser.getString(),
+          "not a date-time with seconds and an offset"
+        );
       }
 
       return _delegatee.deserialize(parser, context);
