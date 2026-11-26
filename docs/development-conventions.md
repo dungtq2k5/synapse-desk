@@ -340,8 +340,10 @@ Mappers live in `packages/grpc-proto/src/mappers/`, named per §12.1.
 - ts-proto types every **message-valued** field as `T | undefined`. That is its convention, **not** permission to omit them. For a non-optional proto field use **`requireProtoTimestamp(v, 'field')`**.
 - Protobuf has no `null`; unset arrives as `undefined`. REST commits to `null`. Convert **deliberately, field by field, in the mapper** (`?? null`) so the JSON key set is stable for clients and OpenAPI.
 - proto3's zero value means "omitted". An enum's `*_UNSPECIFIED` member **MUST** be rejected rather than defaulted to a real value.
+- **A domain value going out (`toProto`) must be one the enum knows.** `enumBridge`'s `toProto` maps `null`, `undefined` and `''` to `*_UNSPECIFIED` and **throws** on any other value it doesn't know, naming the value and the allowed set. A stored value outside its contracts enum is a bug, and the call fails with that line in the service's log rather than crossing the wire as "none".
+- **A proto enum coming in (`fromProto`) depends on the field.** Where the zero value means "none", it maps to `null` and the field is published nullable, with `null` in its `enum`. Where the field always has a value, a zero or unknown value is a **502** naming the field and the value (`requiredEnum()` in the gateway's `common/grpc/required-enum.ts`), and the field is published non-null. `openapi:check` refuses a nullable enum that doesn't list `null`.
 - **Proto enum members are prefixed with the enum name** (`GENDER_MALE`, not `MALE`) — a hard protobuf constraint (§12). Domain enums stay unprefixed (`Gender.MALE`); the mapper pair is the only bridge.
-- `UNRECOGNIZED` (-1) means a newer build sent a member this one doesn't know. Treat it as unspecified, never crash.
+- `UNRECOGNIZED` (-1) means a newer build sent a member this one doesn't know. On a field that always has a value it's the 502 above, so **a new enum member ships to its readers (the gateway, a consumer) before any writer sends it.**
 - The two directions are **deliberately asymmetric** — see [ADR 0004](./decisions/0004-mappers-name-the-foreign-side.md).
 
 ---
