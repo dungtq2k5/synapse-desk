@@ -1,4 +1,5 @@
-# SynapseDesk
+<!-- markdownlint-disable-next-line MD033 -->
+# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/mark-dark.svg"><img src="docs/assets/readme/mark-light.svg" alt="SynapseDesk logo" width="40" align="center"></picture> SynapseDesk
 
 An enterprise AI helpdesk: a knowledge base your users can ask questions of, and a ticketing system that takes over when the answer is not in it.
 
@@ -8,6 +9,7 @@ This repository holds the seven backend services, the web client (`apps/web`), a
 
 ## Contents
 
+- [Screens](#screens)
 - [What is in here](#what-is-in-here)
 - [Documentation](#documentation)
 - [Setup, from A to Z](#setup-from-a-to-z)
@@ -17,6 +19,18 @@ This repository holds the seven backend services, the web client (`apps/web`), a
 - [Kubernetes](#kubernetes)
 - [Inbound email](#inbound-email)
 - [License](#license)
+
+## Screens
+
+Every screen is designed in Figma at 1440 and 390 px, in light and dark mode. Six of them:
+
+| Agent: the ticket list | Agent: a ticket, with the AI panel |
+| :---: | :---: |
+| [![The agent's ticket list](docs/assets/readme/tickets.png)](docs/assets/readme/tickets.png) | [![A ticket with the AI panel](docs/assets/readme/ticket-ai.png)](docs/assets/readme/ticket-ai.png) |
+| **End user: asking the assistant** | **Knowledge: documents** |
+| [![A conversation with the assistant](docs/assets/readme/ask.png)](docs/assets/readme/ask.png) | [![The knowledge documents list](docs/assets/readme/knowledge.png)](docs/assets/readme/knowledge.png) |
+| **Analytics** | **Platform console** |
+| [![The analytics overview](docs/assets/readme/analytics.png)](docs/assets/readme/analytics.png) | [![The platform console overview](docs/assets/readme/platform.png)](docs/assets/readme/platform.png) |
 
 ## What is in here
 
