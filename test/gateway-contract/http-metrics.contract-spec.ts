@@ -1,19 +1,31 @@
 /**
  * @file `http_requests_total` and `http_request_duration_seconds` on `/metrics`.
  *
- * - **Every request matched to a route is counted**, refused or not: a guard's
- *   refusal is counted like a handler's own. A request that matches no route and a
- *   preflight are not.
- * - **`status` is the status the client received**, so the series shows an error
- *   rate.
- * - **`route` is the path TEMPLATE**, as Express writes it (`/api/v1/tickets/:id`),
- *   never the resolved path: one series per ticket otherwise, forever.
+ * - **Every request is counted once**, under the status the client received: one
+ *   a handler served or threw from, and one a guard, the throttler, the lifecycle
+ *   gate, validation, or a middleware or filter refused. So the series shows an
+ *   error rate.
+ * - **`route` is the path TEMPLATE** (`/api/v1/tickets/:id`), never the resolved
+ *   path: one series per ticket otherwise, forever. A request with no template
+ *   gets one of two fixed labels: `unmatched` (it matched no route, a 404) or
+ *   `refused-before-routing` (a middleware or filter refused it first: origin,
+ *   Content-Type, size; it may have targeted a real route).
+ * - **Not counted:**
+ *   - GraphQL: its errors ride inside a 200, so an HTTP-status series can't
+ *     measure them, and counting the requests would read as a near-zero error
+ *     rate;
+ *   - CORS preflights: the browser asking permission, not a call to the API.
+ *
+ * A request the client aborted differs by gateway: Node doesn't count it (the
+ * response never finishes, so nothing is recorded), and Java counts it under
+ * the status the response carried (its filter can't tell an abort apart).
  *
  * Every row measures a DELTA: the counter accumulates over the process, and "this
  * request moved exactly this series by exactly one" is two claims.
  */
 
 import { status as GrpcStatus } from '@grpc/grpc-js';
+import { randomUUID } from 'node:crypto';
 import { sign } from 'jsonwebtoken';
 import { OrgStatus } from '@synapsedesk/contracts';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -136,7 +148,7 @@ describe('the HTTP metrics on /metrics', () => {
   const session = () => new Session(gateway.baseUrl);
 
   rowFor('Ops')(
-    '**a request that reaches a handler is counted once, under its route, method and status — and the duration histogram counts it too**',
+    '**a request a handler serves is counted once, under its route, method and status — and the duration histogram counts it too**',
     async () => {
       const result = await moved(() =>
         fetch(`${gateway.baseUrl}/health/ready`),
@@ -170,8 +182,26 @@ describe('the HTTP metrics on /metrics', () => {
     },
   );
 
+  rowFor('Ops')('**a handler’s 201 is counted under 201**', async () => {
+    peers.auth
+      .on('DepartmentService/CreateDepartment')
+      .reply(wireDepartment(DEPARTMENT));
+
+    const result = await moved(async () => {
+      const response = await session().post(
+        `${API}/departments`,
+        { name: 'Support' },
+        headers(['department.create']),
+      );
+      expect(response.status).toBe(201);
+    });
+
+    expect(result.requests).toEqual({ '/api/v1/departments|POST|201': 1 });
+    expect(result.durations).toEqual({ '/api/v1/departments|POST|201': 1 });
+  });
+
   rowFor('Ops')(
-    '**`status` is the status the client received — a 404, a 503 and a failed validation are each counted under their own**',
+    '**`status` is the status the client received — a handler’s 404, 503 and 500, and a failed validation, are each counted under their own**',
     async () => {
       const result = await moved(async () => {
         peers.auth
@@ -198,6 +228,18 @@ describe('the HTTP metrics on /metrics', () => {
           ).status,
         ).toBe(503);
 
+        peers.auth
+          .on('DepartmentService/GetDepartment')
+          .fail(GrpcStatus.INTERNAL, 'boom');
+        expect(
+          (
+            await session().get(
+              `${API}/departments/${DEPARTMENT}`,
+              headers(['department.read']),
+            )
+          ).status,
+        ).toBe(500);
+
         expect(
           (
             await session().post(
@@ -212,8 +254,10 @@ describe('the HTTP metrics on /metrics', () => {
       expect(result.requests).toEqual({
         '/api/v1/departments/:id|GET|404': 1,
         '/api/v1/departments/:id|GET|503': 1,
+        '/api/v1/departments/:id|GET|500': 1,
         '/api/v1/departments|POST|400': 1,
       });
+      expect(result.durations).toEqual(result.requests);
     },
   );
 
@@ -266,8 +310,56 @@ describe('the HTTP metrics on /metrics', () => {
           headers([]),
         ),
     ],
+    [
+      'a frozen workspace (the lifecycle gate)',
+      '/api/v1/departments/:id|GET|403',
+      () => {
+        peers.auth.on('OrganizationService/GetOrganizationStatus').always({
+          status: toProtoOrgStatus(OrgStatus.FROZEN),
+          deleted: false,
+        });
+        // A tenant no other row has cached, so the gate reads FROZEN.
+        return session().get(
+          `${API}/departments/${DEPARTMENT}`,
+          headers(['department.read'], { organizationId: randomUUID() }),
+        );
+      },
+    ],
+    [
+      'a request with no route behind it (a 404)',
+      'unmatched|GET|404',
+      () => session().get(`${API}/no/such/route`),
+    ],
+    [
+      'a cross-origin write (origin, before routing)',
+      'refused-before-routing|POST|403',
+      () =>
+        session().post(`${API}/auth/logout`, undefined, {
+          origin: 'http://evil.example',
+        }),
+    ],
+    [
+      'a body that is not JSON (Content-Type, before routing)',
+      'refused-before-routing|POST|415',
+      () =>
+        session().post(
+          `${API}/departments`,
+          { name: 'Support' },
+          { ...headers(['department.create']), 'content-type': 'text/plain' },
+        ),
+    ],
+    [
+      'a report over the size cap (size, before routing)',
+      'refused-before-routing|POST|413',
+      () =>
+        session().post(`${API}/client-errors`, {
+          kind: 'error',
+          message: 'too big',
+          stack: 'x'.repeat(9 * 1024),
+        }),
+    ],
   ])(
-    '**a request a guard refuses is counted under its route and the refusal: %s**',
+    '**a refused request is counted once under its route and the refusal: %s**',
     async (_title, series, send) => {
       const expected = Number(series.split('|')[2]);
       const result = await moved(async () => {
@@ -280,10 +372,47 @@ describe('the HTTP metrics on /metrics', () => {
   );
 
   rowFor('Ops')(
-    '**a path that matches no route is not counted — a scanner’s guesses would mint one series each**',
+    '**the throttler’s refusal is counted under 429**',
+    async () => {
+      // Five logins per fifteen minutes per (ip, account); an account no other
+      // row uses, so the bucket starts empty.
+      const email = `metrics-${randomUUID()}@example.com`;
+      const attempt = () =>
+        session().post(`${API}/auth/login`, { email, password: 'whatever' });
+      peers.auth.on('AuthService/Login').always({
+        requiresTwoFactor: true,
+        requiresTenantSelection: false,
+        tenants: [],
+      });
+      for (let index = 0; index < 5; index++) {
+        expect((await attempt()).status).not.toBe(429);
+      }
+
+      const result = await moved(async () => {
+        expect((await attempt()).status).toBe(429);
+      });
+
+      expect(result.requests).toEqual({ '/api/v1/auth/login|POST|429': 1 });
+      expect(result.durations).toEqual({ '/api/v1/auth/login|POST|429': 1 });
+    },
+  );
+
+  rowFor('Ops')(
+    '**a CORS preflight and a GraphQL request are not counted**',
     async () => {
       const result = await moved(async () => {
-        expect((await session().get(`${API}/no/such/route`)).status).toBe(404);
+        await session().request('OPTIONS', `${API}/auth/login`, {
+          headers: {
+            origin: 'http://localhost:5173',
+            'access-control-request-method': 'POST',
+          },
+        });
+        const graphql = await session().post(
+          '/graphql',
+          { query: '{ __typename }' },
+          headers([]),
+        );
+        expect(graphql.status).toBe(200);
       });
 
       expect(result.requests).toEqual({});
@@ -307,6 +436,7 @@ describe('the HTTP metrics on /metrics', () => {
       });
 
       expect(result.requests).toEqual({ '/api/v1/auth/login|POST|401': 1 });
+      expect(result.durations).toEqual({ '/api/v1/auth/login|POST|401': 1 });
     },
   );
 });

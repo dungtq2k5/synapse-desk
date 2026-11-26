@@ -1,7 +1,6 @@
 package com.synapsedesk.gateway.common.security;
 
 import com.synapsedesk.gateway.common.lifecycle.OrganizationLifecycleInterceptor;
-import com.synapsedesk.gateway.common.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.common.throttle.ThrottlerInterceptor;
 import com.synapsedesk.gateway.common.web.PathIdInterceptor;
 import com.synapsedesk.gateway.common.web.UndeclaredQueryInterceptor;
@@ -31,7 +30,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
   private final SessionInterceptor sessionInterceptor;
   private final PermissionInterceptor permissionInterceptor;
   private final ThrottlerInterceptor throttlerInterceptor;
-  private final HttpMetricsInterceptor httpMetricsInterceptor;
   private final OrganizationLifecycleInterceptor organizationLifecycleInterceptor;
   private final PathIdInterceptor pathIdInterceptor;
   private final UndeclaredQueryInterceptor undeclaredQueryInterceptor;
@@ -40,7 +38,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     SessionInterceptor sessionInterceptor,
     PermissionInterceptor permissionInterceptor,
     ThrottlerInterceptor throttlerInterceptor,
-    HttpMetricsInterceptor httpMetricsInterceptor,
     OrganizationLifecycleInterceptor organizationLifecycleInterceptor,
     PathIdInterceptor pathIdInterceptor,
     UndeclaredQueryInterceptor undeclaredQueryInterceptor
@@ -48,7 +45,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     this.sessionInterceptor = sessionInterceptor;
     this.permissionInterceptor = permissionInterceptor;
     this.throttlerInterceptor = throttlerInterceptor;
-    this.httpMetricsInterceptor = httpMetricsInterceptor;
     this.organizationLifecycleInterceptor = organizationLifecycleInterceptor;
     this.pathIdInterceptor = pathIdInterceptor;
     this.undeclaredQueryInterceptor = undeclaredQueryInterceptor;
@@ -56,8 +52,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(InterceptorRegistry registry) {
-    // First, so a request any later interceptor refuses is still counted.
-    registry.addInterceptor(httpMetricsInterceptor);
     // Throttling runs BEFORE permission checks: a caller hammering a route they
     // lack permission for still consumes the rate-limit budget rather than a
     // cheap 403 every time.

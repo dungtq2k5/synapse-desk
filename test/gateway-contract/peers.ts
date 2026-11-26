@@ -49,6 +49,7 @@ export type Recorded = {
 type Programmed =
   | { kind: 'reply'; value: unknown }
   | { kind: 'fail'; code: GrpcStatus; details: string }
+  | { kind: 'hang' }
   | {
       kind: 'stream';
       chunks: unknown[];
@@ -62,6 +63,8 @@ export type Program = {
   /** …and every call after that, until reprogrammed. */
   always: (value: unknown) => void;
   fail: (code: GrpcStatus, details: string) => void;
+  /** The next call never answers, so the caller's own deadline ends it. */
+  hang: () => void;
   /** A server stream: these chunks, then completion — or `failWith`. */
   stream: (
     chunks: unknown[],
@@ -117,6 +120,7 @@ export class FakePeer {
       reply: (value) => queue().push({ kind: 'reply', value }),
       always: (value) => this.standing.set(method, { kind: 'reply', value }),
       fail: (code, details) => queue().push({ kind: 'fail', code, details }),
+      hang: () => queue().push({ kind: 'hang' }),
       stream: (chunks, failWith) =>
         queue().push({ kind: 'stream', chunks, failWith }),
     };
@@ -211,6 +215,7 @@ export class FakePeer {
 
         return;
       }
+      if (programmed.kind === 'hang') return;
       if (programmed.kind === 'stream') {
         callback(unprogrammed(this.name, `${method} (stream on a unary call)`));
 

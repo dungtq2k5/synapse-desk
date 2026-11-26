@@ -11,7 +11,7 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * The route label {@link HttpMetricsInterceptor} writes, derived from every route the
+ * The route label {@link HttpMetricsFilter} writes, derived from every route the
  * gateway maps: each template in the {@code :id} form the dashboards read.
  */
 @SpringBootTest(
@@ -31,7 +31,7 @@ class HttpMetricsLabelsTest {
       for (String pattern : info
         .getPathPatternsCondition()
         .getPatternValues()) {
-        String template = HttpMetricsInterceptor.routeTemplate(pattern);
+        String template = HttpMetricsFilter.routeTemplate(pattern);
 
         // Never a brace left in the label: `{id}` is a placeholder, `:id` is the
         // label's form, and a label that kept the braces is a different series.

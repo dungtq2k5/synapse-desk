@@ -2,10 +2,9 @@
  * @file `grpc_client_duration_seconds{peer, code}` on `/metrics`.
  *
  * Every gateway -> peer call is timed under the PEER it reached and the status it
- * ended with. The `code` label is the status name — `OK`, `NOT_FOUND`,
- * `UNAVAILABLE` — and there is no `method` label. A dashboard reads these values,
- * so a change to how they are named would break the panel and nothing else would
- * notice.
+ * ended with. The `code` label is always the status NAME — `OK`, `NOT_FOUND`,
+ * `UNAVAILABLE`, `DEADLINE_EXCEEDED` — whether the peer answered or the gateway
+ * gave up waiting, and there is no `method` label.
  *
  * Each row measures a DELTA against the peer's own call record: "recorded once
  * per call" is only checkable against what the peer actually saw.
@@ -274,5 +273,30 @@ describe('the gRPC client metric on /metrics', () => {
 
       expect(result['auth-service|UNAVAILABLE']).toBe(1);
     },
+  );
+
+  rowFor('Ops')(
+    '**a deadline is `DEADLINE_EXCEEDED` whether the peer reported it or the gateway gave up waiting — never `4`**',
+    async () => {
+      peers.auth
+        .on('DepartmentService/GetDepartment')
+        .fail(GrpcStatus.DEADLINE_EXCEEDED, 'too slow downstream');
+      peers.auth.on('DepartmentService/GetDepartment').hang();
+
+      const result = await moved(async () => {
+        expect(
+          (await get(`/departments/${DEPARTMENT}`, 'department.read')).status,
+        ).toBe(504);
+        expect(
+          (await get(`/departments/${DEPARTMENT}`, 'department.read')).status,
+        ).toBe(504);
+      });
+
+      expect(result['auth-service|DEADLINE_EXCEEDED']).toBe(2);
+      expect(Object.keys(result).some((key) => /\|\d+$/u.test(key))).toBe(
+        false,
+      );
+    },
+    20_000,
   );
 });
