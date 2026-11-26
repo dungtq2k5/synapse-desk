@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.modules.notifications;
 
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.modules.notifications.dto.graphql.NotificationFeedGqlDto;
 import com.synapsedesk.gateway.modules.notifications.dto.graphql.NotificationGqlDto;
 import java.time.Instant;
@@ -40,7 +41,11 @@ public final class NotificationMapper {
     return new NotificationGqlDto(
       notification.getId(),
       notification.getOrganizationId(),
-      NotificationsController.TYPE_VALUES.get(notification.getType()),
+      RequiredEnum.required(
+        "type",
+        notification.getType(),
+        NotificationsController.TYPE_VALUES.get(notification.getType())
+      ),
       priorityStringOf(notification.getPriority()),
       notification.getTitle(),
       notification.hasBody() ? notification.getBody() : null,
@@ -60,8 +65,10 @@ public final class NotificationMapper {
 
   /** `UNSPECIFIED` -> `null`: no priority set is the same fact as no priority to report. */
   private static String priorityStringOf(NotificationPriority priority) {
-    return priority == NotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED
-      ? null
+    // Always set: the in-app consumer refuses a priority outside the enum.
+    return priority == NotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED ||
+      priority == NotificationPriority.UNRECOGNIZED
+      ? RequiredEnum.<String>required("priority", priority, null)
       : priority.name().replace("NOTIFICATION_PRIORITY_", "");
   }
 

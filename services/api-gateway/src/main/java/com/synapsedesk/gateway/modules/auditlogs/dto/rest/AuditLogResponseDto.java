@@ -340,6 +340,7 @@ public class AuditLogResponseDto {
    * @return action
    */
 
+  @NotNull
   @JsonProperty("action")
   public ActionEnum getAction() {
     return action;

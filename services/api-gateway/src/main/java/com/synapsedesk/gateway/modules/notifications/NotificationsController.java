@@ -589,16 +589,23 @@ public class NotificationsController {
   ) {
     String value = TYPE_VALUES.get(type);
 
-    return value == null
-      ? null
-      : NotificationResponseDto.TypeEnum.fromValue(value);
+    // Always set: the in-app consumer refuses a type outside the enum.
+    return RequiredEnum.required(
+      "type",
+      type,
+      value == null ? null : NotificationResponseDto.TypeEnum.fromValue(value)
+    );
   }
 
   private static NotificationResponseDto.PriorityEnum toPriorityEnum(
     synapsedesk.notification.Notification.NotificationPriority priority
   ) {
-    return NotificationResponseDto.PriorityEnum.fromValue(
-      priority.name().replace("NOTIFICATION_PRIORITY_", "")
+    return RequiredEnum.required(
+      "priority",
+      priority,
+      NotificationResponseDto.PriorityEnum.fromValue(
+        priority.name().replace("NOTIFICATION_PRIORITY_", "")
+      )
     );
   }
 

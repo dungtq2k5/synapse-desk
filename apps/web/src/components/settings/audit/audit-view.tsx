@@ -417,7 +417,7 @@ function Entries({
       className="text-left font-medium text-primary underline-offset-4 hover:underline"
       onClick={() => onOpen(entry)}
     >
-      {entry.action ? auditActionWords(entry.action) : '—'}
+      {auditActionWords(entry.action)}
     </button>
   );
   return (
@@ -541,9 +541,7 @@ function EntrySheet({
         {entry && (
           <>
             <SheetHeader>
-              <SheetTitle>
-                {entry.action ? auditActionWords(entry.action) : 'Entry'}
-              </SheetTitle>
+              <SheetTitle>{auditActionWords(entry.action)}</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-6 px-4 pb-6">
               <dl className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
@@ -557,9 +555,9 @@ function EntrySheet({
                 <dt className="text-muted-foreground">Who</dt>
                 <dd>{actorWords(entry)}</dd>
                 <dt className="text-muted-foreground">Action</dt>
-                <dd>{entry.action ? auditActionWords(entry.action) : '—'}</dd>
+                <dd>{auditActionWords(entry.action)}</dd>
                 <dt className="text-muted-foreground">Code</dt>
-                <dd className="font-mono text-xs">{entry.action ?? '—'}</dd>
+                <dd className="font-mono text-xs">{entry.action}</dd>
                 <dt className="text-muted-foreground">Resource</dt>
                 <dd>{resource(entry)}</dd>
                 <dt className="text-muted-foreground">IP address</dt>

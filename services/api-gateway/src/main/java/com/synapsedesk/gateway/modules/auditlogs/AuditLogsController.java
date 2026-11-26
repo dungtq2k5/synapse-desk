@@ -500,14 +500,13 @@ public class AuditLogsController {
   }
 
   static AuditLogResponseDto.ActionEnum toActionEnum(AuditAction action) {
-    if (
-      action == AuditAction.AUDIT_ACTION_UNSPECIFIED ||
-      action == AuditAction.UNRECOGNIZED
-    ) {
-      return null;
-    }
-    return AuditLogResponseDto.ActionEnum.fromValue(
-      action.name().replace("AUDIT_ACTION_", "")
+    // Always set: the audit consumer refuses an action outside the enum.
+    return RequiredEnum.required(
+      "action",
+      action,
+      AuditLogResponseDto.ActionEnum.fromValue(
+        action.name().replace("AUDIT_ACTION_", "")
+      )
     );
   }
 

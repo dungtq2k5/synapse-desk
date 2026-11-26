@@ -5,6 +5,8 @@ import {
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
+  NOTIFICATION_TYPE_VALUES,
+  NOTIFICATION_PRIORITIES,
 } from '@synapsedesk/contracts';
 import { UnprocessableMessage } from '@synapsedesk/nest-common';
 import { InAppNotificationService } from './in-app/in-app-notification.service';
@@ -83,6 +85,22 @@ export class NotificationsController {
       // same way.
       throw new UnprocessableMessage(
         `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant, a type or an audience`,
+      );
+    }
+    // A value outside its enum is a publisher's bug: stored, it would fail
+    // every read of the feed that reaches it. Parked the same way. A missing
+    // priority takes the column's default, NORMAL.
+    if (!NOTIFICATION_TYPE_VALUES.includes(command.type)) {
+      throw new UnprocessableMessage(
+        `${IN_APP_NOTIFICATION_PATTERN} arrived with type "${command.type}", which is not one of ${NOTIFICATION_TYPE_VALUES.join(', ')}`,
+      );
+    }
+    if (
+      command.priority !== undefined &&
+      !NOTIFICATION_PRIORITIES.includes(command.priority)
+    ) {
+      throw new UnprocessableMessage(
+        `${IN_APP_NOTIFICATION_PATTERN} arrived with priority "${String(command.priority)}", which is not one of ${NOTIFICATION_PRIORITIES.join(', ')}`,
       );
     }
 

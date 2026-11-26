@@ -787,5 +787,30 @@ describe('In-app notification delivery (e2e)', () => {
 
       await expect(fx.prisma.notification.count()).resolves.toBe(0);
     });
+
+    it.each([
+      ['type', 'billing.refund_issued'],
+      ['priority', 'URGENT'],
+    ])(
+      '**29b. A %s outside its enum is PARKED, naming the value, and never stored**',
+      async (field, value) => {
+        // A publisher's bug: stored, the row would fail every read of the
+        // feed that reaches it, since the read refuses a value outside the
+        // enum. The runner logs the message at ERROR as it parks it.
+        const controller = fx.moduleRef.get(NotificationsController);
+        const command = {
+          ...quotaAlert(80),
+          [field]: value,
+        } as unknown as Parameters<
+          NotificationsController['handleInAppNotification']
+        >[0];
+
+        const refusal = controller.handleInAppNotification(command);
+
+        await expect(refusal).rejects.toBeInstanceOf(UnprocessableMessage);
+        await expect(refusal).rejects.toThrow(`${field} "${value}"`);
+        await expect(fx.prisma.notification.count()).resolves.toBe(0);
+      },
+    );
   });
 });

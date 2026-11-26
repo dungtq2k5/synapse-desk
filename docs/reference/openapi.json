@@ -70918,7 +70918,7 @@
             "description": "null for system and cron actors, which have no user acting for them."
           },
           "action": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
               "DATA_EXPORT_REQUESTED",
@@ -70976,8 +70976,7 @@
               "WEBHOOK_ENDPOINT_CREATED",
               "WEBHOOK_ENDPOINT_DELETED",
               "WEBHOOK_ENDPOINT_UPDATED",
-              "WEBHOOK_SECRET_ROTATED",
-              null
+              "WEBHOOK_SECRET_ROTATED"
             ]
           },
           "resourceType": {
@@ -71415,7 +71414,7 @@
             "type": "string"
           },
           "type": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The ORIGINATING event — `ticket.assigned`, never the NATS subject.\n\n`null` for a type this build does not recognise.",
             "enum": [
               "billing.payment_failed",
@@ -71427,14 +71426,13 @@
               "ticket.message_created",
               "ticket.reassigned",
               "ticket.status_changed",
-              "webhook.endpoint_disabled",
-              null
+              "webhook.endpoint_disabled"
             ]
           },
           "priority": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "How urgent it is. `null` when the wire value is one this build cannot name.",
-            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL", null]
+            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
           },
           "title": {
             "type": "string"
@@ -72689,7 +72687,7 @@
             "description": "null for system and cron actors, which have no user acting for them."
           },
           "action": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
               "DATA_EXPORT_REQUESTED",
@@ -72747,8 +72745,7 @@
               "WEBHOOK_ENDPOINT_CREATED",
               "WEBHOOK_ENDPOINT_DELETED",
               "WEBHOOK_ENDPOINT_UPDATED",
-              "WEBHOOK_SECRET_ROTATED",
-              null
+              "WEBHOOK_SECRET_ROTATED"
             ]
           },
           "resourceType": {

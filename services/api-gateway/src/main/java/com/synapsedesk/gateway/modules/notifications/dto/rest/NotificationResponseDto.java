@@ -276,6 +276,7 @@ public class NotificationResponseDto {
    * @return type
    */
 
+  @NotNull
   @JsonProperty("type")
   public TypeEnum getType() {
     return type;
@@ -296,6 +297,7 @@ public class NotificationResponseDto {
    * @return priority
    */
 
+  @NotNull
   @JsonProperty("priority")
   public PriorityEnum getPriority() {
     return priority;

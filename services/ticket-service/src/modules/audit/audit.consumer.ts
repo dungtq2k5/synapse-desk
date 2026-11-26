@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RecordAuditCommand } from '@synapsedesk/contracts';
+import { AUDIT_ACTIONS, RecordAuditCommand } from '@synapsedesk/contracts';
 import { isUniqueConstraintViolation } from '@synapsedesk/core';
 import { formatErrorMsg, UnprocessableMessage } from '@synapsedesk/nest-common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,6 +46,15 @@ export class AuditConsumer {
           `Dropped a malformed audit event: ${JSON.stringify(command)?.slice(0, 500)}`,
         );
         return;
+      }
+
+      // An action outside the contracts enum is a publisher's bug: stored, it
+      // would fail every read of the audit log that reaches it. Parked, for
+      // the same reason as a missing eventId.
+      if (!AUDIT_ACTIONS.includes(command.action)) {
+        throw new UnprocessableMessage(
+          `audit.record arrived with action "${command.action}", which is not one of ${AUDIT_ACTIONS.join(', ')}`,
+        );
       }
 
       // **Not `?? null` any more, and this is where the type stops being a

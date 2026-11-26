@@ -59,7 +59,7 @@ function open(extra: Record<string, unknown> = {}, codes = AUDITOR) {
       entry({
         id: 'a2',
         userId: null,
-        action: null,
+        action: 'USER_LOGOUT_ALL',
         resourceType: null,
         resourceId: null,
         ipAddress: null,
@@ -165,9 +165,14 @@ describe('the log', () => {
     expect(within(sheet).getByText('{"nested":1}')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
-    const [blank] = await screen.findAllByRole('button', { name: '—' });
+    // Every field but the action empty: the action always has a value.
+    const [blank] = await screen.findAllByRole('button', {
+      name: 'Signed out everywhere',
+    });
     await userEvent.click(blank);
-    const empty = await screen.findByRole('dialog', { name: 'Entry' });
+    const empty = await screen.findByRole('dialog', {
+      name: 'Signed out everywhere',
+    });
     expect(within(empty).getAllByText('—').length).toBeGreaterThan(2);
   });
 
