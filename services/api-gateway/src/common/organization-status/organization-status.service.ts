@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  GatewayTimeoutException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import { ClientGrpc } from '@nestjs/microservices';
 import type Redis from 'ioredis';
 import { BaseGrpcClient } from '../grpc/base-grpc.client';
@@ -7,6 +14,7 @@ import {
   AUTH_GRPC_CLIENT,
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
+  type OrganizationStatusResponse,
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/contracts';
@@ -30,6 +38,16 @@ export type OrganizationState = {
  */
 const STATUS_CACHE_TTL_SECONDS = 30;
 
+/**
+ * How long past its fresh thirty seconds a status still answers while
+ * auth-service can't be reached. Redis keeps the entry this much longer, and
+ * that TTL is the only bound: an entry Redis still has is served.
+ */
+const MAX_STALE_SECONDS = 300;
+
+/** A cached state, and whether it is past its fresh thirty seconds. */
+type Entry = { state: OrganizationState; stale: boolean };
+
 const CACHE_PREFIX = 'org-status:';
 
 /**
@@ -50,6 +68,19 @@ const GENERATION_PREFIX = 'org-status-gen:';
  * Redis rather than an in-process map, for the same reason the throttler uses
  * Redis: a freeze must take effect across every replica, not just the one that
  * happened to serve the status change.
+ *
+ * The entry is `{"status":"ACTIVE","deleted":false,"freshUntil":<epoch ms>}`,
+ * the same key and shape on both gateways. An entry without `freshUntil` (an
+ * older replica's) is fresh for as long as Redis keeps it.
+ *
+ * **An auth-service outage serves the last known status, for a bounded time.**
+ * Past its fresh thirty seconds the status is asked for again; if the call
+ * fails with `UNAVAILABLE` or `DEADLINE_EXCEEDED`, the stale entry answers,
+ * with a warning, so an outage doesn't take down every route at the
+ * thirty-second mark. A stale `FROZEN` still refuses. Any other failure, and a
+ * tenant with no entry, still fail the request. Every write that changes a
+ * status calls {@link invalidate}, so a stale entry is never one the gateway
+ * itself made obsolete.
  */
 @Injectable()
 export class OrganizationStatusService
@@ -90,20 +121,27 @@ export class OrganizationStatusService
         ? null
         : `${CACHE_PREFIX}${organizationId}|#${generation}`;
     const cached = key ? await this.readCache(key) : null;
-    if (cached) return cached;
+    if (cached && !cached.stale) return cached.state;
 
-    // Through `call()`, so the most frequent RPC the gateway makes is timed
-    // under `auth-service` and has a deadline like every other. No caller
-    // identity: the RPC is by id and unscoped, and the id came from a JWT this
-    // gateway just verified.
-    const response = await this.call(
-      (metadata) =>
-        this.organizationGrpcService.getOrganizationStatus(
-          { organizationId },
-          metadata,
-        ),
-      UNKNOWN_ORIGIN,
-    );
+    let response: OrganizationStatusResponse;
+    try {
+      response = await this.call(
+        (metadata) =>
+          this.organizationGrpcService.getOrganizationStatus(
+            { organizationId },
+            metadata,
+          ),
+        UNKNOWN_ORIGIN,
+      );
+    } catch (error) {
+      const code = unreachableCode(error);
+      if (!cached || code === null) throw error;
+      this.logger.warn(
+        `auth-service unreachable (${code}); serving the last known status of ${organizationId}`,
+      );
+
+      return cached.state;
+    }
 
     const state: OrganizationState = {
       // `?? OrgStatus.FROZEN` — an UNSPECIFIED status means the tenant's state
@@ -168,10 +206,28 @@ export class OrganizationStatusService
     }
   }
 
-  private async readCache(key: string): Promise<OrganizationState | null> {
+  /** A read failure, or a value not shaped as `writeCache` writes it, is a miss and not an error. */
+  private async readCache(key: string): Promise<Entry | null> {
     try {
       const raw = await this.redis.get(key);
-      return raw ? (JSON.parse(raw) as OrganizationState) : null;
+      if (!raw) return null;
+
+      const value = JSON.parse(raw) as Record<string, unknown> | null;
+      if (
+        typeof value?.status !== 'string' ||
+        typeof value.deleted !== 'boolean'
+      ) {
+        return null;
+      }
+      const { freshUntil } = value;
+
+      return {
+        state: {
+          status: value.status as OrgStatus,
+          deleted: value.deleted,
+        },
+        stale: typeof freshUntil === 'number' && freshUntil <= Date.now(),
+      };
     } catch (error) {
       this.logger.warn(
         `Status cache unavailable, falling through to auth-service: ${
@@ -189,13 +245,32 @@ export class OrganizationStatusService
     try {
       await this.redis.set(
         key,
-        JSON.stringify(state),
+        JSON.stringify({
+          status: state.status,
+          deleted: state.deleted,
+          freshUntil: Date.now() + STATUS_CACHE_TTL_SECONDS * 1000,
+        }),
         'EX',
-        STATUS_CACHE_TTL_SECONDS,
+        STATUS_CACHE_TTL_SECONDS + MAX_STALE_SECONDS,
       );
     } catch {
       // Same reasoning as readCache: losing the cache costs latency, not
       // correctness, so it must not fail the request.
     }
   }
+}
+
+/**
+ * The status name when `error` means auth-service couldn't be reached in
+ * time: unreachable, a peer deadline, or this gateway's own timeout. Null for
+ * anything else.
+ */
+function unreachableCode(error: unknown): string | null {
+  if (error instanceof GatewayTimeoutException) return 'DEADLINE_EXCEEDED';
+  const code = (error as { code?: unknown } | null)?.code;
+
+  return code === GrpcStatus.UNAVAILABLE ||
+    code === GrpcStatus.DEADLINE_EXCEEDED
+    ? GrpcStatus[code]
+    : null;
 }

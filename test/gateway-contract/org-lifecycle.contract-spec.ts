@@ -16,8 +16,9 @@
  * What is pinned is what the gateway DOES: the access table, the category each route
  * resolves to, the three requests that are never gated, the thirty-second cache in
  * Redis under `org-status:<id>|#<generation>` (shared by every replica, so the value is read by
- * whichever replica asks next), failing CLOSED, and that a platform change
- * invalidates the cached decision. The category of EVERY route is held by the table
+ * whichever replica asks next), failing CLOSED, riding out a peer outage on the last
+ * known status but never on none, and that a platform change invalidates the cached
+ * decision. The category of EVERY route is held by the table
  * `org-access-routes.json`; these rows prove the behaviour end to end.
  */
 
@@ -103,8 +104,8 @@ describe('the tenant lifecycle gate', () => {
 
   beforeEach(async () => {
     peers.reset();
-    // The decision is cached for thirty seconds, in a store the rows share:
-    // every generation's entry, and the generation.
+    // The decision is cached in a store the rows share: every generation's
+    // entry, and the generation.
     const stale = await redis.keys(`org-status:${ORGANIZATION}*`);
     await redis.del(GENERATION_KEY, ...stale);
   });
@@ -115,6 +116,14 @@ describe('the tenant lifecycle gate', () => {
       .always({ status: toProtoOrgStatus(status), deleted });
 
   const statusCalls = () => peers.auth.calls(STATUS_RPC);
+  /** A cached status past its fresh thirty seconds, which Redis keeps `seconds` longer. */
+  const stale = async (status: string, seconds = 300) =>
+    redis.set(
+      await cacheKey(),
+      JSON.stringify({ status, deleted: false, freshUntil: Date.now() - 1 }),
+      'EX',
+      seconds,
+    );
 
   const session = () => new Session(gateway.baseUrl);
 
@@ -321,7 +330,7 @@ describe('the tenant lifecycle gate', () => {
       undefined,
     ],
     [
-      'a route Node never authenticates, even for a frozen tenant’s member (health)',
+      'a route that is never authenticated, even for a frozen tenant’s member (health)',
       () => session().get('/health/ready', headers([])),
       200,
     ],
@@ -341,23 +350,24 @@ describe('the tenant lifecycle gate', () => {
   // --------------------------------------------------------------------- cache
 
   rowFor('Ops')(
-    '**a decision is cached for thirty seconds in Redis under `org-status:<id>|#<generation>` — two requests, one question**',
+    '**a decision is fresh for thirty seconds in Redis under `org-status:<id>|#<generation>`, and kept five minutes longer for an outage — two requests, one question**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
+      const before = Date.now();
 
       await ROUTES.READ.send();
       await ROUTES.READ.send();
 
       expect(statusCalls()).toHaveLength(1);
-      expect(JSON.parse((await redis.get(await cacheKey())) ?? 'null')).toEqual(
-        {
-          status: 'ACTIVE',
-          deleted: false,
-        },
-      );
+      const { freshUntil, ...decision } = JSON.parse(
+        (await redis.get(await cacheKey())) ?? 'null',
+      ) as { freshUntil: number };
+      expect(decision).toEqual({ status: 'ACTIVE', deleted: false });
+      expect(freshUntil).toBeGreaterThanOrEqual(before + 30_000);
+      expect(freshUntil).toBeLessThanOrEqual(Date.now() + 30_000);
       const ttl = await redis.ttl(await cacheKey());
-      expect(ttl).toBeGreaterThan(0);
-      expect(ttl).toBeLessThanOrEqual(30);
+      expect(ttl).toBeGreaterThan(300);
+      expect(ttl).toBeLessThanOrEqual(330);
     },
   );
 
@@ -412,9 +422,76 @@ describe('the tenant lifecycle gate', () => {
   );
 
   rowFor('Ops')(
-    '**a peer that cannot be reached fails the request — it does not wave it through**',
+    '**a peer that cannot be reached fails the request of a tenant with no cached status — it does not wave it through**',
     async () => {
       peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+
+      const response = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(response.status).toBe(503);
+      expect(downstreamCalls('READ')).toHaveLength(0);
+    },
+  );
+
+  rowFor('Ops')(
+    '**a peer that cannot be reached is ridden out on the last known status — a stale ACTIVE serves, a stale FROZEN refuses**',
+    async () => {
+      allowFailOpen('auth-service unreachable');
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+
+      await stale('ACTIVE');
+      const served = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(lifecycleRefusal(served.status, served.body)).toBe(false);
+      expect(downstreamCalls('READ').length).toBeGreaterThanOrEqual(1);
+
+      await stale('FROZEN');
+      const refused = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(2);
+      expect(refused.status).toBe(403);
+      expect(errorOf(refused.body)).toBe(enveloped(REFUSAL.FROZEN));
+    },
+  );
+
+  rowFor('Ops')(
+    '**a peer that times out is ridden out too — the status call’s deadline, not just a refused connection**',
+    async () => {
+      allowFailOpen('auth-service unreachable');
+      peers.auth.on(STATUS_RPC).hang();
+      await stale('ACTIVE');
+
+      const served = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(lifecycleRefusal(served.status, served.body)).toBe(false);
+      expect(downstreamCalls('READ').length).toBeGreaterThanOrEqual(1);
+    },
+    20_000,
+  );
+
+  rowFor('Ops')(
+    '**any other failure refuses, even with a stale status cached — only an unreachable peer is ridden out**',
+    async () => {
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.INTERNAL, 'auth broke');
+      await stale('ACTIVE');
+
+      const response = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(response.status).toBe(500);
+      expect(downstreamCalls('READ')).toHaveLength(0);
+    },
+  );
+
+  rowFor('Ops')(
+    '**a status Redis has expired is not ridden out — the Redis TTL bounds the stale window**',
+    async () => {
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+      await stale('ACTIVE', 1);
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
 
       const response = await ROUTES.READ.send();
 
@@ -537,26 +614,32 @@ describe('the tenant lifecycle gate', () => {
   );
 
   rowFor('Organizations')(
-    "**the tenant's own delete drops the cached decision at once** — a frozen workspace does not pass the gate for thirty seconds",
+    '**a tenant deleting its own organization is refused on its next request — the cached ACTIVE is dropped, not served for thirty seconds**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
       await ROUTES.READ.send();
-      expect(await redis.exists(await cacheKey())).toBe(1);
+      expect(statusCalls()).toHaveLength(1);
+
       peers.auth
         .on('OrganizationService/DeleteOrganization')
         .reply({ revokedSessionCount: 1 });
-
       const deleted = await session().request(
         'DELETE',
         `${API}/organizations/current`,
         {
-          body: { reason: 'Closing the workspace' },
+          body: { reason: 'closing' },
           headers: headers(['organization.delete']),
         },
       );
-
       expect(deleted.status).toBe(200);
-      expect(await redis.exists(await cacheKey())).toBe(0);
+
+      // auth-service froze the tenant as it deleted it.
+      tenantIs(OrgStatus.FROZEN);
+      const next = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(2);
+      expect(next.status).toBe(403);
+      expect(errorOf(next.body)).toBe(enveloped(REFUSAL.FROZEN));
     },
   );
 
@@ -660,7 +743,7 @@ describe('the tenant lifecycle gate', () => {
   );
 
   rowFor('Ops')(
-    '**the one public GraphQL query stays open for a frozen workspace’s member, and is never asked about — Node’s JwtAuthGuard does not run on it**',
+    '**the one public GraphQL query stays open for a frozen workspace’s member, and is never asked about — the session check does not run on it**',
     async () => {
       tenantIs(OrgStatus.FROZEN);
 
