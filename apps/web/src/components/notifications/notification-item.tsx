@@ -37,7 +37,7 @@ export function NotificationAvatar({
   actorName: string | null;
   system: boolean;
 }) {
-  const Icon = type ? NOTIFICATION_TYPES[type].icon : null;
+  const Icon = NOTIFICATION_TYPES[type].icon;
   return (
     <span aria-hidden className="relative shrink-0">
       {system ? (
@@ -62,11 +62,9 @@ export function NotificationAvatar({
       ) : (
         <UserAvatar name={actorName} className="size-8 text-xs" />
       )}
-      {Icon && (
-        <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-background text-foreground">
-          <Icon className="size-3" />
-        </span>
-      )}
+      <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-background text-foreground">
+        <Icon className="size-3" />
+      </span>
     </span>
   );
 }

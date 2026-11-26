@@ -146,6 +146,9 @@ export enum AuditAction {
   PLATFORM_PLAN_RELEASED = 'PLATFORM_PLAN_RELEASED',
 }
 
+/** Every action, for validating one that arrives untyped. */
+export const AUDIT_ACTIONS = Object.values(AuditAction);
+
 /**
  * What an audit event happened TO.
  *

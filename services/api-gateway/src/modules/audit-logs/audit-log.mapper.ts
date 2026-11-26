@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import { Logger } from '@nestjs/common';
 import {
   AuditLogResponse,
@@ -32,7 +33,7 @@ export function toAuditLogResponseDto(
     id: log.id,
     organizationId: log.organizationId ?? null,
     userId: log.userId ?? null,
-    action: fromProtoAuditAction(log.action),
+    action: requiredEnum('action', log.action, fromProtoAuditAction),
     resourceType: fromProtoAuditResourceType(log.resourceType),
     resourceId: log.resourceId ?? null,
     ipAddress: log.ipAddress ?? null,

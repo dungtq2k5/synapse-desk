@@ -255,12 +255,12 @@ type Notification {
   createdAt: DateTime!
   id: ID!
   organizationId: ID!
-  priority: String
+  priority: String!
   readAt: DateTime
   resourceId: ID
   resourceType: String
   title: String!
-  type: String
+  type: String!
 }
 
 type NotificationFeed {

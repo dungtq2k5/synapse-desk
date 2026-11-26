@@ -53,10 +53,13 @@ export function toNotificationResponseDto(
   return {
     id: notification.id,
     organizationId: notification.organizationId,
-    type: fromProtoNotificationType(notification.type),
-    // `?? null`, never `?? ''`: an empty string is neither a member of the enum
-    // nor an absence, so a client switching on it falls through every arm.
-    priority: fromProtoNotificationPriority(notification.priority) ?? null,
+    // Always set: the consumer refuses a type or priority outside its enum.
+    type: requiredEnum('type', notification.type, fromProtoNotificationType),
+    priority: requiredEnum(
+      'priority',
+      notification.priority,
+      fromProtoNotificationPriority,
+    ),
     title: notification.title,
     body: notification.body ?? null,
     data: parseData(notification.data),

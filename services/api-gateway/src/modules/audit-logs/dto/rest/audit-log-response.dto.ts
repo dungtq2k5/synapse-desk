@@ -6,14 +6,7 @@ export class AuditLogResponseDto {
   organizationId!: string | null;
   /** null for system and cron actors, which have no user acting for them. */
   userId!: string | null;
-  /**
-   * What happened, as an `AuditAction`.
-   *
-   * `null` for a row whose action THIS build cannot name — only reachable
-   * mid-rolling-deploy, and a client is better told "unknown" than handed a
-   * value its union does not contain.
-   */
-  action!: AuditAction | null;
+  action!: AuditAction;
   resourceType!: AuditResourceType | null;
   resourceId!: string | null;
   ipAddress!: string | null;

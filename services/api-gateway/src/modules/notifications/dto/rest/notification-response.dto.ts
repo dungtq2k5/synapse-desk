@@ -24,14 +24,10 @@ import {
 export class NotificationResponseDto {
   id!: string;
   organizationId!: string;
-  /**
-   * The ORIGINATING event — `ticket.assigned`, never the NATS subject.
-   *
-   * `null` for a type this build does not recognise.
-   */
-  type!: NotificationType | null;
-  /** How urgent it is. `null` when the wire value is one this build cannot name. */
-  priority!: NotificationPriority | null;
+  /** The ORIGINATING event — `ticket.assigned`, never the NATS subject. */
+  type!: NotificationType;
+  /** How urgent it is. */
+  priority!: NotificationPriority;
   title!: string;
   body!: string | null;
   /** The event's payload, decoded from the JSON string the wire carries. */

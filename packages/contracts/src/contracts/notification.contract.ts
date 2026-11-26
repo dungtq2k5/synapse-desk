@@ -329,6 +329,9 @@ export enum NotificationPriority {
   CRITICAL = 'CRITICAL',
 }
 
+/** Every priority, for validating one that arrives untyped. */
+export const NOTIFICATION_PRIORITIES = Object.values(NotificationPriority);
+
 /**
  * Where a device token came from — `device_tokens.platform`.
  *

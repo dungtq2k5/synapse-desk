@@ -25,18 +25,13 @@ export class NotificationResponseGqlDto {
   @Field(() => ID)
   organizationId!: string;
 
-  /**
-   * The ORIGINATING event — `ticket.assigned`, never the NATS subject.
-   *
-   * Nullable because the REST DTO is: a value this build cannot name answers
-   * `null`, and a non-null field receiving one fails the WHOLE query.
-   */
-  @Field(() => String, { nullable: true })
-  type!: NotificationType | null;
+  /** The ORIGINATING event — `ticket.assigned`, never the NATS subject. */
+  @Field(() => String)
+  type!: NotificationType;
 
-  /** How urgent it is. Nullable for the same reason as {@link type}. */
-  @Field(() => String, { nullable: true })
-  priority!: NotificationPriority | null;
+  /** How urgent it is. */
+  @Field(() => String)
+  priority!: NotificationPriority;
 
   @Field(() => String)
   title!: string;

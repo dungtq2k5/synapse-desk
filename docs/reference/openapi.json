@@ -68998,10 +68998,7 @@
           },
           "action": {
             "type": "string",
-            "nullable": true,
-            "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
-              null,
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
               "DEPARTMENT_DELETED",
@@ -69230,10 +69227,7 @@
             "description": "null for system and cron actors, which have no user acting for them."
           },
           "action": {
-            "nullable": true,
-            "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
-              null,
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
               "DEPARTMENT_DELETED",
@@ -69368,10 +69362,8 @@
           },
           "type": {
             "type": "string",
-            "nullable": true,
-            "description": "The ORIGINATING event — `ticket.assigned`, never the NATS subject.\n\n`null` for a type this build does not recognise.",
+            "description": "The ORIGINATING event — `ticket.assigned`, never the NATS subject.",
             "enum": [
-              null,
               "billing.payment_failed",
               "billing.plan_changed",
               "limit.threshold",
@@ -69386,9 +69378,8 @@
           },
           "priority": {
             "type": "string",
-            "nullable": true,
-            "description": "How urgent it is. `null` when the wire value is one this build cannot name.",
-            "enum": [null, "CRITICAL", "HIGH", "LOW", "NORMAL"]
+            "description": "How urgent it is.",
+            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
           },
           "title": {
             "type": "string"

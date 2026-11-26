@@ -26,6 +26,7 @@ const AT = { seconds: 1_756_684_800, nanos: 0 };
 
 const CODES = [
   'analytics.read',
+  'audit.read',
   'document.read',
   'document.update',
   'organization.read',
@@ -252,6 +253,55 @@ const CASES: Case[] = [
         .on('NotificationService/ListPreferences')
         .reply({ items: [preference({ [field]: zero })] }),
     call: get('/notifications/preferences'),
+  })),
+  {
+    name: 'AuditAction',
+    field: 'action',
+    program: (peers) =>
+      peers.ticket.on('AuditService/ListAuditLogs').reply({
+        items: [
+          {
+            id: 'log-1',
+            organizationId: ID,
+            userId: USER,
+            action: 0,
+            resourceType: 'AUDIT_RESOURCE_TYPE_USER',
+            metadata: '{}',
+            createdAt: AT,
+          },
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      }),
+    call: get('/audit-logs'),
+  },
+  ...(['type', 'priority'] as const).map((field): Case => ({
+    name: field === 'type' ? 'NotificationType' : 'NotificationPriority',
+    field,
+    program: (peers) =>
+      peers.notification.on('NotificationService/ListNotifications').reply({
+        items: [
+          {
+            id: ID,
+            organizationId: ID,
+            type: 1,
+            priority: 2,
+            [field]: 0,
+            title: 'Ticket #42 assigned to you',
+            data: '{}',
+            resourceType: 1,
+            groupCount: 1,
+            createdAt: AT,
+          },
+        ],
+        hasMore: false,
+      }),
+    call: get('/notifications'),
   })),
   {
     name: 'WebhookDeliveryStatus',

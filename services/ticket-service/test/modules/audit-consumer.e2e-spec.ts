@@ -536,6 +536,48 @@ describe('AuditConsumer over NATS (e2e)', () => {
     expect(retries).toHaveLength(0);
   });
 
+  it('**an action outside the enum is PARKED on its first delivery, logged by value, and never stored**', async () => {
+    // A publisher's bug: stored, the row would fail every audit-log read that
+    // reaches it, since the read refuses a value outside the enum.
+    const warn = faults.replace(Logger.prototype, 'warn', (() => {}) as never);
+    const error = faults.replace(
+      Logger.prototype,
+      'error',
+      (() => {}) as never,
+    );
+
+    const manager = await nats.jetstreamManager();
+    const before = (await manager.streams.info('DLQ')).state.messages;
+
+    await publishAndWait(
+      { ...auditCommand(), action: 'NOT_A_REAL_ACTION' },
+      // eslint-disable-next-line @typescript-eslint/require-await
+      async () => false,
+      1_000,
+    );
+
+    const parked = await waitUntil(async () => {
+      const info = await manager.streams.info('DLQ');
+
+      return info.state.messages > before;
+    }, 15_000);
+
+    expect(parked).toBe(true);
+    expect(await prisma.auditLog.count()).toBe(0);
+    expect(
+      error.mock.calls.some(([message]) =>
+        String(message).includes(
+          'action "NOT_A_REAL_ACTION", which is not one of',
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      warn.mock.calls.filter(([message]) =>
+        String(message).includes('retrying in'),
+      ),
+    ).toHaveLength(0);
+  });
+
   it('**a transient failure is NAKd and the redelivery succeeds**', async () => {
     // The test that proves ack semantics are wired at all. Everything else in
     // this file would pass against a consumer that acked on delivery.
