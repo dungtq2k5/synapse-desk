@@ -594,10 +594,26 @@ export class TwoFactorAuthService {
     code: string,
     afterTimeStep: number | null,
   ): Promise<number | null> {
+    // A secret this service can't decrypt is its own failure (the master key
+    // changed without re-encrypting), never the person's wrong code: a 500,
+    // logged, not a 401 that sends them to retype a code that was right.
+    let secret: string;
+    try {
+      secret = decryptSecret(encryptedSecret, this.MASTER_KEY);
+    } catch (error) {
+      this.logger.error(
+        `Couldn't decrypt a stored two-step secret: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new RpcException({
+        code: status.INTERNAL,
+        message: 'The stored two-step secret could not be read',
+      });
+    }
+
     try {
       const result = await verify({
         token: code,
-        secret: decryptSecret(encryptedSecret, this.MASTER_KEY),
+        secret,
         epochTolerance: this.TIME_TOLERANCE,
         // A code at or before the last accepted step is a replay.
         ...(afterTimeStep === null ? {} : { afterTimeStep }),
@@ -605,8 +621,7 @@ export class TwoFactorAuthService {
 
       return result.valid && 'timeStep' in result ? result.timeStep : null;
     } catch (error) {
-      // A malformed ciphertext means the master key rotated without a
-      // re-encryption migration — operationally important, not a user error.
+      // `verify` refusing its input: logged, and the code is not accepted.
       this.logger.error(
         `Failed to verify TOTP code: ${error instanceof Error ? error.message : String(error)}`,
       );
