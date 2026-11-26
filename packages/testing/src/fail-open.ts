@@ -12,6 +12,7 @@ export const FAIL_OPEN_LINES = [
   'Rate-limit storage unavailable',
   'Handshake throttle storage unavailable',
   'Event throttle storage unavailable',
+  'WS rate-limit storage unavailable',
   // The entity cache: answers go uncached, or a write is not evicted.
   'Cache read failed',
   'Cache write failed',
@@ -29,6 +30,8 @@ export const FAIL_OPEN_LINES = [
   // Revoked sessions: a signed-out device keeps working.
   'Revoked-session check unavailable',
   'Revoked-session sweep unavailable',
+  "Couldn't read whether session",
+  "Couldn't read which of",
 ] as const;
 
 /** The fail-open lines in some log output, each as logged. */
