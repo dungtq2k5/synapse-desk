@@ -13,6 +13,9 @@ import {
 } from '../graphql/loaders/loaders.factory';
 import { CacheService } from '../cache/cache.service';
 
+/** Where GraphQL is served, outside the global prefix. */
+export const GRAPHQL_PATH = '/graphql';
+
 /**
  * Where the generated SDL is written. Not tracked: the committed contract is
  * `docs/reference/schema.gql`, which the e2e suite holds this file equal to.
@@ -68,6 +71,7 @@ export const getGraphqlConfig = (
     // cannot write beside its compiled sources, and the file is a development
     // artefact (the contract is `docs/reference/schema.gql`). Writing it there
     // failed every pod at boot with EACCES.
+    path: GRAPHQL_PATH,
     autoSchemaFile: isProduction ? true : SCHEMA_PATH,
     sortSchema: true,
 

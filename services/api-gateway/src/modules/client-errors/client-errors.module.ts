@@ -3,10 +3,12 @@ import {
   Module,
   type NestModule,
   PayloadTooLargeException,
+  RequestMethod,
 } from '@nestjs/common';
 import { CLIENT_ERROR_MAX_BYTES } from '@synapsedesk/contracts';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthModule } from '../auth/auth.module';
+import { API_VERSION } from '../health/ops-routes';
 import { ClientErrorsController } from './client-errors.controller';
 
 @Module({
@@ -14,7 +16,13 @@ import { ClientErrorsController } from './client-errors.controller';
   controllers: [ClientErrorsController],
 })
 export class ClientErrorsModule implements NestModule {
-  /** The size cap, by the declared length, before validation reads the body. */
+  /**
+   * The size cap, by the declared length, before validation reads the body.
+   *
+   * For every method, so Nest mounts it with `all()`, which the HTTP metrics
+   * recorder reads as a middleware's route: its refusal is
+   * `refused-before-routing`, not a handler's template.
+   */
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply((request: Request, _response: Response, next: NextFunction) => {
@@ -28,6 +36,10 @@ export class ClientErrorsModule implements NestModule {
         }
         next();
       })
-      .forRoutes(ClientErrorsController);
+      .forRoutes({
+        path: 'client-errors',
+        method: RequestMethod.ALL,
+        version: API_VERSION,
+      });
   }
 }

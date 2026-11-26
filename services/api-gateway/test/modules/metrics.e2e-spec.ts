@@ -154,6 +154,38 @@ describe('Metrics', () => {
     expect(body).not.toContain(ticketId);
   });
 
+  it('3b. **a `BadRequestException` is counted under 400, the status the client received**', async () => {
+    // Gap 34: read before the exception filter ran, this was a 200.
+    const series = `http_requests_total{route="${API}/tickets/:id",method="GET",status="400"}`;
+    const count = async () =>
+      Number(
+        (await scrape()).body
+          .split('\n')
+          .find((line) => line.startsWith(`${series} `))
+          ?.split(' ')[1] ?? 0,
+      );
+    const before = await count();
+
+    await authenticatedAgent(fx.app, { permissionCodes: ['ticket.read.all'] })
+      .get(`${API}/tickets/not-a-uuid`)
+      .expect(400);
+
+    expect((await count()) - before).toBe(1);
+  });
+
+  it('3c. **the generated documentation is not counted**', async () => {
+    const series = async () =>
+      (await scrape()).body
+        .split('\n')
+        .filter((line) => line.startsWith('http_requests_total{'));
+    const before = await series();
+
+    await request(fx.app.getHttpServer()).get(`${API}/docs-json`).expect(200);
+    await request(fx.app.getHttpServer()).get(`${API}/docs/`).expect(200);
+
+    expect(await series()).toEqual(before);
+  });
+
   it('4. **`job_last_success_timestamp_seconds` is ABSENT for a job that never ran**', async () => {
     // **Absent, not zero**. Zero is 1970, which satisfies any
     // `time() - x > threshold` rule and reads as catastrophically stale rather

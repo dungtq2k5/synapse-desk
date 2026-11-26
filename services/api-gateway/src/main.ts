@@ -27,6 +27,7 @@ import { NodeEnv } from '@synapsedesk/contracts';
 import { createNatsTransport } from '@synapsedesk/nest-common';
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 import { VALIDATION_PIPE_OPTIONS } from './common/config/validation.config';
+import { recordHttpMetrics } from './modules/metrics/http-metrics.middleware';
 
 async function bootstrap() {
   const logger = new Logger(AppModule.name);
@@ -55,6 +56,8 @@ async function bootstrap() {
   // The value is a HOP COUNT: `1` means exactly one trusted proxy. Behind both
   // an ALB and Nginx it must be 2, or req.ip is Nginx's address.
   app.set('trust proxy', 1);
+  // First, so it sees every request, refusals included.
+  recordHttpMetrics(app);
 
   // **Security response headers, before anything that can answer a request.**
   // The policy is one object shared with `test/utils/bootstrap.ts` — a suite

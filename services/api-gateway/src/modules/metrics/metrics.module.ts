@@ -2,7 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { MetricsRegistry } from './metrics.registry';
 import { MetricsServer } from './metrics.server';
 import { JobMetricsCollector } from './job-metrics.collector';
-import { HttpMetricsInterceptor } from './http-metrics.interceptor';
 import { PlatformJobsModule } from '../platform-jobs/platform-jobs.module';
 
 /**
@@ -19,12 +18,7 @@ import { PlatformJobsModule } from '../platform-jobs/platform-jobs.module';
 @Global()
 @Module({
   imports: [PlatformJobsModule],
-  providers: [
-    MetricsRegistry,
-    JobMetricsCollector,
-    MetricsServer,
-    HttpMetricsInterceptor,
-  ],
-  exports: [MetricsRegistry, MetricsServer, HttpMetricsInterceptor],
+  providers: [MetricsRegistry, JobMetricsCollector, MetricsServer],
+  exports: [MetricsRegistry, MetricsServer],
 })
 export class MetricsModule {}

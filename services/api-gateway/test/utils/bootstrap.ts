@@ -22,6 +22,7 @@ import {
   resolveGlobalPrefix,
 } from '../../src/modules/health/ops-routes';
 import { setupSwagger } from '../../src/common/config/swagger.config';
+import { recordHttpMetrics } from '../../src/modules/metrics/http-metrics.middleware';
 import { SECURITY_HEADERS } from '../../src/common/config/security-headers.config';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
@@ -111,6 +112,8 @@ export async function bootstrapE2eTest(
   // anonymous callers on req.ip, so without it every request in a test that
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
+  // Mirrors main.ts: first, so it sees every request.
+  recordHttpMetrics(app);
   // Mirrors main.ts: the prefix, then the version.
   applyApiRouting(
     app,

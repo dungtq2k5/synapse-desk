@@ -1,5 +1,5 @@
-import { GatewayTimeoutException } from '@nestjs/common';
-import { Metadata } from '@grpc/grpc-js';
+import { GatewayTimeoutException, Logger } from '@nestjs/common';
+import { Metadata, status as GrpcStatus } from '@grpc/grpc-js';
 import {
   GRPC_DEADLINE_MS,
   packRequestContext,
@@ -18,6 +18,8 @@ import {
   timeout,
   TimeoutError,
 } from 'rxjs';
+
+const logger = new Logger('BaseGrpcClient');
 
 /**
  * Shared behaviour for every gateway -> service gRPC adapter.
@@ -123,11 +125,30 @@ type GrpcDurationMetric = {
   observe: (labels: { peer: string; code: string }, value: number) => void;
 };
 
-/** The gRPC status name, or the shape of whatever else came back. */
-function grpcCodeOf(error: unknown): string {
+/**
+ * The gRPC status NAME (`NOT_FOUND`), whether the gateway timed out or the peer
+ * answered. Anything that isn't a gRPC status is `UNKNOWN`, logged with the
+ * error's type, since the label alone hides what reached here.
+ *
+ * @example grpcCodeOf({ code: 5 }) // 'NOT_FOUND'
+ */
+export function grpcCodeOf(error: unknown): string {
   if (error instanceof GatewayTimeoutException) return 'DEADLINE_EXCEEDED';
 
-  const code = (error as { code?: unknown })?.code;
+  const code = (error as { code?: unknown } | null)?.code;
+  const name = typeof code === 'number' ? GrpcStatus[code] : undefined;
+  if (name !== undefined) return name;
 
-  return typeof code === 'number' ? String(code) : 'UNKNOWN';
+  logger.error(
+    `A gRPC call failed with ${describe(error)}, which carries no gRPC status; labeled UNKNOWN`,
+  );
+  return 'UNKNOWN';
+}
+
+/** The error's type, and its `code` when it has one. */
+function describe(error: unknown): string {
+  const type = error instanceof Error ? error.constructor.name : typeof error;
+  const code = (error as { code?: unknown } | null)?.code;
+
+  return code === undefined ? type : `${type} (code ${JSON.stringify(code)})`;
 }

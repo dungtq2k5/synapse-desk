@@ -139,6 +139,8 @@ describe('CORS allow-lists cover the client contract', () => {
     'auto-submitted':
       'a MAIL header read from the inbound payload, not an HTTP one; RFC 3834 loop suppression',
     precedence: 'a mail header too, read by the same loop guard',
+    'access-control-request-method':
+      'the browser’s own preflight header, read by the HTTP metrics recorder to leave preflights out; script cannot set it',
     'user-agent':
       'a forbidden header name — the browser sets it and script cannot',
     'content-length':
