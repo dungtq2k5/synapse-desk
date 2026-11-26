@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc } from '@synapsedesk/testing/rpc';
 import { status } from '@grpc/grpc-js';
@@ -506,6 +507,43 @@ describe('Two-factor auth (e2e)', () => {
     });
   });
 
+  it('**a stored secret this service cannot decrypt is a server error, never a wrong code**', async () => {
+    // The master key changed without re-encrypting: the person's code is
+    // right, and a 401 would send them to retype it forever.
+    const { user } = await seedTenantWithUser(fx.prisma);
+    const { secret } = await enrol(user.id);
+    await fx.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        twoFactorSecret: encryptSecret(secret, 'a-different-master-key'),
+      },
+    });
+    const error = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+
+    try {
+      await expectRpc(
+        twoFactor.authenticateTwoFactor(
+          {
+            twoFactorToken: await challenge(user.email),
+            code: generateSync({ secret }),
+            rememberDevice: false,
+          },
+          requestOrigin(),
+        ),
+        status.INTERNAL,
+      );
+      expect(
+        error.mock.calls.some(([message]) =>
+          String(message).includes("Couldn't decrypt a stored two-step secret"),
+        ),
+      ).toBe(true);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   describe('a TOTP code works once (RFC 6238 §5.2)', () => {
     it('**a code accepted for sign-in is refused the second time**', async () => {
       const { user } = await seedTenantWithUser(fx.prisma);
@@ -755,11 +793,47 @@ describe('Two-factor auth (e2e)', () => {
         expect(decryptSecret(row.twoFactorSecret!, masterKey())).toBe(SECRET);
       });
 
-      it('the seeder leaves an enrolled secret alone', async () => {
-        const own = encryptSecret(
-          'KRUGS4ZANFZSA5DIMUQGC3TTO5SXE===',
-          masterKey(),
-        );
+      it.each([
+        [
+          'differs from it',
+          () => encryptSecret('KRUGS4ZANFZSA5DIMUQGC3TTO5SXE===', masterKey()),
+          'the stored secret differed',
+        ],
+        [
+          "can't be read (another master key)",
+          () => encryptSecret(SECRET, 'a-different-master-key'),
+          "the stored secret couldn't be read with TWO_FACTOR_MASTER_KEY",
+        ],
+      ])(
+        '**the seeder re-enrolls a stored secret that %s, and says so**',
+        async (_case, stored, reason) => {
+          await fx.prisma.user.update({
+            where: { id: (await seeded()).id },
+            data: { isTwoFactorEnabled: true, twoFactorSecret: stored() },
+          });
+          const warn = jest
+            .spyOn(Logger.prototype, 'warn')
+            .mockImplementation(() => undefined);
+
+          let warned: unknown[][];
+          try {
+            await seedWithSecret();
+          } finally {
+            // Read before restoring: `mockRestore` clears the calls.
+            warned = [...warn.mock.calls];
+            warn.mockRestore();
+          }
+
+          const row = await seeded();
+          expect(decryptSecret(row.twoFactorSecret!, masterKey())).toBe(SECRET);
+          expect(
+            warned.some(([message]) => String(message).includes(reason)),
+          ).toBe(true);
+        },
+      );
+
+      it('the seeder leaves a stored secret that already matches alone', async () => {
+        const own = encryptSecret(SECRET, masterKey());
         await fx.prisma.user.update({
           where: { id: (await seeded()).id },
           data: { isTwoFactorEnabled: true, twoFactorSecret: own },

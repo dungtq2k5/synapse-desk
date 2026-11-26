@@ -12,7 +12,7 @@ import {
 } from '@synapsedesk/contracts';
 import { normalizeEmail } from '@synapsedesk/core';
 import { formatErrorMsg } from '@synapsedesk/nest-common';
-import { encryptSecret } from '../../common/utils/secrets';
+import { decryptSecret, encryptSecret } from '../../common/utils/secrets';
 import { PrismaService } from './prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 
@@ -52,6 +52,11 @@ type SeedSummary = {
   superAdminCreated: boolean;
   /** Two-step turned on from `SUPER_ADMIN_TOTP_SECRET` (dev and test). */
   superAdminEnrolled: boolean;
+  /**
+   * Why an already-enrolled Super Admin was enrolled again with
+   * `SUPER_ADMIN_TOTP_SECRET`, or null when it wasn't.
+   */
+  superAdminReenrolled: 'differed' | 'unreadable' | null;
   rolesCreated: string[];
   freePlanCreated: boolean;
 };
@@ -235,6 +240,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           systemUserCreated: systemUser.created,
           superAdminCreated: superAdmin.created,
           superAdminEnrolled: superAdmin.enrolled,
+          superAdminReenrolled: superAdmin.reenrolled,
           rolesCreated,
           freePlanCreated: freePlan.created,
         } satisfies SeedSummary;
@@ -289,7 +295,15 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           'it from the environment',
       );
     }
-    if (summary.superAdminEnrolled) {
+    if (summary.superAdminReenrolled) {
+      this.logger.warn(
+        "Re-enrolled the Super Admin's two-step with SUPER_ADMIN_TOTP_SECRET: " +
+          (summary.superAdminReenrolled === 'differed'
+            ? 'the stored secret differed'
+            : "the stored secret couldn't be read with TWO_FACTOR_MASTER_KEY") +
+          ' (development and test only)',
+      );
+    } else if (summary.superAdminEnrolled) {
       this.logger.warn(
         'Turned on two-step for the Super Admin from SUPER_ADMIN_TOTP_SECRET ' +
           '(development and test only)',
@@ -702,31 +716,55 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * Only created when absent. If the account already exists the .env password
    * is ignored, so redeploying never resurrects a rotated or leaked credential.
    *
-   * With `SUPER_ADMIN_TOTP_SECRET` (refused in production), two-step is turned
-   * on with that secret, so scripts and suites can compute the code: for a new
-   * Super Admin, or an existing one without two-step. An enrolled secret is
-   * never replaced.
+   * With `SUPER_ADMIN_TOTP_SECRET` (refused in production, so this is
+   * development and test), two-step is turned on with that secret so scripts
+   * and suites can compute the code: for a new Super Admin, one without
+   * two-step, and one whose stored secret differs from it or can't be
+   * decrypted (a changed `TWO_FACTOR_MASTER_KEY`), which is enrolled again.
    */
   private async seedSuperAdmin(
     tx: Prisma.TransactionClient,
     passwordHash: string | null,
-  ): Promise<{ id: string; created: boolean; enrolled: boolean }> {
+  ): Promise<{
+    id: string;
+    created: boolean;
+    enrolled: boolean;
+    reenrolled: 'differed' | 'unreadable' | null;
+  }> {
     const { id, created } = await this.findOrCreateSuperAdmin(tx, passwordHash);
     const secret = this.configService.get<string>('SUPER_ADMIN_TOTP_SECRET');
-    if (!secret) return { id, created, enrolled: false };
+    if (!secret) return { id, created, enrolled: false, reenrolled: null };
+    const masterKey = this.configService.getOrThrow<string>(
+      'TWO_FACTOR_MASTER_KEY',
+    );
 
-    const { count } = await tx.user.updateMany({
-      where: { id, isTwoFactorEnabled: false },
+    const current = await tx.user.findUniqueOrThrow({
+      where: { id },
+      select: { isTwoFactorEnabled: true, twoFactorSecret: true },
+    });
+    let reenrolled: 'differed' | 'unreadable' | null = null;
+    if (current.isTwoFactorEnabled && current.twoFactorSecret) {
+      let stored: string | null;
+      try {
+        stored = decryptSecret(current.twoFactorSecret, masterKey);
+      } catch {
+        stored = null;
+      }
+      if (stored === secret) {
+        return { id, created, enrolled: false, reenrolled: null };
+      }
+      reenrolled = stored === null ? 'unreadable' : 'differed';
+    }
+
+    await tx.user.update({
+      where: { id },
       data: {
         isTwoFactorEnabled: true,
-        twoFactorSecret: encryptSecret(
-          secret,
-          this.configService.getOrThrow<string>('TWO_FACTOR_MASTER_KEY'),
-        ),
+        twoFactorSecret: encryptSecret(secret, masterKey),
         twoFactorLastTimeStep: null,
       },
     });
-    return { id, created, enrolled: count > 0 };
+    return { id, created, enrolled: true, reenrolled };
   }
 
   private async findOrCreateSuperAdmin(
