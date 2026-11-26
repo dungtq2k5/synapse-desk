@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   CreateTicketResponse,
   requireField,
@@ -42,13 +43,15 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     ticketNumber: ticket.ticketNumber,
     organizationId: ticket.organizationId,
     authorId: ticket.authorId,
-    // `?? null` is no longer needed: `fromProto*` already answers null for
-    // UNSPECIFIED and for UNRECOGNIZED, which is what the old `?? null` was
-    // catching — except it could only catch the first, because a lookup miss
-    // and a zero value were the same `undefined`.
-    source: fromProtoTicketSource(ticket.source),
-    status: fromProtoTicketStatus(ticket.status),
-    priority: fromProtoTicketPriority(ticket.priority),
+    // Always set: ticket-service writes each from the contracts enum, so a
+    // zero or unknown value is its bug and answers 502 (`requiredEnum`).
+    source: requiredEnum('source', ticket.source, fromProtoTicketSource),
+    status: requiredEnum('status', ticket.status, fromProtoTicketStatus),
+    priority: requiredEnum(
+      'priority',
+      ticket.priority,
+      fromProtoTicketPriority,
+    ),
     title: ticket.title,
     description: ticket.description,
     currentAssigneeId: ticket.currentAssigneeId ?? null,
@@ -117,7 +120,8 @@ export function toTicketPageDto(
  *
  * `fromStatus` is null on a row with no prior status — `fromProtoTicketStatus`
  * answers `null` for `UNSPECIFIED`, and that null is the honest rendering
- * rather than an omitted key the client has to guess about.
+ * rather than an omitted key the client has to guess about. `toStatus` always
+ * has a value, so a zero there answers 502.
  */
 export function toTicketStatusChangeResponseDto(
   row: TicketStatusChangeResponse,
@@ -126,7 +130,7 @@ export function toTicketStatusChangeResponseDto(
     id: row.id,
     ticketId: row.ticketId,
     fromStatus: fromProtoTicketStatus(row.fromStatus),
-    toStatus: fromProtoTicketStatus(row.toStatus)!,
+    toStatus: requiredEnum('toStatus', row.toStatus, fromProtoTicketStatus),
     changedById: row.changedById,
     reason: row.reason ?? null,
     changedAt: fromProtoTimestamp(row.changedAt)!,

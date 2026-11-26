@@ -101,7 +101,7 @@ describe('Audit logs read API (e2e)', () => {
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
-        action: 'PLATFORM_ORGANIZATION_SUSPENDED',
+        action: AuditAction.PLATFORM_ORGANIZATION_STATUS_CHANGED,
       });
 
       const { items } = await audit.listAuditLogs(listRequest(), auditor());
@@ -121,7 +121,7 @@ describe('Audit logs read API (e2e)', () => {
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
-        action: 'PLATFORM_ORGANIZATION_SUSPENDED',
+        action: AuditAction.PLATFORM_ORGANIZATION_STATUS_CHANGED,
       });
 
       const { items } = await audit.listAuditLogs(
@@ -276,7 +276,7 @@ describe('Audit logs read API (e2e)', () => {
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
-        action: 'PLATFORM_ORGANIZATION_SUSPENDED',
+        action: AuditAction.PLATFORM_ORGANIZATION_STATUS_CHANGED,
       });
 
       const { actions } = await audit.listAuditActions(

@@ -11,8 +11,7 @@ export class OrganizationResponseDto {
   readonly name!: string;
   readonly slug!: string;
   readonly domain!: string | null;
-  /** `OrgStatus`, null when the bridge answers null for `UNSPECIFIED` */
-  readonly status!: OrgStatus | null;
+  readonly status!: OrgStatus;
   readonly enforceTwoFactor!: boolean;
   readonly allowedEmailDomains!: string[];
   readonly maxAgentSeats!: number;
@@ -100,7 +99,7 @@ export class OrganizationUsageResponseDto {
    * no plan next to it is a number they cannot act on: the next question is
    * always "what would I get if I upgraded".
    */
-  readonly aiModelTier!: AiModelTier | null;
+  readonly aiModelTier!: AiModelTier;
   readonly planName!: string;
   /** NULL for a grandfathered tenant, who has no invoice period at all. */
   readonly currentPeriodEnd!: Date | null;
@@ -116,7 +115,7 @@ export class OnboardingResponseDto {
   readonly steps!: OnboardingStepResponseDto[];
   readonly canComplete!: boolean;
   /** `OrgStatus` — see {@link OrganizationResponseDto.status}. */
-  readonly status!: OrgStatus | null;
+  readonly status!: OrgStatus;
 }
 
 export class OffboardResponseDto {

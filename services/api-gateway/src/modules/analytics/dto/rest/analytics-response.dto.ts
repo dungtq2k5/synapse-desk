@@ -153,15 +153,7 @@ export class AiUsageResponseDto {
   totalCostMicros!: number;
   totalGenerations!: number;
   monthlyBudgetMicros!: number;
-  /**
-   * `FAST` | `QUALITY`, or null.
-   *
-   * The wire field was a bare `string` while `billing.proto` spelled the same
-   * fact as `AiModelTier` — drift rather than a decision, and it is an enum on
-   * both now. Null only for UNSPECIFIED, which means auth-service returned no
-   * entitlement.
-   */
-  aiModelTier!: AiModelTier | null;
+  aiModelTier!: AiModelTier;
   draftAcceptance!: RateResponseDto;
   emptyRetrievalRate!: RateResponseDto;
   computedAt!: Date | null;
@@ -234,7 +226,7 @@ export class AgentAnalyticsResponseDto {
 export class KnowledgeGapFlagResponseDto {
   documentId!: string;
   documentTitle!: string;
-  flagType!: DocumentFlagType | null;
+  flagType!: DocumentFlagType;
   detail!: string;
 }
 
@@ -290,8 +282,8 @@ export class DocumentAnalyticsResponseDto {
  */
 export class ExportResponseDto {
   id!: string;
-  status!: ExportStatus | null;
-  kind!: ExportKind | null;
+  status!: ExportStatus;
+  kind!: ExportKind;
   rowCount!: number | null;
   /**
    * The newest rollup run behind the file — the disputed-number guard.

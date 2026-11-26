@@ -28,7 +28,7 @@ export type HistoryEvent =
   | { kind: 'unassigned'; id: string; at: string };
 
 const reasonText = (reason: AssignmentResponseDto['reason']) =>
-  reason ? ASSIGNMENT_REASON_LABEL[reason].toLowerCase() : null;
+  ASSIGNMENT_REASON_LABEL[reason].toLowerCase();
 
 /**
  * A ticket's status changes and assignments as one timeline, newest first.

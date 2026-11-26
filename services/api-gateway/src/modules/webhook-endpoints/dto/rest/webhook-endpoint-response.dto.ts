@@ -58,8 +58,7 @@ export class WebhookDeliveryResponseDto {
   // the string is how it stays visible. The honest consequence: a client
   // switching on this needs a default arm.
   readonly eventType!: string;
-  /** `null` for a wire value this build does not know — never invented. */
-  readonly status!: WebhookDeliveryStatus | null;
+  readonly status!: WebhookDeliveryStatus;
   readonly attempts!: number;
   readonly responseStatus!: number | null;
   readonly lastError!: string | null;

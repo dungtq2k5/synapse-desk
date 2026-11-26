@@ -249,8 +249,8 @@ export class KnowledgeGapFlagResponseGqlDto {
 
   // Nullable, matching the REST DTO: a flag type this build cannot name is
   // reported as absent rather than as a string the client's union lacks.
-  @Field(() => String, { nullable: true })
-  flagType!: DocumentFlagType | null;
+  @Field(() => String)
+  flagType!: DocumentFlagType;
 
   @Field(() => String)
   detail!: string;

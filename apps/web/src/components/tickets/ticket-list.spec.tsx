@@ -95,9 +95,9 @@ const THREE = [
     department: { id: 'd-1', name: 'Billing' },
   }),
   ticket(1044, {
-    status: null,
-    priority: null,
-    source: null,
+    status: 'PENDING_AGENT',
+    priority: 'LOW',
+    source: 'CHAT',
     currentAssigneeId: 'u-3',
     currentDepartmentId: 'd-2',
   }),

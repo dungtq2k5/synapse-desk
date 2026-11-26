@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import type { NotificationType } from '@synapsedesk/contracts';
 import {
   fromProtoTimestamp,
@@ -65,12 +66,11 @@ export function toWebhookDeliveryResponseDto(
     id: delivery.id,
     eventId: delivery.eventId,
     eventType: delivery.eventType,
-    // `?? null`, never `?? ''` — the notifications mapper's rule: an empty
-    // string is neither a member of the enum nor an absence, so a client
-    // switching on it falls through every arm. The bridge's `null` for
-    // UNSPECIFIED stays a visible null: a wire value this build does not know
-    // is a fact worth seeing, not one worth guessing over.
-    status: fromProtoWebhookDeliveryStatus(delivery.status) ?? null,
+    status: requiredEnum(
+      'status',
+      delivery.status,
+      fromProtoWebhookDeliveryStatus,
+    ),
     attempts: delivery.attempts,
     responseStatus: delivery.responseStatus ?? null,
     lastError: delivery.lastError ?? null,

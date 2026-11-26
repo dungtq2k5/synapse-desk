@@ -430,10 +430,9 @@ describe('Webhook endpoints at the HTTP boundary (e2e)', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('5. an unmappable delivery status stays a visible null', async () => {
-      // The opposite rule from the catalogue's filter, and deliberately so: a
-      // delivery is one row a person is reading, so a status this build cannot
-      // name is a fact worth showing rather than one worth hiding.
+    it('5. an unmappable delivery status is a 502 naming the field', async () => {
+      // notification-service writes every delivery status from its enum, so
+      // the zero value is its bug: refused naming the field, never a null.
       fx.stubs.notification.listWebhookDeliveries.mockReturnValue(
         of({
           items: [
@@ -448,8 +447,8 @@ describe('Webhook endpoints at the HTTP boundary (e2e)', () => {
         `${API}/webhook-endpoints/${endpointId}/deliveries`,
       );
 
-      expect(res.status).toBe(200);
-      expect(res.body.data.items[0].status).toBeNull();
+      expect(res.status).toBe(502);
+      expect(res.body.error).toContain(' for status,');
     });
   });
 

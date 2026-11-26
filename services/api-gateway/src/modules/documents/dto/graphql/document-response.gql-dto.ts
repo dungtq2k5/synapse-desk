@@ -45,8 +45,8 @@ export class DocumentResponseGqlDto {
   @Field(() => Boolean)
   isOrganizationWide!: boolean;
 
-  @Field(() => DocumentStatus, { nullable: true })
-  status!: DocumentStatus | null;
+  @Field(() => DocumentStatus)
+  status!: DocumentStatus;
 
   /** The ids, flat. The resolved departments are the `departments` edge. */
   @Field(() => [ID])

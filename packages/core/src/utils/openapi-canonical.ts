@@ -44,6 +44,38 @@ export function canonicalizeEnums<T>(document: T): T {
   return document;
 }
 
+/**
+ * Lists `null` in every nullable schema's `enum`, in place. OpenAPI 3.0's
+ * `nullable: true` widens the type but not the `enum`, so a validator or a
+ * generated client that follows the specification refuses the `null` the
+ * gateway sends. The schema says it is nullable; this makes its `enum` agree.
+ *
+ * @example listNullInNullableEnums({ nullable: true, enum: ['A'] }) // { nullable: true, enum: ['A', null] }
+ */
+export function listNullInNullableEnums<T>(document: T): T {
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+
+    const schema = node as { nullable?: unknown; enum?: unknown };
+    if (
+      schema.nullable === true &&
+      Array.isArray(schema.enum) &&
+      !schema.enum.includes(null)
+    ) {
+      schema.enum.push(null);
+    }
+    Object.values(node).forEach(visit);
+  };
+
+  visit(document);
+
+  return document;
+}
+
 function isPrimitive(value: unknown): value is Primitive {
   return (
     value === null ||

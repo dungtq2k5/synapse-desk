@@ -14,7 +14,7 @@ export class SubscriptionResponseDto {
    * name says.
    */
   monthlyAiTokenBudget!: number;
-  aiModelTier!: AiModelTier | null;
+  aiModelTier!: AiModelTier;
   billingCycleStart!: Date | null;
   /**
    * `OrgStatus` — **ours, not Stripe's**, despite living on a subscription
@@ -22,7 +22,7 @@ export class SubscriptionResponseDto {
    * tenant lifecycle status the subscription drove"*. Only the neighbouring
    * `InvoiceResponseDto.status` carries Stripe's vocabulary.
    */
-  status!: OrgStatus | null;
+  status!: OrgStatus;
   /**
    * When the current period ends: the renewal date, or the end date when
    * `cancelAtPeriodEnd`. Null until a subscription event has named the tenant.
@@ -104,7 +104,7 @@ export class TenantPlanResponseDto {
    */
   monthlyAiTokenBudget!: number;
   /** `AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}. */
-  aiModelTier!: AiModelTier | null;
+  aiModelTier!: AiModelTier;
   maxDocumentBytes!: number;
   maxAttachmentBytes!: number;
   maxDocumentUploads!: number;

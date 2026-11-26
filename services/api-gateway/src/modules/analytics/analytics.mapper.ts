@@ -1,5 +1,6 @@
 /** @file Wire <-> REST conversions for the analytics surface. */
 
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   ExportKind as ProtoExportKind,
   ExportStatus as ProtoExportStatus,
@@ -114,8 +115,8 @@ export function toExportResponseDto(response: {
 }): ExportResponseDto {
   return {
     id: response.id,
-    status: fromProtoExportStatus(response.status),
-    kind: fromProtoExportKind(response.kind),
+    status: requiredEnum('status', response.status, fromProtoExportStatus),
+    kind: requiredEnum('kind', response.kind, fromProtoExportKind),
     rowCount: response.rowCount ?? null,
     rollupComputedAt: fromProtoTimestamp(response.rollupComputedAt) ?? null,
     downloadUrl: response.downloadUrl ?? null,
@@ -230,7 +231,11 @@ export function toAiUsageResponseDto(
     totalCostMicros: response.totalCostMicros,
     totalGenerations: response.totalGenerations,
     monthlyBudgetMicros: response.monthlyBudgetMicros,
-    aiModelTier: fromProtoAiModelTier(response.aiModelTier),
+    aiModelTier: requiredEnum(
+      'aiModelTier',
+      response.aiModelTier,
+      fromProtoAiModelTier,
+    ),
     draftAcceptance: toRateResponseDto(response.draftAcceptance),
     emptyRetrievalRate: toRateResponseDto(response.emptyRetrievalRate),
     computedAt: fromProtoTimestamp(response.computedAt) ?? null,

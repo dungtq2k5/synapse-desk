@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   fromProtoOrgStatus,
   OrganizationResponse,
@@ -37,7 +38,7 @@ export function toOrganizationResponseDto(
     name: organization.name,
     slug: organization.slug,
     domain: organization.domain ?? null,
-    status: fromProtoOrgStatus(organization.status),
+    status: requiredEnum('status', organization.status, fromProtoOrgStatus),
     enforceTwoFactor: organization.enforceTwoFactor,
     allowedEmailDomains: organization.allowedEmailDomains,
     maxAgentSeats: organization.maxAgentSeats,
@@ -133,7 +134,11 @@ export function toOrganizationUsageResponseDto(
           unavailableReason: UsageUnavailableReason.READ_FAILED,
         },
     aiTokens: toUsageMeterResponseDto(response.aiTokens),
-    aiModelTier: fromProtoAiModelTier(response.aiModelTier),
+    aiModelTier: requiredEnum(
+      'aiModelTier',
+      response.aiModelTier,
+      fromProtoAiModelTier,
+    ),
     planName: response.planName,
     currentPeriodEnd: response.currentPeriodEnd
       ? requireProtoTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
@@ -149,7 +154,10 @@ export function toOrganizationUsageResponseDto(
 export function toOnboardingResponseDto(
   response: OnboardingResponse,
 ): OnboardingResponseDto {
-  return { ...response, status: fromProtoOrgStatus(response.status) };
+  return {
+    ...response,
+    status: requiredEnum('status', response.status, fromProtoOrgStatus),
+  };
 }
 
 /**

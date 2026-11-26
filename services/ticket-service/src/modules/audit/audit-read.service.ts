@@ -11,7 +11,6 @@ import {
   toPageMeta,
   toPrismaPage,
   toProtoTimestamp,
-  AuditAction,
   fromProtoAuditAction,
   fromProtoAuditResourceType,
   toProtoAuditAction,
@@ -113,16 +112,13 @@ export class AuditReadService {
     // order the list by when each action was added to the proto, which is not
     // an order anybody reading a filter can predict.
     //
-    // A row whose action this build cannot name maps to UNSPECIFIED and is
-    // dropped: offering a filter that selects nothing is worse than a shorter
-    // list, which is the same call the "only actions that ACTUALLY occurred"
-    // rule already makes.
+    // A row whose action this build can't name throws in `toProto`, naming
+    // the value: it was stored outside the contracts enum.
     return {
       actions: rows
         .map((row) => row.action)
         .sort((a, b) => compareAlphabetically(a, b))
-        .map((action) => toProtoAuditAction(action))
-        .filter((action) => action !== AuditAction.AUDIT_ACTION_UNSPECIFIED),
+        .map((action) => toProtoAuditAction(action)),
     };
   }
 

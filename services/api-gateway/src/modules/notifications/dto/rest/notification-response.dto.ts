@@ -88,18 +88,18 @@ export class MarkReadResponseDto {
 
 export class PreferenceResponseDto {
   /** The event this preference is for, or `'*'` for the catch-all row. */
-  type!: NotificationType | typeof PREFERENCE_WILDCARD_TYPE | null;
+  type!: NotificationType | typeof PREFERENCE_WILDCARD_TYPE;
   /** The transport this preference governs. */
-  channel!: NotificationChannel | null;
+  channel!: NotificationChannel;
   isEnabled!: boolean;
   /** Whether matching notifications batch into a digest. */
-  digest!: DigestMode | null;
+  digest!: DigestMode;
   /**
    * Where the value came from.
    *
    * Lets the UI show "inherited" rather than presenting a default as a choice.
    */
-  source!: PreferenceSource | null;
+  source!: PreferenceSource;
 }
 
 /**
@@ -111,10 +111,7 @@ export class PreferenceResponseDto {
  */
 export class DeviceTokenResponseDto {
   readonly id!: string;
-  /**
-   * `IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.
-   */
-  readonly platform!: DevicePlatform | null;
+  readonly platform!: DevicePlatform;
   readonly deviceName!: string | null;
   /** Null until the first successful push — how stale this device is. */
   readonly lastUsedAt!: Date | null;

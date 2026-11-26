@@ -63809,6 +63809,7 @@
             "nullable": true,
             "description": "The caller's organization's status, answered in every status: the\npast-due banner and the frozen page read it. Null for a Super Admin, who\nhas no organization.",
             "enum": [
+              null,
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
@@ -63852,7 +63853,7 @@
           "gender": {
             "type": "string",
             "nullable": true,
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
+            "enum": [null, "FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
           }
         }
       },
@@ -64023,7 +64024,7 @@
           "gender": {
             "type": "string",
             "nullable": true,
-            "enum": ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
+            "enum": [null, "FEMALE", "MALE", "OTHER", "UNSPECIFIED"]
           }
         }
       },
@@ -64654,8 +64655,6 @@
             "nullable": true
           },
           "status": {
-            "nullable": true,
-            "description": "`OrgStatus`, null when the bridge answers null for `UNSPECIFIED`",
             "enum": [
               "ACTIVE",
               "FROZEN",
@@ -64854,7 +64853,7 @@
             "type": "string",
             "nullable": true,
             "description": "Why there's no number, when `available` is false: `READ_FAILED` (it\ncouldn't be read just now; try again) or `NOT_AVAILABLE` (this\norganization has no such meter). Null when available.",
-            "enum": ["NOT_AVAILABLE", "READ_FAILED"]
+            "enum": [null, "NOT_AVAILABLE", "READ_FAILED"]
           }
         },
         "required": ["available", "used", "limit", "unavailableReason"]
@@ -64882,7 +64881,6 @@
           },
           "aiModelTier": {
             "type": "string",
-            "nullable": true,
             "description": "The plan, beside the meters\n\nThis is the page a customer opens when they hit a limit, and a limit with\nno plan next to it is a number they cannot act on: the next question is\nalways \"what would I get if I upgraded\".",
             "enum": ["FAST", "QUALITY"]
           },
@@ -64935,7 +64933,6 @@
           },
           "status": {
             "type": "string",
-            "nullable": true,
             "description": "`OrgStatus` — see {@link OrganizationResponseDto.status}.",
             "enum": [
               "ACTIVE",
@@ -64973,8 +64970,6 @@
         "properties": {
           "status": {
             "type": "string",
-            "nullable": true,
-            "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "CANCELLED",
               "CHUNKING",
@@ -64989,13 +64984,14 @@
             "type": "string",
             "nullable": true,
             "description": "Why a `QUEUED` attempt waits; `null` is an ordinary queue.",
-            "enum": ["AI_ALLOWANCE", "RETRYING"]
+            "enum": [null, "AI_ALLOWANCE", "RETRYING"]
           },
           "errorCode": {
             "type": "string",
             "nullable": true,
             "description": "Why a `FAILED` attempt failed; `null` on one that hasn't failed.",
             "enum": [
+              null,
               "NO_READABLE_TEXT",
               "OCR_UNAVAILABLE",
               "OTHER",
@@ -65046,7 +65042,6 @@
             "type": "boolean"
           },
           "status": {
-            "nullable": true,
             "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"],
             "type": "string"
           },
@@ -65136,7 +65131,6 @@
             "description": "The flagged document's title, joined in so the list reads as a worklist."
           },
           "flagType": {
-            "nullable": true,
             "description": "What kind of attention this document needs, or `null` when the value is one\nthis build does not recognise — the same nullability\n{@link DocumentResponseDto.status} carries, and for the same reason.",
             "enum": [
               "CONFLICTING",
@@ -65150,7 +65144,6 @@
             "type": "string"
           },
           "severity": {
-            "nullable": true,
             "enum": ["CRITICAL", "INFO", "WARNING"],
             "type": "string"
           },
@@ -65179,7 +65172,7 @@
           "resolution": {
             "nullable": true,
             "description": "`null` while the flag is open, which is what an open flag sends.",
-            "enum": ["DISMISSED", "DOCUMENT_REPLACED", "FIXED"],
+            "enum": [null, "DISMISSED", "DOCUMENT_REPLACED", "FIXED"],
             "type": "string"
           },
           "resolutionComment": {
@@ -65343,8 +65336,6 @@
             "description": "Empty until the worker has queued it."
           },
           "status": {
-            "nullable": true,
-            "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "CANCELLED",
               "CHUNKING",
@@ -65364,6 +65355,7 @@
             "nullable": true,
             "description": "Why a `FAILED` attempt failed, as a reader can act on it: too long, too\nlarge when opened, no readable text, OCR unavailable, the AI provider\nfailed, or other.\n`errorLog` stays the detail. `null` on an attempt that hasn't failed.",
             "enum": [
+              null,
               "NO_READABLE_TEXT",
               "OCR_UNAVAILABLE",
               "OTHER",
@@ -65376,13 +65368,13 @@
           "failedStage": {
             "nullable": true,
             "description": "The stage a `FAILED` attempt was in. `null` on one that hasn't failed.",
-            "enum": ["CHUNKING", "EMBEDDING", "PARSING"],
+            "enum": [null, "CHUNKING", "EMBEDDING", "PARSING"],
             "type": "string"
           },
           "waitingReason": {
             "nullable": true,
             "description": "Why a `QUEUED` attempt waits: `AI_ALLOWANCE` when it was put back because\nthe organization's AI allowance ran out mid-run; it starts again by itself\nonce the allowance resets or the plan changes. `RETRYING` when it was put\nback after an error, and is tried again shortly; the error is on the\nattempt while it waits. `null` is an ordinary queue.",
-            "enum": ["AI_ALLOWANCE", "RETRYING"],
+            "enum": [null, "AI_ALLOWANCE", "RETRYING"],
             "type": "string"
           },
           "processedAt": {
@@ -66894,12 +66886,10 @@
             "type": "string"
           },
           "source": {
-            "nullable": true,
             "enum": ["API", "CHAT", "EMAIL", "WEB"],
             "type": "string"
           },
           "status": {
-            "nullable": true,
             "enum": [
               "CLOSED",
               "ESCALATED",
@@ -66911,7 +66901,6 @@
             "type": "string"
           },
           "priority": {
-            "nullable": true,
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
             "type": "string"
           },
@@ -67047,12 +67036,10 @@
             "type": "string"
           },
           "source": {
-            "nullable": true,
             "enum": ["API", "CHAT", "EMAIL", "WEB"],
             "type": "string"
           },
           "status": {
-            "nullable": true,
             "enum": [
               "CLOSED",
               "ESCALATED",
@@ -67064,7 +67051,6 @@
             "type": "string"
           },
           "priority": {
-            "nullable": true,
             "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"],
             "type": "string"
           },
@@ -67328,12 +67314,10 @@
             "type": "string"
           },
           "status": {
-            "nullable": true,
             "enum": ["FAILED", "PENDING", "READY"],
             "type": "string"
           },
           "kind": {
-            "nullable": true,
             "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY"],
             "type": "string"
           },
@@ -67574,7 +67558,6 @@
             "nullable": true
           },
           "reason": {
-            "nullable": true,
             "enum": [
               "DEPARTMENT_CHANGE",
               "ESCALATION",
@@ -67679,6 +67662,7 @@
             "nullable": true,
             "description": "Null on a row with no prior status.",
             "enum": [
+              null,
               "CLOSED",
               "ESCALATED",
               "NEW",
@@ -67830,6 +67814,7 @@
             "nullable": true,
             "description": "What the generation concluded.\n\n`null` for a human message, and also for a status this build cannot name.",
             "enum": [
+              null,
               "AT_CAP",
               "DOC_ANSWER",
               "DOC_MISSING",
@@ -68111,7 +68096,7 @@
             "type": "string",
             "nullable": true,
             "description": "`LEXICAL_ONLY` when the budget could not confirm room for a generation —\nthe workspace is at its AI allowance, or the quota counter was unreadable.\nThen `nextSteps` is empty because the model was never called, and\n`articles` came from keyword search. `null` on a normal answer, where an\nempty `nextSteps` means the model had nothing to add.\n\nRead it before rendering an empty `nextSteps`: without it, a client shows\n\"no suggestions\" where the truth is \"allowance used\".",
-            "enum": ["LEXICAL_ONLY"]
+            "enum": [null, "LEXICAL_ONLY"]
           }
         },
         "required": ["nextSteps", "articles", "degraded"]
@@ -68126,7 +68111,7 @@
             "type": "string",
             "nullable": true,
             "description": "Null when the model named something that is not a priority.\n\nThe value crosses two hops: rag-service (Python) answers a bare string, and\nticket-service narrows it there — at the one boundary where it is genuinely\nforeign — before putting it on `ClassifyTicketResponse` as a real enum. So a\n`MEDIUM-HIGH` or a translated label arrives here as null rather than as a\nsuggestion the UI would render and no agent could apply.",
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
+            "enum": [null, "HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "confidenceScore": {
             "type": "number"
@@ -68534,8 +68519,6 @@
           },
           "aiModelTier": {
             "type": "string",
-            "nullable": true,
-            "description": "`FAST` | `QUALITY`, or null.\n\nThe wire field was a bare `string` while `billing.proto` spelled the same\nfact as `AiModelTier` — drift rather than a decision, and it is an enum on\nboth now. Null only for UNSPECIFIED, which means auth-service returned no\nentitlement.",
             "enum": ["FAST", "QUALITY"]
           },
           "draftAcceptance": {
@@ -68678,7 +68661,6 @@
           },
           "flagType": {
             "type": "string",
-            "nullable": true,
             "enum": [
               "CONFLICTING",
               "LOW_CONFIDENCE",
@@ -69019,6 +69001,7 @@
             "nullable": true,
             "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
+              null,
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
               "DEPARTMENT_DELETED",
@@ -69081,6 +69064,7 @@
             "type": "string",
             "nullable": true,
             "enum": [
+              null,
               "DEPARTMENT",
               "DOCUMENT_FLAG",
               "EXPORT",
@@ -69249,6 +69233,7 @@
             "nullable": true,
             "description": "What happened, as an `AuditAction`.\n\n`null` for a row whose action THIS build cannot name — only reachable\nmid-rolling-deploy, and a client is better told \"unknown\" than handed a\nvalue its union does not contain.",
             "enum": [
+              null,
               "DATA_EXPORT_REQUESTED",
               "DEPARTMENT_CREATED",
               "DEPARTMENT_DELETED",
@@ -69311,6 +69296,7 @@
           "resourceType": {
             "nullable": true,
             "enum": [
+              null,
               "DEPARTMENT",
               "DOCUMENT_FLAG",
               "EXPORT",
@@ -69385,6 +69371,7 @@
             "nullable": true,
             "description": "The ORIGINATING event — `ticket.assigned`, never the NATS subject.\n\n`null` for a type this build does not recognise.",
             "enum": [
+              null,
               "billing.payment_failed",
               "billing.plan_changed",
               "limit.threshold",
@@ -69401,7 +69388,7 @@
             "type": "string",
             "nullable": true,
             "description": "How urgent it is. `null` when the wire value is one this build cannot name.",
-            "enum": ["CRITICAL", "HIGH", "LOW", "NORMAL"]
+            "enum": [null, "CRITICAL", "HIGH", "LOW", "NORMAL"]
           },
           "title": {
             "type": "string"
@@ -69427,7 +69414,7 @@
             "type": "string",
             "nullable": true,
             "description": "What the notification is ABOUT. `null` when unset or unrecognized.",
-            "enum": ["DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
+            "enum": [null, "DOCUMENT", "ORGANIZATION", "TICKET", "USER"]
           },
           "resourceId": {
             "type": "string",
@@ -69513,7 +69500,6 @@
         "type": "object",
         "properties": {
           "type": {
-            "nullable": true,
             "description": "The event this preference is for, or `'*'` for the catch-all row.",
             "enum": [
               "*",
@@ -69531,7 +69517,6 @@
             "type": "string"
           },
           "channel": {
-            "nullable": true,
             "description": "The transport this preference governs.",
             "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK"],
             "type": "string"
@@ -69540,13 +69525,11 @@
             "type": "boolean"
           },
           "digest": {
-            "nullable": true,
             "description": "Whether matching notifications batch into a digest.",
             "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"],
             "type": "string"
           },
           "source": {
-            "nullable": true,
             "description": "Where the value came from.\n\nLets the UI show \"inherited\" rather than presenting a default as a choice.",
             "enum": ["DEFAULT", "EXPLICIT", "WILDCARD"],
             "type": "string"
@@ -69595,8 +69578,6 @@
             "type": "string"
           },
           "platform": {
-            "nullable": true,
-            "description": "`IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.",
             "enum": ["ANDROID", "IOS", "WEB"],
             "type": "string"
           },
@@ -69719,7 +69700,7 @@
             "type": "string",
             "nullable": true,
             "description": "`disabledReason` as data. NULL exactly when the reason is.",
-            "enum": ["CONSECUTIVE_FAILURES"]
+            "enum": [null, "CONSECUTIVE_FAILURES"]
           },
           "consecutiveFailures": {
             "type": "number",
@@ -69910,8 +69891,6 @@
           },
           "status": {
             "type": "string",
-            "nullable": true,
-            "description": "`null` for a wire value this build does not know — never invented.",
             "enum": ["DELIVERED", "FAILED", "PENDING"]
           },
           "attempts": {
@@ -70073,8 +70052,6 @@
           },
           "status": {
             "type": "string",
-            "nullable": true,
-            "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
@@ -70162,7 +70139,7 @@
             "type": "string",
             "nullable": true,
             "description": "Why this result set is thinner than usual, or `null` when it is not.\n\n`LEXICAL_ONLY` means the vector search was skipped.",
-            "enum": ["LEXICAL_ONLY"]
+            "enum": [null, "LEXICAL_ONLY"]
           }
         },
         "required": ["chunks", "degraded"]
@@ -70217,7 +70194,6 @@
           },
           "aiModelTier": {
             "type": "string",
-            "nullable": true,
             "enum": ["FAST", "QUALITY"]
           },
           "billingCycleStart": {
@@ -70227,7 +70203,6 @@
           },
           "status": {
             "type": "string",
-            "nullable": true,
             "description": "`OrgStatus` — **ours, not Stripe's**, despite living on a subscription\nresponse. The proto field is `OrgStatus` and its comment says so: *\"the\ntenant lifecycle status the subscription drove\"*. Only the neighbouring\n`InvoiceResponseDto.status` carries Stripe's vocabulary.",
             "enum": [
               "ACTIVE",
@@ -70406,7 +70381,6 @@
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
           },
           "aiModelTier": {
-            "nullable": true,
             "description": "`AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}.",
             "enum": ["FAST", "QUALITY"],
             "type": "string"

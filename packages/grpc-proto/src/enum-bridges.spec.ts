@@ -404,16 +404,18 @@ describe('every enum bridge round-trips', () => {
       expect(new Set(values).size).toBe(members.length);
     });
 
-    it('answers null for UNSPECIFIED, UNRECOGNIZED and an unknown string', () => {
+    it('answers null for UNSPECIFIED and UNRECOGNIZED, and throws on an unknown string', () => {
       expect(fromProto(0)).toBeNull();
       // -1 is `UNRECOGNIZED`, which ts-proto emits on every enum for a member
       // some newer build knows about.
       expect(fromProto(-1)).toBeNull();
       expect(fromProto(undefined)).toBeNull();
-      // The `to` direction takes a bare `string` on purpose — its caller is
-      // usually handing over a Prisma VarChar — and must answer UNSPECIFIED
-      // rather than throwing on the response path.
-      expect(Number(toProto('NOT_A_MEMBER'))).toBe(0);
+      // The `to` direction takes a bare `string` on purpose: its caller is
+      // usually handing over a Prisma VarChar. No value is UNSPECIFIED; a value
+      // outside the enum slipped past a write's validation, and throws.
+      expect(() => toProto('NOT_A_MEMBER')).toThrow(
+        '"NOT_A_MEMBER" is not one of',
+      );
       expect(Number(toProto(null))).toBe(0);
       expect(Number(toProto(undefined))).toBe(0);
     });

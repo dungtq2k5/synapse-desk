@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   ChatRequest,
   ChatResponse,
@@ -81,7 +82,7 @@ export function toKnowledgeAskResponseDto(
 ): KnowledgeAskResponseDto {
   return {
     content: response.content,
-    status: fromProtoRagAnswerStatus(response.status),
+    status: requiredEnum('status', response.status, fromProtoRagAnswerStatus),
     citations: response.citations.map(toCitationResponseDto),
     generationId: response.generationId,
   };

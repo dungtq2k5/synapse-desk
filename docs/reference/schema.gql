@@ -83,7 +83,7 @@ type Document {
   id: ID!
   isOrganizationWide: Boolean!
   organizationId: ID!
-  status: DocumentStatus
+  status: DocumentStatus!
   title: String!
   updatedAt: DateTime!
 }
@@ -156,7 +156,7 @@ type IngestionJob {
   failedStage: IngestionStage
   id: ID!
   processedAt: DateTime
-  status: IngestionJobStatus
+  status: IngestionJobStatus!
   waitingReason: IngestionWaitingReason
 }
 
@@ -200,7 +200,7 @@ type KnowledgeGapFlag {
   document: Document
   documentId: ID!
   documentTitle: String!
-  flagType: String
+  flagType: String!
 }
 
 type KnowledgeGaps {
@@ -445,10 +445,10 @@ type Ticket {
   """
   messages(first: Int! = 50): [TicketMessage!]!
   organizationId: ID!
-  priority: TicketPriority
+  priority: TicketPriority!
   resolvedAt: DateTime
-  source: TicketSource
-  status: TicketStatus
+  source: TicketSource!
+  status: TicketStatus!
   ticketNumber: Int!
   title: String!
   unreadCount: Int!

@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   fromProtoAiModelTier,
   fromProtoOrgStatus,
@@ -30,12 +31,16 @@ export function toSubscriptionResponseDto(
     maxAgentSeats: response.maxAgentSeats,
     maxStorageBytes: response.maxStorageBytes,
     monthlyAiTokenBudget: response.monthlyAiTokenBudget,
-    aiModelTier: fromProtoAiModelTier(response.aiModelTier),
+    aiModelTier: requiredEnum(
+      'aiModelTier',
+      response.aiModelTier,
+      fromProtoAiModelTier,
+    ),
     billingCycleStart: requireProtoTimestamp(
       response.billingCycleStart,
       'billingCycleStart',
     ),
-    status: fromProtoOrgStatus(response.status),
+    status: requiredEnum('status', response.status, fromProtoOrgStatus),
     currentPeriodEnd: fromProtoTimestamp(response.currentPeriodEnd) ?? null,
     cancelAtPeriodEnd: response.cancelAtPeriodEnd,
     priceId: response.priceId ?? null,
@@ -79,7 +84,11 @@ export function toTenantPlanResponseDtos(
     maxAgentSeats: plan.maxAgentSeats,
     maxStorageBytes: Number(plan.maxStorageBytes),
     monthlyAiTokenBudget: Number(plan.monthlyAiTokenBudget),
-    aiModelTier: fromProtoAiModelTier(plan.aiModelTier),
+    aiModelTier: requiredEnum(
+      'aiModelTier',
+      plan.aiModelTier,
+      fromProtoAiModelTier,
+    ),
     maxDocumentBytes: Number(plan.maxDocumentBytes),
     maxAttachmentBytes: Number(plan.maxAttachmentBytes),
     maxDocumentUploads: plan.maxDocumentUploads,

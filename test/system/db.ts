@@ -5,14 +5,17 @@
  * assertion rather than a spy. The existing suites spy on publishers precisely
  * because they cannot observe the other end; this harness can, so it should.
  *
- * Read-only by intent. Nothing here writes: the journey drives every write
- * through the API, because a row this file inserted proves nothing about
- * whether two services agree.
+ * Read-only by intent: the journey drives every write through the API,
+ * because a row this file inserted proves nothing about whether two services
+ * agree. One row writes on purpose, `stored-enum.system-spec.ts`: a value no
+ * API would store, which is the case it exists to show, and it puts the row
+ * back.
  */
 
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient as NotificationPrisma } from '../../services/notification-service/src/generated/prisma/client';
+import { PrismaClient as TicketPrisma } from '../../services/ticket-service/src/generated/prisma/client';
 import { REPO_ROOT } from './services';
 
 /**
@@ -46,6 +49,15 @@ export function notificationDb(): NotificationPrisma {
   return new NotificationPrisma({
     adapter: new PrismaPg({
       connectionString: databaseUrl('notification-service'),
+    }),
+  });
+}
+
+/** `ticket-service`'s database, the same way. */
+export function ticketDb(): TicketPrisma {
+  return new TicketPrisma({
+    adapter: new PrismaPg({
+      connectionString: databaseUrl('ticket-service'),
     }),
   });
 }

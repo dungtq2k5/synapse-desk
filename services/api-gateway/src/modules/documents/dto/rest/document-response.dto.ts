@@ -12,8 +12,7 @@ import {
 
 /** The part of a document's newest ingestion attempt a list row needs. */
 export class LatestIngestionJobResponseDto {
-  /** `null` only if the peer sent a member this build does not know. */
-  status!: IngestionJobStatus | null;
+  status!: IngestionJobStatus;
   /** Why a `QUEUED` attempt waits; `null` is an ordinary queue. */
   waitingReason!: IngestionWaitingReason | null;
   /** Why a `FAILED` attempt failed; `null` on one that hasn't failed. */
@@ -50,7 +49,7 @@ export class DocumentResponseDto {
   ocrLanguages!: OcrLanguage[];
   fileSizeBytes!: number;
   isOrganizationWide!: boolean;
-  status!: DocumentStatus | null;
+  status!: DocumentStatus;
   departmentIds!: string[];
   chunkCount!: number;
   createdAt!: Date;
@@ -87,8 +86,8 @@ export class DocumentFlagResponseDto {
    * this build does not recognise — the same nullability
    * {@link DocumentResponseDto.status} carries, and for the same reason.
    */
-  flagType!: DocumentFlagType | null;
-  severity!: DocumentFlagSeverity | null;
+  flagType!: DocumentFlagType;
+  severity!: DocumentFlagSeverity;
   detail!: string;
   confidenceScore!: number | null;
   detectedAt!: Date;

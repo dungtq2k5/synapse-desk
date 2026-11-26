@@ -22,7 +22,7 @@ export class AssignmentResponseDto {
   departmentId!: string;
   assignedAt!: Date;
   unassignedAt!: Date | null;
-  reason!: ReassignmentReason | null;
+  reason!: ReassignmentReason;
   isCurrent!: boolean;
   createdAt!: Date;
 }

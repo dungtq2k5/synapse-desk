@@ -46,8 +46,8 @@ export class IngestionJobResponseGqlDto {
    * newer ingestion-service can add a status, and a gateway that threw on the
    * unknown member would fail the whole page rather than one field.
    */
-  @Field(() => IngestionJobStatus, { nullable: true })
-  status!: IngestionJobStatus | null;
+  @Field(() => IngestionJobStatus)
+  status!: IngestionJobStatus;
 
   @Field(() => String, { nullable: true })
   errorLog!: string | null;

@@ -342,6 +342,7 @@ describe('analytics', () => {
         totalCostMicros: 4_500,
         totalGenerations: 9,
         monthlyBudgetMicros: 1_000_000,
+        aiModelTier: 1, // AI_MODEL_TIER_FAST
         draftAcceptance: { numerator: 0, denominator: 0 },
         emptyRetrievalRate: { numerator: 0, denominator: 0 },
         dataThrough: '2024-01-31',

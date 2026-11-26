@@ -65,7 +65,7 @@ describe('tickets', () => {
     assignedById: AGENT,
     departmentId: DEPARTMENT,
     assignedAt: { seconds: 1_756_684_800, nanos: 0 },
-    reason: 0, // REASSIGNMENT_REASON_UNSPECIFIED
+    reason: 1, // REASSIGNMENT_REASON_INITIAL
     isCurrent: true,
     createdAt: { seconds: 1_756_684_800, nanos: 0 },
     ...overrides,

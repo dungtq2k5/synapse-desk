@@ -50,14 +50,14 @@ export class TicketResponseGqlDto {
   @Field(() => ID)
   authorId!: string;
 
-  @Field(() => TicketSource, { nullable: true })
-  source!: TicketSource | null;
+  @Field(() => TicketSource)
+  source!: TicketSource;
 
-  @Field(() => TicketStatus, { nullable: true })
-  status!: TicketStatus | null;
+  @Field(() => TicketStatus)
+  status!: TicketStatus;
 
-  @Field(() => TicketPriority, { nullable: true })
-  priority!: TicketPriority | null;
+  @Field(() => TicketPriority)
+  priority!: TicketPriority;
 
   @Field(() => String)
   title!: string;

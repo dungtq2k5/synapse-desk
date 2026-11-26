@@ -292,7 +292,7 @@ function Loaded({
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight break-words">
+          <h1 className="text-3xl font-semibold tracking-tight wrap-break-word">
             {document.title}
           </h1>
           <p className="flex flex-wrap items-center gap-2 text-sm">
@@ -509,7 +509,7 @@ function steps(
   const at: Stage =
     latest.status === 'FAILED'
       ? (latest.failedStage ?? 'PARSING')
-      : (latest.status ?? 'QUEUED');
+      : latest.status;
   const index = STAGES.indexOf(at);
   return Object.fromEntries(
     STAGES.map((stage, position) => [
@@ -617,9 +617,7 @@ function Processing({
     latest?.status === 'QUEUED' && latest.waitingReason === 'RETRYING';
   const running =
     latest !== null &&
-    ['QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING'].includes(
-      latest.status ?? '',
-    );
+    ['QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING'].includes(latest.status);
   const deleted = Boolean(document.deletedAt);
 
   // A stage change is said, politely; becoming searchable too.

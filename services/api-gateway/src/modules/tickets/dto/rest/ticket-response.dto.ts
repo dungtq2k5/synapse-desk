@@ -22,9 +22,9 @@ export class TicketResponseDto {
   ticketNumber!: number;
   organizationId!: string;
   authorId!: string;
-  source!: TicketSource | null;
-  status!: TicketStatus | null;
-  priority!: TicketPriority | null;
+  source!: TicketSource;
+  status!: TicketStatus;
+  priority!: TicketPriority;
   title!: string;
   description!: string;
   currentAssigneeId!: string | null;

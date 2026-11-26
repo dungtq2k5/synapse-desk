@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   ConfirmDocumentRequest,
   DocumentChunkResponse,
@@ -71,7 +72,7 @@ export function toDocumentResponseDto(
     ),
     fileSizeBytes: document.fileSizeBytes,
     isOrganizationWide: document.isOrganizationWide,
-    status: fromProtoDocumentStatus(document.status),
+    status: requiredEnum('status', document.status, fromProtoDocumentStatus),
     departmentIds: document.departmentIds,
     chunkCount: document.chunkCount,
     createdAt: requireProtoTimestamp(document.createdAt, 'createdAt'),
@@ -80,7 +81,11 @@ export function toDocumentResponseDto(
     deletedById: document.deletedById ?? null,
     latestJob: document.latestJob
       ? {
-          status: fromProtoIngestionJobStatus(document.latestJob.status),
+          status: requiredEnum(
+            'status',
+            document.latestJob.status,
+            fromProtoIngestionJobStatus,
+          ),
           waitingReason: fromProtoIngestionWaitingReason(
             document.latestJob.waitingReason,
           ),
@@ -120,7 +125,7 @@ export function toDocumentResponseGqlDto(
     fileType: fromProtoDocumentFileType(document.fileType) ?? UNKNOWN_EXTENSION,
     fileSizeBytes: document.fileSizeBytes,
     isOrganizationWide: document.isOrganizationWide,
-    status: fromProtoDocumentStatus(document.status),
+    status: requiredEnum('status', document.status, fromProtoDocumentStatus),
     departmentIds: document.departmentIds,
     chunkCount: document.chunkCount,
     createdAt: requireProtoTimestamp(document.createdAt, 'createdAt'),
@@ -156,8 +161,16 @@ export function toDocumentFlagResponseDto(
     // `| null` rather than a fallback, matching `status` above: there is no
     // "unknown flag type" a client could sensibly render, so the honest answer
     // is that this build does not recognise the value.
-    flagType: fromProtoDocumentFlagType(flag.flagType),
-    severity: fromProtoDocumentFlagSeverity(flag.severity),
+    flagType: requiredEnum(
+      'flagType',
+      flag.flagType,
+      fromProtoDocumentFlagType,
+    ),
+    severity: requiredEnum(
+      'severity',
+      flag.severity,
+      fromProtoDocumentFlagSeverity,
+    ),
     detail: flag.detail,
     // `?? null`: a flag raised by a rule rather than a model has no score, and
     // that is different from a score of zero.

@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   toProtoExportKind,
   fromProtoDocumentFlagType,
@@ -302,7 +303,11 @@ export class AnalyticsService {
         // a JSON response as an integer.
         flags: (gaps?.flags ?? []).map((flag) => ({
           ...flag,
-          flagType: fromProtoDocumentFlagType(flag.flagType),
+          flagType: requiredEnum(
+            'flagType',
+            flag.flagType,
+            fromProtoDocumentFlagType,
+          ),
         })),
         dataThrough: gaps?.dataThrough ?? null,
         unavailable,

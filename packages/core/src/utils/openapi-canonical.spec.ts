@@ -1,4 +1,7 @@
-import { canonicalizeEnums } from './openapi-canonical';
+import {
+  canonicalizeEnums,
+  listNullInNullableEnums,
+} from './openapi-canonical';
 
 describe('canonicalizeEnums', () => {
   it('**sorts every primitive `enum` array, at any depth**', () => {
@@ -59,5 +62,23 @@ describe('canonicalizeEnums', () => {
     expect(JSON.stringify(canonicalizeEnums(one))).toBe(
       JSON.stringify(canonicalizeEnums(two)),
     );
+  });
+});
+
+describe('listNullInNullableEnums', () => {
+  it('**adds `null` to a nullable enum, at any depth, once, and leaves others alone**', () => {
+    const document = {
+      a: { nullable: true, enum: ['B', 'A'] },
+      nested: { items: { nullable: true, enum: ['X'] } },
+      listed: { nullable: true, enum: ['Y', null] },
+      plain: { enum: ['Z'] },
+    };
+
+    expect(listNullInNullableEnums(document)).toEqual({
+      a: { nullable: true, enum: ['B', 'A', null] },
+      nested: { items: { nullable: true, enum: ['X', null] } },
+      listed: { nullable: true, enum: ['Y', null] },
+      plain: { enum: ['Z'] },
+    });
   });
 });

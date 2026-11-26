@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   IngestionJobResponse,
   ListIngestionJobsRequest,
@@ -70,9 +71,7 @@ export function toIngestionJobResponseDto(
     id: job.id,
     documentId: job.documentId,
     bullmqJobId: job.bullmqJobId,
-    // `| null` rather than a fallback, matching `DocumentResponseDto.status`:
-    // inventing a member here would report a status the peer never sent.
-    status: fromProtoIngestionJobStatus(job.status),
+    status: requiredEnum('status', job.status, fromProtoIngestionJobStatus),
     errorLog: toErrorLog(job.errorLog),
     // UNSPECIFIED is "not set" on the wire; REST commits to null.
     errorCode: fromProtoIngestionErrorCode(job.errorCode),

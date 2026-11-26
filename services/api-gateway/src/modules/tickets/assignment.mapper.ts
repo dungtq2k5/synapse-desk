@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   AssignmentResponse,
   AssignTicketRequest,
@@ -27,7 +28,11 @@ export function toAssignmentResponseDto(
     departmentId: assignment.departmentId,
     assignedAt: requireProtoTimestamp(assignment.assignedAt, 'assignedAt'),
     unassignedAt: fromProtoTimestamp(assignment.unassignedAt) ?? null,
-    reason: fromProtoReassignmentReason(assignment.reason),
+    reason: requiredEnum(
+      'reason',
+      assignment.reason,
+      fromProtoReassignmentReason,
+    ),
     isCurrent: assignment.isCurrent,
     createdAt: requireProtoTimestamp(assignment.createdAt, 'createdAt'),
   };

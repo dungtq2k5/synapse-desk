@@ -507,10 +507,10 @@ function useChangeAnnouncements(ticket: TicketResponseDto) {
   useEffect(() => {
     const before = previous.current;
     previous.current = ticket;
-    if (before.status !== ticket.status && ticket.status) {
+    if (before.status !== ticket.status) {
       announce(`Status changed to ${STATUS_LABEL[ticket.status]}`);
     }
-    if (before.priority !== ticket.priority && ticket.priority) {
+    if (before.priority !== ticket.priority) {
       announce(`Priority changed to ${PRIORITY_LABEL[ticket.priority]}`);
     }
     if (

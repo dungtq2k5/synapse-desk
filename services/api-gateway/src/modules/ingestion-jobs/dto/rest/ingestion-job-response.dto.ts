@@ -11,8 +11,7 @@ export class IngestionJobResponseDto {
   documentId!: string;
   /** Empty until the worker has queued it. */
   bullmqJobId!: string;
-  /** `null` only if the peer sent a member this build does not know. */
-  status!: IngestionJobStatus | null;
+  status!: IngestionJobStatus;
   errorLog!: string | null;
   /**
    * Why a `FAILED` attempt failed, as a reader can act on it: too long, too

@@ -39,8 +39,7 @@ export class KnowledgeSearchResponseDto {
  */
 export class KnowledgeAskResponseDto {
   content!: string;
-  /** `null` only if the peer sent a member this build does not know. */
-  status!: AnswerStatus | null;
+  status!: AnswerStatus;
   citations!: CitationResponseDto[];
   /**
    * The `ai_generations` row this answer was billed to.

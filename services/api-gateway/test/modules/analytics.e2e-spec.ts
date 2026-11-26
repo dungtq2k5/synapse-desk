@@ -656,12 +656,7 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
           totalCostMicros: 4_500,
           totalGenerations: 910,
           monthlyBudgetMicros: 1_000_000,
-          // **`'BALANCED'` used to sit here — a tier that has never existed.**
-          // The field was a proto `string`, so the fixture could name anything
-          // and the gateway forwarded it verbatim. It is an enum now, and the
-          // equivalent case is UNRECOGNIZED: a member some newer build knows
-          // and this one does not.
-          aiModelTier: ProtoAiModelTier.UNRECOGNIZED,
+          aiModelTier: ProtoAiModelTier.AI_MODEL_TIER_QUALITY,
           draftAcceptance: wireRate(6, 10),
           emptyRetrievalRate: wireRate(1, 20),
           computedAt: timestamp(),
@@ -674,10 +669,35 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
 
       expect(res.body.data.byPurpose[0].purpose).toBe('EMBEDDING');
       expect(res.body.data.monthlyBudgetMicros).toBe(1_000_000);
-      // Null, not the raw value: a client whose union is FAST | QUALITY is
-      // better told "unknown" than handed a third member it cannot switch on.
-      expect(res.body.data.aiModelTier).toBeNull();
+      expect(res.body.data.aiModelTier).toBe('QUALITY');
       expect(res.body.data.draftAcceptance.denominator).toBe(10);
+    });
+
+    it('21a. a tier this build does not know is a 502 naming the field, never a null', async () => {
+      // UNRECOGNIZED is a member some newer build knows and this one doesn't.
+      // The tier always has a value, so the gateway refuses rather than guess.
+      fx.stubs.ledger.getAiUsage.mockReturnValue(
+        of({
+          points: [],
+          byPurpose: [],
+          byModel: [],
+          totalCostMicros: 0,
+          totalGenerations: 0,
+          monthlyBudgetMicros: 1_000_000,
+          aiModelTier: ProtoAiModelTier.UNRECOGNIZED,
+          draftAcceptance: wireRate(0, 0),
+          emptyRetrievalRate: wireRate(0, 0),
+          computedAt: timestamp(),
+        }),
+      );
+
+      const res = await agent().get(
+        // Its own range: the read is cached per range, and row 21 cached this one.
+        `${API}/analytics/ai-usage?from=2025-01-01&to=2025-03-31`,
+      );
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toContain(' for aiModelTier,');
     });
   });
 

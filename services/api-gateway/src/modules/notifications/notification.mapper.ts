@@ -1,3 +1,4 @@
+import { requiredEnum } from '../../common/grpc/required-enum';
 import {
   fromProtoDigestMode,
   fromProtoNotificationChannel,
@@ -79,20 +80,27 @@ export function toNotificationResponseDto(
  * detail, and publishing it would make every HTTP consumer depend on the proto
  * file to interpret a settings screen.
  *
- * `?? ''` on each, matching `toOrganizationResponseDto`: `UNSPECIFIED` means the field
- * was not set, and there is no member to honestly read that as. It should not
- * arise — the service maps from validated rows — so degrading to empty beats
- * failing a read the user is entitled to.
+ * Each always has a value: notification-service builds the list from the
+ * contracts sets and validates every write, so a zero or unknown value is its
+ * bug and answers 502 (`requiredEnum`).
  */
 export function toPreferenceResponseDto(
   preference: PreferenceResponse,
 ): PreferenceResponseDto {
   return {
-    type: asPreferenceType(preference.type),
-    channel: fromProtoNotificationChannel(preference.channel) ?? null,
+    type: requiredEnum('type', preference.type, asPreferenceType),
+    channel: requiredEnum(
+      'channel',
+      preference.channel,
+      fromProtoNotificationChannel,
+    ),
     isEnabled: preference.isEnabled,
-    digest: fromProtoDigestMode(preference.digest) ?? null,
-    source: fromProtoPreferenceSource(preference.source) ?? null,
+    digest: requiredEnum('digest', preference.digest, fromProtoDigestMode),
+    source: requiredEnum(
+      'source',
+      preference.source,
+      fromProtoPreferenceSource,
+    ),
   };
 }
 
@@ -196,7 +204,11 @@ export function toDeviceTokenResponseDto(
 ): DeviceTokenResponseDto {
   return {
     id: device.id,
-    platform: fromProtoDevicePlatform(device.platform),
+    platform: requiredEnum(
+      'platform',
+      device.platform,
+      fromProtoDevicePlatform,
+    ),
     deviceName: device.deviceName ?? null,
     lastUsedAt: fromProtoTimestamp(device.lastUsedAt) ?? null,
     createdAt: fromProtoTimestamp(device.createdAt) ?? null,

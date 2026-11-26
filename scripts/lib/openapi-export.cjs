@@ -138,9 +138,33 @@ function openapiViolations(document) {
   const Validator = require('openapi-schema-validator').default;
   const { errors } = new Validator({ version: 3 }).validate(document);
 
-  return errors.map(
-    (error) => `${error.instancePath || '/'}: ${error.message}`,
-  );
+  return [
+    ...errors.map((error) => `${error.instancePath || '/'}: ${error.message}`),
+    ...nullableEnumsWithoutNull(document, ''),
+  ];
+}
+
+/**
+ * Each schema that is `nullable: true` and has an `enum` without `null`: the
+ * 3.0 form widens the type and not the `enum`, so a client that follows the
+ * specification refuses the `null` the schema allows. Pointers are JSON
+ * Pointers, `~` and `/` escaped.
+ */
+function nullableEnumsWithoutNull(node, pointer) {
+  if (!node || typeof node !== 'object') return [];
+  const found = [];
+  if (
+    node.nullable === true &&
+    Array.isArray(node.enum) &&
+    !node.enum.includes(null)
+  ) {
+    found.push(`${pointer || '/'}: nullable, and its enum does not list null`);
+  }
+  for (const [key, value] of Object.entries(node)) {
+    const segment = key.replaceAll('~', '~0').replaceAll('/', '~1');
+    found.push(...nullableEnumsWithoutNull(value, `${pointer}/${segment}`));
+  }
+  return found;
 }
 
 module.exports = {

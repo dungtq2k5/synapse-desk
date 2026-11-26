@@ -130,6 +130,24 @@ describe('the OpenAPI export — the pure half', () => {
       );
     });
 
+    it('**a nullable enum that does not list `null` is reported, naming the property**', () => {
+      const document = valid();
+      Object.assign(document.components.schemas, {
+        Probe: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', nullable: true, enum: ['A', 'B'] },
+            listed: { type: 'string', nullable: true, enum: [null, 'A'] },
+            plain: { type: 'string', enum: ['A'] },
+          },
+        },
+      });
+
+      expect(openapiViolations(document)).toEqual([
+        '/components/schemas/Probe/properties/status: nullable, and its enum does not list null',
+      ]);
+    });
+
     it('a missing `info` is reported — the validator checks the whole document, not one rule', () => {
       // The argument for a real validator over rules written from the bug
       // already had: it knows the classes nobody here has thought of.
