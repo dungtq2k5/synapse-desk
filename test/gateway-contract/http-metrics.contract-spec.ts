@@ -14,9 +14,11 @@
  *   - GraphQL: its errors ride inside a 200, so an HTTP-status series can't
  *     measure them, and counting the requests would read as a near-zero error
  *     rate;
- *   - CORS preflights: the browser asking permission, not a call to the API;
- *   - a request the client aborted: the Java gateway can't see one at its
- *     filter, and counting it on one gateway only would split the series.
+ *   - CORS preflights: the browser asking permission, not a call to the API.
+ *
+ * A request the client aborted differs by gateway: Node doesn't count it (the
+ * response never finishes, so nothing is recorded), and Java counts it under
+ * the status the response carried (its filter can't tell an abort apart).
  *
  * Every row measures a DELTA: the counter accumulates over the process, and "this
  * request moved exactly this series by exactly one" is two claims.
