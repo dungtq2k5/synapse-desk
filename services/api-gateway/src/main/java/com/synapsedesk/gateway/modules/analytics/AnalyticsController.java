@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.dto.ExportResponseDto;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.common.validation.StrictIso8601;
@@ -1281,32 +1282,48 @@ public class AnalyticsController {
   private static ExportResponseDto.StatusEnum toExportStatusEnum(
     synapsedesk.ticket.Analytics.ExportStatus status
   ) {
-    return ExportResponseDto.StatusEnum.fromValue(
-      status.name().replace("EXPORT_STATUS_", "")
+    return RequiredEnum.required(
+      "status",
+      status,
+      ExportResponseDto.StatusEnum.fromValue(
+        status.name().replace("EXPORT_STATUS_", "")
+      )
     );
   }
 
   private static ExportResponseDto.KindEnum toExportKindEnum(
     synapsedesk.ticket.Analytics.ExportKind kind
   ) {
-    return ExportResponseDto.KindEnum.fromValue(
-      kind.name().replace("EXPORT_KIND_", "")
+    return RequiredEnum.required(
+      "kind",
+      kind,
+      ExportResponseDto.KindEnum.fromValue(
+        kind.name().replace("EXPORT_KIND_", "")
+      )
     );
   }
 
   private static KnowledgeGapFlagResponseDto.FlagTypeEnum toFlagTypeEnum(
     synapsedesk.ingestion.Document.DocumentFlagType flagType
   ) {
-    return KnowledgeGapFlagResponseDto.FlagTypeEnum.fromValue(
-      flagType.name().replace("DOCUMENT_FLAG_TYPE_", "")
+    return RequiredEnum.required(
+      "flagType",
+      flagType,
+      KnowledgeGapFlagResponseDto.FlagTypeEnum.fromValue(
+        flagType.name().replace("DOCUMENT_FLAG_TYPE_", "")
+      )
     );
   }
 
   private static AiUsageResponseDto.AiModelTierEnum toAiModelTierEnum(
     synapsedesk.auth.Common.AiModelTier tier
   ) {
-    return AiUsageResponseDto.AiModelTierEnum.fromValue(
-      tier.name().replace("AI_MODEL_TIER_", "")
+    return RequiredEnum.required(
+      "aiModelTier",
+      tier,
+      AiUsageResponseDto.AiModelTierEnum.fromValue(
+        tier.name().replace("AI_MODEL_TIER_", "")
+      )
     );
   }
 

@@ -297,6 +297,7 @@ public class SubscriptionResponseDto {
    * @return aiModelTier
    */
 
+  @NotNull
   @JsonProperty("aiModelTier")
   public AiModelTierEnum getAiModelTier() {
     return aiModelTier;
@@ -339,6 +340,7 @@ public class SubscriptionResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;

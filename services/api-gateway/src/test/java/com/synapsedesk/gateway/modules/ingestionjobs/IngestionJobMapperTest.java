@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.ingestionjobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.Timestamp;
@@ -13,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.ingestion.Document.IngestionErrorCode;
 import synapsedesk.ingestion.Document.IngestionJobResponse;
 import synapsedesk.ingestion.Document.IngestionJobStatus;
@@ -171,10 +173,8 @@ class IngestionJobMapperTest {
   }
 
   @Test
-  void unspecifiedMembersAndNoProcessedAtAreNullOnBothSurfaces() {
-    IngestionJobResponse job = wire()
-      .setStatus(IngestionJobStatus.INGESTION_JOB_STATUS_UNSPECIFIED)
-      .build();
+  void unspecifiedOptionalMembersAndNoProcessedAtAreNullOnBothSurfaces() {
+    IngestionJobResponse job = wire().build();
 
     IngestionJobResponseDto rest = IngestionJobMapper.toDto(job);
     IngestionJobGqlDto gql = IngestionJobMapper.toIngestionJobGqlDto(job);
@@ -183,11 +183,25 @@ class IngestionJobMapperTest {
     assertThat(rest.getFailedStage()).isNull();
     assertThat(rest.getWaitingReason()).isNull();
     assertThat(rest.getProcessedAt()).isNull();
-    assertThat(gql.status()).isNull();
     assertThat(gql.errorCode()).isNull();
     assertThat(gql.failedStage()).isNull();
     assertThat(gql.waitingReason()).isNull();
     assertThat(gql.processedAt()).isNull();
+  }
+
+  @Test
+  void anUnspecifiedStatusIsA502NamingTheFieldOnBothSurfaces() {
+    // The status always has a value: ingestion-service writes it from its enum.
+    IngestionJobResponse job = wire()
+      .setStatus(IngestionJobStatus.INGESTION_JOB_STATUS_UNSPECIFIED)
+      .build();
+
+    assertThatThrownBy(() -> IngestionJobMapper.toDto(job))
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("A service sent 0 for status");
+    assertThatThrownBy(() -> IngestionJobMapper.toIngestionJobGqlDto(job))
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("A service sent 0 for status");
   }
 
   @Test

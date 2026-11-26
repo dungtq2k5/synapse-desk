@@ -8,6 +8,7 @@ import com.synapsedesk.gateway.common.cache.EvictsCache;
 import com.synapsedesk.gateway.common.config.InboundEmailProperties;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
@@ -630,24 +631,36 @@ public class OrganizationsController {
   private static OrganizationResponseDto.StatusEnum toStatusEnum(
     OrgStatus status
   ) {
-    return OrganizationResponseDto.StatusEnum.fromValue(
-      status.name().replace("ORG_STATUS_", "")
+    return RequiredEnum.required(
+      "status",
+      status,
+      OrganizationResponseDto.StatusEnum.fromValue(
+        status.name().replace("ORG_STATUS_", "")
+      )
     );
   }
 
   private static OnboardingResponseDto.StatusEnum toOnboardingStatusEnum(
     OrgStatus status
   ) {
-    return OnboardingResponseDto.StatusEnum.fromValue(
-      status.name().replace("ORG_STATUS_", "")
+    return RequiredEnum.required(
+      "status",
+      status,
+      OnboardingResponseDto.StatusEnum.fromValue(
+        status.name().replace("ORG_STATUS_", "")
+      )
     );
   }
 
   private static OrganizationUsageResponseDto.AiModelTierEnum toAiModelTierEnum(
     AiModelTier tier
   ) {
-    return OrganizationUsageResponseDto.AiModelTierEnum.fromValue(
-      tier.name().replace("AI_MODEL_TIER_", "")
+    return RequiredEnum.required(
+      "aiModelTier",
+      tier,
+      OrganizationUsageResponseDto.AiModelTierEnum.fromValue(
+        tier.name().replace("AI_MODEL_TIER_", "")
+      )
     );
   }
 

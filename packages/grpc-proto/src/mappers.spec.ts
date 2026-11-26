@@ -179,14 +179,13 @@ describe('mapper round-trip sweep (unit)', () => {
       expect(fromProtoOrgStatus(ProtoOrgStatus.UNRECOGNIZED)).toBe(null);
     });
 
-    it('maps an unknown string to UNSPECIFIED, never to ACTIVE', () => {
+    it('throws on an unknown string, never maps it to ACTIVE', () => {
       // `to*` takes a bare string because it usually receives a Prisma VarChar.
-      // This is the RESPONSE path, so a column holding something
-      // unrecognised must surface as unset rather than as full access.
-      expect(toProtoOrgStatus('NOT_A_STATUS')).toBe(
-        ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+      // A column holding something unrecognised must fail loudly rather than
+      // read as full access.
+      expect(() => toProtoOrgStatus('NOT_A_STATUS')).toThrow(
+        '"NOT_A_STATUS" is not one of',
       );
-      expect(toProtoOrgStatus('')).toBe(ProtoOrgStatus.ORG_STATUS_UNSPECIFIED);
     });
   });
 
@@ -214,12 +213,12 @@ describe('mapper round-trip sweep (unit)', () => {
       expect(fromProtoAiModelTier(ProtoAiModelTier.UNRECOGNIZED)).toBe(null);
     });
 
-    it('maps an unknown string to UNSPECIFIED, never to the first member', () => {
+    it('throws on an unknown string, never maps it to the first member', () => {
       // The specific bug worth naming: a lookup falling back to index 0 would
       // put every unrecognised tenant on FAST — a downgrade that reads as a
       // model quality complaint rather than as a mapping bug.
-      expect(toProtoAiModelTier('PREMIUM')).toBe(
-        ProtoAiModelTier.AI_MODEL_TIER_UNSPECIFIED,
+      expect(() => toProtoAiModelTier('PREMIUM')).toThrow(
+        '"PREMIUM" is not one of',
       );
     });
   });
@@ -271,15 +270,12 @@ describe('mapper round-trip sweep (unit)', () => {
       ).toBe(null);
     });
 
-    it('maps an unknown string to UNSPECIFIED, never to a level', () => {
+    it('throws on an unknown string, never maps it to a level', () => {
       // `notifications.priority` is a VarChar defaulting to "NORMAL", so
       // this receives whatever is in the column. An unrecognised value must
-      // surface as unset rather than as a plausible-looking level.
-      expect(toProtoNotificationPriority('URGENT')).toBe(
-        ProtoNotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED,
-      );
-      expect(toProtoNotificationPriority('')).toBe(
-        ProtoNotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED,
+      // fail loudly rather than read as a plausible-looking level.
+      expect(() => toProtoNotificationPriority('URGENT')).toThrow(
+        '"URGENT" is not one of',
       );
     });
   });
@@ -307,12 +303,12 @@ describe('mapper round-trip sweep (unit)', () => {
       ).toBe(null);
     });
 
-    it('maps an unknown string to UNSPECIFIED, never to a channel', () => {
+    it('throws on an unknown string, never maps it to a channel', () => {
       // The `to*` direction takes a bare string because it usually receives a
-      // Prisma VarChar. A column holding something unrecognised must
-      // surface as unset rather than as a plausible-looking EMAIL.
-      expect(toProtoNotificationChannel('CARRIER_PIGEON')).toBe(
-        ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED,
+      // Prisma VarChar. A column holding something unrecognised must fail
+      // loudly rather than read as a plausible-looking EMAIL.
+      expect(() => toProtoNotificationChannel('CARRIER_PIGEON')).toThrow(
+        '"CARRIER_PIGEON" is not one of',
       );
     });
   });

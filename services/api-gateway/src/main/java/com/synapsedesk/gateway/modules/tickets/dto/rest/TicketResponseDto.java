@@ -332,6 +332,7 @@ public class TicketResponseDto {
    * @return source
    */
 
+  @NotNull
   @JsonProperty("source")
   public SourceEnum getSource() {
     return source;
@@ -352,6 +353,7 @@ public class TicketResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;
@@ -372,6 +374,7 @@ public class TicketResponseDto {
    * @return priority
    */
 
+  @NotNull
   @JsonProperty("priority")
   public PriorityEnum getPriority() {
     return priority;

@@ -289,6 +289,7 @@ public class AiUsageResponseDto {
    * @return aiModelTier
    */
 
+  @NotNull
   @JsonProperty("aiModelTier")
   public AiModelTierEnum getAiModelTier() {
     return aiModelTier;

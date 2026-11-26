@@ -91,8 +91,8 @@ export function FlagCard({
   const { can } = useViewer();
   const [resolving, setResolving] = useState<Resolve | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const kind = flag.flagType ? FLAG_TYPE[flag.flagType] : null;
-  const label = kind?.label ?? 'Flag';
+  const kind = FLAG_TYPE[flag.flagType];
+  const label = kind.label;
   const detail = [
     flag.detail,
     flag.confidenceScore !== null

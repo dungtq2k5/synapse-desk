@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.knowledge;
 
 import com.synapsedesk.gateway.common.dto.CitationResponseDto;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleBlockResponseDto;
 import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleDetailResponseDto;
 import com.synapsedesk.gateway.modules.knowledge.dto.rest.KnowledgeArticleResponseDto;
@@ -72,12 +73,13 @@ final class KnowledgeMapper {
     return new KnowledgeAskResponseDto()
       .content(content)
       .status(
-        status == AnswerStatus.UNRECOGNIZED ||
-          status == AnswerStatus.ANSWER_STATUS_UNSPECIFIED
-          ? null
-          : KnowledgeAskResponseDto.StatusEnum.fromValue(
-              status.name().replace("ANSWER_STATUS_", "")
-            )
+        RequiredEnum.required(
+          "status",
+          status,
+          KnowledgeAskResponseDto.StatusEnum.fromValue(
+            status.name().replace("ANSWER_STATUS_", "")
+          )
+        )
       )
       .citations(
         citations.stream().map(KnowledgeMapper::toCitationDto).toList()

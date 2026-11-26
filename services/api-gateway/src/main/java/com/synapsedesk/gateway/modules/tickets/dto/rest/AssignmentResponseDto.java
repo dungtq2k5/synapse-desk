@@ -266,6 +266,7 @@ public class AssignmentResponseDto {
    * @return reason
    */
 
+  @NotNull
   @JsonProperty("reason")
   public ReasonEnum getReason() {
     return reason;

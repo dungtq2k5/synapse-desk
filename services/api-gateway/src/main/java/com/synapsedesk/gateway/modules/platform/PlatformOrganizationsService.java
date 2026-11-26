@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.platform;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
@@ -563,8 +564,12 @@ public class PlatformOrganizationsService {
       .slug(organization.getSlug())
       .domain(organization.hasDomain() ? organization.getDomain() : null)
       .status(
-        OrganizationResponseDto.StatusEnum.fromValue(
-          organization.getStatus().name().replace("ORG_STATUS_", "")
+        RequiredEnum.required(
+          "status",
+          organization.getStatus(),
+          OrganizationResponseDto.StatusEnum.fromValue(
+            organization.getStatus().name().replace("ORG_STATUS_", "")
+          )
         )
       )
       .enforceTwoFactor(organization.getEnforceTwoFactor())

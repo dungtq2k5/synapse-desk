@@ -173,6 +173,7 @@ public class ExportResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;
@@ -193,6 +194,7 @@ public class ExportResponseDto {
    * @return kind
    */
 
+  @NotNull
   @JsonProperty("kind")
   public KindEnum getKind() {
     return kind;

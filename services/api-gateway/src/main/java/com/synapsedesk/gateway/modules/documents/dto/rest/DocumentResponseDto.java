@@ -429,6 +429,7 @@ public class DocumentResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;

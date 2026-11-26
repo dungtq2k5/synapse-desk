@@ -224,6 +224,7 @@ public class PreferenceResponseDto {
    * @return type
    */
 
+  @NotNull
   @JsonProperty("type")
   public TypeEnum getType() {
     return type;
@@ -244,6 +245,7 @@ public class PreferenceResponseDto {
    * @return channel
    */
 
+  @NotNull
   @JsonProperty("channel")
   public ChannelEnum getChannel() {
     return channel;
@@ -284,6 +286,7 @@ public class PreferenceResponseDto {
    * @return digest
    */
 
+  @NotNull
   @JsonProperty("digest")
   public DigestEnum getDigest() {
     return digest;
@@ -304,6 +307,7 @@ public class PreferenceResponseDto {
    * @return source
    */
 
+  @NotNull
   @JsonProperty("source")
   public SourceEnum getSource() {
     return source;

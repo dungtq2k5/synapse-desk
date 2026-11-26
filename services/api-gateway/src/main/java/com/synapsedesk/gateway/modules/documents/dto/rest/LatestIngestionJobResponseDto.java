@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.documents.dto.rest;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
+import jakarta.validation.constraints.NotNull;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -168,6 +169,7 @@ public class LatestIngestionJobResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;

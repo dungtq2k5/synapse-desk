@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.common.auth.RequestOrigin;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.error.RefusalException;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccess;
 import com.synapsedesk.gateway.common.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
@@ -566,24 +567,36 @@ public class BillingController {
   private static SubscriptionResponseDto.StatusEnum toStatusEnum(
     OrgStatus status
   ) {
-    return SubscriptionResponseDto.StatusEnum.fromValue(
-      status.name().replace("ORG_STATUS_", "")
+    return RequiredEnum.required(
+      "status",
+      status,
+      SubscriptionResponseDto.StatusEnum.fromValue(
+        status.name().replace("ORG_STATUS_", "")
+      )
     );
   }
 
   private static SubscriptionResponseDto.AiModelTierEnum toAiModelTierEnum(
     AiModelTier tier
   ) {
-    return SubscriptionResponseDto.AiModelTierEnum.fromValue(
-      tier.name().replace("AI_MODEL_TIER_", "")
+    return RequiredEnum.required(
+      "aiModelTier",
+      tier,
+      SubscriptionResponseDto.AiModelTierEnum.fromValue(
+        tier.name().replace("AI_MODEL_TIER_", "")
+      )
     );
   }
 
   private static TenantPlanResponseDto.AiModelTierEnum toTenantPlanAiModelTierEnum(
     AiModelTier tier
   ) {
-    return TenantPlanResponseDto.AiModelTierEnum.fromValue(
-      tier.name().replace("AI_MODEL_TIER_", "")
+    return RequiredEnum.required(
+      "aiModelTier",
+      tier,
+      TenantPlanResponseDto.AiModelTierEnum.fromValue(
+        tier.name().replace("AI_MODEL_TIER_", "")
+      )
     );
   }
 

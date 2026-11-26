@@ -277,6 +277,9 @@ class TicketsAssignmentServiceTest {
       .setAssignedById("agent-1")
       .setDepartmentId(DEPARTMENT_ID.toString())
       .setAssignedAt(now)
+      .setReason(
+        synapsedesk.ticket.Common.ReassignmentReason.REASSIGNMENT_REASON_INITIAL
+      )
       .setIsCurrent(true)
       .setCreatedAt(now)
       .build();

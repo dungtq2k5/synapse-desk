@@ -222,6 +222,7 @@ public class TenantPlanResponseDto {
    * @return aiModelTier
    */
 
+  @NotNull
   @JsonProperty("aiModelTier")
   public AiModelTierEnum getAiModelTier() {
     return aiModelTier;

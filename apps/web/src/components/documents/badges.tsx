@@ -43,7 +43,6 @@ export function DocumentStatusBadge({
 }: {
   status: DocumentResponseDtoStatus;
 }) {
-  if (!status) return null;
   const Icon = STATUS_ICON[status];
   return (
     <Badge className={cn('rounded-full', STATUS_CLASS[status])}>
@@ -105,7 +104,6 @@ export function SeverityBadge({
 }: {
   severity: DocumentFlagResponseDtoSeverity;
 }) {
-  if (!severity) return null;
   const { label, variant, Icon } = SEVERITY[severity];
   return (
     <Badge

@@ -7,6 +7,7 @@ import com.synapsedesk.gateway.common.cache.CacheService;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.graphql.UserSummaryGqlDto;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.modules.analytics.dto.graphql.AgentAnalyticsGqlDto;
 import com.synapsedesk.gateway.modules.analytics.dto.graphql.AgentStatGqlDto;
@@ -430,8 +431,9 @@ public class AnalyticsResolver {
     synapsedesk.ingestion.Document.DocumentFlagType flagType
   ) {
     return flagType ==
-      synapsedesk.ingestion.Document.DocumentFlagType.DOCUMENT_FLAG_TYPE_UNSPECIFIED
-      ? null
+      synapsedesk.ingestion.Document.DocumentFlagType.DOCUMENT_FLAG_TYPE_UNSPECIFIED ||
+      flagType == synapsedesk.ingestion.Document.DocumentFlagType.UNRECOGNIZED
+      ? RequiredEnum.<String>required("flagType", flagType, null)
       : flagType.name().replace("DOCUMENT_FLAG_TYPE_", "");
   }
 

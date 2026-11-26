@@ -5,6 +5,7 @@ import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.security.RequirePermission;
 import com.synapsedesk.gateway.common.web.ApiPaths;
@@ -497,7 +498,7 @@ public class WebhookEndpointsController {
       case WEBHOOK_DELIVERY_STATUS_PENDING -> WebhookDeliveryResponseDto.StatusEnum.PENDING;
       case WEBHOOK_DELIVERY_STATUS_DELIVERED -> WebhookDeliveryResponseDto.StatusEnum.DELIVERED;
       case WEBHOOK_DELIVERY_STATUS_FAILED -> WebhookDeliveryResponseDto.StatusEnum.FAILED;
-      default -> null;
+      default -> RequiredEnum.required("status", status, null);
     };
   }
 

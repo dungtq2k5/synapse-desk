@@ -8,6 +8,7 @@ import com.synapsedesk.gateway.common.cache.EvictsCache;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.dto.UploadMethod;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.openapi.CachedRead;
 import com.synapsedesk.gateway.common.security.RequirePermission;
@@ -1007,8 +1008,12 @@ public class DocumentsController {
       .fileSizeBytes(BigDecimal.valueOf(document.getFileSizeBytes()))
       .isOrganizationWide(document.getIsOrganizationWide())
       .status(
-        DocumentResponseDto.StatusEnum.fromValue(
-          document.getStatus().name().replace("DOCUMENT_STATUS_", "")
+        RequiredEnum.required(
+          "status",
+          document.getStatus(),
+          DocumentResponseDto.StatusEnum.fromValue(
+            document.getStatus().name().replace("DOCUMENT_STATUS_", "")
+          )
         )
       )
       .departmentIds(new ArrayList<>(document.getDepartmentIdsList()))
@@ -1030,8 +1035,12 @@ public class DocumentsController {
     LatestIngestionJob job
   ) {
     return new LatestIngestionJobResponseDto(
-      LatestIngestionJobResponseDto.StatusEnum.fromValue(
-        job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+      RequiredEnum.required(
+        "status",
+        job.getStatus(),
+        LatestIngestionJobResponseDto.StatusEnum.fromValue(
+          job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+        )
       ),
       LatestIngestionJobResponseDto.WaitingReasonEnum.fromValue(
         job.getWaitingReason().name().replace("INGESTION_WAITING_REASON_", "")
@@ -1047,11 +1056,19 @@ public class DocumentsController {
       flag.getId(),
       flag.getDocumentId(),
       flag.getDocumentTitle(),
-      DocumentFlagResponseDto.FlagTypeEnum.fromValue(
-        flag.getFlagType().name().replace("DOCUMENT_FLAG_TYPE_", "")
+      RequiredEnum.required(
+        "flagType",
+        flag.getFlagType(),
+        DocumentFlagResponseDto.FlagTypeEnum.fromValue(
+          flag.getFlagType().name().replace("DOCUMENT_FLAG_TYPE_", "")
+        )
       ),
-      DocumentFlagResponseDto.SeverityEnum.fromValue(
-        flag.getSeverity().name().replace("DOCUMENT_FLAG_SEVERITY_", "")
+      RequiredEnum.required(
+        "severity",
+        flag.getSeverity(),
+        DocumentFlagResponseDto.SeverityEnum.fromValue(
+          flag.getSeverity().name().replace("DOCUMENT_FLAG_SEVERITY_", "")
+        )
       ),
       flag.getDetail(),
       flag.hasConfidenceScore()

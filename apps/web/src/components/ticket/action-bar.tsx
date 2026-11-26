@@ -67,11 +67,9 @@ export function ActionBar({ ticket }: { ticket: TicketResponseDto }) {
   const [deleting, setDeleting] = useState(false);
 
   const status = ticket.status;
-  const moves = status
-    ? statusMoves(status, TICKET_STATUS_TRANSITIONS).filter(
-        (item) => item.permission === null || can(item.permission),
-      )
-    : [];
+  const moves = statusMoves(status, TICKET_STATUS_TRANSITIONS).filter(
+    (item) => item.permission === null || can(item.permission),
+  );
   const assigned = Boolean(ticket.currentAssigneeId);
   const mine = assigned && ticket.currentAssigneeId === user?.id;
   const selfDepartments = departmentIds
@@ -160,7 +158,7 @@ export function ActionBar({ ticket }: { ticket: TicketResponseDto }) {
         aria-label="Ticket actions"
         className="flex flex-wrap items-center gap-2"
       >
-        {moves.length > 0 && status && (
+        {moves.length > 0 && (
           <DropdownMenu>
             <Toolbar.Button asChild>
               <DropdownMenuTrigger asChild>

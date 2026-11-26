@@ -275,6 +275,7 @@ public class DocumentFlagResponseDto {
    * @return flagType
    */
 
+  @NotNull
   @JsonProperty("flagType")
   public FlagTypeEnum getFlagType() {
     return flagType;
@@ -295,6 +296,7 @@ public class DocumentFlagResponseDto {
    * @return severity
    */
 
+  @NotNull
   @JsonProperty("severity")
   public SeverityEnum getSeverity() {
     return severity;

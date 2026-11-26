@@ -63226,8 +63226,8 @@
             "type": "boolean"
           },
           "status": {
-            "type": ["string", "null"],
-            "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING", null]
+            "type": "string",
+            "enum": ["FAILED", "INDEXED", "PENDING", "PROCESSING"]
           },
           "departmentIds": {
             "type": "array",
@@ -63289,7 +63289,7 @@
         "type": "object",
         "properties": {
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "CANCELLED",
@@ -63298,8 +63298,7 @@
               "EMBEDDING",
               "FAILED",
               "PARSING",
-              "QUEUED",
-              null
+              "QUEUED"
             ]
           },
           "waitingReason": {
@@ -64338,24 +64337,23 @@
             "type": "string"
           },
           "source": {
-            "type": ["string", "null"],
-            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
+            "type": "string",
+            "enum": ["API", "CHAT", "EMAIL", "WEB"]
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "enum": [
               "CLOSED",
               "ESCALATED",
               "NEW",
               "OPEN",
               "PENDING_AGENT",
-              "RESOLVED",
-              null
+              "RESOLVED"
             ]
           },
           "priority": {
-            "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+            "type": "string",
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "title": {
             "type": "string"
@@ -65184,24 +65182,23 @@
             "type": "string"
           },
           "source": {
-            "type": ["string", "null"],
-            "enum": ["API", "CHAT", "EMAIL", "WEB", null]
+            "type": "string",
+            "enum": ["API", "CHAT", "EMAIL", "WEB"]
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "enum": [
               "CLOSED",
               "ESCALATED",
               "NEW",
               "OPEN",
               "PENDING_AGENT",
-              "RESOLVED",
-              null
+              "RESOLVED"
             ]
           },
           "priority": {
-            "type": ["string", "null"],
-            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT", null]
+            "type": "string",
+            "enum": ["HIGH", "LOW", "MEDIUM", "URGENT"]
           },
           "title": {
             "type": "string"
@@ -65405,7 +65402,7 @@
             "format": "date-time"
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": "string",
             "enum": [
               "DEPARTMENT_CHANGE",
               "ESCALATION",
@@ -65413,8 +65410,7 @@
               "LOAD_BALANCING",
               "MANUAL",
               "SELF_ASSIGNED",
-              "UNAVAILABLE",
-              null
+              "UNAVAILABLE"
             ]
           },
           "isCurrent": {
@@ -65547,12 +65543,12 @@
             "type": "string"
           },
           "status": {
-            "type": ["string", "null"],
-            "enum": ["FAILED", "PENDING", "READY", null]
+            "type": "string",
+            "enum": ["FAILED", "PENDING", "READY"]
           },
           "kind": {
-            "type": ["string", "null"],
-            "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY", null]
+            "type": "string",
+            "enum": ["AGENT_DAILY", "AUDIT_LOG", "TICKET", "TICKET_DAILY"]
           },
           "rowCount": {
             "type": ["number", "null"]
@@ -66357,14 +66353,13 @@
             "type": ["string", "null"]
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`OrgStatus`, null when the bridge answers null for `UNSPECIFIED`",
             "enum": [
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE",
-              null
+              "SUSPENDED_PAST_DUE"
             ]
           },
           "enforceTwoFactor": {
@@ -66916,9 +66911,9 @@
             "type": "string"
           },
           "platform": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.",
-            "enum": ["ANDROID", "IOS", "WEB", null]
+            "enum": ["ANDROID", "IOS", "WEB"]
           },
           "deviceName": {
             "type": ["string", "null"]
@@ -67185,15 +67180,14 @@
             "type": "string"
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "AT_CAP",
               "DOC_ANSWER",
               "DOC_MISSING",
               "GREETING",
-              "REFUSED",
-              null
+              "REFUSED"
             ]
           },
           "citations": {
@@ -67248,7 +67242,7 @@
             "description": "Empty until the worker has queued it."
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`null` only if the peer sent a member this build does not know.",
             "enum": [
               "CANCELLED",
@@ -67257,8 +67251,7 @@
               "EMBEDDING",
               "FAILED",
               "PARSING",
-              "QUEUED",
-              null
+              "QUEUED"
             ]
           },
           "errorLog": {
@@ -67456,7 +67449,7 @@
             "description": "The flagged document's title, joined in so the list reads as a worklist."
           },
           "flagType": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "What kind of attention this document needs, or `null` when the value is one\nthis build does not recognise — the same nullability\n{@link DocumentResponseDto.status} carries, and for the same reason.",
             "enum": [
               "CONFLICTING",
@@ -67465,13 +67458,12 @@
               "OUTDATED",
               "PAGES_NOT_INDEXED",
               "UNCITED",
-              "UNRETRIEVED",
-              null
+              "UNRETRIEVED"
             ]
           },
           "severity": {
-            "type": ["string", "null"],
-            "enum": ["CRITICAL", "INFO", "WARNING", null]
+            "type": "string",
+            "enum": ["CRITICAL", "INFO", "WARNING"]
           },
           "detail": {
             "type": "string"
@@ -69051,7 +69043,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The event this preference is for, or `'*'` for the catch-all row.",
             "enum": [
               "*",
@@ -69064,27 +69056,26 @@
               "ticket.message_created",
               "ticket.reassigned",
               "ticket.status_changed",
-              "webhook.endpoint_disabled",
-              null
+              "webhook.endpoint_disabled"
             ]
           },
           "channel": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The transport this preference governs.",
-            "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK", null]
+            "enum": ["EMAIL", "IN_APP", "PUSH", "SMS", "WEBHOOK"]
           },
           "isEnabled": {
             "type": "boolean"
           },
           "digest": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Whether matching notifications batch into a digest.",
-            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF", null]
+            "enum": ["DAILY", "HOURLY", "IMMEDIATE", "OFF"]
           },
           "source": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "Where the value came from.\n\nLets the UI show \"inherited\" rather than presenting a default as a choice.",
-            "enum": ["DEFAULT", "EXPLICIT", "WILDCARD", null]
+            "enum": ["DEFAULT", "EXPLICIT", "WILDCARD"]
           }
         },
         "required": ["channel", "digest", "isEnabled", "source", "type"]
@@ -69392,9 +69383,9 @@
             "type": "string"
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`null` for a wire value this build does not know — never invented.",
-            "enum": ["DELIVERED", "FAILED", "PENDING", null]
+            "enum": ["DELIVERED", "FAILED", "PENDING"]
           },
           "attempts": {
             "type": "number"
@@ -71282,9 +71273,9 @@
             "format": "date-time"
           },
           "aiModelTier": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "The plan, beside the meters\n\nThis is the page a customer opens when they hit a limit, and a limit with\nno plan next to it is a number they cannot act on: the next question is\nalways \"what would I get if I upgraded\".",
-            "enum": ["FAST", "QUALITY", null]
+            "enum": ["FAST", "QUALITY"]
           },
           "planName": {
             "type": "string"
@@ -71343,14 +71334,13 @@
             "type": "boolean"
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`OrgStatus` — see {@link OrganizationResponseDto.status}.",
             "enum": [
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE",
-              null
+              "SUSPENDED_PAST_DUE"
             ]
           }
         },
@@ -72300,22 +72290,21 @@
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
           },
           "aiModelTier": {
-            "type": ["string", "null"],
-            "enum": ["FAST", "QUALITY", null]
+            "type": "string",
+            "enum": ["FAST", "QUALITY"]
           },
           "billingCycleStart": {
             "type": ["string", "null"],
             "format": "date-time"
           },
           "status": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`OrgStatus` — **ours, not Stripe's**, despite living on a subscription\nresponse. The proto field is `OrgStatus` and its comment says so: *\"the\ntenant lifecycle status the subscription drove\"*. Only the neighbouring\n`InvoiceResponseDto.status` carries Stripe's vocabulary.",
             "enum": [
               "ACTIVE",
               "FROZEN",
               "PENDING_ONBOARDING",
-              "SUSPENDED_PAST_DUE",
-              null
+              "SUSPENDED_PAST_DUE"
             ]
           },
           "currentPeriodEnd": {
@@ -72426,9 +72415,9 @@
             "description": "The AI allowance a month, in millionths of a US dollar (1000000 is\n$1.00), charged by what each AI request costs. Not tokens, whatever the\nname says."
           },
           "aiModelTier": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`AiModelTier` — see {@link SubscriptionResponseDto.aiModelTier}.",
-            "enum": ["FAST", "QUALITY", null]
+            "enum": ["FAST", "QUALITY"]
           },
           "maxDocumentBytes": {
             "type": "number"
@@ -73224,7 +73213,7 @@
             "type": "string"
           },
           "flagType": {
-            "type": ["string", "null"],
+            "type": "string",
             "enum": [
               "CONFLICTING",
               "LOW_CONFIDENCE",
@@ -73232,8 +73221,7 @@
               "OUTDATED",
               "PAGES_NOT_INDEXED",
               "UNCITED",
-              "UNRETRIEVED",
-              null
+              "UNRETRIEVED"
             ]
           },
           "detail": {
@@ -73523,9 +73511,9 @@
             "type": "number"
           },
           "aiModelTier": {
-            "type": ["string", "null"],
+            "type": "string",
             "description": "`FAST` | `QUALITY`, or null.\n\nThe wire field was a bare `string` while `billing.proto` spelled the same\nfact as `AiModelTier` — drift rather than a decision, and it is an enum on\nboth now. Null only for UNSPECIFIED, which means auth-service returned no\nentitlement.",
-            "enum": ["FAST", "QUALITY", null]
+            "enum": ["FAST", "QUALITY"]
           },
           "draftAcceptance": {
             "$ref": "#/components/schemas/RateResponseDto"

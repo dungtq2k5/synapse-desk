@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.tickets;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.AssignTicketToSelfDto;
@@ -272,12 +273,13 @@ public class TicketsAssignmentService {
           : null
       )
       .reason(
-        assignment.getReason() ==
-          ReassignmentReason.REASSIGNMENT_REASON_UNSPECIFIED
-          ? null
-          : AssignmentResponseDto.ReasonEnum.fromValue(
-              assignment.getReason().name().replace("REASSIGNMENT_REASON_", "")
-            )
+        RequiredEnum.required(
+          "reason",
+          assignment.getReason(),
+          AssignmentResponseDto.ReasonEnum.fromValue(
+            assignment.getReason().name().replace("REASSIGNMENT_REASON_", "")
+          )
+        )
       )
       .isCurrent(assignment.getIsCurrent())
       .createdAt(
@@ -299,8 +301,12 @@ public class TicketsAssignmentService {
           : null
       )
       .toStatus(
-        TicketStatusChangeResponseDto.ToStatusEnum.fromValue(
-          row.getToStatus().name().replace("TICKET_STATUS_", "")
+        RequiredEnum.required(
+          "toStatus",
+          row.getToStatus(),
+          TicketStatusChangeResponseDto.ToStatusEnum.fromValue(
+            row.getToStatus().name().replace("TICKET_STATUS_", "")
+          )
         )
       )
       .changedById(row.getChangedById())

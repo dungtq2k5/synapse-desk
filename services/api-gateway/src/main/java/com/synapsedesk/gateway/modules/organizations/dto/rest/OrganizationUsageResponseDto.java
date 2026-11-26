@@ -188,6 +188,7 @@ public class OrganizationUsageResponseDto {
    * @return aiModelTier
    */
 
+  @NotNull
   @JsonProperty("aiModelTier")
   public AiModelTierEnum getAiModelTier() {
     return aiModelTier;

@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.dto.ExportResponseDto;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.CreateTicketExportDto;
 import com.synapsedesk.gateway.modules.tickets.dto.rest.SimilarTicketResponseDto;
@@ -156,13 +157,21 @@ public class TicketsExportAndAiService {
     return new ExportResponseDto()
       .id(response.getId())
       .status(
-        ExportResponseDto.StatusEnum.fromValue(
-          response.getStatus().name().replace("EXPORT_STATUS_", "")
+        RequiredEnum.required(
+          "status",
+          response.getStatus(),
+          ExportResponseDto.StatusEnum.fromValue(
+            response.getStatus().name().replace("EXPORT_STATUS_", "")
+          )
         )
       )
       .kind(
-        ExportResponseDto.KindEnum.fromValue(
-          response.getKind().name().replace("EXPORT_KIND_", "")
+        RequiredEnum.required(
+          "kind",
+          response.getKind(),
+          ExportResponseDto.KindEnum.fromValue(
+            response.getKind().name().replace("EXPORT_KIND_", "")
+          )
         )
       )
       .rowCount(

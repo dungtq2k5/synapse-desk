@@ -18,6 +18,8 @@
  */
 
 import { execFile, execFileSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { REPO_ROOT } from './services';
@@ -53,6 +55,13 @@ async function runWhileServing(command: string, args: string[]): Promise<void> {
 
 export default async function globalSetup(): Promise<void> {
   installReapers();
+
+  // Every service's output as a file, so a row can read what a service logged
+  // (the web suite and CI name their own directory first).
+  if (!process.env.SYSTEM_LOG_DIR) {
+    process.env.SYSTEM_LOG_DIR = join(tmpdir(), 'synapsedesk-system-logs');
+    rmSync(process.env.SYSTEM_LOG_DIR, { recursive: true, force: true });
+  }
 
   // A run that was killed never reached teardown, and the PID table it left is
   // the only record of what it started. Reaping it first turns the common case

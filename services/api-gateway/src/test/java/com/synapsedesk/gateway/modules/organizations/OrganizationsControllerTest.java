@@ -274,7 +274,11 @@ class OrganizationsControllerTest {
   void completingOnboardingDropsTheCachedStatus() {
     when(
       stub.completeOnboarding(any(CompleteOnboardingRequest.class))
-    ).thenReturn(OrganizationResponse.getDefaultInstance());
+    ).thenReturn(
+      OrganizationResponse.newBuilder()
+        .setStatus(synapsedesk.auth.Common.OrgStatus.ORG_STATUS_ACTIVE)
+        .build()
+    );
     requestWithBody("{}");
 
     controller.organizationsControllerCompleteOnboardingV1();

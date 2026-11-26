@@ -116,6 +116,7 @@ public class DeviceTokenResponseDto {
    * @return platform
    */
 
+  @NotNull
   @JsonProperty("platform")
   public PlatformEnum getPlatform() {
     return platform;

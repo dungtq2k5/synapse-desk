@@ -135,6 +135,7 @@ public class KnowledgeGapFlagResponseDto {
    * @return flagType
    */
 
+  @NotNull
   @JsonProperty("flagType")
   public FlagTypeEnum getFlagType() {
     return flagType;

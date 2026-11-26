@@ -76,6 +76,11 @@ class TicketsResolverTest {
       .setTicketNumber(42)
       .setOrganizationId("org-1")
       .setAuthorId("author-1")
+      .setSource(synapsedesk.ticket.Common.TicketSource.TICKET_SOURCE_WEB)
+      .setStatus(synapsedesk.ticket.Common.TicketStatus.TICKET_STATUS_NEW)
+      .setPriority(
+        synapsedesk.ticket.Common.TicketPriority.TICKET_PRIORITY_MEDIUM
+      )
       .setTitle("Broken widget")
       .setDescription("It broke")
       .setUnreadCount(0)

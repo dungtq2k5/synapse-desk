@@ -293,7 +293,7 @@ describe('historyTimeline', () => {
     id: string,
     assignedAt: string,
     unassignedAt: string | null,
-    reason: 'INITIAL' | 'DEPARTMENT_CHANGE' | null,
+    reason: 'INITIAL' | 'DEPARTMENT_CHANGE',
   ) => ({
     id,
     ticketId: 't1',

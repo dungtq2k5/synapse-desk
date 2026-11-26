@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.modules.ingestionjobs;
 
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionErrorCodeGql;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobGqlDto;
 import com.synapsedesk.gateway.modules.ingestionjobs.dto.graphql.IngestionJobStatusGql;
@@ -47,8 +48,12 @@ public final class IngestionJobMapper {
       job.getId(),
       job.getDocumentId(),
       job.getBullmqJobId(),
-      IngestionJobResponseDto.StatusEnum.fromValue(
-        job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+      RequiredEnum.required(
+        "status",
+        job.getStatus(),
+        IngestionJobResponseDto.StatusEnum.fromValue(
+          job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+        )
       ),
       toErrorLog(job.getErrorLog()),
       IngestionJobResponseDto.ErrorCodeEnum.fromValue(
@@ -131,7 +136,7 @@ public final class IngestionJobMapper {
       case INGESTION_JOB_STATUS_COMPLETED -> IngestionJobStatusGql.COMPLETED;
       case INGESTION_JOB_STATUS_FAILED -> IngestionJobStatusGql.FAILED;
       case INGESTION_JOB_STATUS_CANCELLED -> IngestionJobStatusGql.CANCELLED;
-      default -> null;
+      default -> RequiredEnum.required("status", status, null);
     };
   }
 

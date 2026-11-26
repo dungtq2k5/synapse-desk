@@ -4,6 +4,7 @@ import com.synapsedesk.gateway.common.auth.CurrentRequest;
 import com.synapsedesk.gateway.common.auth.CurrentUser;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.openapi.ApiErrors;
 import com.synapsedesk.gateway.common.web.ApiPaths;
 import com.synapsedesk.gateway.common.web.ApiResponse;
@@ -507,21 +508,39 @@ public class NotificationsController {
       // The wire's `type` is already the dotted string / `'*'` a preference
       // key can be — `fromValue` answers null for anything else, matching
       // `asPreferenceType`'s own narrowing.
-      .type(PreferenceResponseDto.TypeEnum.fromValue(preference.getType()))
+      .type(
+        RequiredEnum.required(
+          "type",
+          preference.getType(),
+          PreferenceResponseDto.TypeEnum.fromValue(preference.getType())
+        )
+      )
       .channel(
-        PreferenceResponseDto.ChannelEnum.fromValue(
-          preference.getChannel().name().replace("NOTIFICATION_CHANNEL_", "")
+        RequiredEnum.required(
+          "channel",
+          preference.getChannel(),
+          PreferenceResponseDto.ChannelEnum.fromValue(
+            preference.getChannel().name().replace("NOTIFICATION_CHANNEL_", "")
+          )
         )
       )
       .isEnabled(preference.getIsEnabled())
       .digest(
-        PreferenceResponseDto.DigestEnum.fromValue(
-          preference.getDigest().name().replace("DIGEST_MODE_", "")
+        RequiredEnum.required(
+          "digest",
+          preference.getDigest(),
+          PreferenceResponseDto.DigestEnum.fromValue(
+            preference.getDigest().name().replace("DIGEST_MODE_", "")
+          )
         )
       )
       .source(
-        PreferenceResponseDto.SourceEnum.fromValue(
-          preference.getSource().name().replace("PREFERENCE_SOURCE_", "")
+        RequiredEnum.required(
+          "source",
+          preference.getSource(),
+          PreferenceResponseDto.SourceEnum.fromValue(
+            preference.getSource().name().replace("PREFERENCE_SOURCE_", "")
+          )
         )
       );
   }
@@ -532,8 +551,12 @@ public class NotificationsController {
     return new DeviceTokenResponseDto()
       .id(device.getId())
       .platform(
-        DeviceTokenResponseDto.PlatformEnum.fromValue(
-          device.getPlatform().name().replace("DEVICE_PLATFORM_", "")
+        RequiredEnum.required(
+          "platform",
+          device.getPlatform(),
+          DeviceTokenResponseDto.PlatformEnum.fromValue(
+            device.getPlatform().name().replace("DEVICE_PLATFORM_", "")
+          )
         )
       )
       .deviceName(device.hasDeviceName() ? device.getDeviceName() : null)

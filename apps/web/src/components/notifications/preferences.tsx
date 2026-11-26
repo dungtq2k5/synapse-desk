@@ -393,11 +393,7 @@ function PreferenceCell({
         />
         {channel === 'EMAIL' && (
           <Select
-            value={
-              value.digest && value.digest in DIGESTS
-                ? value.digest
-                : 'IMMEDIATE'
-            }
+            value={value.digest in DIGESTS ? value.digest : 'IMMEDIATE'}
             disabled={!value.isEnabled}
             onValueChange={(digest) => onSave({ digest: digest as Digest })}
           >
@@ -425,7 +421,7 @@ function PreferenceCell({
           value.source === 'EXPLICIT' && 'text-foreground',
         )}
       >
-        {SOURCE[value.source ?? 'DEFAULT']}
+        {SOURCE[value.source]}
       </span>
     </div>
   );

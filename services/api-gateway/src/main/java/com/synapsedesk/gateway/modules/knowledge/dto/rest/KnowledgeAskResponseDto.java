@@ -115,6 +115,7 @@ public class KnowledgeAskResponseDto {
    * @return status
    */
 
+  @NotNull
   @JsonProperty("status")
   public StatusEnum getStatus() {
     return status;

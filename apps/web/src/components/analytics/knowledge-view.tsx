@@ -273,7 +273,7 @@ function Flags({ flags }: { flags: KnowledgeGapsResponseDto['flags'] }) {
                 <TableRow key={`${flag.documentId}:${flag.flagType}`}>
                   <TableCell>
                     <Badge variant="info" className="rounded-full">
-                      {flag.flagType ? FLAG_TYPE[flag.flagType].label : 'Flag'}
+                      {FLAG_TYPE[flag.flagType].label}
                     </Badge>
                   </TableCell>
                   <TableCell>

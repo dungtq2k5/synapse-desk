@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.modules.documents;
 
 import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.modules.documents.dto.graphql.DocumentGqlDto;
 import com.synapsedesk.gateway.modules.documents.dto.graphql.DocumentStatusGql;
 import java.time.Instant;
@@ -54,7 +55,7 @@ public final class DocumentMapper {
       case DOCUMENT_STATUS_PROCESSING -> DocumentStatusGql.PROCESSING;
       case DOCUMENT_STATUS_INDEXED -> DocumentStatusGql.INDEXED;
       case DOCUMENT_STATUS_FAILED -> DocumentStatusGql.FAILED;
-      default -> null;
+      default -> RequiredEnum.required("status", status, null);
     };
   }
 

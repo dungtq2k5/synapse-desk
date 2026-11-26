@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.modules.tickets;
 
 import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.common.graphql.PageMetaGqlDto;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.modules.tickets.dto.graphql.CitationGqlDto;
 import com.synapsedesk.gateway.modules.tickets.dto.graphql.TicketGqlDto;
 import com.synapsedesk.gateway.modules.tickets.dto.graphql.TicketMessageGqlDto;
@@ -114,7 +115,7 @@ public final class TicketMapper {
       case TICKET_SOURCE_CHAT -> TicketSourceGql.CHAT;
       case TICKET_SOURCE_EMAIL -> TicketSourceGql.EMAIL;
       case TICKET_SOURCE_API -> TicketSourceGql.API;
-      default -> null;
+      default -> RequiredEnum.required("source", source, null);
     };
   }
 
@@ -126,7 +127,7 @@ public final class TicketMapper {
       case TICKET_STATUS_ESCALATED -> TicketStatusGql.ESCALATED;
       case TICKET_STATUS_RESOLVED -> TicketStatusGql.RESOLVED;
       case TICKET_STATUS_CLOSED -> TicketStatusGql.CLOSED;
-      default -> null;
+      default -> RequiredEnum.required("status", status, null);
     };
   }
 
@@ -136,7 +137,7 @@ public final class TicketMapper {
       case TICKET_PRIORITY_MEDIUM -> TicketPriorityGql.MEDIUM;
       case TICKET_PRIORITY_HIGH -> TicketPriorityGql.HIGH;
       case TICKET_PRIORITY_URGENT -> TicketPriorityGql.URGENT;
-      default -> null;
+      default -> RequiredEnum.required("priority", priority, null);
     };
   }
 

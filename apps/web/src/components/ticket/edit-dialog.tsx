@@ -78,9 +78,7 @@ function EditForm({
 }) {
   const [title, setTitle] = useState(ticket.title);
   const [description, setDescription] = useState(ticket.description);
-  const [priority, setPriority] = useState<Priority>(
-    ticket.priority ?? 'MEDIUM',
-  );
+  const [priority, setPriority] = useState<Priority>(ticket.priority);
   const [errors, setErrors] = useState<{
     title?: string;
     description?: string;

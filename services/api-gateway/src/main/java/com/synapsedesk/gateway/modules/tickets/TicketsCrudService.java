@@ -3,6 +3,7 @@ package com.synapsedesk.gateway.modules.tickets;
 import com.synapsedesk.gateway.common.auth.RequestContext;
 import com.synapsedesk.gateway.common.dto.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.common.grpc.CallerMetadata;
+import com.synapsedesk.gateway.common.grpc.RequiredEnum;
 import com.synapsedesk.gateway.common.web.ApiResponse;
 import com.synapsedesk.gateway.common.web.PageMeta;
 import com.synapsedesk.gateway.common.web.PagedData;
@@ -408,18 +409,30 @@ public class TicketsCrudService {
       .organizationId(ticket.getOrganizationId())
       .authorId(ticket.getAuthorId())
       .source(
-        TicketResponseDto.SourceEnum.fromValue(
-          ticket.getSource().name().replace("TICKET_SOURCE_", "")
+        RequiredEnum.required(
+          "source",
+          ticket.getSource(),
+          TicketResponseDto.SourceEnum.fromValue(
+            ticket.getSource().name().replace("TICKET_SOURCE_", "")
+          )
         )
       )
       .status(
-        TicketResponseDto.StatusEnum.fromValue(
-          ticket.getStatus().name().replace("TICKET_STATUS_", "")
+        RequiredEnum.required(
+          "status",
+          ticket.getStatus(),
+          TicketResponseDto.StatusEnum.fromValue(
+            ticket.getStatus().name().replace("TICKET_STATUS_", "")
+          )
         )
       )
       .priority(
-        TicketResponseDto.PriorityEnum.fromValue(
-          ticket.getPriority().name().replace("TICKET_PRIORITY_", "")
+        RequiredEnum.required(
+          "priority",
+          ticket.getPriority(),
+          TicketResponseDto.PriorityEnum.fromValue(
+            ticket.getPriority().name().replace("TICKET_PRIORITY_", "")
+          )
         )
       )
       .title(ticket.getTitle())

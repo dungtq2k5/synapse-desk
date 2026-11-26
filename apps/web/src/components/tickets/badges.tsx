@@ -29,7 +29,6 @@ const PRIORITY_CLASS: Record<NonNullable<TicketResponseDtoPriority>, string> = {
 
 /** A status, by its label: never color alone. */
 export function StatusBadge({ status }: { status: TicketResponseDtoStatus }) {
-  if (!status) return null;
   return (
     <Badge className={cn('rounded-full', STATUS_CLASS[status])}>
       {STATUS_LABEL[status]}
@@ -40,7 +39,8 @@ export function StatusBadge({ status }: { status: TicketResponseDtoStatus }) {
 export function PriorityBadge({
   priority,
 }: {
-  priority: TicketResponseDtoPriority;
+  /** Null for an AI suggestion that named no priority: nothing is drawn. */
+  priority: TicketResponseDtoPriority | null;
 }) {
   if (!priority) return null;
   return (
@@ -70,7 +70,6 @@ export function SourceLabel({
   started?: boolean;
   className?: string;
 }) {
-  if (!source) return <span className="text-muted-foreground">—</span>;
   const Icon = SOURCE_ICON[source];
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>
