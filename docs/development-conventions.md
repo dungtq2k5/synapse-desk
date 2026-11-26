@@ -72,6 +72,20 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 | A call to the gateway from the web | nowhere by hand: the generated client in `packages/api-client`, through its fetcher |
 | A colour, spacing, radius or type value | a token, exported from Figma into `apps/web/design-tokens/`; never a literal in a component |
 
+**What a merge into `main-java` keeps, and what it deletes.** Changes flow one way, from `main` into `main-java`. Most files merge normally; these don't:
+
+- **Keep `main-java`'s side,** even when the merge is clean:
+  - `docs/reference/known-gaps.md`: each branch tracks its own gaps;
+  - `test/gateway-contract/org-lifecycle.contract-spec.ts` and `test/gateway-contract/graphql.contract-spec.ts`: they pin Java-only behavior;
+  - `docs/reference/openapi.json`: keep `main-java`'s side, then regenerate it;
+  - `scripts/lib/openapi-export.cjs` and its spec;
+  - files `main-java` rewrote for the Java gateway, such as `README.md` and `docs/tech-stack-spec.md`.
+- **Delete in every merge:**
+  - the Node gateway's files; a modify/delete conflict is resolved with `git rm`;
+  - Node-only files under `services/api-gateway/src` and `services/api-gateway/test`;
+  - Node-only guards: `packages/config/src/body-transforms.spec.ts` and `packages/config/src/no-all-routes.spec.ts`.
+- **A contract spec both gateways pass is shared,** not kept: `http-metrics.contract-spec.ts` and `grpc-metrics.contract-spec.ts` come from `main`. A spec leaves the keep list as soon as the two copies can be one.
+
 ---
 
 ## 3. Shared Libraries — Use Them
