@@ -25,6 +25,8 @@ export const FAIL_OPEN_LINES = [
   // The organization-status cache.
   'Status cache unavailable',
   'Could not invalidate cached status',
+  // An auth-service outage: a tenant's last known status is served.
+  'auth-service unreachable',
   // Revoked sessions: a signed-out device keeps working.
   'Revoked-session check unavailable',
   'Revoked-session sweep unavailable',

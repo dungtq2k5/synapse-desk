@@ -116,6 +116,14 @@ describe('the tenant lifecycle gate', () => {
       .always({ status: toProtoOrgStatus(status), deleted });
 
   const statusCalls = () => peers.auth.calls(STATUS_RPC);
+  /** A cached status past its fresh thirty seconds, which Redis keeps `seconds` longer. */
+  const stale = async (status: string, seconds = 300) =>
+    redis.set(
+      await cacheKey(),
+      JSON.stringify({ status, deleted: false, freshUntil: Date.now() - 1 }),
+      'EX',
+      seconds,
+    );
 
   const session = () => new Session(gateway.baseUrl);
 
@@ -429,18 +437,8 @@ describe('the tenant lifecycle gate', () => {
   rowFor('Ops')(
     '**a peer that cannot be reached is ridden out on the last known status — a stale ACTIVE serves, a stale FROZEN refuses**',
     async () => {
+      allowFailOpen('auth-service unreachable');
       peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
-      const stale = async (status: string) =>
-        redis.set(
-          await cacheKey(),
-          JSON.stringify({
-            status,
-            deleted: false,
-            freshUntil: Date.now() - 1,
-          }),
-          'EX',
-          300,
-        );
 
       await stale('ACTIVE');
       const served = await ROUTES.READ.send();
@@ -455,6 +453,51 @@ describe('the tenant lifecycle gate', () => {
       expect(statusCalls()).toHaveLength(2);
       expect(refused.status).toBe(403);
       expect(errorOf(refused.body)).toBe(enveloped(REFUSAL.FROZEN));
+    },
+  );
+
+  rowFor('Ops')(
+    '**a peer that times out is ridden out too — the status call’s deadline, not just a refused connection**',
+    async () => {
+      allowFailOpen('auth-service unreachable');
+      peers.auth.on(STATUS_RPC).hang();
+      await stale('ACTIVE');
+
+      const served = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(lifecycleRefusal(served.status, served.body)).toBe(false);
+      expect(downstreamCalls('READ').length).toBeGreaterThanOrEqual(1);
+    },
+    20_000,
+  );
+
+  rowFor('Ops')(
+    '**any other failure refuses, even with a stale status cached — only an unreachable peer is ridden out**',
+    async () => {
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.INTERNAL, 'auth broke');
+      await stale('ACTIVE');
+
+      const response = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(response.status).toBe(500);
+      expect(downstreamCalls('READ')).toHaveLength(0);
+    },
+  );
+
+  rowFor('Ops')(
+    '**a status Redis has expired is not ridden out — the Redis TTL bounds the stale window**',
+    async () => {
+      peers.auth.on(STATUS_RPC).fail(GrpcStatus.UNAVAILABLE, 'auth is down');
+      await stale('ACTIVE', 1);
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+      const response = await ROUTES.READ.send();
+
+      expect(statusCalls()).toHaveLength(1);
+      expect(response.status).toBe(503);
+      expect(downstreamCalls('READ')).toHaveLength(0);
     },
   );
 
@@ -570,7 +613,7 @@ describe('the tenant lifecycle gate', () => {
     },
   );
 
-  rowFor('Ops')(
+  rowFor('Organizations')(
     '**a tenant deleting its own organization is refused on its next request — the cached ACTIVE is dropped, not served for thirty seconds**',
     async () => {
       tenantIs(OrgStatus.ACTIVE);
