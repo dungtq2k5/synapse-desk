@@ -83,7 +83,7 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 
 - **Keep `main-java`'s side,** even when the merge is clean:
   - `docs/reference/known-gaps.md`: each branch tracks its own gaps;
-  - `test/gateway-contract/org-lifecycle.contract-spec.ts` and `test/gateway-contract/graphql.contract-spec.ts`: they pin Java-only behavior;
+  - `test/gateway-contract/graphql.contract-spec.ts`: it pins Java-only behavior;
   - `docs/reference/openapi.json`: keep `main-java`'s side, then regenerate it;
   - `scripts/lib/openapi-export.cjs` and its spec;
   - files `main-java` rewrote for the Java gateway, such as `README.md` and `docs/tech-stack-spec.md`.
@@ -91,7 +91,7 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
   - the Node gateway's files; a modify/delete conflict is resolved with `git rm`;
   - Node-only files under `services/api-gateway/src` and `services/api-gateway/test`;
   - Node-only guards: `packages/config/src/body-transforms.spec.ts` and `packages/config/src/no-all-routes.spec.ts`.
-- **A contract spec both gateways pass is shared,** not kept: `http-metrics.contract-spec.ts` and `grpc-metrics.contract-spec.ts` come from `main`. A spec leaves the keep list as soon as the two copies can be one.
+- **A file both gateways can share is shared,** not kept: `http-metrics.contract-spec.ts`, `grpc-metrics.contract-spec.ts`, `org-lifecycle.contract-spec.ts` and `packages/testing/src/fail-open.ts` (whose `FAIL_OPEN_LINES` lists both gateways' lines) come from `main`. A file leaves the keep list as soon as the two copies can be one.
 
 ---
 
