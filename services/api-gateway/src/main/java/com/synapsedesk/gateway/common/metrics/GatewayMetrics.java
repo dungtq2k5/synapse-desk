@@ -93,6 +93,17 @@ public class GatewayMetrics {
       .increment();
   }
 
+  /**
+   * One refused socket handshake, by reason: {@code flood}, {@code failed-handshakes},
+   * {@code per-user} or {@code unauthenticated}.
+   */
+  public void handshakeRefused(String reason) {
+    Counter.builder(PublishedSeries.WEBSOCKET_HANDSHAKES_REFUSED)
+      .tag("reason", reason)
+      .register(registry)
+      .increment();
+  }
+
   /** One inbound-email webhook request, by outcome. */
   public void inboundEmail(String outcome) {
     Counter.builder(PublishedSeries.INBOUND_EMAIL)

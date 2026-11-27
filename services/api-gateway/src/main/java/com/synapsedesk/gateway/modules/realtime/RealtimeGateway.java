@@ -186,20 +186,46 @@ public class RealtimeGateway implements RuntimeParticipant {
    * of connection setup (`CLIENT_EVENTS.ticketJoin` — a later group).
    */
   private void onConnect(SocketIOClient client) {
+    // The limits in layers (see `WsThrottlerService`): the flood ceiling before
+    // any verification, then the failed or the per-user limit by what the
+    // cookie proved.
     String handshakeIp = SocketHandshakes.ip(client);
     if (!wsThrottler.allowHandshake(handshakeIp)) {
-      LOG.warn("Handshake budget exceeded for {}", handshakeIp);
-      refuse(
-        client,
-        RealtimeEvents.CONNECTION_REFUSED_CODES_RATE_LIMITED,
-        "Too many connections from this address"
-      );
-
+      shed(client, "flood", "Too many connections from this address");
       return;
     }
 
     try {
-      JwtPrincipal principal = verifyHandshake(client);
+      JwtVerifier.Handshake identity = identify(client);
+      if (identity instanceof JwtVerifier.Handshake.Unverified unverified) {
+        if (!wsThrottler.allowFailed(handshakeIp)) {
+          shed(
+            client,
+            "failed-handshakes",
+            "Too many connections from this address"
+          );
+          return;
+        }
+        throw new IllegalStateException(unverified.reason());
+      }
+
+      // A verified signature, expired or revoked included, is charged to the
+      // user it names, never to the address an office shares.
+      JwtPrincipal principal =
+        identity instanceof JwtVerifier.Handshake.Verified verified
+          ? verified.principal()
+          : ((JwtVerifier.Handshake.Expired) identity).principal();
+      if (!wsThrottler.allowUser(principal.sub())) {
+        shed(client, "per-user", "Too many connections for this account");
+        return;
+      }
+      if (identity instanceof JwtVerifier.Handshake.Expired) {
+        throw new IllegalStateException("Access token expired");
+      }
+      // A signed-out device's socket is refused at the door.
+      if (revokedSessions.isRevoked(principal.sid())) {
+        throw new IllegalStateException("Session revoked");
+      }
       client.getHandshakeData().setAuthToken(principal);
 
       client.joinRoom(RealtimeRooms.userRoom(principal.sub()));
@@ -236,6 +262,7 @@ public class RealtimeGateway implements RuntimeParticipant {
         client.getSessionId(),
         refused.getMessage()
       );
+      metrics.handshakeRefused("unauthenticated");
       refuse(
         client,
         RealtimeEvents.CONNECTION_REFUSED_CODES_UNAUTHENTICATED,
@@ -747,31 +774,40 @@ public class RealtimeGateway implements RuntimeParticipant {
     return principal;
   }
 
-  private JwtPrincipal verifyHandshake(SocketIOClient client) {
+  /** What the handshake's access cookie proves; see {@link JwtVerifier#identify}. */
+  private JwtVerifier.Handshake identify(SocketIOClient client) {
     String rawCookie = client
       .getHandshakeData()
       .getHttpHeaders()
       .get(HttpHeaderNames.COOKIE);
     if (rawCookie == null) {
-      throw new IllegalStateException("No cookies in handshake");
+      return new JwtVerifier.Handshake.Unverified("No cookies in handshake");
     }
 
     String cookiePrefix = jwt.accessName() + "=";
-    String token = Arrays.stream(rawCookie.split(";"))
+    return Arrays.stream(rawCookie.split(";"))
       .map(String::trim)
       .filter(part -> part.startsWith(cookiePrefix))
       .map(part -> part.substring(cookiePrefix.length()))
       .findFirst()
-      .orElseThrow(() -> new IllegalStateException("Access token missing"));
-
-    JwtPrincipal principal = jwtVerifier
-      .verifyAccess(token)
-      .orElseThrow(() ->
-        new IllegalStateException("Invalid or expired access token")
+      .map(jwtVerifier::identify)
+      .orElseGet(() ->
+        new JwtVerifier.Handshake.Unverified("Access token missing")
       );
-    if (revokedSessions.isRevoked(principal.sid())) {
-      throw new IllegalStateException("Session revoked");
-    }
-    return principal;
+  }
+
+  /** Refuses a handshake past one of the limits, counted under that limit. */
+  private void shed(SocketIOClient client, String reason, String message) {
+    LOG.warn(
+      "Handshake refused ({}) for socket {}",
+      reason,
+      client.getSessionId()
+    );
+    metrics.handshakeRefused(reason);
+    refuse(
+      client,
+      RealtimeEvents.CONNECTION_REFUSED_CODES_RATE_LIMITED,
+      message
+    );
   }
 }

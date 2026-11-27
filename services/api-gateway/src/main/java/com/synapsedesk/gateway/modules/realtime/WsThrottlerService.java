@@ -1,27 +1,33 @@
 package com.synapsedesk.gateway.modules.realtime;
 
 import com.synapsedesk.gateway.common.config.ThrottleProperties;
-import java.time.Duration;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-IP handshake and per-user event budgets for the realtime socket, kept
- * in Redis.
+ * The socket handshake's limits, in layers, each keyed on the best thing known at
+ * its stage, and the per-event limit, kept in Redis.
  *
- * <p><b>The handshake key</b> is {@code ws_handshake:${identity}:${ip}}, where
- * the identity is {@link #GATEWAY_IDENTITY} — a literal wire-key constant,
- * not a reflected class name, so renaming the class cannot silently move
- * every budget to a new key.
+ * <ul>
+ *   <li><b>Flood ceiling</b>, before the token is checked: the client IP ({@code
+ *       ws_handshake:flood:<ip>}).
+ *   <li><b>Failed handshakes</b>: the client IP ({@code ws_handshake:failed:<ip>}),
+ *       charged only by a handshake with no verified identity, after the token is
+ *       checked.
+ *   <li><b>Per user</b>: the verified {@code sub} ({@code ws_handshake:user:<sub>}),
+ *       an expired or revoked token's included.
+ *   <li><b>Events</b>: {@code ws_event:<event>:<sub>}.
+ * </ul>
  *
- * <p>{@code ws_event:{event}:{subject}} is built from contract strings only
- * (an event name, a verified JWT `sub`).
- *
- * <p>Algorithm: the same {@code INCR} + one-time {@code EXPIRE} pattern
- * {@code ThrottlerInterceptor} already uses for HTTP, not a Lua script. Fails
- * OPEN on any Redis error, exactly like every other Redis-backed class here.
+ * <p>Each key is counted by {@link #COUNT}, which starts its window on the first hit
+ * in the same step, so a key can never be left without an expiry. The keys carry no
+ * gateway name, so a client has one budget whichever gateway it reaches. Past a limit the handshake is shed, never blocked. Fails OPEN
+ * on any Redis error, loudly.
  */
 @Component
 public class WsThrottlerService {
@@ -30,8 +36,13 @@ public class WsThrottlerService {
     WsThrottlerService.class
   );
 
-  /** This gateway's wire identity in the handshake key — never a class name. */
-  private static final String GATEWAY_IDENTITY = "java-realtime-gateway";
+  /** {@code INCR}, and {@code PEXPIRE} on the first hit, atomically. */
+  static final RedisScript<Long> COUNT = new DefaultRedisScript<>(
+    "local n = redis.call('INCR', KEYS[1])\n" +
+      "if n == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end\n" +
+      "return n",
+    Long.class
+  );
 
   private final StringRedisTemplate redis;
   private final ThrottleProperties throttle;
@@ -44,40 +55,55 @@ public class WsThrottlerService {
     this.throttle = throttle;
   }
 
-  /**
-   * The handshake budget: sheds past the limit, and never blocks. A refused
-   * handshake retries on the client's own backoff and succeeds once the window
-   * moves on. A block would turn a burst into a guaranteed outage: a switch drops
-   * every socket at once, and an office behind one NAT reconnects together.
-   */
+  /** Counts a handshake from {@code ip} against the flood ceiling. */
   public boolean allowHandshake(String ip) {
-    String key = "ws_handshake:" + GATEWAY_IDENTITY + ":" + ip;
-
-    return allow(key, throttle.wsHandshakeTtl(), throttle.wsHandshakeLimit());
+    return allow(
+      "ws_handshake:flood:" + ip,
+      throttle.wsHandshakeTtl(),
+      throttle.wsHandshakeLimit()
+    );
   }
 
-  /** The per-event budget: sheds past the limit like the handshake; exceeding it is normal. */
+  /** Counts a handshake with no verified identity; false once {@code ip} is past the limit. */
+  public boolean allowFailed(String ip) {
+    return allow(
+      "ws_handshake:failed:" + ip,
+      throttle.wsHandshakeFailedTtl(),
+      throttle.wsHandshakeFailedLimit()
+    );
+  }
+
+  /** Counts a handshake whose signature verified against its user. */
+  public boolean allowUser(String sub) {
+    return allow(
+      "ws_handshake:user:" + sub,
+      throttle.wsHandshakeUserTtl(),
+      throttle.wsHandshakeUserLimit()
+    );
+  }
+
+  /** Counts an event from a verified user. */
   public boolean allowEvent(String event, String subject) {
     WsEventLimits.Limit limit = WsEventLimits.of(event);
-    String key = "ws_event:" + event + ":" + subject;
-
-    return allow(key, limit.ttlMs(), limit.count());
+    return allow(
+      "ws_event:" + event + ":" + subject,
+      limit.ttlMs(),
+      limit.count()
+    );
   }
 
   private boolean allow(String key, long ttlMs, int limit) {
     try {
-      long count = redis.opsForValue().increment(key);
-      if (count == 1) {
-        redis.expire(key, Duration.ofMillis(ttlMs));
-      }
-
-      return count <= limit;
+      Long hits = redis.execute(COUNT, List.of(key), String.valueOf(ttlMs));
+      if (hits == null) throw new IllegalStateException(
+        "Redis returned no count"
+      );
+      return hits <= limit;
     } catch (RuntimeException redisFailure) {
       LOG.error(
         "WS rate-limit storage unavailable; allowing unthrottled: {}",
         redisFailure.getMessage()
       );
-
       return true;
     }
   }

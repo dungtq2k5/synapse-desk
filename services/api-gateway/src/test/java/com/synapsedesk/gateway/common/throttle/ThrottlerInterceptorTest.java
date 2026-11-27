@@ -53,6 +53,10 @@ class ThrottlerInterceptorTest {
     900_000L,
     5,
     30,
+    60_000L,
+    120,
+    60_000L,
+    60,
     60_000L
   );
 

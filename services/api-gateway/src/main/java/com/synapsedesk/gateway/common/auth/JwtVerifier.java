@@ -55,6 +55,49 @@ public class JwtVerifier {
       .map(this::toPrincipal);
   }
 
+  /**
+   * What a socket handshake's access token proves: {@link Handshake.Verified}; {@link
+   * Handshake.Expired}, whose signature verified, so its identity is this gateway's
+   * to trust though the token can't be used; or {@link Handshake.Unverified} (a bad
+   * signature, a malformed token, the wrong key, a 2FA challenge).
+   */
+  public Handshake identify(String token) {
+    try {
+      SignedJWT jwt = SignedJWT.parse(token);
+      if (
+        !ALGORITHM.equals(jwt.getHeader().getAlgorithm()) ||
+        !jwt.verify(accessVerifier)
+      ) {
+        return new Handshake.Unverified("Invalid access token");
+      }
+
+      JWTClaimsSet claims = jwt.getJWTClaimsSet();
+      if (isChallenge(claims)) {
+        return new Handshake.Unverified("Two-factor challenge is not complete");
+      }
+      Date expiry = claims.getExpirationTime();
+      if (expiry != null && expiry.before(new Date())) {
+        return new Handshake.Expired(toPrincipal(claims));
+      }
+
+      return new Handshake.Verified(toPrincipal(claims));
+    } catch (ParseException | JOSEException malformedOrUnverifiable) {
+      return new Handshake.Unverified("Malformed access token");
+    }
+  }
+
+  /** What {@link #identify} found. */
+  public sealed interface Handshake {
+    /** A usable token. */
+    record Verified(JwtPrincipal principal) implements Handshake {}
+
+    /** A genuine token past its expiry. */
+    record Expired(JwtPrincipal principal) implements Handshake {}
+
+    /** No identity this gateway can trust. */
+    record Unverified(String reason) implements Handshake {}
+  }
+
   /** The 2FA cookie's token. Rejects anything NOT marked as a challenge. */
   public Optional<JwtPrincipal> verifyTwoFactor(String token) {
     return verify(token, twoFactorVerifier)

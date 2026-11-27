@@ -28,6 +28,8 @@ public final class PublishedSeries {
   public static final String GRPC_DURATION = "grpc_client_duration_seconds";
   public static final String WEBSOCKET_CONNECTIONS = "websocket_connections";
   public static final String WEBSOCKET_EVENTS = "websocket_events_total";
+  public static final String WEBSOCKET_HANDSHAKES_REFUSED =
+    "websocket_handshakes_refused_total";
   public static final String INBOUND_EMAIL = "inbound_email_webhook_total";
   public static final String CLIENT_ERRORS = "client_errors_total";
   public static final String JOB_LAST_SUCCESS =
@@ -45,6 +47,8 @@ public final class PublishedSeries {
     List.of(),
     WEBSOCKET_EVENTS,
     List.of("event"),
+    WEBSOCKET_HANDSHAKES_REFUSED,
+    List.of("reason"),
     INBOUND_EMAIL,
     List.of("outcome"),
     CLIENT_ERRORS,

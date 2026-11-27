@@ -27,7 +27,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +83,8 @@ class RealtimeGatewayTest {
   void wireListeners() {
     when(wsThrottler.allowHandshake(any())).thenReturn(true);
     when(wsThrottler.allowEvent(any(), any())).thenReturn(true);
+    when(wsThrottler.allowFailed(any())).thenReturn(true);
+    when(wsThrottler.allowUser(any())).thenReturn(true);
     when(
       messagesStub.withDeadlineAfter(
         org.mockito.ArgumentMatchers.anyLong(),
@@ -179,7 +180,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
+    when(jwtVerifier.identify("tok")).thenReturn(
+      new JwtVerifier.Handshake.Verified(principal)
+    );
     SocketIOClient client = clientWithCookie("access_token=tok");
 
     connectCaptor.getValue().onConnect(client);
@@ -212,7 +215,9 @@ class RealtimeGatewayTest {
         true,
         false
       );
-      when(jwtVerifier.verifyAccess("agent")).thenReturn(Optional.of(agent));
+      when(jwtVerifier.identify("agent")).thenReturn(
+        new JwtVerifier.Handshake.Verified(agent)
+      );
       SocketIOClient client = clientWithCookie("access_token=agent");
 
       connectCaptor.getValue().onConnect(client);
@@ -229,7 +234,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("member")).thenReturn(Optional.of(endUser));
+    when(jwtVerifier.identify("member")).thenReturn(
+      new JwtVerifier.Handshake.Verified(endUser)
+    );
     SocketIOClient member = clientWithCookie("access_token=member");
 
     connectCaptor.getValue().onConnect(member);
@@ -249,7 +256,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
+    when(jwtVerifier.identify("tok")).thenReturn(
+      new JwtVerifier.Handshake.Verified(principal)
+    );
     SocketIOClient client = clientWithCookie("access_token=tok");
 
     connectCaptor.getValue().onConnect(client);
@@ -271,7 +280,9 @@ class RealtimeGatewayTest {
 
   @Test
   void anInvalidOrExpiredTokenIsRefused() {
-    when(jwtVerifier.verifyAccess("bad")).thenReturn(Optional.empty());
+    when(jwtVerifier.identify("bad")).thenReturn(
+      new JwtVerifier.Handshake.Unverified("invalid")
+    );
     SocketIOClient client = clientWithCookie("access_token=bad");
 
     connectCaptor.getValue().onConnect(client);
@@ -282,8 +293,8 @@ class RealtimeGatewayTest {
 
   @Test
   void aRevokedSessionsTokenIsRefusedAtTheHandshake() {
-    when(jwtVerifier.verifyAccess("revoked")).thenReturn(
-      Optional.of(
+    when(jwtVerifier.identify("revoked")).thenReturn(
+      new JwtVerifier.Handshake.Verified(
         new JwtPrincipal(
           "u1",
           "o1",
@@ -382,7 +393,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
+    when(jwtVerifier.identify("tok")).thenReturn(
+      new JwtVerifier.Handshake.Verified(principal)
+    );
     when(presence.onConnect("o1", "u1")).thenReturn("online");
 
     connectCaptor.getValue().onConnect(clientWithCookie("access_token=tok"));
@@ -405,7 +418,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
+    when(jwtVerifier.identify("tok")).thenReturn(
+      new JwtVerifier.Handshake.Verified(principal)
+    );
     // Already `busy`: the connection set nothing. And the state is not read
     // first, since a read taken before another socket's update is stale.
     when(presence.onConnect("o1", "u1")).thenReturn(null);
@@ -427,7 +442,9 @@ class RealtimeGatewayTest {
       true,
       false
     );
-    when(jwtVerifier.verifyAccess("tok")).thenReturn(Optional.of(principal));
+    when(jwtVerifier.identify("tok")).thenReturn(
+      new JwtVerifier.Handshake.Verified(principal)
+    );
 
     connectCaptor.getValue().onConnect(clientWithCookie("access_token=tok"));
 
