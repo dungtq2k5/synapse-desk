@@ -1,5 +1,5 @@
 <!-- markdownlint-disable-next-line MD033 -->
-# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/mark-dark.svg"><img src="docs/assets/readme/mark-light.svg" alt="SynapseDesk logo" width="40" align="center"></picture> SynapseDesk
+# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/mark-dark.svg"><img src="docs/assets/readme/mark-light.svg" alt="SynapseDesk logo" width="40" align="top"></picture> SynapseDesk
 
 An enterprise AI helpdesk: a knowledge base your users can ask questions of, and a ticketing system that takes over when the answer is not in it.
 
