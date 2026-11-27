@@ -203,4 +203,8 @@ export const envValidationSchema = Joi.object({
   // the cost of exhausting this is a retry rather than a lockout.
   WS_HANDSHAKE_LIMIT: Joi.number().required(),
   WS_HANDSHAKE_TTL: Joi.number().required(),
+  WS_HANDSHAKE_FAILED_LIMIT: Joi.number().required(),
+  WS_HANDSHAKE_FAILED_TTL: Joi.number().required(),
+  WS_HANDSHAKE_USER_LIMIT: Joi.number().required(),
+  WS_HANDSHAKE_USER_TTL: Joi.number().required(),
 });

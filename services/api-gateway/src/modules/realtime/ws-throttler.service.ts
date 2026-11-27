@@ -1,111 +1,99 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ThrottlerStorage } from '@nestjs/throttler';
+import type Redis from 'ioredis';
 import { Socket } from 'socket.io';
+import { RedisService } from '../../common/redis/redis.service';
 import { socketIp } from '../../common/utils/client-ip';
 
 /**
- * Flood control for the WebSocket HANDSHAKE.
+ * Counts a key once and starts its window on the first hit, in one step, so a
+ * key can never be left without an expiry. The Java gateway runs the same
+ * script on the same keys, so a client has one budget whichever gateway it
+ * reaches.
+ */
+const COUNT = `local n = redis.call('INCR', KEYS[1])
+if n == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+return n`;
+
+/** A limit: at most `limit` inside each window of `ttlMs`. */
+type Limit = { limit: number; ttlMs: number };
+
+/**
+ * The socket handshake's limits, in layers, each keyed on the best thing
+ * known at its stage, and the per-event limit.
  *
- * `SmartThrottlerGuard` cannot do this: it is an HTTP guard on a route, and a
- * socket handshake is neither. Without something here, `/ws` is the one
- * unmetered entry point in the gateway — and it is the cheapest to abuse, since
- * an unauthenticated connection attempt costs a JWT verification and a Redis
- * round trip before it is refused.
+ * - **Flood ceiling**, before the token is checked: the client IP
+ *   (`ws_handshake:flood:<ip>`). High enough for an office reconnecting
+ *   together.
+ * - **Failed handshakes**: the client IP (`ws_handshake:failed:<ip>`),
+ *   charged only by a handshake with no verified identity (no cookie, a bad
+ *   signature, a malformed token or the wrong key), after the token is
+ *   checked. So a valid user from an address that is forging still connects;
+ *   a verification costs about 0.05 ms, little next to the handshake.
+ * - **Per user**: the verified `sub` (`ws_handshake:user:<sub>`), charged by
+ *   every handshake whose signature verifies, expired or revoked included.
  *
- * **Reuses the injected `ThrottlerStorage`**, which is already the Redis-backed
- * one the HTTP throttler uses. That is the whole design: no second store, no
- * second configuration, and the limit is a property of the SYSTEM rather than
- * of one replica — a per-process counter would be N times the intended budget
- * behind a load balancer, which is the same trap the HTTP tier avoids.
+ * Past any limit the handshake is shed, never blocked: the client retries on
+ * its backoff once the window moves. Nothing the client chooses is in a key.
+ * The counters live in the Redis every replica shares, so the budget is the
+ * system's, not one replica's. A Redis failure allows the handshake, loudly.
  */
 @Injectable()
 export class WsThrottlerService {
   private readonly logger = new Logger(WsThrottlerService.name);
+  private readonly redis: Redis;
+  private readonly flood: Limit;
+  private readonly failed: Limit;
+  private readonly perUser: Limit;
 
-  private readonly LIMIT: number;
-  private readonly TTL: number;
+  constructor(redis: RedisService, config: ConfigService) {
+    this.redis = redis.client;
+    this.flood = {
+      limit: config.getOrThrow<number>('WS_HANDSHAKE_LIMIT'),
+      ttlMs: config.getOrThrow<number>('WS_HANDSHAKE_TTL'),
+    };
+    this.failed = {
+      limit: config.getOrThrow<number>('WS_HANDSHAKE_FAILED_LIMIT'),
+      ttlMs: config.getOrThrow<number>('WS_HANDSHAKE_FAILED_TTL'),
+    };
+    this.perUser = {
+      limit: config.getOrThrow<number>('WS_HANDSHAKE_USER_LIMIT'),
+      ttlMs: config.getOrThrow<number>('WS_HANDSHAKE_USER_TTL'),
+    };
+  }
 
-  constructor(
-    @Inject(ThrottlerStorage) private readonly storage: ThrottlerStorage,
-    configService: ConfigService,
-  ) {
-    this.LIMIT = configService.getOrThrow<number>('WS_HANDSHAKE_LIMIT');
-    this.TTL = configService.getOrThrow<number>('WS_HANDSHAKE_TTL');
+  /** Counts a handshake from this socket's address against the flood ceiling. */
+  allowHandshake(client: Socket): Promise<boolean> {
+    return this.count(
+      `ws_handshake:flood:${socketIp(client)}`,
+      this.flood,
+      'Handshake throttle storage unavailable',
+    );
   }
 
   /**
-   * Returns false if this address is flooding; the caller refuses the socket.
-   *
-   * Keyed on IP, unlike the HTTP tier's per-account keying, and that difference
-   * is forced: at handshake time nothing has been verified yet — the cookie is
-   * an unvalidated string — so there is no identity to key on that an attacker
-   * could not simply invent. IP is the only thing observed rather than claimed.
-   *
-   * The NAT cost is real and accepted here: a whole office shares one budget for
-   * OPENING connections. The limit is sized for that (many per minute, not
-   * five), and exhausting it SHEDS, never blocks: a block duration of 0, so a
-   * refused handshake retries on the client's own backoff and succeeds once the
-   * window moves on. A block would turn a burst into a guaranteed outage: a
-   * switch drops every socket at once, and an office reconnects together.
+   * Counts a handshake that had no verified identity against its address;
+   * false once the address is past the failed-handshake limit.
    */
-  async allowHandshake(client: Socket, gatewayName: string): Promise<boolean> {
-    // The client, not the Ingress: see `socketIp`.
-    const ip = socketIp(client);
-    const key = `ws_handshake:${gatewayName}:${ip}`;
-
-    try {
-      const { totalHits } = await this.storage.increment(
-        key,
-        this.TTL,
-        this.LIMIT,
-        SHED_ONLY,
-        gatewayName,
-      );
-
-      if (totalHits > this.LIMIT) {
-        this.logger.warn(
-          `Handshake flood blocked on [${gatewayName}] from ${ip} (${totalHits} hits)`,
-        );
-        // The caller refuses the socket, telling it why first.
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      // FAIL OPEN, loudly — the same trade `SmartThrottlerGuard` makes. A Redis
-      // outage must not become a total real-time outage; while it lasts the
-      // handshake limit is not enforced, and this log line is the signal that
-      // the protection is off. It must be alerted on.
-      this.logger.error(
-        `Handshake throttle storage unavailable; allowing connection: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return true;
-    }
+  allowFailed(client: Socket): Promise<boolean> {
+    return this.count(
+      `ws_handshake:failed:${socketIp(client)}`,
+      this.failed,
+      'Handshake throttle storage unavailable',
+    );
   }
 
-  /**
-   * Flood control for an authenticated C→S **event**.
-   *
-   * `allowHandshake` above guards only the connection. Every client-to-server
-   * handler needs this too, and `message:send` needs it most: it reaches the
-   * same RPC as `POST /tickets/:id/messages`, so without a limit here the socket
-   * is a rate-limit bypass for the endpoint the HTTP tier carefully throttles.
-   *
-   * **Keyed on the USER, not the IP**, which is the opposite of the handshake
-   * and for a reason that has flipped: by the time a frame arrives the token has
-   * been verified, so there is a real identity to key on — and keying on IP
-   * would make one office share one budget for sending messages, which is the
-   * NAT cost the handshake accepts and a message path should not.
-   *
-   * Returns false rather than throwing, so a caller decides whether to drop
-   * silently (typing) or tell the client (`message:send`). The two want opposite
-   * things: a dropped typing frame is invisible and correct, while a dropped
-   * message needs to surface or the user's text disappears.
-   */
-  async allowEvent(
+  /** Counts a handshake whose signature verified against its user. */
+  allowUser(sub: string): Promise<boolean> {
+    return this.count(
+      `ws_handshake:user:${sub}`,
+      this.perUser,
+      'Handshake throttle storage unavailable',
+    );
+  }
+
+  /** Counts an event from this socket's verified user; one with no user is refused. */
+  allowEvent(
     client: Socket,
     event: string,
     limit: number,
@@ -113,45 +101,35 @@ export class WsThrottlerService {
   ): Promise<boolean> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const subject = (client.data.user as { sub?: string } | undefined)?.sub;
-    // No verified identity means the socket never authenticated. Refused rather
-    // than allowed — the handler would refuse it a line later anyway, and doing
-    // it here keeps an unauthenticated frame from costing a storage round trip.
-    if (!subject) return false;
+    if (!subject) return Promise.resolve(false);
 
-    const key = `ws_event:${event}:${subject}`;
+    return this.count(
+      `ws_event:${event}:${subject}`,
+      { limit, ttlMs },
+      `Event throttle storage unavailable (${event})`,
+    );
+  }
 
+  /** Whether `key` is still within `limit` after this hit. Fails open, loudly. */
+  private async count(
+    key: string,
+    { limit, ttlMs }: Limit,
+    failure: string,
+  ): Promise<boolean> {
     try {
-      const { totalHits } = await this.storage.increment(
-        key,
-        ttlMs,
-        limit,
-        // No real block: exceeding an event limit is ordinary client
-        // behaviour — a held key, a reconnect storm — and locking the user out
-        // for five minutes for typing too fast is a worse product than dropping
-        // the frame.
-        SHED_ONLY,
-        event,
-      );
-
-      return totalHits <= limit;
+      const hits = Number(await this.redis.eval(COUNT, 1, key, ttlMs));
+      return hits <= limit;
     } catch (error) {
-      // FAIL OPEN, like the handshake and the HTTP tier. A Redis outage must not
-      // silently stop message delivery; the log line is the signal that the
-      // limit is off.
-      this.logger.error(
-        `Event throttle storage unavailable; allowing ${event}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.storageFailed(failure, error);
       return true;
     }
   }
-}
 
-/**
- * The block duration that sheds without blocking: 1 ms, not 0. The Redis
- * storage writes the block with `SET … PX <duration>`, and Redis refuses
- * `PX 0`; the script's error then reads as a storage outage, which fails open,
- * so a 0 here meant the limit was never enforced once it was exceeded.
- */
-export const SHED_ONLY = 1;
+  private storageFailed(message: string, error: unknown): void {
+    this.logger.error(
+      `${message}; allowing it: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}

@@ -110,6 +110,13 @@ export class MetricsRegistry {
   readonly websocketEvents: Counter<'event'>;
 
   /**
+   * Socket handshakes refused, by `reason`: one of the three limits (`flood`,
+   * `failed-handshakes`, `per-user`) or `unauthenticated`. What an alert on
+   * the shed would read.
+   */
+  readonly websocketHandshakesRefused: Counter<'reason'>;
+
+  /**
    * Resend inbound-webhook deliveries, by outcome — **one metric, one label,
    * several questions.** Every exit of `ResendInboundService` counts itself
    * once.
@@ -196,6 +203,13 @@ export class MetricsRegistry {
       // `event` and NOT `ticket` — the event names are a fixed enum
       // (`REALTIME_EVENTS`), so the cardinality is the size of that object.
       labelNames: ['event'],
+    });
+
+    this.websocketHandshakesRefused = this.counter({
+      name: 'websocket_handshakes_refused_total',
+      help: 'WebSocket handshakes refused, by reason.',
+      // A fixed set of four, never an address or a user.
+      labelNames: ['reason'],
     });
 
     this.clientErrors = this.counter({

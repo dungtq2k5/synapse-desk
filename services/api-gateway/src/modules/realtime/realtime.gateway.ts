@@ -1,6 +1,6 @@
 import { BeforeApplicationShutdown, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, TokenExpiredError } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   MessageBody,
@@ -69,6 +69,15 @@ import { TicketViewers } from './ticket-viewers.service';
 import { TicketReferences } from '../tickets/ticket-references.service';
 import { socketIp } from '../../common/utils/client-ip';
 
+/** Why a handshake was refused: the label of `websocket_handshakes_refused_total`. */
+type HandshakeRefusal =
+  'flood' | 'failed-handshakes' | 'per-user' | 'unauthenticated';
+
+/** What a handshake's cookie proves; see `RealtimeGateway.identify`. */
+type HandshakeIdentity =
+  | { kind: 'verified' | 'expired'; payload: JwtPayload }
+  | { kind: 'unverified'; reason: string };
+
 /**
  * The gateway's real-time surface.
  *
@@ -133,20 +142,37 @@ export class RealtimeGateway
    */
   async handleConnection(client: Socket): Promise<void> {
     try {
-      if (
-        !(await this.wsThrottler.allowHandshake(client, RealtimeGateway.name))
-      ) {
-        // Refused before auth runs: a socket that is going away costs no
-        // verification.
-        this.refuse(
-          client,
-          CONNECTION_REFUSED_CODES.rateLimited,
-          'Too many connections from this address',
-        );
+      // The limits in layers (see `WsThrottlerService`): the flood ceiling
+      // before any verification, then the failed or the per-user limit by
+      // what the cookie proved.
+      if (!(await this.wsThrottler.allowHandshake(client))) {
+        this.shed(client, 'flood', 'Too many connections from this address');
         return;
       }
 
-      const payload = this.verifyHandshake(client);
+      const identity = this.identify(client);
+      if (identity.kind === 'unverified') {
+        if (!(await this.wsThrottler.allowFailed(client))) {
+          this.shed(
+            client,
+            'failed-handshakes',
+            'Too many connections from this address',
+          );
+          return;
+        }
+        throw new WsException(identity.reason);
+      }
+      // A verified signature, expired or revoked included, is charged to the
+      // user it names, never to the address an office shares.
+      if (!(await this.wsThrottler.allowUser(identity.payload.sub))) {
+        this.shed(client, 'per-user', 'Too many connections for this account');
+        return;
+      }
+      if (identity.kind === 'expired') {
+        throw new WsException('Access token expired');
+      }
+
+      const payload = identity.payload;
       // A signed-out device's socket is refused at the door; one already
       // connected is dropped by `RevokedSocketSweep`.
       if (await this.revokedSessions.isRevoked(payload.sid)) {
@@ -212,12 +238,25 @@ export class RealtimeGateway
       this.logger.warn(
         `Refused socket ${client.id}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      this.metrics.websocketHandshakesRefused.inc({
+        reason: 'unauthenticated',
+      });
       this.refuse(
         client,
         CONNECTION_REFUSED_CODES.unauthenticated,
         'Sign in again',
       );
     }
+  }
+
+  /** Refuses a handshake past one of the limits, counted under that limit. */
+  private shed(
+    client: Socket,
+    reason: Exclude<HandshakeRefusal, 'unauthenticated'>,
+    message: string,
+  ): void {
+    this.metrics.websocketHandshakesRefused.inc({ reason });
+    this.refuse(client, CONNECTION_REFUSED_CODES.rateLimited, message);
   }
 
   /**
@@ -571,16 +610,16 @@ export class RealtimeGateway
   // -------------------------------------------------------------------------
 
   /**
-   * Reads and VERIFIES the access token from the handshake cookie.
-   *
-   * Verification, not decoding: the payload decides which rooms this socket
-   * joins, so an unverified `sub` would let anyone address themselves as
-   * anyone. Same RS256 public key the HTTP guards use — the gateway holds no
-   * signing material and cannot mint what it checks.
+   * Who the handshake's access cookie names, and how far to trust it:
+   * `verified`; `expired` (the signature verified, so the identity is the
+   * server's, though the token can't be used); or `unverified` (no cookie, a
+   * bad signature, a malformed token, the wrong key), with the reason.
    */
-  private verifyHandshake(client: Socket): JwtPayload {
+  private identify(client: Socket): HandshakeIdentity {
     const rawCookie = client.handshake.headers.cookie;
-    if (!rawCookie) throw new WsException('No cookies in handshake');
+    if (!rawCookie) {
+      return { kind: 'unverified', reason: 'No cookies in handshake' };
+    }
 
     const token = rawCookie
       .split(';')
@@ -588,9 +627,25 @@ export class RealtimeGateway
       .find((part) => part.startsWith(`${this.ACCESS_COOKIE_NAME}=`))
       ?.slice(this.ACCESS_COOKIE_NAME.length + 1);
 
-    if (!token) throw new WsException('Access token missing');
+    if (!token) return { kind: 'unverified', reason: 'Access token missing' };
 
-    const payload = this.jwtService.verify<MaybeJwtPayload>(token);
+    let payload: MaybeJwtPayload;
+    try {
+      payload = this.jwtService.verify<MaybeJwtPayload>(token);
+    } catch (error) {
+      // jsonwebtoken checks the signature before the expiry, so an expired
+      // token's claims are ones this gateway's key signed.
+      if (error instanceof TokenExpiredError) {
+        const expired = this.jwtService.decode<MaybeJwtPayload | null>(token);
+        if (expired && isFullJwtPayload(expired)) {
+          return { kind: 'expired', payload: expired };
+        }
+      }
+      return {
+        kind: 'unverified',
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
 
     // A 2FA CHALLENGE token proves a password and nothing else. It is signed by
     // a different keypair so it should already have failed verification — this
@@ -598,10 +653,13 @@ export class RealtimeGateway
     // the same reason: the failure it guards against is a half-authenticated
     // caller holding a full session, which is severe and silent.
     if (!isFullJwtPayload(payload)) {
-      throw new WsException('Two-factor challenge is not complete');
+      return {
+        kind: 'unverified',
+        reason: 'Two-factor challenge is not complete',
+      };
     }
 
-    return payload;
+    return { kind: 'verified', payload };
   }
 
   /** The verified payload this socket authenticated with. */
