@@ -30,6 +30,7 @@ import {
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { MetricsRegistry } from '../metrics/metrics.registry';
 import { ReportClientErrorDto } from './dto/rest/client-error.dto';
+import { requestIp } from '../../common/utils/client-ip';
 
 /**
  * Browser errors, as one log line each: WARN, `"event":"client_error"`.
@@ -59,7 +60,7 @@ export class ClientErrorsController {
       ...ROUTE_THROTTLE.clientErrors,
       // By address only: a report before sign-in has no session to key on.
       getTracker: (request: Record<string, unknown>) =>
-        `ip:${(request as unknown as Request).ip ?? 'unknown'}`,
+        `ip:${requestIp(request as unknown as Request) || 'unknown'}`,
     },
   })
   @UseGuards(OptionalJwtAuthGuard)

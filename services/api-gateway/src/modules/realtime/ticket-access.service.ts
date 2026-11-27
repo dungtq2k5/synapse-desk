@@ -12,6 +12,7 @@ import {
   TicketStatus,
 } from '@synapsedesk/grpc-proto';
 import { JwtPayload } from '@synapsedesk/contracts';
+import { socketIp } from '../../common/utils/client-ip';
 
 /**
  * "May this person watch this ticket?" — asked once, answered once.
@@ -155,7 +156,7 @@ export class TicketAccessService implements OnModuleInit {
             // tenant filter to this lookup as to `GET /tickets/:id`.
             packRequestContext({
               ...caller,
-              ip: client.handshake.address,
+              ip: socketIp(client),
               userAgent:
                 (client.handshake.headers['user-agent'] as string) ?? '',
             }),

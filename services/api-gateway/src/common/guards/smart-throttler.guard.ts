@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { verify } from 'jsonwebtoken';
 import { AUTH_THROTTLER_TIER } from '../config/throttler.config';
 import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
+import { requestIp } from '../utils/client-ip';
 
 /**
  * Routes requests to ONE tier set instead of all of them.
@@ -98,7 +99,7 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
     const userId = req.user?.sub ?? this.subjectFromToken(req);
     if (userId) return Promise.resolve(`user:${userId}`);
 
-    const ip = req.ip ?? 'unknown';
+    const ip = requestIp(req) || 'unknown';
     const account = extractAccountIdentifier(req);
 
     return Promise.resolve(account ? `ip:${ip}|acct:${account}` : `ip:${ip}`);

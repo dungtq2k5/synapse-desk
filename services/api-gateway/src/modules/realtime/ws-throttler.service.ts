@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { Socket } from 'socket.io';
+import { socketIp } from '../../common/utils/client-ip';
 
 /**
  * Flood control for the WebSocket HANDSHAKE.
@@ -49,10 +50,8 @@ export class WsThrottlerService {
    * switch drops every socket at once, and an office reconnects together.
    */
   async allowHandshake(client: Socket, gatewayName: string): Promise<boolean> {
-    // `handshake.address` rather than `client.conn.remoteAddress`: Socket.IO
-    // resolves the former through the `trust proxy` setting Express already
-    // applies, so behind a load balancer it is the real client.
-    const ip = client.handshake.address;
+    // The client, not the Ingress: see `socketIp`.
+    const ip = socketIp(client);
     const key = `ws_handshake:${gatewayName}:${ip}`;
 
     try {

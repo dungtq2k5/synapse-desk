@@ -1,6 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { RequestOrigin, UNKNOWN_ORIGIN } from '@synapsedesk/contracts';
 import { requestOf } from '../utils/execution-request.util';
+import { requestIp } from '../utils/client-ip';
 
 /**
  * The caller's OBSERVED provenance — `{ ip, userAgent }`.
@@ -9,9 +10,9 @@ import { requestOf } from '../utils/execution-request.util';
  * origin never touches the raw Express object, and provenance is read the same
  * way as identity via `@CurrentUser()`.
  *
- * Never populated from the body or a query param: `req.ip` is what the gateway
- * observed, and it is only the true client because `trust proxy` is set in
- * `main.ts`. Accepting a claimed IP would let a caller poison every audit row.
+ * Never populated from the body or a query param: the IP is `requestIp`, the
+ * rightmost `X-Forwarded-For` entry the trusted hop appended. Accepting a
+ * claimed IP would let a caller poison every audit row.
  *
  * Unlike `@CurrentUser()` this needs NO guard — provenance exists for anonymous
  * callers too, which is why login and password-reset can carry it.
@@ -25,7 +26,7 @@ export const CurrentOrigin = createParamDecorator(
     if (!request) return UNKNOWN_ORIGIN;
 
     return {
-      ip: request.ip ?? '',
+      ip: requestIp(request),
       userAgent: request.get('user-agent') ?? '',
     };
   },

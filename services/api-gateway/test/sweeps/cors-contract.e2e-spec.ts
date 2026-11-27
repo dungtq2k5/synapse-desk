@@ -141,6 +141,8 @@ describe('CORS allow-lists cover the client contract', () => {
     precedence: 'a mail header too, read by the same loop guard',
     'access-control-request-method':
       'the browser’s own preflight header, read by the HTTP metrics recorder to leave preflights out; script cannot set it',
+    'x-forwarded-for':
+      'set by the Ingress, which appends the address it saw: `clientIp` reads only that last entry, so nothing a browser sends there is trusted',
     'user-agent':
       'a forbidden header name — the browser sets it and script cannot',
     'content-length':

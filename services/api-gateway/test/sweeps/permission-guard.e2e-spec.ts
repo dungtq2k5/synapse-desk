@@ -56,8 +56,8 @@ describe('PermissionGuard ANY semantics (unit)', () => {
         isEmailVerified: true,
         ...overrides,
       },
-      ip: '203.0.113.1',
       headers: {},
+      socket: { remoteAddress: '203.0.113.1' },
       // `RequestContextService.fromRequest` reads the user-agent through
       // Express's `req.get()`, so a bare object literal is not enough of a
       // request — the guard fails with `req.get is not a function` long before

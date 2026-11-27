@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import Redis from 'ioredis';
 import { connect, JSONCodec, type NatsConnection } from 'nats';
 import { io, type Socket } from 'socket.io-client';
 import { sign } from 'jsonwebtoken';
@@ -48,6 +49,7 @@ describe('realtime across replicas, and the cache', () => {
   let first: Gateway;
   let second: Gateway;
   let nats: NatsConnection;
+  let redis: Redis;
   const sockets: Socket[] = [];
 
   const token = (
@@ -74,6 +76,7 @@ describe('realtime across replicas, and the cache', () => {
     sub: string,
     permissionCodes?: string[],
     isSuperAdmin?: boolean,
+    headers: Record<string, string> = {},
   ) => {
     const socket = io(`${gateway.wsUrl}${REALTIME_SOCKET.namespace}`, {
       transports: ['websocket'],
@@ -81,6 +84,7 @@ describe('realtime across replicas, and the cache', () => {
       forceNew: true,
       extraHeaders: {
         cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(sub, permissionCodes, isSuperAdmin)}`,
+        ...headers,
       },
     });
     sockets.push(socket);
@@ -148,11 +152,13 @@ describe('realtime across replicas, and the cache', () => {
     first = await startGateway(env);
     second = await startGateway(env);
     nats = await connect({ servers: natsUrl });
+    redis = new Redis(redisUrl);
   }, 120_000);
 
   afterAll(async () => {
     for (const socket of sockets) socket.close();
     await nats?.drain();
+    redis?.disconnect();
     await first?.stop();
     await second?.stop();
     await peers?.stop();
@@ -240,6 +246,50 @@ describe('realtime across replicas, and the cache', () => {
       await publishCreated(CAROL);
 
       expect(seen.map((frames) => frames())).toEqual([0, 1]);
+    },
+  );
+
+  rowFor('Tickets')(
+    '**a socket’s IP is the rightmost `X-Forwarded-For` entry** — its handshake budget and its gRPC caller metadata, not the Ingress’s address or a forged leftmost entry',
+    async () => {
+      // A client address no other row uses, so its budget key is this row's.
+      const client = `203.0.113.${(Date.now() % 200) + 20}`;
+      const forged = '198.51.100.77';
+      const ticketId = randomUUID();
+      peers.ticket.on('TicketService/GetTicket').always({
+        id: ticketId,
+        ticketNumber: 9,
+        organizationId: ORGANIZATION,
+        authorId: ALICE,
+        source: 2,
+        status: 1,
+        priority: 2,
+        title: 'Printer is on fire',
+        description: 'It is genuinely on fire',
+        unreadCount: 0,
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
+
+      const socket = await connectClient(first, ALICE, AGENT, false, {
+        'x-forwarded-for': `${forged}, ${client}`,
+      });
+      const joined = new Promise((resolve) =>
+        socket.once(REALTIME_EVENTS.ticketJoined, resolve),
+      );
+      socket.emit(CLIENT_EVENTS.ticketJoin, { ticketId });
+      await joined;
+
+      const budgets = await redis.keys('*ws_handshake:*');
+      expect(budgets.some((key) => key.includes(client))).toBe(true);
+      expect(budgets.some((key) => key.includes(forged))).toBe(false);
+      const calls = peers.ticket
+        .calls('TicketService/GetTicket')
+        .filter((call) => call.request.id === ticketId);
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.map((call) => call.metadata.ip_address)).toEqual(
+        calls.map(() => client),
+      );
     },
   );
 

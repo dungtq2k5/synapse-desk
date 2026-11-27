@@ -47,14 +47,10 @@ async function bootstrap() {
     rawBody: true,
   });
 
-  // CRITICAL FOR PRODUCTION: tells Express to read X-Forwarded-For, which is
-  // what makes `req.ip` the real client rather than the load balancer. Set
-  // immediately, not from a 'listening' handler — everything downstream that
-  // records provenance (device_sessions.ip_address, password_reset_tokens,
-  // audit_logs) is silently wrong if this has not been applied.
-  //
-  // The value is a HOP COUNT: `1` means exactly one trusted proxy. Behind both
-  // an ALB and Nginx it must be 2, or req.ip is Nginx's address.
+  // One trusted proxy hop (the Ingress): Express reads `X-Forwarded-For` for
+  // `req.protocol` and `req.hostname` by it. The client's IP comes from
+  // `clientIp` (`common/utils/client-ip.ts`), which trusts the same one hop for
+  // HTTP and sockets alike; change both together if another proxy is added.
   app.set('trust proxy', 1);
   // First, so it sees every request, refusals included.
   recordHttpMetrics(app);

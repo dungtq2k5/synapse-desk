@@ -32,7 +32,7 @@ describe('WsThrottlerService', () => {
   } as unknown as ConfigService;
 
   const client = {
-    handshake: { address: '10.0.0.1' },
+    handshake: { address: '10.0.0.1', headers: {} },
     data: { user: { sub: 'user-1' } },
     disconnect: jest.fn(),
   } as unknown as Socket;

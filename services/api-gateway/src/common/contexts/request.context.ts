@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import { isFullJwtPayload, RequestContext } from '@synapsedesk/contracts';
+import { requestIp } from '../utils/client-ip';
 
 @Injectable()
 export class RequestContextService {
@@ -20,7 +21,7 @@ export class RequestContextService {
       departmentIds: jwt.departmentIds || [],
       permissionCodes: jwt.permissionCodes || [],
       isEmailVerified: jwt.isEmailVerified,
-      ip: req.ip || '',
+      ip: requestIp(req),
       userAgent: req.get('user-agent') || '',
     };
   }

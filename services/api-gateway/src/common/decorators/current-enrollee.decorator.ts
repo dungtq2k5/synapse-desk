@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { RequestOrigin } from '@synapsedesk/contracts';
+import { requestIp } from '../utils/client-ip';
 
 /**
  * Who is enrolling, plus where from.
@@ -40,7 +41,7 @@ export const CurrentEnrollee = createParamDecorator(
 
     return {
       sub,
-      ip: request.ip ?? '',
+      ip: requestIp(request),
       userAgent: request.get('user-agent') ?? '',
     };
   },

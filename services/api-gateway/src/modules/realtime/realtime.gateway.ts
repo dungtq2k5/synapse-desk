@@ -67,6 +67,7 @@ import { RevokedSessionsService } from '../../common/redis/revoked-sessions.serv
 import { isAgent, orgAgentsRoom } from './agents';
 import { TicketViewers } from './ticket-viewers.service';
 import { TicketReferences } from '../tickets/ticket-references.service';
+import { socketIp } from '../../common/utils/client-ip';
 
 /**
  * The gateway's real-time surface.
@@ -671,7 +672,7 @@ export class RealtimeGateway
   private requestContext(client: Socket, payload: JwtPayload): RequestContext {
     return {
       ...payload,
-      ip: client.handshake.address,
+      ip: socketIp(client),
       userAgent: (client.handshake.headers['user-agent'] as string) ?? '',
     };
   }
